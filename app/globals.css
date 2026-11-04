@@ -1,0 +1,209 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/literata/wght.css";
+@import "@fontsource-variable/golos-text/wght.css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --paper: #f7f3ea;
+  --paper-dot: #d9d2c2;
+  --ink: #2a2620;
+  --ink-soft: #6f685b;
+  --ink-faint: #7a7263;
+  --male: #5c7a82;
+  --female: #b4694f;
+  --neutral: #a39b8b;
+  --line: #bdb4a2;
+  --accent: #a4502e;
+
+  --radius: 0.625rem;
+  --background: #fffdf8;
+  --foreground: var(--ink);
+  --card: #fffdf8;
+  --card-foreground: var(--ink);
+  --popover: #fffdf8;
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: #fffdf8;
+  --secondary: #efe9dc;
+  --secondary-foreground: var(--ink);
+  --muted: #f1ecdf;
+  --muted-foreground: var(--ink-soft);
+  --accent-ui: #efe9dc;
+  --destructive: #a4302e;
+  --border: #e6dfd0;
+  --input: #e0d8c7;
+  --ring: #7a7263;
+}
+
+@theme inline {
+  --font-sans: "Golos Text Variable", ui-sans-serif, sans-serif;
+  --font-serif: "Literata Variable", ui-serif, Georgia, serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent-ui);
+  --color-accent-foreground: var(--foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-rust: var(--accent);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  html, body { height: 100%; }
+  body { @apply bg-paper text-ink font-sans antialiased; font-size: 14px; }
+}
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Canvas */
+.canvas {
+  position: fixed; inset: 0; overflow: hidden; cursor: grab; touch-action: none; user-select: none;
+  background-color: var(--paper);
+  background-image: radial-gradient(var(--paper-dot) 1px, transparent 1.2px);
+  background-size: calc(22px * var(--k, 1)) calc(22px * var(--k, 1));
+  background-position: var(--tx, 0) var(--ty, 0);
+}
+.canvas:active { cursor: grabbing; }
+.canvas input { user-select: text; -webkit-user-select: text; }
+.world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+.world > svg { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.world.animate { transition: transform .45s cubic-bezier(.22, .8, .24, 1); }
+
+/* One line weight, one colour; meaning comes from the dash, explained in the legend. */
+.line, .union { fill: none; stroke: var(--line); stroke-linejoin: round; stroke-linecap: round; transition: opacity .15s, stroke .15s; }
+.line { stroke-width: 1.5; }
+.union { stroke-width: 2.5; stroke: #a79d88; }
+.line-halo { fill: none; stroke: var(--paper); stroke-width: 6; }
+.line.adopted { stroke-dasharray: 8 5; }
+.line.assumed, .union.assumed { stroke-dasharray: 1.5 5; }
+.line-hit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: pointer; }
+.line.hover, .union.hover { stroke: var(--accent); }
+.linkbar { position: absolute; transform: translate(-50%, calc(-100% - 8px)) scale(calc(1 / var(--k, 1))); transform-origin: 50% 100%; display: flex; align-items: center; gap: 2px; padding: 3px; white-space: nowrap; font-size: 12px; z-index: 5; cursor: default; }
+.linkbar select { height: 26px; background: transparent; border-radius: 6px; padding: 0 4px; color: var(--ink); }
+.linkbar-count { color: var(--ink-soft); padding: 0 4px; font-variant-numeric: tabular-nums; }
+.linkbar-del { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 6px; color: var(--ink-soft); }
+.linkbar-del:hover { color: var(--destructive); background: var(--muted); }
+.pcard:focus-visible { outline: none; }
+.pcard:focus-visible .ava { box-shadow: 0 0 0 3px var(--accent), 0 0 0 6px #fffdf8; }
+.world > svg.hits { z-index: 2; }
+.pcard:hover, .pcard:focus-within { z-index: 3; }
+.line-hit.own { cursor: pointer; }
+.line.selected, .union.selected, .focused .line.selected, .focused .union.selected { stroke: var(--accent); stroke-width: 3; opacity: 1; }
+.link-draft { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-dasharray: 7 5; stroke-linecap: round; }
+.pcard.drop-target .ava { box-shadow: 0 0 0 3px var(--accent), 0 0 0 6px #fffdf8, 0 6px 16px 4px rgb(60 45 20 / .25); transform: scale(1.06); }
+.dot { fill: var(--ink); stroke: var(--paper); stroke-width: 2; transition: opacity .15s, r .12s; }
+.dot.open { fill: var(--paper); stroke: var(--ink); stroke-width: 1.5; }
+.dot-hit { fill: transparent; }
+.dot-group.can-add { pointer-events: all; cursor: pointer; }
+.dot-plus { stroke: #fffdf8; stroke-width: 1.5; stroke-linecap: round; opacity: 0; pointer-events: none; }
+.dot-group.can-add:hover .dot { r: 9; fill: var(--accent); stroke: var(--paper); }
+.dot-group.can-add:hover .dot-plus { opacity: 1; }
+.focused .line, .focused .union, .focused .dot { opacity: .45; }
+.focused .hot { opacity: 1; stroke: var(--ink); }
+.focused .dot.hot { fill: var(--accent); stroke: var(--paper); }
+
+.pcard { position: absolute; width: 156px; display: flex; flex-direction: column; align-items: center; text-align: center; cursor: pointer; padding-bottom: 6px; transition: opacity .15s, left .45s cubic-bezier(.22, .8, .24, 1), top .45s cubic-bezier(.22, .8, .24, 1); border-radius: 12px; outline-offset: 2px; }
+.pcard .ava { --ring: var(--neutral); width: 60px; height: 60px; border-radius: 50%; background: #e7dfcd; box-shadow: 0 0 0 2.5px var(--ring), 0 0 0 5px #fffdf8, 0 3px 10px 4px rgb(60 45 20 / .14); overflow: hidden; flex: none; margin-top: 4px; transition: box-shadow .15s, transform .15s; }
+.pcard.sex-M .ava { --ring: var(--male); }
+.pcard.sex-F .ava { --ring: var(--female); }
+.pcard .ava img { width: 100%; height: 100%; object-fit: cover; display: block; -webkit-user-drag: none; }
+.pcard:hover .ava { transform: translateY(-1px); }
+.pcard .nm { font-family: var(--font-serif); font-weight: 560; font-size: 13.5px; line-height: 1.22; margin-top: 9px; padding: 0 6px; color: var(--ink); text-wrap: balance; }
+.pcard .yr { font-size: 11px; color: var(--ink-soft); margin-top: 2px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pcard .rel { font-size: 10.5px; line-height: 1.5; margin-top: 3px; padding: 0 7px; border-radius: 99px; max-width: 150px; }
+.pcard .rel.me { color: var(--accent); }
+.pcard .rel.kin { background: var(--ink); color: #fffdf8; }
+.pcard.dead .ava img { filter: saturate(.5) sepia(.15); }
+.pcard.dead .nm { color: #57503f; }
+.pcard.assumed .ava { outline: 1.5px dashed var(--ink-faint); outline-offset: 6px; }
+.pcard.focus .ava { box-shadow: 0 0 0 3px var(--accent), 0 0 0 6px #fffdf8, 0 6px 16px 4px rgb(60 45 20 / .25); }
+.pcard.isme .nm { color: var(--accent); }
+.focused .pcard.dim { opacity: .42; }
+
+/* Buttons belong to the card: a small fixed share of the avatar at any zoom. Only when very far
+   out do they stop shrinking at 12px on screen, so they can still be hit. */
+.pcard .tools { position: absolute; inset: 0; opacity: 0; transition: opacity .12s; pointer-events: none; --s: max(1, calc(0.667 / var(--k, 1))); --half: calc(9px * var(--s)); }
+.pcard:hover .tools, .pcard:focus-within .tools, .pcard .tools:has([data-state="open"]) { opacity: 1; pointer-events: auto; }
+@media (hover: none) { .pcard.focus .tools { opacity: 1; pointer-events: auto; } }
+.tool { position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: #fffdf8; border: 1px solid var(--line); display: grid; place-items: center; color: var(--ink-soft); box-shadow: 0 1px 2px rgb(60 45 20 / .18); cursor: pointer; transform: scale(var(--s)); }
+.tool svg { display: block; width: 11px; height: 11px; }
+.tool:hover { color: #fffdf8; background: var(--accent); border-color: var(--accent); }
+.tool.top { left: 50%; top: calc(2px - var(--half)); }
+.tool.right { left: calc(50% + 32px + var(--half)); top: 34px; }
+.tool.bottom { left: 50%; top: calc(100% + var(--half)); }
+.tool.more { left: calc(50% - 32px - var(--half)); top: 34px; }
+.tool.more:hover { background: var(--ink); border-color: var(--ink); }
+
+.legend-svg { overflow: visible; }
+.legend-ring { width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid var(--neutral); background: #e7dfcd; display: block; }
+.legend-ring.sex-M { border-color: var(--male); background: #d5dfe0; }
+.legend-ring.sex-F { border-color: var(--female); background: #efdccf; }
+
+.float { background: rgb(255 253 248 / .92); backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 1px 2px rgb(60 45 20 / .06), 0 8px 24px rgb(60 45 20 / .08); }
+.bar-btn { height: 36px; min-width: 36px; padding: 0 9px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: var(--ink-soft); font-size: 13px; cursor: pointer; white-space: nowrap; }
+.bar-btn:hover { background: #efe9dc; color: var(--ink); }
+.bar-btn.on { background: var(--ink); color: #fffdf8; }
+kbd { font: 11px var(--font-sans); color: var(--ink-faint); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+
+[cmdk-input]:focus-visible { outline: none; }
+.inline-input { background: transparent; border-radius: 5px; padding: 1px 5px; margin-left: -5px; width: 100%; outline: none; }
+.inline-input:hover:not(:read-only) { background: #f1ecdf; }
+.inline-input:focus { background: #fff; box-shadow: 0 0 0 1.5px var(--ring); }
+.inline-input::placeholder { color: var(--ink-faint); font-style: italic; }
+
+.panel { position: fixed; top: 12px; right: 12px; bottom: 12px; width: min(480px, calc(100vw - 24px)); background: #fffdf8; border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 2px 6px rgb(60 45 20 / .07), 0 24px 60px rgb(60 45 20 / .16); display: flex; flex-direction: column; overflow: hidden; z-index: 20; animation: panel-in .28s cubic-bezier(.22, .8, .24, 1); transition: width .25s cubic-bezier(.22, .8, .24, 1); }
+.panel.full { width: calc(100vw - 24px); }
+/* Touch screens: tabs and choices are big enough for a finger. */
+@media (pointer: coarse) {
+  [role=tablist] { height: auto; }
+  [role=tab] { min-height: 40px; padding-inline: 12px; }
+  [role=radio] { min-height: 36px; }
+  .pick { min-height: 34px; padding-inline: 12px; }
+  .bar-btn { min-height: 40px; }
+}
+
+/* Narrow windows, or windows that run past the screen edge: the editor becomes a sheet anchored to
+   the left, which stays on screen, and the chart centres in the space above it. */
+@media (max-width: 1200px) {
+  .panel { top: auto; left: 8px; right: 8px; bottom: 8px; width: min(600px, calc(100vw - 16px)); height: 62vh; }
+  .panel.full { top: 8px; left: 8px; right: 8px; bottom: 8px; width: auto; height: auto; }
+}
+@media (max-width: 640px) {
+  .panel { height: 84vh; }
+}
+@keyframes panel-in { from { transform: translateX(24px); opacity: 0; } }
+
+/* Photo tags */
+.tagbox { position: absolute; border: 1.5px solid rgb(255 255 255 / .9); box-shadow: 0 0 0 1px rgb(0 0 0 / .35); border-radius: 4px; opacity: 0; transition: opacity .15s; cursor: pointer; }
+.photo-stage:hover .tagbox, .tagbox.show { opacity: 1; }
+.tagbox .tagname { position: absolute; left: -1px; top: calc(100% + 4px); background: var(--ink); color: #fffdf8; font-size: 11px; padding: 0 6px; border-radius: 4px; white-space: nowrap; }
+.tagbox.suggest { border-style: dashed; border-color: #ffd79c; opacity: 1; }
+
+/* BlockNote: use the app's paper and fonts */
+.bn-container[data-color-scheme], .bn-editor { background: transparent !important; font-family: var(--font-sans) !important; --bn-colors-editor-background: transparent; --bn-colors-editor-text: var(--ink); }
+.bn-block-content[data-content-type="heading"] { font-family: var(--font-serif); }
+.bn-block-content[data-content-type="quote"] { font-family: var(--font-serif); font-style: italic; }
+.mention-chip { background: #efe5d3; border-radius: 5px; padding: 0 5px; color: var(--accent); cursor: pointer; font-weight: 500; }
+.mention-chip:hover { background: #e7d9c0; }
