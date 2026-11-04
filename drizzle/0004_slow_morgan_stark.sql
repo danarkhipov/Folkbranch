@@ -1,0 +1,1 @@
+ALTER TABLE `persons` ADD `sources` text DEFAULT '[]' NOT NULL;

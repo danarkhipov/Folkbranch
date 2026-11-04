@@ -1,6 +1,6 @@
 import { and, eq, or } from 'drizzle-orm'
 import { getDb, schema } from '../db'
-import type { Certainty, Fact, Graph, ParentKind, Person, Sex, UnionKind } from '../types'
+import type { Certainty, Claim, Fact, Graph, ParentKind, Person, Sex, Source, UnionKind } from '../types'
 import { personName, yearOf } from '../types'
 import { translate } from '../i18n'
 import { Actor, Changes, can, mutate, newId, OpError, requireRole } from './core'
@@ -20,12 +20,12 @@ export function hiddenFor(actor: Actor, p: { id: string; living: boolean }) {
 
 export function getGraph(actor: Actor): Graph {
   const db = getDb()
-  const rows = db.select().from(schema.persons).all() as unknown as (Omit<Person, 'tags' | 'facts'> & { tags: string; facts: string })[]
+  const rows = db.select().from(schema.persons).all() as unknown as (Omit<Person, 'tags' | 'facts' | 'sources' | 'claims'> & { tags: string; facts: string; sources: string; claims: string })[]
   return {
     persons: rows.map((r) => {
-      const p = { ...r, tags: JSON.parse(r.tags ?? '[]') as string[], facts: JSON.parse(r.facts ?? '[]') as Fact[] }
+      const p = { ...r, tags: JSON.parse(r.tags ?? '[]') as string[], facts: JSON.parse(r.facts ?? '[]') as Fact[], sources: JSON.parse(r.sources ?? '[]') as Source[], claims: JSON.parse(r.claims ?? '[]') as Claim[] }
       return hiddenFor(actor, p)
-        ? { ...p, givenName: '', surname: '', maidenName: '', patronymic: '', otherNames: '', birthDate: '', birthYear: null, birthPlace: '', deathDate: '', deathPlace: '', sex: 'U' as Sex, avatarMediaId: null, avatarCrop: null, tags: [], facts: [], hidden: true }
+        ? { ...p, givenName: '', surname: '', maidenName: '', patronymic: '', otherNames: '', birthDate: '', birthYear: null, birthPlace: '', deathDate: '', deathPlace: '', sex: 'U' as Sex, avatarMediaId: null, avatarCrop: null, tags: [], facts: [], sources: [], claims: [], hidden: true }
         : p
     }),
     parentChild: db.select().from(schema.parentChild).all() as Graph['parentChild'],
@@ -54,13 +54,17 @@ export interface PersonInput {
   certainty?: Certainty
   tags?: string[]
   facts?: Fact[]
+  sources?: Source[]
+  claims?: Claim[]
 }
 
 function normalize(input: PersonInput) {
-  const { tags, facts, ...rest } = input
+  const { tags, facts, sources, claims, ...rest } = input
   const row: Record<string, unknown> = { ...rest, updatedAt: Date.now() }
   if (tags !== undefined) row.tags = JSON.stringify(tags)
   if (facts !== undefined) row.facts = JSON.stringify(facts)
+  if (sources !== undefined) row.sources = JSON.stringify(sources)
+  if (claims !== undefined) row.claims = JSON.stringify(claims)
   if (input.birthDate !== undefined) row.birthYear = yearOf(input.birthDate)
   if (input.deathDate !== undefined) row.deathYear = yearOf(input.deathDate)
   return row
@@ -151,7 +155,7 @@ export function addUnion(c: Changes, aId: string, bId: string, kind: UnionKind =
 }
 
 const FIELD: Record<string, string> = {
-  givenName: 'Имя', surname: 'Фамилия', maidenName: 'Девичья фамилия', patronymic: 'Отчество', otherNames: 'Другие имена', tags: 'Группа или метка', facts: 'Факты', sex: 'Пол', birthDate: 'Рождение', birthPlace: 'Место рождения',
+  givenName: 'Имя', surname: 'Фамилия', maidenName: 'Девичья фамилия', patronymic: 'Отчество', otherNames: 'Другие имена', tags: 'Группа или метка', facts: 'Факты', sources: 'Источники', claims: 'Версии', sex: 'Пол', birthDate: 'Рождение', birthPlace: 'Место рождения',
   deathDate: 'Смерть', deathPlace: 'Место смерти', living: 'Жив', certainty: 'Уверенность',
 }
 

@@ -28,6 +28,34 @@ export interface Person {
   hidden?: boolean
   tags: string[]
   facts: Fact[]
+  sources: Source[]
+  claims: Claim[]
+}
+
+export type ClaimField = 'birthDate' | 'birthPlace' | 'deathDate' | 'deathPlace' | 'givenName' | 'patronymic' | 'surname' | 'maidenName'
+export type Reliability = 'original' | 'copy' | 'transcript' | 'witness' | 'hearsay' | 'guess'
+
+export interface Claim {
+  id: string
+  field: ClaimField
+  value: string
+  sourceId: string | null
+  status: 'accepted' | 'possible' | 'rejected'
+  /** Why it was rejected. */
+  reason: string
+  at: number
+}
+
+export interface Source {
+  id?: string
+  reliability?: Reliability
+  /** The archive, book or person it comes from. */
+  title: string
+  /** Fond, inventory and file, or any other reference. */
+  ref: string
+  /** Sheet or page. */
+  page: string
+  url: string
 }
 
 export interface Fact {

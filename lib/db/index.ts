@@ -9,6 +9,8 @@ export const DATA_DIR = path.resolve(process.env.DATA_DIR || './data')
 export const MEDIA_DIR = path.join(DATA_DIR, 'media')
 
 function open() {
+  // Tests write freely, so they must never reach the real archive.
+  if (process.env.VITEST && DATA_DIR === path.resolve('./data')) throw new Error('tests must not open ./data')
   fs.mkdirSync(MEDIA_DIR, { recursive: true })
   const sqlite = new Database(path.join(DATA_DIR, 'family.db'))
   sqlite.pragma('journal_mode = WAL')

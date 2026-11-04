@@ -1,13 +1,14 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { beforeAll, describe, expect, it } from 'vitest'
 import sharp from 'sharp'
 import { blocksToMarkdown, markdownToBlocks } from '../lib/markdown'
+import { buildMcpServer } from '../lib/mcp'
 import { parseFamilyText, planFamilyText, serializeFamilyText } from '../lib/textformat'
 import type { Actor } from '../lib/ops/core'
-
-process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'family-api-'))
 
 const owner: Actor = { userId: 'o', name: 'Owner', role: 'owner', personId: null }
 
@@ -215,11 +216,97 @@ describe('text format', () => {
 })
 
 describe('markdown', () => {
+  it('keeps a #tag in the text', () => {
+    const md = 'Служил на флоте [#Флот](tag:)'
+    const inline = markdownToBlocks(md)[0].content as { type: string; props?: Record<string, string> }[]
+    expect(inline[1]).toEqual({ type: 'tag', props: { name: 'Флот' } })
+    expect(blocksToMarkdown(markdownToBlocks(md))).toBe(md)
+  })
+  it('keeps paragraph marks: not checked, and a link to a source', () => {
+    const md = 'Родился в Перми. [не проверено](unverified:) [Метрика](source:abc)'
+    const inline = markdownToBlocks(md)[0].content as { type: string; props?: Record<string, string> }[]
+    expect(inline.map((c) => c.type)).toEqual(['text', 'unverified', 'text', 'citation'])
+    expect(inline[3].props).toEqual({ sourceId: 'abc', label: 'Метрика' })
+    expect(blocksToMarkdown(markdownToBlocks(md))).toBe(md)
+  })
   it('round-trips the blocks a model uses', () => {
     const md = '# Заголовок\nТекст **жирный** и *курсив*, [@Иван](person:abc) и [ссылка](https://e.org)\n- пункт\n1. раз\n2. два\n> цитата\n---\n![подпись](/api/v1/media/x/file)'
     const blocks = markdownToBlocks(md)
     expect(blocks.map((b) => b.type)).toEqual(['heading', 'paragraph', 'bulletListItem', 'numberedListItem', 'numberedListItem', 'quote', 'divider', 'image'])
     expect(blocks[1].content.find((c: any) => c.type === 'mention').props).toEqual({ personId: 'abc', label: 'Иван' })
     expect(blocksToMarkdown(blocks)).toBe(md)
+  })
+})
+
+describe('agents over MCP', () => {
+  const connect = async (actor: Actor) => {
+    const [a, b] = InMemoryTransport.createLinkedPair()
+    await buildMcpServer(actor).connect(a)
+    const client = new Client({ name: 'test', version: '1' })
+    await client.connect(b)
+    const call = async (name: string, args: Record<string, unknown> = {}) => {
+      const r = (await client.callTool({ name, arguments: args })) as { content: { text: string }[]; isError?: boolean }
+      if (r.isError) throw new Error(r.content[0].text)
+      try { return JSON.parse(r.content[0].text) } catch { return r.content[0].text }
+    }
+    return { client, call }
+  }
+
+  it('gives a reader the overview and the gaps, but no writing tools or hidden people', async () => {
+    people.createPerson(owner, { givenName: 'Живой', surname: 'Скрытов', birthDate: '1990' })
+    const { client, call } = await connect(issue('reader'))
+    const names = (await client.listTools()).tools.map((t: { name: string }) => t.name)
+    expect(names).toEqual(expect.arrayContaining(['get_overview', 'find_gaps', 'parse_table', 'search_people']))
+    expect(names).not.toContain('add_version')
+    const o = await call('get_overview')
+    expect(o.you.writes).toBe('not allowed')
+    expect(o.people.hiddenFromYou).toBeGreaterThan(0)
+    expect(JSON.stringify(await call('find_gaps', { limit: 200 }))).not.toContain('Скрытов')
+  })
+
+  it('records a found value as a version with its source, keeping what was there', async () => {
+    const p = people.createPerson(owner, { givenName: 'Версия', surname: 'Проверкина', birthDate: '1923', deathDate: '1990' })
+    const bot = issue('editor', false)
+    const { call } = await connect(bot)
+    await call('add_version', { personId: p.id, field: 'birthDate', value: '1925', source: { title: 'Метрика', ref: 'ф. 1', reliability: 'original' } })
+    const after = (await call('get_person', { id: p.id })).person
+    expect(after.birthDate).toBe('1923')
+    expect(after.claims.map((c: { value: string; status: string }) => [c.value, c.status])).toEqual([['1923', 'accepted'], ['1925', 'possible']])
+    expect(after.sources[0]).toMatchObject({ title: 'Метрика', reliability: 'original' })
+    const gaps = await call('find_gaps', { onlyConflicts: true, limit: 200 })
+    expect(gaps.find((g: { id: string }) => g.id === p.id).conflicts).toEqual(['birthDate'])
+    const v1925 = after.claims[1].id
+    await call('choose_version', { personId: p.id, field: 'birthDate', versionId: v1925 })
+    expect((await call('get_person', { id: p.id })).person.birthDate).toBe('1925')
+    const v1923 = after.claims[0].id
+    await call('reject_version', { personId: p.id, field: 'birthDate', versionId: v1923, reason: 'другой человек' })
+    const last = (await call('get_person', { id: p.id })).person
+    expect(last.claims.find((c: { id: string }) => c.id === v1923)).toMatchObject({ status: 'rejected', reason: 'другой человек' })
+    await expect(call('choose_version', { personId: p.id, field: 'birthDate', versionId: 'nope' })).rejects.toThrow('not found')
+  })
+
+  it('holds a version for review when the token must ask first', async () => {
+    const p = people.createPerson(owner, { givenName: 'Очередь', surname: 'Версий', deathDate: '1990' })
+    const { call } = await connect(issue('editor'))
+    const r = await call('add_version', { personId: p.id, field: 'birthPlace', value: 'Пермь' })
+    expect(r.status).toBe('pending_review')
+    expect(people.getGraph(owner).persons.find((x) => x.id === p.id)!.birthPlace).toBe('')
+  })
+
+  it('turns a table into text an import accepts', async () => {
+    const { call } = await connect(issue('editor'))
+    const r = await call('parse_table', { csv: 'ФИО;Родился;Отец\nТабличный Сын;1950;Табличный Отец\n' })
+    expect(r.columns).toEqual({ ФИО: 'name', Родился: 'birthDate', Отец: 'father' })
+    const plan = await call('preview_text', { text: r.text })
+    expect(plan.errors).toEqual([])
+    expect(plan.creates).toEqual(expect.arrayContaining(['Табличный Сын', 'Табличный Отец']))
+    await expect(call('parse_table', { csv: 'a;b\n1;2\n' })).rejects.toThrow('no name column')
+  })
+
+  it('offers ready prompts, and reads the notes as data', async () => {
+    const { client } = await connect(issue('editor'))
+    expect((await client.listPrompts()).prompts.map((p: { name: string }) => p.name)).toEqual(['research_person', 'fill_gaps', 'import_notes'])
+    const m = await client.getPrompt({ name: 'import_notes', arguments: { notes: 'Анна Белова' } })
+    expect((m.messages[0].content as { text: string }).text).toContain('<notes>')
   })
 })

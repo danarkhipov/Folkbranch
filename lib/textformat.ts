@@ -1,6 +1,7 @@
 // The text form of the graph. Based on Diagrammo's `family` chart: one person per line,
 // `A + B` for a couple, indented lines for their children. Pure code: the browser uses it
 // for the live preview and the server for the real import.
+import { splitPatronymic } from './names'
 import type { Certainty, Graph, ParentKind, Person, Sex } from './types'
 import { personName, yearOf } from './types'
 
@@ -125,7 +126,7 @@ export function parsedToGraph(p: ParsedText): Graph {
   const persons: Person[] = [...p.people.values()].map((t) => ({
     id: t.ref, givenName: t.givenName || t.ref, surname: t.surname, maidenName: t.attrs.maiden ?? '', patronymic: '', otherNames: '', sex: SEX[(t.attrs.sex ?? 'u').toLowerCase()] ?? 'U',
     birthDate: t.attrs.b ?? '', birthYear: yearOf(t.attrs.b ?? ''), birthPlace: t.attrs.bp ?? '', deathDate: t.attrs.d ?? '', deathYear: yearOf(t.attrs.d ?? ''), deathPlace: t.attrs.dp ?? '',
-    living: !t.attrs.d, certainty: (t.attrs.c as Certainty) ?? 'family', avatarMediaId: null, avatarCrop: null, updatedAt: 0, tags: [], facts: [],
+    living: !t.attrs.d, certainty: (t.attrs.c as Certainty) ?? 'family', avatarMediaId: null, avatarCrop: null, updatedAt: 0, tags: [], facts: [], sources: [], claims: [],
   }))
   return {
     persons,
@@ -156,8 +157,10 @@ export function planFamilyText(parsed: ParsedText, graph: Graph, resolutions: Re
   const byId = new Map(graph.persons.map((p) => [p.id, p]))
   const byName = new Map<string, Person[]>()
   for (const p of graph.persons) {
-    const k = norm(personName(p))
-    if (k) byName.set(k, [...(byName.get(k) ?? []), p])
+    // Findable both as "Пётр Иванов" and as "Пётр Сергеевич Иванов".
+    for (const k of new Set([norm(personName(p)), norm([p.givenName, p.patronymic, p.surname].filter(Boolean).join(' '))])) {
+      if (k) byName.set(k, [...(byName.get(k) ?? []), p])
+    }
   }
 
   let tmp = 0
@@ -181,8 +184,9 @@ export function planFamilyText(parsed: ParsedText, graph: Graph, resolutions: Re
       const tempId = `tmp_t${++tmp}`
       ids.set(t.ref, tempId)
       plan.creates.push(`${t.givenName} ${t.surname}`.trim())
+      const [givenName, patronymic] = splitPatronymic(t.givenName)
       plan.ops.push({ op: 'create_person', tempId, args: { person: {
-        givenName: t.givenName, surname: t.surname, sex: SEX[(t.attrs.sex ?? '').toLowerCase()] ?? 'U', maidenName: t.attrs.maiden ?? '',
+        givenName, ...(patronymic ? { patronymic } : {}), surname: t.surname, sex: SEX[(t.attrs.sex ?? '').toLowerCase()] ?? 'U', maidenName: t.attrs.maiden ?? '',
         birthDate: t.attrs.b ?? '', birthPlace: t.attrs.bp ?? '', deathDate: t.attrs.d ?? '', deathPlace: t.attrs.dp ?? '',
         ...(t.attrs.c ? { certainty: t.attrs.c } : {}),
       } } })
@@ -220,6 +224,12 @@ export function planFamilyText(parsed: ParsedText, graph: Graph, resolutions: Re
     plan.ops.push({ op: 'add_relation', args: { type: 'son', to: parent, other: child, kind: l.kind, certainty: l.certainty } })
   }
   return plan
+}
+
+/** One person's line; a value may contain commas, the next key is what ends it. */
+export function serializeNameLine(name: string, attrs: Record<string, string>) {
+  const a = Object.entries(attrs).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(', ')
+  return a ? `${name} ${a}` : name
 }
 
 export function serializeFamilyText(graph: Graph, title = ''): string {

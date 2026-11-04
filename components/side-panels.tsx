@@ -1,8 +1,8 @@
 'use client'
-import { familyWords, peopleWords } from '@/lib/names'
+import { ImportDialog } from './import-dialog'
 import { useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, Check, Copy, Trash2, Undo2, X } from 'lucide-react'
+import { ArrowRight, Check, Copy, Trash2, Undo2, X, Upload } from 'lucide-react'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { api, useApp, useWrite } from '@/lib/client'
@@ -216,12 +216,9 @@ function Archive({ familyName, lang }: { familyName: string; lang: Lang }) {
 }
 
 function DataTab() {
-  const { t, canEdit, lang } = useApp()
+  const { t, canEdit } = useApp()
   const [hide, setHide] = useState(true)
-  const [text, setText] = useState<string | null>(null)
-  const [preview, setPreview] = useState<{ version: string; persons: number; families: number; sample: string[] } | null>(null)
-  const input = useRef<HTMLInputElement>(null)
-  const doImport = useWrite(() => api('gedcom/import', { method: 'POST', body: text! }))
+  const [importing, setImporting] = useState(false)
   return (
     <div className="flex flex-col gap-4 pt-2 text-[13px]">
       <div className="flex items-center gap-3">
@@ -229,24 +226,10 @@ function DataTab() {
         <label className="flex items-center gap-2 text-ink-soft"><input type="checkbox" checked={hide} onChange={(e) => setHide(e.target.checked)} /> {t('Скрыть живых при экспорте')}</label>
       </div>
       {canEdit && (
-        <div className="flex flex-col gap-2">
-          <button className="bar-btn border border-border self-start" onClick={() => input.current?.click()}>{t('Импорт GEDCOM')}</button>
-          <input ref={input} type="file" accept=".ged,.gedcom,text/plain" hidden onChange={async (e) => {
-            const f = e.target.files?.[0]
-            e.target.value = ''
-            if (!f) return
-            const s = await f.text()
-            setText(s)
-            setPreview(await api('gedcom/preview', { method: 'POST', body: s }))
-          }} />
-          {preview && (
-            <div className="rounded-lg bg-muted p-3 flex flex-col gap-2">
-              <p>{t('Будет добавлено')}: <b>{peopleWords(preview.persons, lang)}</b>, <b>{familyWords(preview.families, lang)}</b> <span className="text-ink-faint">(GEDCOM {preview.version})</span></p>
-              <p className="text-xs text-ink-soft truncate">{preview.sample.join(', ')}</p>
-              <button className="bar-btn on self-start" disabled={doImport.isPending || doImport.isSuccess} onClick={() => doImport.mutate()}>{doImport.isSuccess ? <Check size={14} /> : t('Импортировать')}</button>
-            </div>
-          )}
-        </div>
+        <>
+          <button className="bar-btn border border-border self-start" onClick={() => setImporting(true)}><Upload size={14} /> {t('Импорт')}: GEDCOM, Excel, CSV, JSON</button>
+          <ImportDialog open={importing} onOpenChange={setImporting} />
+        </>
       )}
     </div>
   )

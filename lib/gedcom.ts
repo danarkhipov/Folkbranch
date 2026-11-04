@@ -1,5 +1,5 @@
 // GEDCOM 5.5.1 and 7.0: a deterministic parser and writer. No model is involved.
-import type { Fact, Graph, Person } from './types'
+import type { Fact, Graph, Person, Source } from './types'
 import { splitPatronymic } from './names'
 
 /** Facts that have their own GEDCOM tag. Any other kind travels as EVEN with a TYPE. */
@@ -87,7 +87,7 @@ export interface ImportedPerson {
   quality: number | null
   notes: string[]
   facts: Fact[]
-  sources: string[]
+  sources: Source[]
 }
 
 export interface Imported {
@@ -100,6 +100,17 @@ function bestQuality(person: GedLine) {
   const vital = person.children.filter((c) => ['NAME', 'BIRT', 'DEAT'].includes(c.tag))
   const quays = [person, ...vital].flatMap((l) => l.children.filter((c) => c.tag === 'SOUR')).map((s) => val(s, 'QUAY')).filter((q) => /^[0-3]$/.test(q)).map(Number)
   return quays.length ? Math.max(...quays) : null
+}
+
+/** PAGE holds "ref, л. 12" here: a reference and a sheet, split where we can tell them apart. */
+function pageOf(v: string) {
+  const m = v.match(/^(.*?)(?:,\s*)?(?:л\.|лист|p\.|page)\s*(\S+)$/i)
+  return m ? { ref: m[1], page: m[2] } : { ref: v, page: '' }
+}
+
+function uniqueSources(list: Source[]) {
+  const seen = new Set<string>()
+  return list.filter((s) => { const k = JSON.stringify(s); return !seen.has(k) && !!seen.add(k) })
 }
 
 export function parseGedcom(text: string, lang: 'ru' | 'en' = 'ru'): Imported {
@@ -147,7 +158,7 @@ export function parseGedcom(text: string, lang: 'ru' | 'en' = 'ru'): Imported {
           return { kind: val(c, 'TYPE') || FACT_TAGS[c.tag]?.[lang === 'en' ? 1 : 0] || (lang === 'en' ? 'Event' : 'Событие'), date: fromGedDate(val(c, 'DATE')), place: val(c, 'PLAC'), note, source: source ? sourceTitles.get(source.value) ?? source.value : '' }
         }),
       // Citations on an event stay with its fact; the rest are about the person.
-      sources: [...new Set([...r.children, ...r.children.filter((c) => c.tag !== 'EVEN' && !(c.tag in FACT_TAGS)).flatMap((c) => c.children)].filter((c) => c.tag === 'SOUR').map((c) => sourceTitles.get(c.value) ?? c.value).filter(Boolean))],
+      sources: uniqueSources([...r.children, ...r.children.filter((c) => c.tag !== 'EVEN' && !(c.tag in FACT_TAGS)).flatMap((c) => c.children)].filter((c) => c.tag === 'SOUR').map((c) => ({ title: sourceTitles.get(c.value) ?? c.value, ...pageOf(val(c, 'PAGE')), url: val(c, 'WWW') || val(c, 'NOTE') })).filter((s) => s.title)),
     }
   })
 
@@ -220,6 +231,12 @@ export function writeGedcom(graph: Graph, opts: { hideLiving: boolean; source: s
         if (p.deathPlace) out.push(`2 PLAC ${p.deathPlace}`)
       }
       for (const f of p.facts) out.push(...factLines(f))
+      for (const s of p.sources) {
+        out.push(`1 SOUR ${s.title}`)
+        const page = [s.ref, s.page && `л. ${s.page}`].filter(Boolean).join(', ')
+        if (page) out.push(`2 PAGE ${page}`)
+        if (s.url) out.push(`2 NOTE ${s.url}`)
+      }
     }
     famList.forEach((f, i) => {
       if (f.a === p.id || f.b === p.id) out.push(`1 FAMS ${famRef(i)}`)
