@@ -1,0 +1,5 @@
+#!/bin/sh
+# Runs a server command inside the running app, for example: ./family token create --name my-agent
+cd "$(dirname "$0")" || exit 1
+[ -t 0 ] && [ -t 1 ] && exec docker compose exec family node family.mjs "$@"
+exec docker compose exec -T family node family.mjs "$@"

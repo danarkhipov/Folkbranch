@@ -8,3 +8,4 @@ next-env.d.ts
 !.env.example
 *.ged
 .claude/
+START_PROMPT.md

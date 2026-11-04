@@ -186,6 +186,8 @@ export const apiTokens = sqliteTable('api_tokens', {
   createdAt: integer('created_at').notNull(),
   lastUsedAt: integer('last_used_at'),
   revokedAt: integer('revoked_at'),
+  // A token for one job can end by itself. Null means it lasts until revoked.
+  expiresAt: integer('expires_at'),
 })
 
 // One open draft per token collects its operations until a person accepts or rejects it.
