@@ -10,12 +10,12 @@ const primary = 'h-10 rounded-lg bg-ink text-white disabled:opacity-40'
 
 const post = (url: string, body: unknown) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
 
-export function SetupScreen({ needsCode }: { needsCode: boolean }) {
+export function SetupScreen({ needsCode, initialCode = '' }: { needsCode: boolean; initialCode?: string }) {
   const [lang, setLang] = useState<Lang>('ru')
   const t = (k: string) => translate(lang, k)
   const [name, setName] = useState('')
   const [familyName, setFamilyName] = useState('')
-  const [code, setCode] = useState('')
+  const [code, setCode] = useState(initialCode)
   const [demo, setDemo] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')

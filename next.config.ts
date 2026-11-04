@@ -7,7 +7,14 @@ const config: NextConfig = {
   transpilePackages: ['@blocknote/core', '@blocknote/react', '@blocknote/mantine'],
   async headers() {
     // The archive is private: search engines stay out of every route.
-    return [{ source: '/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }, { key: 'X-Content-Type-Options', value: 'nosniff' }] }]
+    return [{ source: '/:path*', headers: [
+      { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'Referrer-Policy', value: 'no-referrer' },
+      { key: 'X-Frame-Options', value: 'DENY' },
+      { key: 'Content-Security-Policy', value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" },
+      { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+    ] }]
   },
 }
 export default config

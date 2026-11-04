@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -235,6 +236,45 @@ describe('markdown', () => {
     expect(blocks.map((b) => b.type)).toEqual(['heading', 'paragraph', 'bulletListItem', 'numberedListItem', 'numberedListItem', 'quote', 'divider', 'image'])
     expect(blocks[1].content.find((c: any) => c.type === 'mention').props).toEqual({ personId: 'abc', label: 'Иван' })
     expect(blocksToMarkdown(blocks)).toBe(md)
+  })
+})
+
+describe('tokens', () => {
+  it('stop working when they expire or are revoked', () => {
+    const live = tokens.createToken(owner, { name: 'live', role: 'reader', review: true, expiresInDays: 30 })
+    expect(tokens.actorFromToken(live.token)).toBeTruthy()
+    const past = tokens.createToken(owner, { name: 'past', role: 'reader', review: true, expiresInDays: 1 })
+    db.getDb().update(db.schema.apiTokens).set({ expiresAt: Date.now() - 1000 }).where(eq(db.schema.apiTokens.id, past.id)).run()
+    expect(tokens.actorFromToken(past.token)).toBeNull()
+    tokens.revokeToken(owner, live.id)
+    expect(tokens.actorFromToken(live.token)).toBeNull()
+    expect(tokens.actorFromToken('fg_made_up')).toBeNull()
+  })
+})
+
+describe('every read tool, as a reader', () => {
+  it('never shows a living relative, however it is asked', async () => {
+    const secret = 'Секретова'
+    const alive = people.createPerson(owner, { givenName: 'Живая', surname: secret, birthDate: '1990', birthPlace: 'Тайноград' })
+    people.updatePerson(owner, alive.id, { patronymic: 'Скрытовна', otherNames: 'Псевдоним', tags: ['Тайнагруппа'], facts: [{ kind: 'Служба', date: '', place: 'Тайноград', note: 'тайна' }], sources: [{ title: 'Тайноисточник', ref: '', page: '', url: '' }] })
+    const dead = people.createPerson(owner, { givenName: 'Умерший', surname: 'Открытов', birthDate: '1880', deathDate: '1950' })
+    const page = pages.createPage(owner, { personId: alive.id, title: 'Страница', content: [{ type: 'paragraph', content: [{ type: 'text', text: secret, styles: {} }] }] })
+    const [a, b] = InMemoryTransport.createLinkedPair()
+    await buildMcpServer(issue('reader')).connect(a)
+    const client = new Client({ name: 'test', version: '1' })
+    await client.connect(b)
+    const calls: [string, Record<string, unknown>][] = [
+      ['get_overview', {}], ['find_gaps', { limit: 200 }], ['search_people', { query: secret }], ['search_people', { query: '', limit: 500 }], ['get_person', { id: alive.id }], ['get_relatives', { id: alive.id }], ['get_relatives', { id: dead.id }],
+      ['how_related', { from: dead.id, to: alive.id }], ['list_pages', { personId: alive.id }], ['get_page', { id: page.id }], ['list_photos', {}], ['list_photos', { personId: alive.id }], ['export_text', {}], ['export_gedcom', { hideLiving: false }], ['get_history', { limit: 200 }],
+    ]
+    for (const [name, args] of calls) {
+      const r = (await client.callTool({ name, arguments: args })) as { content: { text: string }[]; isError?: boolean }
+      const text = r.content[0].text
+      // Asking about a hidden person by id may only ever end in "not found"; anything else must work.
+      if (r.isError) expect(text, name).toMatch(/not found/)
+      if (r.isError) expect(JSON.stringify(args), `${name}: ${text}`).toMatch(new RegExp(`${alive.id}|${page.id}`))
+      for (const word of [secret, 'Скрытовна', 'Псевдоним', 'Тайнагруппа', 'Тайноград', 'Тайноисточник']) expect(text, `${name} shows ${word}`).not.toContain(word)
+    }
   })
 })
 

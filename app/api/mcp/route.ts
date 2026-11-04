@@ -13,4 +13,7 @@ async function handle(req: Request) {
   return transport.handleRequest(req)
 }
 
-export { handle as GET, handle as POST, handle as DELETE }
+// Stateless means no stream to hold open and no session to end; an idle GET would otherwise hang.
+const notHere = () => new Response(null, { status: 405, headers: { Allow: 'POST' } })
+
+export { handle as POST, notHere as GET, notHere as DELETE }

@@ -59,7 +59,7 @@ export function ReviewPanel({ onClose }: { onClose: () => void }) {
   )
 }
 
-interface TokenRow { id: string; name: string; role: 'reader' | 'editor'; review: boolean; lastUsedAt: number | null; revokedAt: number | null }
+interface TokenRow { id: string; name: string; role: 'reader' | 'editor'; review: boolean; lastUsedAt: number | null; revokedAt: number | null; expiresAt: number | null }
 
 type Client = 'claude' | 'json' | 'prompt'
 const CLIENTS: Record<Client, string> = { claude: 'Claude Code', json: 'Cursor и другие', prompt: 'Задание агенту' }
@@ -71,6 +71,7 @@ export function TokensTab() {
   const [name, setName] = useState('')
   const [role, setRole] = useState<'reader' | 'editor'>('reader')
   const [review, setReview] = useState(true)
+  const [days, setDays] = useState('')
   const [made, setMade] = useState('')
   const [copied, setCopied] = useState(false)
   const refresh = () => qc.invalidateQueries({ queryKey: ['tokens'] })
@@ -87,7 +88,7 @@ export function TokensTab() {
       <form className="flex flex-col gap-2" onSubmit={async (e) => {
         e.preventDefault()
         if (!name.trim()) return
-        const r = await api<{ token: string }>('tokens', { json: { name: name.trim(), role, review } })
+        const r = await api<{ token: string }>('tokens', { json: { name: name.trim(), role, review, expiresInDays: days ? Number(days) : null } })
         setMade(r.token)
         setCopied(false)
         setName('')
@@ -98,6 +99,12 @@ export function TokensTab() {
           <select className="h-9 rounded-lg border border-input bg-white px-2" value={role} onChange={(e) => setRole(e.target.value as 'reader' | 'editor')}>
             <option value="reader">{t('только чтение')}</option>
             <option value="editor">{t('редактор')}</option>
+          </select>
+          <select aria-label={t('Срок действия')} className="h-9 rounded-lg border border-input bg-white px-2" value={days} onChange={(e) => setDays(e.target.value)}>
+            <option value="">{t('бессрочно')}</option>
+            <option value="1">{t('на день')}</option>
+            <option value="30">{t('на месяц')}</option>
+            <option value="365">{t('на год')}</option>
           </select>
           <button className="h-9 px-3 rounded-lg bg-ink text-white whitespace-nowrap disabled:opacity-40" disabled={!name.trim()}>{t('Создать токен')}</button>
         </div>
@@ -121,6 +128,7 @@ export function TokensTab() {
             <span className="text-xs text-ink-faint whitespace-nowrap">
               {t(r.role === 'reader' ? 'только чтение' : r.review ? 'Правки через проверку' : 'Правит сразу')}
               {r.lastUsedAt ? ` · ${t('последнее использование')} ${fmt.format(r.lastUsedAt)}` : ''}
+              {r.expiresAt ? ` · ${t(r.expiresAt < Date.now() ? 'истёк' : 'действует до')} ${fmt.format(r.expiresAt)}` : ''}
             </span>
             {r.revokedAt ? <span className="text-xs text-ink-faint">{t('Отозван')}</span> : <button className="text-xs text-ink-soft hover:text-destructive" onClick={async () => { await api(`tokens/${r.id}`, { method: 'DELETE' }); refresh() }}>{t('Отозвать')}</button>}
           </div>

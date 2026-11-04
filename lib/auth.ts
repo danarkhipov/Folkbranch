@@ -12,6 +12,7 @@ import { z } from 'zod'
 import { DATA_DIR, getDb, schema } from './db'
 import { findInvite, findOwnerId, hasUsers, isRecoveryToken, setSetting } from './ops/settings'
 import { loadDemo } from './demo'
+import { setupCodeMatches } from './setup-code'
 
 function secret() {
   if (process.env.BETTER_AUTH_SECRET) return process.env.BETTER_AUTH_SECRET
@@ -52,7 +53,7 @@ const familyAccess = () =>
       }, async (ctx) => {
         if (hasUsers()) throw new APIError('FORBIDDEN', { message: 'already set up' })
         // On a public host, SETUP_TOKEN stops a stranger from claiming the empty instance.
-        if (process.env.SETUP_TOKEN && ctx.body.code !== process.env.SETUP_TOKEN) throw new APIError('FORBIDDEN', { message: 'wrong setup code' })
+        if (!setupCodeMatches(ctx.body.code)) throw new APIError('FORBIDDEN', { message: 'wrong setup code' })
         const u = await createFamilyUser(ctx, ctx.body.name, 'owner', null)
         setSetting('familyName', ctx.body.familyName)
         setSetting('language', ctx.body.language)

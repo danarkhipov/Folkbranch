@@ -192,7 +192,7 @@ export function buildMcpServer(actor: Actor) {
   // A read-only token is not even shown the writing tools.
   if (actor.role !== 'reader') {
     for (const [name, d] of Object.entries(OPS)) {
-      server.registerTool(name, { description: d.description, inputSchema: d.input as z.ZodObject }, async (args: unknown) => {
+      server.registerTool(name, { description: d.description, inputSchema: d.input as z.ZodObject, annotations: { readOnlyHint: false, destructiveHint: /^(delete|remove|untag|undo|reject)_?/.test(name), openWorldHint: name === 'upload_photo' } }, async (args: unknown) => {
         try {
           return ok(await dispatch(actor, name, args))
         } catch (e) {

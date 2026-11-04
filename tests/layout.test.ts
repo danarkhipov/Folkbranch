@@ -65,7 +65,7 @@ describe('chart conventions', () => {
 
 describe('layoutFamily', () => {
   it('keeps bars out of tall captions, whichever way the tree grows', () => {
-    const long = { givenName: 'Екатерина Ивановна', surname: 'Волынкина' }
+    const long = { givenName: 'Екатерина Ивановна', surname: 'Лесная' }
     const g = graph(['a', 'b', 'c'], [['a', 'c'], ['b', 'c']], [['a', 'b']])
     const tall = { ...g, persons: g.persons.map((p) => ({ ...p, ...long })) }
     for (const rootsBelow of [false, true]) {

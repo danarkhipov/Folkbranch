@@ -1,6 +1,33 @@
+# ./install.sh writes .env and starts this. Add --profile https for automatic certificates.
 services:
   family:
     build: .
-    ports: ["3000:3000"]
-    volumes: ["./data:/data"]
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "${BIND:-127.0.0.1}:${PORT:-3000}:3000"
+    volumes:
+      - family-data:/data
+    environment:
+      PORT: "3000"
     restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    profiles: [https]
+    depends_on: [family]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    restart: unless-stopped
+
+volumes:
+  family-data:
+  caddy-data:

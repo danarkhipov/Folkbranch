@@ -1,0 +1,34 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm test
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The image builds and answers
+        run: |
+          docker build -t folkbranch .
+          docker run -d --name family -p 3000:3000 folkbranch
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:3000/api/health && docker exec family node family.mjs doctor && exit 0; sleep 2; done
+          docker logs family
+          exit 1

@@ -1,6 +1,7 @@
 {
   "name": "folkbranch",
   "version": "0.1.0",
+  "description": "A self-hosted family tree with Notion-style pages, shared editing and MCP access for AI agents",
   "private": true,
   "license": "AGPL-3.0-only",
   "scripts": {
