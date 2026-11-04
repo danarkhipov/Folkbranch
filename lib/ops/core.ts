@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { and, desc, eq } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { getDb, schema } from '../db'
@@ -11,7 +12,12 @@ export interface Actor {
   /** Set when the caller is an API token rather than a signed-in person. */
   tokenId?: string
   review?: boolean
+  /** The app's built-in assistant, acting for this person. */
+  assistant?: boolean
 }
+
+/** Sees only people who have died: a reader, or a model the data would be sent to. */
+export const seesOnlyPublic = (a: Actor) => a.role === 'reader'
 
 export class OpError extends Error {
   constructor(public status: number, message: string) {
@@ -59,8 +65,10 @@ export class Changes {
     const before = this.get(table, id)
     if (!before) throw new OpError(404, 'not found')
     this.db.update(TRACKED[table]).set(patch as never).where(eq(TRACKED[table].id, id)).run()
-    const after = this.get(table, id)
-    this.list.push({ table, id, before, after })
+    const after = this.get(table, id)!
+    // History keeps only what changed: undo needs no more, and a page's text is not stored again for a new title.
+    const fields = changedFields(before, after)
+    if (fields.length) this.list.push({ table, id, before: pick(before, ['id', ...fields]), after: pick(after, ['id', ...fields]) })
     return after as never
   }
 
@@ -77,6 +85,16 @@ export class Changes {
 }
 
 export const newId = () => nanoid(12)
+
+const pick = (row: Row, fields: string[]) => Object.fromEntries(fields.map((k) => [k, row[k]])) as Row
+const changedFields = (before: Row, after: Row) => Object.keys(before).filter((k) => before[k] !== after[k])
+/** Two people can be linked once, so a link cannot return when it was made again meanwhile. */
+function pairTaken(table: Tracked, row: Row) {
+  const db = getDb()
+  if (table === 'parentChild') return !!db.select({ id: schema.parentChild.id }).from(schema.parentChild).where(and(eq(schema.parentChild.parentId, row.parentId as string), eq(schema.parentChild.childId, row.childId as string))).get()
+  if (table === 'unions') return !!db.select({ id: schema.unions.id }).from(schema.unions).where(and(eq(schema.unions.aId, row.aId as string), eq(schema.unions.bId, row.bId as string))).get()
+  return false
+}
 
 interface Meta {
   summary: string
@@ -117,16 +135,38 @@ export function mutateGroup<T>(actor: Actor, summary: string, fn: () => T): { re
   })
 }
 
+const historyScope = new AsyncLocalStorage<{ id: string | null }>()
+
+/** Runs one call and says which history entry it made, even with other calls running beside it. */
+export async function withHistoryScope<T>(fn: () => T | Promise<T>) {
+  const scope = { id: null as string | null }
+  const result = await historyScope.run(scope, fn)
+  return { result, historyId: scope.id }
+}
+
 function writeHistory(actor: Actor, meta: Meta, changes: Change[], undoOf?: string): string {
+  const id = recordHistory(actor, meta, changes, undoOf)
+  const scope = historyScope.getStore()
+  if (scope) scope.id = id
+  return id
+}
+
+function recordHistory(actor: Actor, meta: Meta, changes: Change[], undoOf?: string): string {
   const db = getDb()
   const now = Date.now()
   if (meta.key) {
-    const last = db.select().from(schema.history)
-      .where(and(eq(schema.history.key, meta.key), eq(schema.history.userId, actor.userId)))
-      .orderBy(desc(schema.history.at)).limit(1).get()
-    if (last && !last.undoneAt && now - last.at < COALESCE_MS) {
+    // Only onto the newest entry: merging past somebody else's edit would take it along on undo.
+    const last = db.select().from(schema.history).orderBy(desc(schema.history.at)).limit(1).get()
+    // The assistant's edits stay apart: undoing one answer must not take the person's own edit along.
+    if (!actor.assistant && last && !last.actorName.includes('→') && last.key === meta.key && last.userId === actor.userId && (last.tokenId ?? undefined) === actor.tokenId && !last.undoneAt && now - last.at < COALESCE_MS) {
       const prev = JSON.parse(last.changes) as Change[]
-      const merged = changes.map((ch) => ({ ...ch, before: prev.find((p) => p.id === ch.id)?.before ?? ch.before }))
+      const merged = [
+        ...prev.filter((p) => !changes.some((ch) => ch.table === p.table && ch.id === p.id)),
+        ...changes.map((ch) => {
+          const p = prev.find((x) => x.table === ch.table && x.id === ch.id)
+          return p ? { ...ch, before: p.before && ch.before ? { ...ch.before, ...p.before } : p.before, after: ch.after && { ...p.after, ...ch.after } } : ch
+        }),
+      ]
       db.update(schema.history).set({ at: now, changes: JSON.stringify(merged) }).where(eq(schema.history.id, last.id)).run()
       return last.id
     }
@@ -178,10 +218,14 @@ export function undo(actor: Actor, historyId: string, summary: string) {
       if (!ch.before) c.remove(ch.table, ch.id)
       else if (!ch.after) {
         const exists = db.select({ id: TRACKED[ch.table].id }).from(TRACKED[ch.table]).where(eq(TRACKED[ch.table].id, ch.id)).get()
-        if (!exists) c.insert(ch.table, ch.before)
+        if (!exists && !pairTaken(ch.table, ch.before)) c.insert(ch.table, ch.before)
       } else {
-        const exists = db.select({ id: TRACKED[ch.table].id }).from(TRACKED[ch.table]).where(eq(TRACKED[ch.table].id, ch.id)).get()
-        if (exists) c.update(ch.table, ch.id, ch.before)
+        const now = db.select().from(TRACKED[ch.table]).where(eq(TRACKED[ch.table].id, ch.id)).get() as Row | undefined
+        if (!now) continue
+        // Only what this entry changed goes back, and only if nobody has changed it since.
+        const fields = changedFields(ch.before, ch.after).filter((k) => k !== 'updatedAt')
+        if (fields.some((k) => now[k] !== ch.after![k])) throw new OpError(409, 'changed later: undo the newer edit first')
+        if (fields.length) c.update(ch.table, ch.id, { ...pick(ch.before, fields), ...('updatedAt' in now ? { updatedAt: Math.max(Date.now(), (now.updatedAt as number) + 1) } : {}) })
       }
     }
     purgeOrphans(c)

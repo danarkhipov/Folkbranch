@@ -12,18 +12,8 @@ import { z } from 'zod'
 import { DATA_DIR, getDb, schema } from './db'
 import { findInvite, findOwnerId, hasUsers, isRecoveryToken, setSetting } from './ops/settings'
 import { loadDemo } from './demo'
+import { serverSecret } from './server-secret'
 import { setupCodeMatches } from './setup-code'
-
-function secret() {
-  if (process.env.BETTER_AUTH_SECRET) return process.env.BETTER_AUTH_SECRET
-  // Zero-config install: the secret lives next to the data it protects.
-  const file = path.join(DATA_DIR, 'auth-secret')
-  if (!fs.existsSync(file)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true })
-    fs.writeFileSync(file, randomBytes(32).toString('hex'), { mode: 0o600 })
-  }
-  return fs.readFileSync(file, 'utf8')
-}
 
 function baseURL() {
   if (process.env.BETTER_AUTH_URL) return process.env.BETTER_AUTH_URL
@@ -115,10 +105,11 @@ function build() {
       })]
     : []
   return betterAuth({
-    secret: secret(),
+    secret: serverSecret(),
     baseURL: baseURL(),
     database: drizzleAdapter(getDb(), { provider: 'sqlite', schema }),
-    session: { expiresIn: 365 * 24 * 3600, updateAge: 7 * 24 * 3600 },
+    // Stays alive while in use; a lost phone stops working after three months without it.
+    session: { expiresIn: 90 * 24 * 3600, updateAge: 24 * 3600 },
     // Invited relatives have no real email, so Google or Yandex is linked from a signed-in session.
     account: { accountLinking: { enabled: true, allowDifferentEmails: true } },
     user: {

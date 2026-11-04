@@ -12,7 +12,7 @@ export async function api<T = any>(path: string, init?: { method?: string; json?
     headers: init?.json !== undefined ? { 'Content-Type': 'application/json' } : undefined,
     body: init?.json !== undefined ? JSON.stringify(init.json) : init?.body,
   })
-  if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? res.statusText)
+  if (!res.ok) throw Object.assign(new Error((await res.json().catch(() => null))?.error ?? res.statusText), { status: res.status })
   return res.json()
 }
 
@@ -56,6 +56,10 @@ export function useWrite<V = void, R = unknown>(fn: (v: V) => Promise<R>, also: 
     },
   })
 }
+
+/** Why an undo was refused, in words a person can act on. */
+export const undoFailure = (e: unknown, t: (key: string) => string) =>
+  (e as { status?: number }).status === 409 ? t('Это уже изменили позже. Сначала отмените более новую правку') : `${t('Не удалось сохранить')}: ${(e as Error).message}`
 
 /** The person's photo, or a drawn portrait when there is none. */
 export const avatarUrl = (p: Person) => (p.avatarMediaId ? `/api/v1/persons/${p.id}/avatar?v=${p.updatedAt}` : drawnAvatar(p))

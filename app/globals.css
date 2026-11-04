@@ -10,11 +10,11 @@
   --paper-dot: #d9d2c2;
   --ink: #2a2620;
   --ink-soft: #6f685b;
-  --ink-faint: #7a7263;
+  --ink-faint: #6b6455;
   --male: #5c7a82;
   --female: #b4694f;
-  --neutral: #a39b8b;
-  --line: #bdb4a2;
+  --neutral: #8a8272;
+  --line: #948b7a;
   --accent: #a4502e;
 
   --radius: 0.625rem;
@@ -75,7 +75,10 @@
   body { @apply bg-paper text-ink font-sans antialiased; font-size: 14px; }
 }
 
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Where someone types, the caret is the sign of focus; a frame around text only gets in the way. */
+:focus-visible:not(input, textarea, select, [contenteditable]) { outline: 2px solid var(--accent); outline-offset: 2px; }
+input:focus-visible, textarea:focus-visible, select:focus-visible, [contenteditable]:focus-visible { outline: none; }
+.border-input:focus, .border-input:focus-visible { border-color: color-mix(in oklab, var(--ink) 40%, var(--border)); }
 
 /* Canvas */
 .canvas {
@@ -87,6 +90,10 @@
 }
 .canvas:active { cursor: grabbing; }
 .canvas input { user-select: text; -webkit-user-select: text; }
+/* Not inherited, or each frame of a pan would restyle every card on the chart. */
+@property --tx { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --ty { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --k { syntax: '<number>'; inherits: false; initial-value: 1; }
 .world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
 .world > svg { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
 .world.animate { transition: transform .45s cubic-bezier(.22, .8, .24, 1); }
@@ -130,9 +137,9 @@
 .pcard.sex-F .ava { --ring: var(--female); }
 .pcard .ava img { width: 100%; height: 100%; object-fit: cover; display: block; -webkit-user-drag: none; }
 .pcard:hover .ava { transform: translateY(-1px); }
-.pcard .nm { max-width: 136px; text-wrap: balance; font-family: var(--font-serif); font-weight: 560; font-size: 13.5px; line-height: 1.22; padding: 0 6px; color: var(--ink); text-wrap: balance; }
-.pcard .yr { font-size: 11px; color: var(--ink-soft); margin-top: 2px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.pcard .rel { font-size: 10.5px; line-height: 1.5; margin-top: 3px; padding: 0 7px; border-radius: 99px; max-width: 150px; }
+.pcard .nm { width: max-content; max-width: 150px; text-wrap: balance; font-family: var(--font-serif); font-weight: 560; font-size: calc(13.5px * var(--lbl, 1)); line-height: 1.22; padding: 0 6px; color: var(--ink); text-wrap: balance; }
+.pcard .yr { font-size: calc(11.5px * var(--lbl, 1)); color: var(--ink-soft); margin-top: 2px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pcard .rel { font-size: calc(10.5px * var(--lbl, 1)); line-height: 1.5; margin-top: 3px; padding: 0 7px; border-radius: 99px; white-space: nowrap; }
 .pcard .rel.me { color: var(--accent); }
 .pcard .rel.kin { background: var(--ink); color: #fffdf8; }
 .pcard.dead .ava img { filter: saturate(.5) sepia(.15); }
@@ -141,16 +148,16 @@
 .pcard.focus .ava { box-shadow: 0 0 0 3px var(--accent), 0 0 0 6px #fffdf8, 0 6px 16px 4px rgb(60 45 20 / .25); }
 .pcard.isme .nm { color: var(--accent); }
 .focused .pcard.dim .ava, .focused .pcard.dim .cap > * { opacity: .42; }
-.pcard .cap { margin-top: 7px; padding: 2px 6px 5px; border-radius: 6px; background: var(--paper); display: flex; flex-direction: column; align-items: center; }
+.pcard .cap { width: max-content; margin-top: 7px; padding: 2px 6px 1px; border-radius: 6px; background: var(--paper); display: flex; flex-direction: column; align-items: center; }
 
 /* Buttons belong to the card: a small fixed share of the avatar at any zoom. Only when very far
    out do they stop shrinking at 12px on screen, so they can still be hit. */
-.pcard .tools { position: absolute; inset: 0; opacity: 0; transition: opacity .12s; pointer-events: none; --s: max(1, calc(0.667 / var(--k, 1))); --half: calc(9px * var(--s)); }
+.pcard .tools { position: absolute; inset: 0; opacity: 0; transition: opacity .12s; pointer-events: none; --s: var(--lbl, 1); --half: calc(9px * var(--s)); }
 .pcard:hover .tools, .pcard:focus-within .tools, .pcard .tools:has([data-state="open"]) { opacity: 1; }
 /* The layer covers the whole card, so only the buttons take the mouse: a click on the portrait opens the editor. */
 .pcard:hover .tool, .pcard:focus-within .tool, .pcard .tools:has([data-state="open"]) .tool { pointer-events: auto; }
 @media (hover: none) { .pcard.focus .tools { opacity: 1; } .pcard.focus .tool { pointer-events: auto; } }
-.tool { position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: #fffdf8; border: 1px solid var(--line); display: grid; place-items: center; color: var(--ink-soft); box-shadow: 0 1px 2px rgb(60 45 20 / .18); cursor: pointer; transform: scale(var(--s)); }
+.tool { position: absolute; width: calc(18px * var(--s)); height: calc(18px * var(--s)); margin: calc(-1 * var(--half)) 0 0 calc(-1 * var(--half)); border-radius: 50%; background: #fffdf8; border: 1px solid var(--line); display: grid; place-items: center; color: var(--ink-soft); box-shadow: 0 1px 2px rgb(60 45 20 / .18); cursor: pointer; transform: scale(var(--s)); }
 .tool svg { display: block; width: 11px; height: 11px; }
 .tool:hover { color: #fffdf8; background: var(--accent); border-color: var(--accent); }
 .tool.top { left: 50%; top: calc(2px - var(--half)); }
@@ -170,12 +177,11 @@
 kbd { font: 11px var(--font-sans); color: var(--ink-faint); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
 
 [cmdk-input]:focus-visible { outline: none; }
-.inline-input { background: transparent; border-radius: 5px; padding: 1px 5px; margin-left: -5px; width: 100%; outline: none; }
-.inline-input:hover:not(:read-only) { background: #f1ecdf; }
-.inline-input:focus { background: #fff; box-shadow: 0 0 0 1.5px var(--ring); }
+.inline-input { background: transparent; border-radius: 0; padding: 0; width: 100%; outline: none; text-overflow: ellipsis; }
+.inline-fit { width: auto; min-width: 2ch; max-width: 100%; field-sizing: content; }
 .inline-input::placeholder { color: var(--ink-faint); font-style: italic; }
 
-.panel { position: fixed; top: 12px; right: 12px; bottom: 12px; width: min(480px, calc(100vw - 24px)); background: #fffdf8; border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 2px 6px rgb(60 45 20 / .07), 0 24px 60px rgb(60 45 20 / .16); display: flex; flex-direction: column; overflow: hidden; z-index: 20; animation: panel-in .28s cubic-bezier(.22, .8, .24, 1); transition: width .25s cubic-bezier(.22, .8, .24, 1); }
+.panel { position: fixed; top: 12px; right: 12px; bottom: 12px; width: min(var(--panel-w, 480px), calc(100vw - 24px)); background: #fffdf8; border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 2px 6px rgb(60 45 20 / .07), 0 24px 60px rgb(60 45 20 / .16); display: flex; flex-direction: column; overflow: hidden; z-index: 20; animation: panel-in .28s cubic-bezier(.22, .8, .24, 1); transition: width .25s cubic-bezier(.22, .8, .24, 1); }
 .panel.full { width: calc(100vw - 24px); }
 /* Touch screens: tabs and choices are big enough for a finger. */
 @media (pointer: coarse) {
@@ -186,14 +192,10 @@ kbd { font: 11px var(--font-sans); color: var(--ink-faint); border: 1px solid va
   .bar-btn { min-height: 40px; }
 }
 
-/* Narrow windows, or windows that run past the screen edge: the editor becomes a sheet anchored to
-   the left, which stays on screen, and the chart centres in the space above it. */
-@media (max-width: 1200px) {
-  .panel { top: auto; left: 8px; right: 8px; bottom: 8px; width: min(600px, calc(100vw - 16px)); height: 62vh; }
-  .panel.full { top: 8px; left: 8px; right: 8px; bottom: 8px; width: auto; height: auto; }
-}
+/* Phones: the editor becomes a sheet whose top can be dragged up, and the chart centres above it. */
 @media (max-width: 640px) {
-  .panel { height: 84vh; }
+  .panel { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; height: min(var(--panel-h, 70dvh), calc(100dvh - 16px)); }
+  .panel.full { top: 8px; left: 8px; right: 8px; bottom: 8px; width: auto; height: auto; }
 }
 @keyframes panel-in { from { transform: translateX(24px); opacity: 0; } }
 
@@ -223,4 +225,57 @@ kbd { font: 11px var(--font-sans); color: var(--ink-faint); border: 1px solid va
 .mark-chip { background: #efe5d3; border-radius: 5px; padding: 0 5px; font-size: 12px; font-family: var(--font-sans, inherit); font-weight: 400; color: var(--ink-soft); white-space: nowrap; }
 .mark-chip[data-citation] { cursor: pointer; }
 .mark-chip[data-citation]:hover { color: var(--accent); }
-.mark-chip.unverified { background: #f7e3d3; color: var(--accent); }
+.mark-chip.unverified { background: #f7e3d3; color: #8f4426; }
+
+/* The assistant's chat: a soft box for typing, as in the chat apps people know. */
+.panel-edge { position: absolute; z-index: 20; touch-action: none; }
+.panel-edge-right, .panel-edge-left { top: 12px; bottom: 12px; width: 10px; cursor: col-resize; }
+.panel-edge-right { right: -5px; }
+.panel-edge-left { left: 0; }
+.panel-edge-top { top: 0; left: 0; right: 0; height: 12px; cursor: row-resize; }
+.panel-edge::after { content: ''; position: absolute; border-radius: 2px; background: var(--line); opacity: 0; transition: opacity .12s; }
+.panel-edge-right::after, .panel-edge-left::after { top: 50%; left: 3.5px; width: 3px; height: 36px; margin-top: -18px; }
+.panel-edge-top::after { left: 50%; top: 4px; height: 3px; width: 36px; margin-left: -18px; opacity: .8; }
+.panel-edge:hover::after, .panel-edge:active::after, .panel-edge:focus-visible::after { opacity: 1; }
+.panel-edge:focus-visible { outline: none; }
+.composer [data-slot="input-group"] { height: auto; flex-direction: column; align-items: stretch; border-radius: 16px; border: 1px solid var(--border) !important; background: #fff; box-shadow: 0 1px 4px rgb(60 45 20 / .07) !important; transition: border-color .12s, box-shadow .12s; }
+.composer [data-slot="input-group"]:has(textarea:focus) { border-color: color-mix(in oklab, var(--ink) 35%, var(--border)) !important; box-shadow: 0 2px 10px rgb(60 45 20 / .12) !important; }
+.composer textarea { width: 100%; min-height: 24px; max-height: 200px; overflow-y: auto; padding: 10px 14px 2px; font-size: 13.5px; line-height: 1.45; outline: none !important; border: 0 !important; box-shadow: none !important; background: transparent !important; }
+.composer textarea:focus, .composer textarea:focus-visible { outline: none !important; box-shadow: none !important; }
+.composer [data-align="block-end"] { padding: 2px 6px 6px; border: 0; }
+.composer [data-align="block-end"] button { height: 28px; width: 28px; border-radius: 999px; }
+.composer button:focus-visible { outline-offset: 1px; }
+.tool-row > summary { display: flex; align-items: center; gap: 6px; list-style: none; cursor: pointer; font-size: 12px; color: var(--ink-soft, #6b6355); padding: 1px 0; }
+.tool-row > summary::-webkit-details-marker { display: none; }
+.tool-row > summary:hover { color: var(--ink); }
+
+/* Pages in the narrow panel: the handles beside each paragraph need no more room than this. */
+.panel .bn-editor { padding-inline: 36px !important; }
+
+/* The main bar: words where there is room, icons with tooltips where not, and on phones a tab bar. */
+.nav-label { display: none; }
+.main-bar:not(.compact) .nav-label { display: inline; }
+.main-bar.no-name .family-name, .main-bar.no-name .sep { display: none; }
+.main-bar.no-name .bar-btn { padding: 0 7px; }
+@media (max-width: 1000px) { .main-bar.compact .family-name, .main-bar.compact .sep { display: none; } }
+@media (max-width: 1100px) { .view-bar.crowded { display: none; } }
+@media (max-width: 640px) {
+  .main-bar { top: auto; left: 8px; right: 8px; bottom: 8px; justify-content: space-around; z-index: 40; }
+  .main-bar .family-name, .main-bar .sep { display: none; }
+  .main-bar .bar-btn { flex: 1; flex-direction: column; gap: 2px; height: 48px; padding: 0 2px; font-size: 11px; line-height: 1.1; }
+  .main-bar .nav-label { display: block; white-space: nowrap; }
+  .view-bar { left: 8px !important; bottom: 72px; }
+  .chart-hint { display: none; }
+  .panel { bottom: 68px; }
+  .panel.full { bottom: 68px; }
+  .side-sheet { top: 8px !important; bottom: 68px !important; left: 8px !important; right: 8px !important; width: auto !important; max-width: none !important; }
+}
+/* Fingers need room: everything that can be tapped is at least 40 px. */
+@media (pointer: coarse) {
+  .panel button, .side-sheet button, [role=dialog] button, [role=dialog] select, .view-bar button, .main-bar button, .panel select, [data-slot=popover-content] button { min-height: 40px; min-width: 40px; }
+  .composer [data-align="block-end"] button { height: 40px; width: 40px; }
+}
+
+.panel-tabs { height: 36px; padding: 4px; }
+.panel-tabs [role=tab] { height: 28px; }
+.legend-ring.assumed { outline: 1.5px dashed var(--ink-faint); outline-offset: 2px; }

@@ -12,15 +12,15 @@ RUN pnpm build
 FROM node:24-slim
 WORKDIR /app
 ENV NODE_ENV=production DATA_DIR=/data PORT=3000 HOSTNAME=0.0.0.0
-COPY --from=build /app/.next/standalone ./
-COPY --from=build /app/.next/static ./.next/static
-COPY --from=build /app/public ./public
-COPY --from=build /app/drizzle ./drizzle
-COPY scripts/family.mjs ./family.mjs
+COPY --chown=node:node --from=build /app/.next/standalone ./
+COPY --chown=node:node --from=build /app/.next/static ./.next/static
+COPY --chown=node:node --from=build /app/public ./public
+COPY --chown=node:node --from=build /app/drizzle ./drizzle
+COPY --chown=node:node scripts/family.mjs ./family.mjs
 # The standalone build keeps the driver out of sight; the server commands need to find it, and the build fails if they cannot.
 RUN cd node_modules && ln -s .pnpm/better-sqlite3@*/node_modules/better-sqlite3 better-sqlite3 && cd .. && node -e "require('better-sqlite3')"
 # Not root: whatever goes wrong inside stays inside. The folder is made here so a new volume inherits it.
-RUN mkdir -p /data && chown -R node:node /data /app
+RUN mkdir -p /data && chown node:node /data
 USER node
 VOLUME /data
 EXPOSE 3000

@@ -119,7 +119,7 @@ export const unions = sqliteTable('unions', {
   endDate: text('end_date').notNull().default(''),
   place: text('place').notNull().default(''),
   certainty: text('certainty').notNull().default('family'),
-}, (t) => [uniqueIndex('unions_pair').on(t.aId, t.bId)])
+}, (t) => [uniqueIndex('unions_pair').on(t.aId, t.bId), index('unions_b').on(t.bId)])
 
 export const pages = sqliteTable('pages', {
   id: text('id').primaryKey(),
@@ -130,7 +130,7 @@ export const pages = sqliteTable('pages', {
   position: real('position').notNull().default(0),
   content: text('content').notNull().default('[]'),
   updatedAt: integer('updated_at').notNull().default(0),
-}, (t) => [index('pages_person').on(t.personId)])
+}, (t) => [index('pages_person').on(t.personId), index('pages_parent').on(t.parentPageId)])
 
 export const media = sqliteTable('media', {
   id: text('id').primaryKey(),
@@ -146,7 +146,7 @@ export const media = sqliteTable('media', {
   place: text('place').notNull().default(''),
   uploadedBy: text('uploaded_by').notNull().default(''),
   createdAt: integer('created_at').notNull().default(0),
-})
+}, (t) => [index('media_created').on(t.createdAt)])
 
 // Boxes are fractions of the photo size, so they survive any thumbnail. Null box: person
 // is on the photo, but no frame has been drawn yet.

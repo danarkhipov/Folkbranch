@@ -136,6 +136,17 @@ const degree = (n: number, s: Sex) => {
 }
 const pra = (n: number) => 'пра'.repeat(Math.max(0, n))
 
+const GENITIVE: Record<string, string> = { отец: 'отца', мать: 'матери', дочь: 'дочери', ребёнок: 'ребёнка' }
+/** Kin terms are a closed vocabulary, so these endings cover all of them. */
+const genitiveWord = (w: string) => GENITIVE[w] ?? (
+  /ый$/.test(w) ? w.replace(/ый$/, 'ого')
+    : /ая$/.test(w) ? w.replace(/ая$/, 'ой')
+    : /[кгхжчшщ]а$/.test(w) || /я$/.test(w) ? w.slice(0, -1) + 'и'
+    : /а$/.test(w) ? w.slice(0, -1) + 'ы'
+    : /ь$/.test(w) ? w.slice(0, -1) + 'я'
+    : w + 'а')
+export const genitive = (term: string) => term.split(/([ /])/).map((w) => (/^[ /]$/.test(w) ? w : genitiveWord(w))).join('')
+
 const RU = {
   blood(up: number, down: number, s: Sex, half: boolean): string {
     if (down === 0) {
@@ -178,8 +189,7 @@ const RU = {
     return null
   },
   spouseKin: (term: string, spouse: Sex) => `${term} ${g(spouse, 'мужа', 'жены', 'супруга')}`,
-  // Declining the term would need a full case grammar, so the relation is named as a pair.
-  kinSpouse: (term: string) => `по браку: ${term}`,
+  kinSpouse: (term: string, s: Sex) => `${g(s, 'муж', 'жена', 'супруг')} ${genitive(term)}`,
 }
 
 const pick = (s: Sex, m: string, f: string, n: string) => (s === 'M' ? m : s === 'F' ? f : n)
@@ -216,6 +226,6 @@ const EN = {
 /** "ваш прадед" / "ваша бабушка". */
 export function yourTerm(label: string, sex: Sex, lang: Lang) {
   if (lang === 'en') return `your ${label}`
-  if (label.startsWith('по браку')) return label
+  if (/^(муж|жена|супруг) /.test(label)) return label
   return `${sex === 'F' ? 'ваша' : 'ваш'} ${label}`
 }

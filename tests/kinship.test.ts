@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Family, yourTerm } from '../lib/kinship'
+import { Family, yourTerm, genitive } from '../lib/kinship'
 import type { Graph, Person, Sex } from '../lib/types'
 
 const P = (id: string, sex: Sex) => ({ id, sex } as Person)
@@ -23,9 +23,15 @@ describe('kinship (ru)', () => {
   ])('%s → %s', (to, label) => expect(ru(to)).toBe(label))
 
   it('names a relative by marriage without calling them your spouse', () => {
-    expect(ru('tet')).toBe('по браку: дядя')
-    expect(yourTerm('по браку: дядя', 'F', 'ru')).toBe('по браку: дядя')
+    expect(ru('tet')).toBe('жена дяди')
+    expect(yourTerm('жена дяди', 'F', 'ru')).toBe('жена дяди')
+    expect(yourTerm('жена', 'F', 'ru')).toBe('ваша жена')
   })
+  it.each([
+    ['внук', 'внука'], ['внучка', 'внучки'], ['правнучка', 'правнучки'], ['дядя', 'дяди'], ['тётя', 'тёти'], ['сестра', 'сестры'],
+    ['двоюродный брат', 'двоюродного брата'], ['двоюродная сестра', 'двоюродной сестры'], ['сводная сестра', 'сводной сестры'],
+    ['племянница', 'племянницы'], ['внучатый племянник', 'внучатого племянника'], ['внук/внучка', 'внука/внучки'], ['родитель', 'родителя'],
+  ])('%s → %s', (term, want) => expect(genitive(term)).toBe(want))
   it('path runs from one person to the other', () => {
     const k = f.relation('ya', 'kuz')!
     expect(k.path[0]).toBe('ya')

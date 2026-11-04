@@ -1,4 +1,5 @@
 import { getAuth } from './auth'
+import { ownCard } from './ops/settings'
 import { actorFromToken } from './ops/tokens'
 import type { Actor } from './ops/core'
 import type { Role } from './types'
@@ -18,5 +19,5 @@ export async function getActor(headers: Headers): Promise<Actor | null> {
   const session = await getAuth().api.getSession({ headers })
   if (!session) return null
   const u = session.user as typeof session.user & { role: Role; personId: string | null }
-  return { userId: u.id, name: u.name, role: u.role, personId: u.personId ?? null }
+  return { userId: u.id, name: u.name, role: u.role, personId: ownCard(u.personId) }
 }

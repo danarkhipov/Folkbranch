@@ -1,14 +1,12 @@
 import { parseGedcom, writeGedcom } from '../gedcom'
 import type { Certainty } from '../types'
 import { yearOf } from '../types'
-import { translate } from '../i18n'
 import { peopleWords } from '../names'
-import { Actor, mutate, requireRole } from './core'
+import { Actor, mutate, requireRole, seesOnlyPublic } from './core'
 import { addParent, addUnion, getGraph, insertPerson } from './people'
 import { insertPage } from './pages'
-import { getSetting } from './settings'
+import { getSetting, say } from './settings'
 
-const say = (key: string) => translate(getSetting('language') === 'en' ? 'en' : 'ru', key)
 
 export function previewGedcom(actor: Actor, text: string) {
   requireRole(actor, 'editor')
@@ -71,5 +69,5 @@ export function importGedcom(actor: Actor, text: string) {
 export function exportGedcom(actor: Actor, hideLiving: boolean) {
   const graph = getGraph(actor)
   // Readers never get living relatives, whatever the checkbox says.
-  return writeGedcom(graph, { hideLiving: hideLiving || actor.role === 'reader', source: 'Folkbranch' })
+  return writeGedcom(graph, { hideLiving: hideLiving || seesOnlyPublic(actor), source: 'Folkbranch' })
 }

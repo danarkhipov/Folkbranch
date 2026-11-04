@@ -2,6 +2,16 @@
 
 Agents use the same operations as the app, through MCP at `/api/mcp` or REST at `/api/v1`. Authentication is a bearer token.
 
+## The assistant inside the app
+
+A chat panel for people signed in to the app. The owner pastes a provider's key right in the panel, where it is checked and kept encrypted in the database, or sets one on the server (see `.env.example`: Anthropic, OpenRouter, OpenAI, Google, or a local model), then the owner turns it on under **Settings → AI**. It is off by default.
+
+- What it reads in the archive is sent to the model's provider. It works as the person talking to it, with everything they can see, living relatives included. Photos in the archive are not sent.
+- It acts as the person talking to it, with their role. Ordinary edits ask first, or can be allowed for one conversation. Deleting, importing, undoing and settings always ask.
+- Each answer's edits can be undone with one button, and show in history as `Assistant → name`.
+
+Files attached in the chat go to the provider too, and stay out of the archive until the person allows saving them. `AGENT_PROVIDER` and `AGENT_MODEL` choose what answers.
+
 ## Get a token
 
 In the app, open the agents panel, or on the server:

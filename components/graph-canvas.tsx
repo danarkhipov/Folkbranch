@@ -1,14 +1,15 @@
 'use client'
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { forwardRef, memo, useEffect, useImperativeHandle, useMemo, useRef, useState, type RefObject } from 'react'
 import { select } from 'd3-selection'
 import { zoom as d3zoom, zoomIdentity, type ZoomBehavior } from 'd3-zoom'
 import { useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2 } from 'lucide-react'
-import { AVATAR_CY, layoutFamily, CARD_H, CARD_W } from '@/lib/graph/layout'
+import { ArrowUpDown, Plus, Trash2 } from 'lucide-react'
+import { AVATAR_CY, layoutFamily, CARD_H, CARD_W, type EdgePos, type Layout } from '@/lib/graph/layout'
 import { api, avatarUrl, useApp, type QuickType } from '@/lib/client'
 import { yourTerm } from '@/lib/kinship'
 import { cn } from '@/lib/utils'
-import { lifeYears, personName, type HistoryEntry, type Person } from '@/lib/types'
+import { translate } from '@/lib/i18n'
+import { lifeYears, personName, type HistoryEntry, type Lang, type Person } from '@/lib/types'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 export interface CanvasHandle {
@@ -19,8 +20,8 @@ export interface CanvasHandle {
 
 const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`)
 
-export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; groupIds: Set<string> | null; panelOpen: boolean; onDelete: (id: string) => void; onRemoveRelation: (type: 'parent' | 'union', id: string) => void }>(
-  function GraphCanvas({ pathIds, groupIds, panelOpen, onDelete, onRemoveRelation }, ref) {
+export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; groupIds: Set<string> | null; panelOpen: boolean; leftInset?: number; onDelete: (id: string) => void; onRemoveRelation: (type: 'parent' | 'union', id: string) => void }>(
+  function GraphCanvas({ pathIds, groupIds, panelOpen, leftInset = 0, onDelete, onRemoveRelation }, ref) {
     const app = useApp()
     const { graph, family, focusId, me, lang, t, byId } = app
     const layout = useMemo(() => layoutFamily(graph, { rootsBelow: app.rootsBelow }), [graph, app.rootsBelow])
@@ -38,6 +39,9 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
       s.setProperty('--tx', `${x}px`)
       s.setProperty('--ty', `${y}px`)
       s.setProperty('--k', String(k))
+      // Labels stay readable when zoomed out. Stepped and inherited, so a pan never restyles the cards.
+      const lbl = String(Math.round(Math.min(1.3, Math.max(1, 1 / k)) * 20) / 20)
+      if (s.getPropertyValue('--lbl') !== lbl) s.setProperty('--lbl', lbl)
     }
 
     useEffect(() => {
@@ -66,8 +70,10 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
     const viewport = () => {
       const el = canvas.current!
       if (!panelOpen) return { w: el.clientWidth, h: el.clientHeight }
-      // The editor is a sheet at the bottom on narrow windows, and a side panel on wide ones.
-      return window.innerWidth <= 1200 ? { w: el.clientWidth, h: el.clientHeight * 0.38 } : { w: el.clientWidth - 492, h: el.clientHeight }
+      // The editor is a sheet at the bottom on phones, and a side panel elsewhere, as wide or tall as the person dragged it.
+      const panel = document.querySelector('.panel')?.getBoundingClientRect()
+      if (window.innerWidth <= 640) return { w: el.clientWidth, h: el.clientHeight - (panel?.height ?? el.clientHeight * 0.62) - 8 }
+      return { w: el.clientWidth - (panel?.width ?? 480) - 12, h: el.clientHeight }
     }
 
     const fit = (animate = true) => {
@@ -93,9 +99,9 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
       const ty = parseFloat(canvas.current!.style.getPropertyValue('--ty')) || 0
       const sx = tx + c.x * k, sy = ty + (c.y + CARD_H / 2) * k
       const m = 90 * k
-      if (sx > m && sx < w - m && sy > 70 + m && sy < h - m) return
+      if (sx > leftInset + m && sx < w - m && sy > 70 + m && sy < h - m) return
       const zoom = Math.max(k, 0.6)
-      go(w / 2 - c.x * zoom, h / 2 - (c.y + CARD_H / 2) * zoom, zoom)
+      go((leftInset + w) / 2 - c.x * zoom, h / 2 - (c.y + CARD_H / 2) * zoom, zoom)
     }
 
     useImperativeHandle(ref, () => ({
@@ -164,11 +170,8 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
       else if (familyActive) layout.edges.filter((e) => e.familyKey === hoverFamily).forEach((e) => e.parentIds.forEach((p) => out.add(pairKey(p, e.childId))))
       return out
     }, [kin, pathIds, hoverKin, hoverId, familyActive, hoverFamily, layout])
-    /** A line is lit when both ends are in the highlighted set; a path is lit pair by pair. */
-    const hotEdge = (e: { childId: string; parentIds: string[] }) =>
-      pathIds || kin ? e.parentIds.some((p) => hotPairs.has(pairKey(p, e.childId)))
-        : !!(hoverKin || familyActive || groupIds) && !!active && active.has(e.childId) && e.parentIds.some((p) => active.has(p))
-    const active = pathIds ? new Set(pathIds) : kin ? new Set([focusId!, ...kin.keys()]) : hoverKin ? new Set([hoverId!, ...hoverKin.keys()]) : familyActive ?? groupIds
+    const lightMode: LightMode = pathIds || kin ? 'pairs' : hoverKin || familyActive || groupIds ? 'both-ends' : 'none'
+    const active = useMemo(() => (pathIds ? new Set(pathIds) : kin ? new Set([focusId!, ...kin.keys()]) : hoverKin ? new Set([hoverId!, ...hoverKin.keys()]) : familyActive ?? groupIds), [pathIds, kin, focusId, hoverKin, hoverId, familyActive, groupIds])
     /** With several marriages, say which one a child comes from. */
     const childNote = (parent: string, child: string) => {
       if ((family.spouses.get(parent) ?? []).length < 2) return ''
@@ -318,7 +321,7 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
     type Sel = { kind: 'edge' | 'union'; ids: string[]; ax: number; ay: number }
     const [sel, setSel] = useState<Sel | null>(null)
     const [hoverIds, setHoverIds] = useState<string[]>([])
-    const selIds = new Set(sel?.ids ?? [])
+    const selIds = useMemo(() => new Set(sel?.ids ?? []), [sel])
     const selEdges = sel?.kind === 'edge' ? layout.edges.filter((e) => selIds.has(e.id)) : []
     const selUnion = sel?.kind === 'union' ? layout.unions.find((u) => u.id === sel.ids[0]) : undefined
     /** One edge per bar, for hit areas: siblings share the same shared stretch. */
@@ -378,24 +381,32 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
 
     const tipAt = (e: React.MouseEvent, text: string) => setTip({ x: e.clientX, y: e.clientY, text })
 
+    // The chart's parts are memoized and read these at the moment of the event, so a hover redraws only what it lights.
+    const acts = useRef<ChartActions>(null!)
+    acts.current = {
+      open: app.focus,
+      hover: hoverSoon,
+      drag: startFromPerson,
+      add(type, id) {
+        if (type === 'parent' && (family.parents.get(id) ?? []).length >= 2) return app.notify(t('У этого человека уже двое родителей'))
+        app.quickAdd(type, id)
+      },
+      enterLine(familyKey, ids) { setHoverFamily(familyKey); setHoverIds(ids) },
+      leaveLine() { setTip(null); setHoverFamily(null); setHoverIds([]) },
+      tipEdge(ev, e) { if (!sel) tipAt(ev, edgeText(e.parentIds, e.childId)) },
+      tipUnion(ev, u) { tipAt(ev, `${family.relation(u.union.bId, u.union.aId, lang)?.label ?? ''}, ${family.relation(u.union.aId, u.union.bId, lang)?.label ?? ''}${u.union.startDate ? ` · ${u.union.startDate}` : ''}`) },
+      tipDot(ev) { if (app.canEdit) tipAt(ev, t('Добавить ребёнка этой пары')) },
+      hideTip() { setTip(null) },
+      pick,
+      startDot(e, u) { startLink(e, { parents: [u.union.aId, u.union.bId] }, u.x, u.y, () => app.quickAdd('child', u.union.aId, u.union.bId)) },
+      addChild(u) { app.quickAdd('child', u.union.aId, u.union.bId) },
+    }
+
     return (
       <div ref={canvas} className="canvas" onClick={(e) => { if (e.target === canvas.current || e.target === world.current) { app.focus(null); setSel(null) } }}>
         <div ref={world} className={cn('world', active && 'focused')}>
           <svg className="links" width="1" height="1">
-            {/* Each family is drawn over a paper-coloured halo, so crossings read as one line passing over another. */}
-            {families.map(([key, edges]) => (
-              <g key={key}>
-                <path d={edges.map((e) => e.path).join('')} className="line-halo" />
-                {edges.map((e) => {
-                  const hot = hotEdge(e)
-                  return <path key={e.id} d={e.path} className={cn('line', e.style !== 'solid' && e.style, hot && 'hot', selIds.has(e.id) && 'selected', hoverIds.includes(e.id) && 'hover')} />
-                })}
-              </g>
-            ))}
-            {layout.unions.map((u) => {
-              const hot = hotPairs.has(pairKey(u.union.aId, u.union.bId)) || (!!active && active.has(u.union.aId) && active.has(u.union.bId))
-              return <path key={u.id} d={u.path} className={cn('union', u.union.certainty === 'assumed' && 'assumed', hot && 'hot', selIds.has(u.id) && 'selected', hoverIds.includes(u.id) && 'hover')} />
-            })}
+            <Lines families={families} unions={layout.unions} active={active} hotPairs={hotPairs} lightMode={lightMode} selIds={selIds} hoverIds={hoverIds} />
           </svg>
           {graph.persons.map((p) => {
             const c = layout.cards.get(p.id)
@@ -405,80 +416,26 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
             const mine = fromMe?.get(p.id)
             const near = hoverKin?.get(p.id)
             const label = k && !pathIds ? k.label + (focusId && family.children.get(focusId)?.includes(p.id) ? childNote(focusId, p.id) : '') : near
-            const open = () => app.focus(p.id)
             return (
-              <div
+              <PersonCard
                 key={p.id}
-                data-person={p.id}
-                role="button"
-                tabIndex={0}
-                aria-label={p.hidden ? t('Живой родственник') : `${personName(p)} ${lifeYears(p)}`}
+                p={p}
+                left={c.x - CARD_W / 2}
+                top={c.y}
                 className={cn('pcard', `sex-${p.sex}`, !p.living && 'dead', p.certainty === 'assumed' && 'assumed', p.hidden && 'hidden-p', p.id === focusId && 'focus', p.id === me.personId && 'isme', active && !isActive && 'dim', draft?.target === p.id && 'drop-target')}
-                style={{ left: c.x - CARD_W / 2, top: c.y }}
-                onClick={open}
-                onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) open() }}
-                onMouseEnter={() => hoverSoon(p.id)}
-                onMouseLeave={() => hoverSoon(null)}
-              >
-                <div className={cn('ava', app.canEdit && !p.hidden && 'link-start')} onPointerDown={app.canEdit && !p.hidden ? (e) => startFromPerson(e, p.id) : undefined}><img src={avatarUrl(p)} alt="" draggable={false} /></div>
-                {/* Opaque, so a line coming from below stops at the text however tall it wraps. */}
-                <div className="cap">
-                  <div className="nm">{p.hidden ? t('Живой родственник') : personName(p) || t('Без названия')}</div>
-                  {!p.hidden && <div className="yr">{lifeYears(p)}</div>}
-                  {label && <div className="rel kin">{label}</div>}
-                  {!label && mine && <div className="rel me">{yourTerm(mine.label, p.sex, lang)}</div>}
-                </div>
-                {app.canEdit && !p.hidden && <CardTools person={p} onDrag={startFromPerson} />}
-              </div>
+                label={label}
+                mine={!label && mine ? yourTerm(mine.label, p.sex, lang) : undefined}
+                canEdit={app.canEdit}
+                rootsBelow={app.rootsBelow}
+                lang={lang}
+                acts={acts}
+              />
             )
           })}
           {/* Above the cards, or a card's box would take the click meant for a line passing through it. */}
           <svg className="hits" width="1" height="1">
-            {/* Wide invisible strokes on top make thin lines easy to hover. */}
-            {groupHeads.map((e) => (
-              <path
-                key={`g${e.group}`}
-                d={e.shared}
-                className="line-hit"
-                onMouseEnter={() => { setHoverFamily(e.familyKey); setHoverIds(layout.edges.filter((x) => x.group === e.group).map((x) => x.id)) }}
-                onMouseMove={(ev) => { if (!sel) tipAt(ev, edgeText(e.parentIds, e.childId)) }}
-                onMouseLeave={() => { setTip(null); setHoverFamily(null); setHoverIds([]) }}
-                onClick={(ev) => pick(ev, 'edge', layout.edges.filter((x) => x.group === e.group).map((x) => x.id), e.groupAt[0], e.groupAt[1] - 14)}
-              />
-            ))}
-            {layout.edges.map((e) => (
-              <path
-                key={`o${e.id}`}
-                d={e.own}
-                className="line-hit"
-                onMouseEnter={() => { setHoverFamily(e.familyKey); setHoverIds([e.id]) }}
-                onMouseMove={(ev) => { if (!sel) tipAt(ev, edgeText(e.parentIds, e.childId)) }}
-                onMouseLeave={() => { setTip(null); setHoverFamily(null); setHoverIds([]) }}
-                onClick={(ev) => pick(ev, 'edge', [e.id], e.barAt[0], e.barAt[1] - 14)}
-              />
-            ))}
-            {layout.unions.map((u) => (
-              <path
-                key={u.id}
-                d={u.path}
-                onClick={(ev) => pick(ev, 'union', [u.id], u.x, u.y - 14)}
-                onMouseEnter={() => setHoverIds([u.id])}
-                className="line-hit"
-                onMouseMove={(ev) => tipAt(ev, `${family.relation(u.union.bId, u.union.aId, lang)?.label ?? ''}, ${family.relation(u.union.aId, u.union.bId, lang)?.label ?? ''}${u.union.startDate ? ` · ${u.union.startDate}` : ''}`)}
-                onMouseLeave={() => { setTip(null); setHoverIds([]) }}
-              />
-            ))}
-            {layout.unions.map((u) => {
-              const hot = !!active && active.has(u.union.aId) && active.has(u.union.bId)
-              const open = u.union.kind === 'civil'
-              return (
-                <g key={u.id} className={cn('dot-group link-start', app.canEdit && 'can-add')} onPointerDown={(e) => startLink(e, { parents: [u.union.aId, u.union.bId] }, u.x, u.y, () => app.quickAdd('child', u.union.aId, u.union.bId))} onClick={app.canEdit ? (e) => { e.stopPropagation(); app.quickAdd('child', u.union.aId, u.union.bId) } : undefined} onMouseEnter={(ev) => app.canEdit && tipAt(ev, t('Добавить ребёнка этой пары'))} onMouseLeave={() => setTip(null)}>
-                  <circle cx={u.x} cy={u.y} r={13} className="dot-hit" />
-                  <circle cx={u.x} cy={u.y} r={5} className={cn('dot', open && 'open', hot && 'hot')} />
-                  {app.canEdit && <path d={`M${u.x - 4} ${u.y}H${u.x + 4}M${u.x} ${u.y - 4}V${u.y + 4}`} className="dot-plus" />}
-                </g>
-              )
-            })}
+            <HitAreas layout={layout} groupHeads={groupHeads} acts={acts} />
+            <FamilyDots unions={layout.unions} active={active} canEdit={app.canEdit} acts={acts} />
             {draft && <path d={`M${draft.x1} ${draft.y1}L${draft.x2} ${draft.y2}`} className="link-draft" />}
           </svg>
           {sel && (selEdges.length > 0 || selUnion) && (
@@ -505,35 +462,153 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
             </div>
           )}
         </div>
-        {draft && <div className="fixed z-50 pointer-events-none float px-2 py-1 text-xs" style={{ left: draft.cx + 14, top: draft.cy + 14 }}>{draft.label}</div>}
-        {clipped && !panelOpen && <div className="float fixed left-1/2 -translate-x-1/2 bottom-[68px] z-10 px-3 py-1.5 text-xs text-ink-soft pointer-events-none whitespace-nowrap">{t('Схема шире экрана: тяните, чтобы сдвинуть')}</div>}
+        {draft && <div className="fixed z-50 pointer-events-none float px-2 py-1 text-xs" style={{ left: draft.cx + 14, top: draft.cy + 14 }}>{t(draft.label)}</div>}
+        {clipped && !panelOpen && !leftInset && <div className="float chart-hint fixed left-1/2 -translate-x-1/2 bottom-[68px] z-10 px-3 py-1.5 text-xs text-ink-soft pointer-events-none whitespace-nowrap">{t('Схема шире экрана: тяните, чтобы сдвинуть')}</div>}
         {tip && <div className="fixed z-50 pointer-events-none float px-2 py-1 text-xs" style={{ left: tip.x + 12, top: tip.y + 12 }}>{tip.text}</div>}
       </div>
     )
   },
 )
 
-function Add({ type, label, person, side, onDrag }: { type: QuickType; label: string; person: Person; side: string; onDrag: (e: React.PointerEvent, id: string) => void }) {
-  const { t, quickAdd, family, notify } = useApp()
-  const add = () => {
-    if (type === 'parent' && (family.parents.get(person.id) ?? []).length >= 2) return notify(t('У этого человека уже двое родителей'))
-    quickAdd(type, person.id)
-  }
-  return (
-    <button tabIndex={-1} className={`tool add ${side}`} title={`${t(label)}. ${t('Протяните к человеку, чтобы связать')}`} aria-label={t(label)} onPointerDown={(e) => onDrag(e, person.id)} onClick={add}><Plus strokeWidth={2.5} /></button>
-  )
+type LightMode = 'pairs' | 'both-ends' | 'none'
+type UnionItem = Layout['unions'][number]
+interface ChartActions {
+  open: (id: string) => void
+  hover: (id: string | null) => void
+  drag: (e: React.PointerEvent, id: string) => void
+  add: (type: QuickType, id: string) => void
+  enterLine: (familyKey: string | null, ids: string[]) => void
+  leaveLine: () => void
+  tipEdge: (ev: React.MouseEvent, e: EdgePos) => void
+  tipUnion: (ev: React.MouseEvent, u: UnionItem) => void
+  tipDot: (ev: React.MouseEvent) => void
+  hideTip: () => void
+  pick: (ev: React.MouseEvent, kind: 'edge' | 'union', ids: string[], ax: number, ay: number) => void
+  startDot: (e: React.PointerEvent, u: UnionItem) => void
+  addChild: (u: UnionItem) => void
 }
+type Acts = RefObject<ChartActions>
+
+const Lines = memo(function Lines({ families, unions, active, hotPairs, lightMode, selIds, hoverIds }: { families: [string, EdgePos[]][]; unions: UnionItem[]; active: Set<string> | null; hotPairs: Set<string>; lightMode: LightMode; selIds: Set<string>; hoverIds: string[] }) {
+  /** A line is lit when both ends are in the highlighted set; a path is lit pair by pair. */
+  const hotEdge = (e: EdgePos) =>
+    lightMode === 'pairs' ? e.parentIds.some((p) => hotPairs.has(pairKey(p, e.childId)))
+      : lightMode === 'both-ends' && !!active && active.has(e.childId) && e.parentIds.some((p) => active.has(p))
+  return (
+    <>
+      {/* Each family is drawn over a paper-coloured halo, so crossings read as one line passing over another. */}
+      {families.map(([key, edges]) => (
+        <g key={key}>
+          <path d={edges.map((e) => e.path).join('')} className="line-halo" />
+          {edges.map((e) => <path key={e.id} d={e.path} className={cn('line', e.style !== 'solid' && e.style, hotEdge(e) && 'hot', selIds.has(e.id) && 'selected', hoverIds.includes(e.id) && 'hover')} />)}
+        </g>
+      ))}
+      {unions.map((u) => {
+        const hot = hotPairs.has(pairKey(u.union.aId, u.union.bId)) || (!!active && active.has(u.union.aId) && active.has(u.union.bId))
+        return <path key={u.id} d={u.path} className={cn('union', u.union.certainty === 'assumed' && 'assumed', hot && 'hot', selIds.has(u.id) && 'selected', hoverIds.includes(u.id) && 'hover')} />
+      })}
+    </>
+  )
+})
+
+const PersonCard = memo(function PersonCard({ p, left, top, className, label, mine, canEdit, rootsBelow, lang, acts }: { p: Person; left: number; top: number; className: string; label?: string; mine?: string; canEdit: boolean; rootsBelow: boolean; lang: Lang; acts: Acts }) {
+  const t = (key: string) => translate(lang, key)
+  const open = () => acts.current.open(p.id)
+  return (
+    <div
+      data-person={p.id}
+      role="button"
+      tabIndex={0}
+      aria-label={p.hidden ? t('Живой родственник') : `${personName(p)} ${lifeYears(p)}`}
+      className={className}
+      style={{ left, top }}
+      onClick={open}
+      onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) open() }}
+      onMouseEnter={() => acts.current.hover(p.id)}
+      onMouseLeave={() => acts.current.hover(null)}
+    >
+      <div className={cn('ava', canEdit && !p.hidden && 'link-start')} onPointerDown={canEdit && !p.hidden ? (e) => acts.current.drag(e, p.id) : undefined}><img src={avatarUrl(p)} alt="" draggable={false} /></div>
+      {/* Opaque, so a line coming from below stops at the text however tall it wraps. */}
+      <div className="cap">
+        <div className="nm">{p.hidden ? t('Живой родственник') : personName(p) || t('Без названия')}</div>
+        {!p.hidden && <div className="yr">{lifeYears(p)}</div>}
+        {label && <div className="rel kin">{label}</div>}
+        {mine && <div className="rel me">{mine}</div>}
+      </div>
+      {canEdit && !p.hidden && <CardTools id={p.id} rootsBelow={rootsBelow} lang={lang} acts={acts} />}
+    </div>
+  )
+})
+
+/** Wide invisible strokes on top make thin lines easy to hover. */
+const HitAreas = memo(function HitAreas({ layout, groupHeads, acts }: { layout: Layout; groupHeads: EdgePos[]; acts: Acts }) {
+  return (
+    <>
+      {groupHeads.map((e) => {
+        const ids = () => layout.edges.filter((x) => x.group === e.group).map((x) => x.id)
+        return (
+          <path
+            key={`g${e.group}`}
+            d={e.shared}
+            className="line-hit"
+            onMouseEnter={() => acts.current.enterLine(e.familyKey, ids())}
+            onMouseMove={(ev) => acts.current.tipEdge(ev, e)}
+            onMouseLeave={() => acts.current.leaveLine()}
+            onClick={(ev) => acts.current.pick(ev, 'edge', ids(), e.groupAt[0], e.groupAt[1] - 14)}
+          />
+        )
+      })}
+      {layout.edges.map((e) => (
+        <path
+          key={`o${e.id}`}
+          d={e.own}
+          className="line-hit"
+          onMouseEnter={() => acts.current.enterLine(e.familyKey, [e.id])}
+          onMouseMove={(ev) => acts.current.tipEdge(ev, e)}
+          onMouseLeave={() => acts.current.leaveLine()}
+          onClick={(ev) => acts.current.pick(ev, 'edge', [e.id], e.barAt[0], e.barAt[1] - 14)}
+        />
+      ))}
+      {layout.unions.map((u) => (
+        <path
+          key={u.id}
+          d={u.path}
+          onClick={(ev) => acts.current.pick(ev, 'union', [u.id], u.x, u.y - 14)}
+          onMouseEnter={() => acts.current.enterLine(null, [u.id])}
+          className="line-hit"
+          onMouseMove={(ev) => acts.current.tipUnion(ev, u)}
+          onMouseLeave={() => acts.current.leaveLine()}
+        />
+      ))}
+    </>
+  )
+})
+
+const FamilyDots = memo(function FamilyDots({ unions, active, canEdit, acts }: { unions: UnionItem[]; active: Set<string> | null; canEdit: boolean; acts: Acts }) {
+  return unions.map((u) => {
+    const hot = !!active && active.has(u.union.aId) && active.has(u.union.bId)
+    return (
+      <g key={u.id} className={cn('dot-group link-start', canEdit && 'can-add')} onPointerDown={(e) => acts.current.startDot(e, u)} onClick={canEdit ? (e) => { e.stopPropagation(); acts.current.addChild(u) } : undefined} onMouseEnter={(ev) => acts.current.tipDot(ev)} onMouseLeave={() => acts.current.hideTip()}>
+        <circle cx={u.x} cy={u.y} r={13} className="dot-hit" />
+        <circle cx={u.x} cy={u.y} r={5} className={cn('dot', u.union.kind === 'civil' && 'open', hot && 'hot')} />
+        {canEdit && <path d={`M${u.x - 4} ${u.y}H${u.x + 4}M${u.x} ${u.y - 4}V${u.y + 4}`} className="dot-plus" />}
+      </g>
+    )
+  })
+})
 
 /** A plus on every side, placed where the relative will stand. A click on the portrait opens the editor. */
-function CardTools({ person, onDrag }: { person: Person; onDrag: (e: React.PointerEvent, id: string) => void }) {
-  const { rootsBelow } = useApp()
+function CardTools({ id, rootsBelow, lang, acts }: { id: string; rootsBelow: boolean; lang: Lang; acts: Acts }) {
   const stop = (e: React.SyntheticEvent) => e.stopPropagation()
+  const add = (type: QuickType, label: string, side: string, key = side) => (
+    <button key={key} tabIndex={-1} className={`tool add ${side}`} title={`${translate(lang, label)}. ${translate(lang, 'Протяните к человеку, чтобы связать')}`} aria-label={translate(lang, label)} onPointerDown={(e) => acts.current.drag(e, id)} onClick={() => acts.current.add(type, id)}><Plus strokeWidth={2.5} /></button>
+  )
   return (
     <div className="tools" onClick={stop} onPointerDown={stop} onMouseDown={stop} onDoubleClick={stop} onKeyDown={stop}>
-      <Add type="parent" label="Добавить родителя" person={person} side={rootsBelow ? 'bottom' : 'top'} onDrag={onDrag} />
-      <Add type="spouse" label="Добавить супруга" person={person} side="left" onDrag={onDrag} />
-      <Add type="spouse" label="Добавить супруга" person={person} side="right" onDrag={onDrag} />
-      <Add type="child" label="Добавить ребёнка" person={person} side={rootsBelow ? 'top' : 'bottom'} onDrag={onDrag} />
+      {add('parent', 'Добавить родителя', rootsBelow ? 'bottom' : 'top')}
+      {add('spouse', 'Добавить супруга', 'left')}
+      {add('spouse', 'Добавить супруга', 'right')}
+      {add('child', 'Добавить ребёнка', rootsBelow ? 'top' : 'bottom')}
     </div>
   )
 }
@@ -546,16 +621,19 @@ export function Legend() {
   )
   const line = (cls: string) => <svg width="40" height="12" className="legend-svg"><path d="M2 6H38" className={cls} /></svg>
   const ring = (cls: string) => <span className={`legend-ring ${cls}`} />
+  const fine = typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches
   return (
     <div>
       {row(ring('sex-M'), 'Мужчина')}
       {row(ring('sex-F'), 'Женщина')}
       {row(<svg width="40" height="12" className="legend-svg"><path d="M2 6H38" className="union" /><circle cx="20" cy="6" r="5" className="dot" /></svg>, 'Брак, от точки идут дети')}
-      {row(<svg width="40" height="12" className="legend-svg"><path d="M2 6H38" className="union" /><circle cx="20" cy="6" r="5" className="dot open" /></svg>, 'Гражданский союз')}
+      {row(<svg width="40" height="12" className="legend-svg"><path d="M2 6H38" className="union" /><circle cx="20" cy="6" r="5" className="dot open" /></svg>, 'Без регистрации')}
       {row(line('line'), 'Родной ребёнок')}
       {row(line('line adopted'), 'Приёмный или отчим и мачеха')}
       {row(line('line assumed'), 'Предположение')}
-      <p className="mt-2 pt-2 border-t border-border text-xs text-ink-soft leading-relaxed">{t('Протяните линию от аватарки к человеку, чтобы связать, или на пустое место, чтобы добавить нового. Клик по линии и Delete удаляют связь. ⌘Z отменяет.')}</p>
+      {row(ring('assumed'), 'Человек под вопросом')}
+      {row(<ArrowUpDown size={15} />, 'Перевернуть схему')}
+      <p className="mt-2 pt-2 border-t border-border text-xs text-ink-soft leading-relaxed">{t('Нажмите на человека, чтобы открыть карточку. Кнопки + вокруг него добавляют родственника, а если протянуть + к другому человеку, появится связь.')}{fine && <> {t('Клик по линии и Delete удаляют связь. ⌘Z отменяет.').replace('⌘Z', /Mac/.test(navigator.platform) ? '⌘Z' : 'Ctrl+Z')}</>}</p>
     </div>
   )
 }

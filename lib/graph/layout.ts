@@ -137,6 +137,17 @@ function cardHeight(name: string) {
 }
 const mean = (xs: number[]) => xs.reduce((a, c) => a + c, 0) / xs.length
 
+/** dagre takes most of the time on a large family, and only the shape of the tree matters to it, so editing a name or a date reuses its answer. */
+let lastPlacing: { key: string; placed: Map<string, { x: number; y: number }> } | null = null
+function placeBlocks(d: InstanceType<typeof dagre.graphlib.Graph>, members: Map<string, Set<string>>) {
+  const key = JSON.stringify([[...members].map(([k, m]) => [k, m.size]), d.edges().map((e: { v: string; w: string }) => [e.v, e.w])])
+  if (lastPlacing?.key === key) return lastPlacing.placed
+  dagre.layout(d)
+  const placed = new Map([...members.keys()].map((k) => { const n = d.node(k) as { x: number; y: number }; return [k, { x: n.x, y: n.y }] as const }))
+  lastPlacing = { key, placed }
+  return placed
+}
+
 /** `rootsBelow` draws the tree as it grows: elders at the bottom, the youngest at the top. */
 export function layoutFamily(g: Graph, { rootsBelow = false }: { rootsBelow?: boolean } = {}): Layout {
   const { members, blockOf, adjacency, parentsOf } = buildBlocks(g)
@@ -147,9 +158,9 @@ export function layoutFamily(g: Graph, { rootsBelow = false }: { rootsBelow?: bo
     const a = blockOf.get(l.parentId), b = blockOf.get(l.childId)
     if (a !== undefined && b !== undefined && a !== b) d.setEdge(a, b)
   }
-  dagre.layout(d)
+  const placed = placeBlocks(d, members)
 
-  const ys = [...new Set([...members.keys()].map((k) => d.node(k).y))].sort((a, b) => a - b)
+  const ys = [...new Set([...placed.values()].map((n) => n.y))].sort((a, b) => a - b)
   // The tallest caption sets the row, so that bars in the gaps never run through text.
   const heightOf = (id: string) => { const p = byId.get(id); return Math.max(CARD_H, cardHeight(p ? `${p.givenName ?? ''} ${p.surname ?? ''}` : '')) }
   const tallest = Math.max(CARD_H, ...g.persons.map((p) => heightOf(p.id)))
@@ -157,7 +168,7 @@ export function layoutFamily(g: Graph, { rootsBelow = false }: { rootsBelow?: bo
   const rowY = (rank: number) => (rootsBelow ? ys.length - 1 - rank : rank) * ROW
   const blocks = new Map<string, Block>()
   for (const [k, m] of members) {
-    const n = d.node(k)
+    const n = placed.get(k)!
     blocks.set(k, { key: k, members: [...m], rank: ys.indexOf(n.y), x: n.x, width: m.size * CARD_W })
   }
   const rows: Block[][] = ys.map(() => [])
@@ -285,16 +296,22 @@ export function layoutFamily(g: Graph, { rootsBelow = false }: { rootsBelow?: bo
   })
 
   // Children grouped by their set of parents: one family, one shared bar.
+  const linksOf = Map.groupBy(g.parentChild, (l) => l.childId)
   const byFamily = new Map<string, { key: string; parents: string[]; children: string[]; links: ParentLink[] }>()
   for (const [child, parents] of parentsOf) {
     if (!cards.has(child)) continue
     const key = [...parents].sort().join('|')
     const fam = byFamily.get(key) ?? { key, parents, children: [], links: [] }
     fam.children.push(child)
-    fam.links.push(...g.parentChild.filter((l) => l.childId === child))
+    fam.links.push(...(linksOf.get(child) ?? []))
     byFamily.set(key, fam)
   }
-  const dotOf = (parents: string[]) => unions.find((u) => parents.length === 2 && parents.includes(u.union.aId) && parents.includes(u.union.bId))
+  const unionOfPair = new Map<string, UnionPos>()
+  for (const u of unions) {
+    const pair = [u.union.aId, u.union.bId].sort().join('|')
+    if (!unionOfPair.has(pair)) unionOfPair.set(pair, u)
+  }
+  const dotOf = (parents: string[]) => (parents.length === 2 ? unionOfPair.get([...parents].sort().join('|')) : undefined)
   const families = [...byFamily.values()].map((f) => {
     const dot = dotOf(f.parents)
     const ps = f.parents.map((p) => cards.get(p)).filter(Boolean) as CardPos[]
@@ -342,12 +359,26 @@ export function layoutFamily(g: Graph, { rootsBelow = false }: { rootsBelow?: bo
     [g.trunkX, g.start, y],
     ...g.kids.map((c): [number, number, number] => [cards.get(c)!.x, y, entryY(cards.get(c)!)]),
   ]
+  /** Only families that share both a stretch of height and of width can cross, so the others are not looked at. */
+  const neighbours = (() => {
+    const near = new Map<Group, Set<Group>>(groupsList.map((g) => [g, new Set()]))
+    const rows = new Map<number, Group[]>()
+    for (const g of groupsList) {
+      const heights = [g.start, ...Array.from({ length: 6 }, (_, lane) => laneY(g.rank, lane)), ...g.kids.map((c) => entryY(cards.get(c)!))]
+      for (let r = Math.floor(Math.min(...heights) / ROW); r <= Math.floor(Math.max(...heights) / ROW); r++) {
+        const row = rows.get(r) ?? []
+        for (const h of row) if (h !== g && h.lo <= g.hi && h.hi >= g.lo) { near.get(g)!.add(h); near.get(h)!.add(g) }
+        row.push(g)
+        rows.set(r, row)
+      }
+    }
+    return near
+  })()
   /** Crossings a bar at height y would make with every other family, plus a large penalty for two bars on one line. */
   const cost = (g: Group, y: number) => {
     let c = 0
     const mine = verticals(g, y)
-    for (const h of groupsList) {
-      if (h === g) continue
+    for (const h of neighbours.get(g)!) {
       if (h.rank === g.rank && Math.abs(h.barY - y) < 1 && h.lo < g.hi && h.hi > g.lo) c += 1000
       for (const [vx, v1, v2] of verticals(h, h.barY)) if (vx > g.lo && vx < g.hi && y > Math.min(v1, v2) && y < Math.max(v1, v2)) c += 1
       for (const [vx, v1, v2] of mine) if (vx > h.lo && vx < h.hi && h.barY > Math.min(v1, v2) && h.barY < Math.max(v1, v2)) c += 1
