@@ -16,3 +16,7 @@ Only the latest version is supported.
 - Run it behind HTTPS on any public address. `./install.sh --domain` does this.
 - Keep `.env` and the data volume private, and take backups. Data is not encrypted at rest.
 - A person marked as dead, or with a birth year too old to be alive, is treated as not living. Check imported data.
+
+## The assistant and prompt injection
+
+Text in pages, sources and attached files can address the model, and no prompt can stop that for certain. So the app limits what a fooled model can do: nothing on a page loads from another site (Content-Security-Policy), any tool call containing an outside address always asks the person and shows the address, the chat does not render links or pictures from the model, invitation links never reach the model, and role checks run on the server whatever the model says. What the assistant reads, and what is attached in chat, goes to the chosen AI provider.

@@ -14,6 +14,8 @@ function open() {
   fs.mkdirSync(MEDIA_DIR, { recursive: true })
   const sqlite = new Database(path.join(DATA_DIR, 'family.db'))
   sqlite.pragma('journal_mode = WAL')
+  // Each answered save survives a power cut, not only a crash. Writes here are few, so the cost is small.
+  sqlite.pragma('synchronous = FULL')
   sqlite.pragma('foreign_keys = ON')
   sqlite.pragma('busy_timeout = 5000')
   const db = drizzle(sqlite, { schema })

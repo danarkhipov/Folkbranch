@@ -91,6 +91,9 @@ export interface Graph {
   unions: Union[]
 }
 
+/** Whether this person can talk to the assistant now, and if not, why. */
+export type AssistantState = { ready: true } | { ready: false; reason: 'no-key' | 'off' | 'readers'; canFix: boolean }
+
 export interface Me {
   id: string
   name: string

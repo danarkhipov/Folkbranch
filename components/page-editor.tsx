@@ -1,4 +1,5 @@
 'use client'
+import { translate } from '@/lib/i18n'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { BlockNoteSchema, defaultInlineContentSpecs } from '@blocknote/core'
@@ -10,6 +11,7 @@ import '@blocknote/core/fonts/inter.css'
 import '@blocknote/mantine/style.css'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { api, useApp } from '@/lib/client'
+import { autosave, clearDraft, loadDraft, type SaveStatus } from '@/lib/autosave'
 import { personName, type Media, type Page } from '@/lib/types'
 
 const Mention = createReactInlineContentSpec(
@@ -24,7 +26,7 @@ const Mention = createReactInlineContentSpec(
 /** A mark on a paragraph: nobody has checked this yet. */
 const Unverified = createReactInlineContentSpec(
   { type: 'unverified', propSchema: {}, content: 'none' } as const,
-  { render: () => <span className="mark-chip unverified">⚠ не проверено</span> },
+  { render: () => <span className="mark-chip unverified">⚠ {translate(typeof document !== 'undefined' && document.documentElement.lang === 'en' ? 'en' : 'ru', 'не проверено')}</span> },
 )
 
 /** A link from a paragraph to one of this person's sources. */
@@ -54,12 +56,22 @@ export default function PageEditor({ pageId, personId, onChanged }: { pageId: st
 function Editor({ page, personId, onChanged }: { page: Page; personId: string; onChanged: () => void }) {
   const { t, canEdit, lang, graph, focus, openPhoto, notify } = useApp()
   const qc = useQueryClient()
-  const [title, setTitle] = useState(page.title)
-  const [status, setStatus] = useState<'' | 'saved' | 'error'>('')
+  // Text that never reached the server comes back, whatever happened to the last tab.
+  const [draft] = useState(() => {
+    const kept = canEdit ? loadDraft(page.id) : null
+    if (!kept) return null
+    if (kept.title === page.title && JSON.stringify(kept.content) === JSON.stringify(JSON.parse(page.content))) {
+      clearDraft(page.id)
+      return null
+    }
+    return kept
+  })
+  const [title, setTitle] = useState(draft?.title ?? page.title)
+  const [status, setStatus] = useState<SaveStatus>('')
   const initial = useMemo(() => {
-    const blocks = JSON.parse(page.content)
+    const blocks = (draft?.content as unknown[] | undefined) ?? JSON.parse(page.content)
     return blocks.length ? blocks : undefined
-  }, [page.content])
+  }, [page.content, draft])
 
   const editor = useCreateBlockNote({
     schema,
@@ -75,30 +87,45 @@ function Editor({ page, personId, onChanged }: { page: Page; personId: string; o
     },
   })
 
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  const dirty = useRef(false)
-  const latestTitle = useRef(page.title)
-  const save = async () => {
-    clearTimeout(timer.current)
-    if (!dirty.current) return
-    dirty.current = false
-    const renamed = latestTitle.current !== page.title
-    try {
-      await api(`pages/${page.id}`, { method: 'PATCH', json: { title: latestTitle.current, content: editor.document } })
-      setStatus('saved')
+  const latestTitle = useRef(draft?.title ?? page.title)
+  const savedTitle = useRef(page.title)
+  const saver = useRef<ReturnType<typeof autosave>>(null)
+  saver.current ??= autosave({
+    id: page.id,
+    base: draft?.base ?? page.updatedAt,
+    read: () => ({ title: latestTitle.current, content: editor.document }),
+    send: async (text, base) => {
+      const { updatedAt } = await api<{ updatedAt: number }>(`pages/${page.id}`, { method: 'PATCH', json: { ...text, ...(base === null ? {} : { baseUpdatedAt: base }) } })
       qc.invalidateQueries({ queryKey: ['history'] })
-      if (renamed) onChanged()
-    } catch {
-      setStatus('error')
+      if (text.title !== savedTitle.current) { savedTitle.current = text.title; onChanged() }
+      return updatedAt
+    },
+    onStatus: setStatus,
+  })
+  const schedule = () => saver.current!.change()
+  useEffect(() => {
+    const s = saver.current!
+    if (draft) { s.change(); notify(t('Восстановлен несохранённый текст')) }
+    const online = () => s.retry()
+    // The tab is going away. The browser keeps the text; a short one can also still reach the server.
+    const hide = () => {
+      const text = s.hide()
+      if (!text || !navigator.onLine) return
+      const body = JSON.stringify({ title: text.title, content: text.content, baseUpdatedAt: text.base })
+      if (body.length < 60_000) void fetch(`/api/v1/pages/${page.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {})
     }
-  }
-  const schedule = () => {
-    dirty.current = true
-    clearTimeout(timer.current)
-    timer.current = setTimeout(save, 700)
-  }
-  // Leaving a page must not lose the last keystrokes.
-  useEffect(() => () => void save(), []) // eslint-disable-line react-hooks/exhaustive-deps
+    const warn = (e: BeforeUnloadEvent) => { if (s.unsent()) e.preventDefault() }
+    window.addEventListener('online', online)
+    window.addEventListener('pagehide', hide)
+    window.addEventListener('beforeunload', warn)
+    return () => {
+      window.removeEventListener('online', online)
+      window.removeEventListener('pagehide', hide)
+      window.removeEventListener('beforeunload', warn)
+      // Leaving a page must not lose the last keystrokes.
+      s.close()
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const people = useMemo(() => graph.persons.filter((p) => !p.hidden), [graph])
   const person = graph.persons.find((p) => p.id === personId)
@@ -165,7 +192,7 @@ function Editor({ page, personId, onChanged }: { page: Page; personId: string; o
       }}
     >
       <input
-        className="w-full bg-transparent outline-none font-serif text-[26px] font-medium px-[54px] pb-2 placeholder:text-ink-faint"
+        className="w-full bg-transparent outline-none font-serif text-[20px] font-medium px-9 pb-1 placeholder:text-ink-faint"
         value={title}
         readOnly={!canEdit}
         placeholder={t('Без названия')}
@@ -176,7 +203,7 @@ function Editor({ page, personId, onChanged }: { page: Page; personId: string; o
         }}
       />
       {canEdit && (
-        <div className="sticky top-0 z-10 bg-[#fffdf8] flex flex-wrap items-center gap-1.5 px-[54px] py-1.5 text-xs" onMouseDown={(e) => { if ((e.target as HTMLElement).tagName !== 'INPUT') e.preventDefault() }}>
+        <div className="sticky top-0 z-10 bg-[#fffdf8] flex flex-wrap items-center gap-1.5 px-9 py-1 text-xs" onMouseDown={(e) => { if ((e.target as HTMLElement).tagName !== 'INPUT') e.preventDefault() }}>
           <span className="text-ink-faint">{t('К этому абзацу')}:</span>
           <button className="pick rounded-full border border-border px-2.5 h-7 text-ink-soft hover:text-ink" onClick={toggleUnverified}>⚠ {t('Не проверено')}</button>
           <Popover open={picking} onOpenChange={setPicking}>
@@ -185,7 +212,7 @@ function Editor({ page, personId, onChanged }: { page: Page; personId: string; o
               {sources.filter((s) => s.id).map((s) => <button key={s.id} className="text-left rounded px-2 py-1.5 hover:bg-muted truncate" onMouseDown={(e) => e.preventDefault()} onClick={() => cite(s.id!, s.title || t('Без названия'))}>{s.title || t('Без названия')}</button>)}
               {!sources.some((s) => s.id) && <p className="px-2 py-1 text-xs text-ink-faint">{t('У этого человека пока нет источников')}</p>}
               <form className="flex gap-1 pt-1 border-t border-border" onSubmit={(e) => { e.preventDefault(); createSource() }}>
-                <input value={newSource} onChange={(e) => setNewSource(e.target.value)} placeholder={t('Новый источник')} aria-label={t('Новый источник')} className="h-8 min-w-0 flex-1 rounded-md border border-input bg-white px-2" />
+                <input value={newSource} onChange={(e) => setNewSource(e.target.value)} placeholder={t('Новый источник')} aria-label={t('Новый источник')} className="h-9 min-w-0 flex-1 rounded-md border border-input bg-white px-2" />
                 <button className="bar-btn border border-border flex-none" disabled={!newSource.trim()}>{t('Добавить')}</button>
               </form>
             </PopoverContent>
@@ -221,7 +248,17 @@ function Editor({ page, personId, onChanged }: { page: Page; personId: string; o
           }
         />
       </BlockNoteView>
-      {status === 'error' && <p className="px-[54px] text-xs text-destructive">{t('Не удалось сохранить')}</p>}
+      {status === 'waiting' && <p role="status" className="px-9 text-xs text-destructive">{t('Нет связи. Текст сохранён в этом браузере и отправится сам, когда связь вернётся')}</p>}
+      {status === 'failed' && <p role="alert" className="px-9 text-xs text-destructive">{t('Не удалось сохранить')}. {t('Текст остался в этом браузере')}</p>}
+      {status === 'conflict' && (
+        <div role="alert" className="mx-[54px] mt-1 rounded-md border border-destructive/40 p-2 text-xs">
+          <p>{t('Эту страницу уже изменили в другом окне или другой человек. Какой текст оставить?')}</p>
+          <div className="mt-1.5 flex gap-2">
+            <button className="underline" onClick={() => { saver.current!.discard(); setStatus(''); qc.invalidateQueries({ queryKey: ['page', page.id] }) }}>{t('Показать новый, мой убрать')}</button>
+            <button className="underline" onClick={() => saver.current!.overwrite()}>{t('Оставить мой')}</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

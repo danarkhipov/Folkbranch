@@ -1,8 +1,9 @@
 'use client'
+import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowUpDown, CircleHelp, Clock, FileText, GitFork, LogOut, Maximize, Minus, Plus, Search, Settings, Sparkles, Tags, Upload, UserPlus, X } from 'lucide-react'
-import { App, api, useTr, useWrite, type AppCtx, type QuickType } from '@/lib/client'
+import { ArrowUpDown, CircleHelp, Clock, Minus, Plus, Search, Settings, Tags, UserPlus, Users, X } from 'lucide-react'
+import { App, api, undoFailure, useTr, useWrite, type AppCtx, type QuickType } from '@/lib/client'
 import { Family } from '@/lib/kinship'
 import { personName, type Graph, type HistoryEntry, type Lang, type Me } from '@/lib/types'
 import { GraphCanvas, Legend, type CanvasHandle } from './graph-canvas'
@@ -12,6 +13,10 @@ import { QuickAdd } from './quick-add'
 import { PhotoDialog } from './photo-dialog'
 import { ConfirmDialog, SearchDialog } from './person-pickers'
 import { HistoryPanel, HowRelated, SettingsDialog } from './side-panels'
+import type { AssistantState } from '@/lib/types'
+import { AssistantIcon } from './assistant-icon'
+import { cn } from '@/lib/utils'
+import { useAssistantWidth } from './assistant-setup'
 import { ReviewPanel, TextDialog, useProposals } from './ai-panels'
 import { ImportDialog } from './import-dialog'
 
@@ -20,15 +25,35 @@ interface Props {
   lang: Lang
   familyName: string
   providers: { google: boolean; yandex: boolean }
+  assistant: AssistantState
 }
 
-export function FamilyApp({ me, lang, familyName, providers }: Props) {
+// Its libraries are heavy and most visits never open it.
+const AssistantPanel = dynamic(() => import('./assistant-panel'), { ssr: false })
+const AssistantSetup = dynamic(() => import('./assistant-setup'), { ssr: false })
+
+/** Below this, the chat and the card do not fit side by side. */
+const NARROW = 960
+
+export function FamilyApp({ me, lang, familyName, providers, assistant }: Props) {
   const t = useTr(lang)
   const { data: graph } = useQuery({ queryKey: ['graph'], queryFn: () => api<Graph>('graph') })
   const canvas = useRef<CanvasHandle>(null)
   const [focusId, setFocusId] = useState<string | null>(() => (typeof location !== 'undefined' ? new URLSearchParams(location.search).get('p') : null))
   const [search, setSearch] = useState(false)
-  const [side, setSide] = useState<'related' | 'history' | 'review' | null>(null)
+  const [side, setSide] = useState<'related' | 'history' | 'review' | 'assistant' | null>(null)
+  // Mounted on first use and kept, so the conversation survives closing the panel.
+  const [assistantUsed, setAssistantUsed] = useState(false)
+  const [assistantWidth, setAssistantWidth] = useAssistantWidth()
+  const toggleAssistant = useCallback(() => {
+    setAssistantUsed(true)
+    // A narrow window holds one panel at a time.
+    if (window.innerWidth < NARROW) setFocusId(null)
+    setPath(null)
+    setSide((s) => (s === 'assistant' ? null : 'assistant'))
+  }, [])
+  useEffect(() => { document.documentElement.lang = lang }, [lang])
+  useEffect(() => { if (focusId && window.innerWidth < NARROW) setSide((s) => (s === 'assistant' ? null : s)) }, [focusId])
   const [textOpen, setTextOpen] = useState(false)
   const { data: drafts = [] } = useProposals(me.role !== 'reader')
   const draftOps = drafts.reduce((n, d) => n + d.ops.length, 0)
@@ -39,7 +64,7 @@ export function FamilyApp({ me, lang, familyName, providers }: Props) {
   const [dropped, setDropped] = useState<File | null>(null)
   // A file dropped on the chart opens the import; inside the editor it stays a picture in the text.
   useEffect(() => {
-    const isFile = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files') && !(e.target as HTMLElement).closest?.('.panel, [role=dialog]')
+    const isFile = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files') && !(e.target as HTMLElement).closest?.('.panel, .assistant, [role=dialog]')
     const over = (e: DragEvent) => { if (isFile(e)) e.preventDefault() }
     const drop = (e: DragEvent) => {
       if (!isFile(e) || me.role === 'reader') return
@@ -55,12 +80,12 @@ export function FamilyApp({ me, lang, familyName, providers }: Props) {
   useEffect(() => {
     try { if (localStorage.getItem('chart-direction') === 'down') setRootsBelow(false) } catch {}
   }, [])
-  const flipChart = () => {
-    const next = !rootsBelow
+  const directChart = (next: boolean) => {
     setRootsBelow(next)
     try { localStorage.setItem('chart-direction', next ? 'up' : 'down') } catch {}
     requestAnimationFrame(() => requestAnimationFrame(() => canvas.current?.fit()))
   }
+  const flipChart = () => directChart(!rootsBelow)
   const [photo, setPhoto] = useState<{ id: string; list?: string[] } | null>(null)
   const [quick, setQuick] = useState<{ type: QuickType; to: string; otherParent?: string } | { type: null; to: null } | null>(null)
   const [confirmState, setConfirm] = useState<{ text: string; action: string; resolve: (v: boolean) => void } | null>(null)
@@ -79,6 +104,10 @@ export function FamilyApp({ me, lang, familyName, providers }: Props) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         setSearch((s) => !s)
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
+        e.preventDefault()
+        toggleAssistant()
       }
       const typing = (e.target as HTMLElement).closest?.('input, textarea, select, [contenteditable=true], [role=dialog]')
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && !typing && me.role !== 'reader') {
@@ -102,7 +131,11 @@ export function FamilyApp({ me, lang, familyName, providers }: Props) {
     const rows = await api<HistoryEntry[]>('history?limit=20')
     const last = rows.find((r) => !r.undoneAt && !r.undoOf)
     if (!last) return notify(t('Пока ничего не менялось'))
-    await api(`history/${last.id}/undo`, { json: {} })
+    try {
+      await api(`history/${last.id}/undo`, { json: {} })
+    } catch (e) {
+      return notify(undoFailure(e, t))
+    }
     await qc.invalidateQueries()
     notify(`${t('Отменено')}: ${last.summary}`)
   }, [notify, qc]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -138,6 +171,28 @@ export function FamilyApp({ me, lang, familyName, providers }: Props) {
     return on.length ? new Set((graph?.persons ?? []).filter((p) => p.tags.some((tag) => on.includes(tag))).map((p) => p.id)) : null
   }, [groups, allGroups, graph])
 
+  // When the card leaves too little room, the family name goes first and the labels last.
+  const nav = useRef<HTMLElement>(null)
+  const barFull = useRef(720)
+  const barName = useRef(90)
+  const [barMode, setBarMode] = useState<'full' | 'no-name' | 'compact'>('full')
+  useEffect(() => {
+    const card = document.querySelector<HTMLElement>('aside.panel')
+    const measure = () => {
+      const bar = nav.current
+      if (bar && !bar.classList.contains('compact') && !bar.classList.contains('no-name')) {
+        barFull.current = bar.offsetWidth
+        barName.current = (bar.querySelector<HTMLElement>('.family-name')?.offsetWidth ?? 90) + 30 // the name, its divider, tighter buttons
+      }
+      const room = card ? window.innerWidth - card.offsetWidth - 32 : Infinity
+      setBarMode(room >= barFull.current ? 'full' : room >= barFull.current - barName.current ? 'no-name' : 'compact')
+    }
+    measure()
+    const seen = new ResizeObserver(measure)
+    if (card) seen.observe(card)
+    window.addEventListener('resize', measure)
+    return () => { seen.disconnect(); window.removeEventListener('resize', measure) }
+  }, [focusId, ctx])
   if (!ctx) return <div className="canvas" />
   const focused = focusId ? ctx.byId.get(focusId) : undefined
   const panelOpen = !!focused && !focused.hidden
@@ -152,26 +207,24 @@ export function FamilyApp({ me, lang, familyName, providers }: Props) {
 
   return (
     <App.Provider value={ctx}>
-      <GraphCanvas ref={canvas} pathIds={path} groupIds={groupIds} panelOpen={panelOpen} onDelete={onDelete} onRemoveRelation={(type, id) => delRelation.mutate({ type, id })} />
+      <ConnectionNotice t={t} />
+      <GraphCanvas ref={canvas} pathIds={path} groupIds={groupIds} panelOpen={panelOpen} leftInset={side === 'assistant' ? assistantWidth + 12 : 0} onDelete={onDelete} onRemoveRelation={(type, id) => delRelation.mutate({ type, id })} />
 
-      <nav className="float fixed left-3 top-3 z-10 flex items-center gap-0.5 p-1">
-        <span className="font-serif font-medium text-[15px] px-2.5 max-w-[120px] lg:max-w-[220px] truncate">{familyName}</span>
-        <span className="w-px h-5 bg-border mx-0.5" />
-        <button className="bar-btn" aria-label={t('Поиск людей')} onClick={() => setSearch(true)}><Search size={15} /> <span className="hidden lg:inline">{t('Поиск людей')}</span> <kbd className="hidden lg:inline">⌘K</kbd></button>
-        <button className={side === 'related' ? 'bar-btn on' : 'bar-btn'} aria-label={t('Кем приходится?')} onClick={() => { setSide(side === 'related' ? null : 'related'); setPath(null) }}><GitFork size={15} /> <span className="hidden lg:inline">{t('Кем приходится?')}</span></button>
-        <button className={side === 'history' ? 'bar-btn on' : 'bar-btn'} aria-label={t('Что нового')} onClick={() => { setSide(side === 'history' ? null : 'history'); setPath(null) }}><Clock size={15} /> <span className="hidden lg:inline">{t('Что нового')}</span></button>
-        <button className="bar-btn" title={t('Текст')} aria-label={t('Текст')} onClick={() => setTextOpen(true)}><FileText size={15} /></button>
-        {ctx.canEdit && <button className="bar-btn" title={t('Импорт')} aria-label={t('Импорт')} onClick={() => { setDropped(null); setImporting(true) }}><Upload size={15} /></button>}
-        {(draftOps > 0 || side === 'review') && <button className={side === 'review' ? 'bar-btn on' : 'bar-btn !text-rust'} onClick={() => { setSide(side === 'review' ? null : 'review'); setPath(null) }}><Sparkles size={15} /> <span className="hidden lg:inline">{t('Правки ИИ')}</span> {draftOps}</button>}
-        <button className="bar-btn" title={t('Настройки')} aria-label={t('Настройки')} onClick={() => setSettings(true)}><Settings size={15} /></button>
-        <button className="bar-btn" title={t('Выйти')} aria-label={t('Выйти')} onClick={async () => { if (!(await ctx.confirm(t('После выхода войти снова можно будет только по новой ссылке или через привязанный Google и Яндекс ID.'), t('Выйти')))) return; await fetch('/api/auth/sign-out', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); location.href = '/login' }}><LogOut size={15} /></button>
+      <nav aria-label={t('Главное меню')} ref={nav} className={cn('float main-bar fixed left-3 top-3 z-10 flex items-center gap-0.5 p-1', barMode !== 'full' && barMode)}>
+        <span className="family-name font-serif font-medium text-[15px] px-2.5 max-w-[220px] truncate">{familyName}</span>
+        <span className="sep w-px h-5 bg-border mx-0.5" />
+        <button className="bar-btn" title={`${t('Поиск людей')} (⌘K)`} aria-label={t('Поиск людей')} onClick={() => setSearch(true)}><Search size={16} /> <span className="nav-label">{t('Поиск')}</span></button>
+        <button className={side === 'related' ? 'bar-btn on' : 'bar-btn'} title={t('Кем приходится?')} aria-label={t('Кем приходится?')} onClick={() => { setSide(side === 'related' ? null : 'related'); setPath(null) }}><Users size={16} /> <span className="nav-label">{t('Родство')}</span></button>
+        <button className={side === 'assistant' ? 'bar-btn on' : 'bar-btn'} title={`${t('Ассистент')} (⌘J)`} aria-label={t('Ассистент')} onClick={toggleAssistant}><AssistantIcon /> <span className="nav-label">{t('Ассистент')}</span></button>
+        <button className={side === 'history' || side === 'review' ? 'bar-btn on relative' : 'bar-btn relative'} title={draftOps > 0 ? `${t('Что нового')}: ${t('Правки ассистента')} ${draftOps}` : t('Что нового')} aria-label={t('Что нового')} onClick={() => { setSide(side === 'review' ? 'history' : side === 'history' ? null : draftOps > 0 ? 'review' : 'history'); setPath(null) }}><Clock size={16} /> <span className="nav-label">{t('Что нового')}</span>{draftOps > 0 && <span className="absolute right-1 top-1 min-w-4 rounded-full bg-rust px-1 text-center text-[11px] leading-4 text-white">{draftOps}</span>}</button>
+        <button className="bar-btn" title={t('Настройки')} aria-label={t('Настройки')} onClick={() => setSettings(true)}><Settings size={16} /> <span className="nav-label">{t('Настройки')}</span></button>
       </nav>
 
-      <div className="float fixed left-3 bottom-3 z-10 flex items-center gap-0.5 p-1">
+      {/* Only about how the chart looks; it steps aside for a panel on the left. */}
+      <div aria-label={t('Вид схемы')} role="group" className={cn('float view-bar fixed bottom-3 z-10 flex items-center gap-0.5 p-1', (panelOpen || side) && 'crowded')} style={{ left: side === 'assistant' ? assistantWidth + 24 : side === 'history' ? 344 : side === 'review' ? 408 : 12 }}>
         <button className="bar-btn" title={t('Отдалить')} aria-label={t('Отдалить')} onClick={() => canvas.current?.zoomBy(0.75)}><Minus size={15} /></button>
         <button className="bar-btn" title={t('Приблизить')} aria-label={t('Приблизить')} onClick={() => canvas.current?.zoomBy(1.33)}><Plus size={15} /></button>
-        <button className="bar-btn" onClick={() => { focus(null); canvas.current?.fit() }}><Maximize size={14} /> {t('Показать всех')}</button>
-        <button className="bar-btn" title={t(rootsBelow ? 'Сейчас старшие снизу. Показать старших сверху' : 'Сейчас старшие сверху. Показать старших снизу')} aria-label={t(rootsBelow ? 'Сейчас старшие снизу. Показать старших сверху' : 'Сейчас старшие сверху. Показать старших снизу')} onClick={flipChart}><ArrowUpDown size={15} /> <span className="hidden lg:inline">{t(rootsBelow ? 'Старшие снизу' : 'Старшие сверху')}</span></button>
+        <button className="bar-btn" title={t(rootsBelow ? 'Сейчас старшие снизу. Показать старших сверху' : 'Сейчас старшие сверху. Показать старших снизу')} aria-label={t(rootsBelow ? 'Сейчас старшие снизу. Показать старших сверху' : 'Сейчас старшие сверху. Показать старших снизу')} onClick={flipChart}><ArrowUpDown size={15} /></button>
         {allGroups.length > 0 && (
           <Popover>
             <PopoverTrigger asChild><button className={groups.length ? 'bar-btn on' : 'bar-btn'} title={t('Группы')} aria-label={t('Группы')}><Tags size={15} />{groups.length > 0 && ` ${groups.length}`}</button></PopoverTrigger>
@@ -202,6 +255,8 @@ export function FamilyApp({ me, lang, familyName, providers }: Props) {
       {side === 'related' && <HowRelated onPath={setPath} onClose={() => { setSide(null); setPath(null) }} />}
       {side === 'history' && <HistoryPanel onClose={() => setSide(null)} />}
       {side === 'review' && <ReviewPanel onClose={() => setSide(null)} />}
+      {!assistant.ready && <AssistantSetup state={assistant} open={side === 'assistant'} width={assistantWidth} onWidth={setAssistantWidth} onClose={() => setSide(null)} />}
+      {assistant.ready && assistantUsed && <AssistantPanel open={side === 'assistant'} width={assistantWidth} onWidth={setAssistantWidth} onClose={() => setSide(null)} onPath={setPath} onDirection={directChart} />}
       {panelOpen && <PersonPanel key={focused!.id} person={focused!} onClose={() => focus(null)} onDelete={onDelete} />}
 
       <SearchDialog open={search} onOpenChange={setSearch} onPick={(id) => focus(id)} />
@@ -217,7 +272,25 @@ export function FamilyApp({ me, lang, familyName, providers }: Props) {
       <TextDialog open={textOpen} onOpenChange={setTextOpen} />
       <ImportDialog open={importing} file={dropped} onOpenChange={setImporting} />
       <ConfirmDialog state={confirmState} onClose={() => setConfirm(null)} />
-      <SettingsDialog open={settings} onOpenChange={setSettings} familyName={familyName} providers={providers} />
+      <SettingsDialog open={settings} onOpenChange={setSettings} familyName={familyName} providers={providers} onText={() => setTextOpen(true)} />
     </App.Provider>
   )
+}
+
+/** Says so when the server cannot be reached, so nobody types into a chart that will not save. */
+function ConnectionNotice({ t }: { t: (key: string) => string }) {
+  const [down, setDown] = useState(false)
+  useEffect(() => {
+    const check = () => fetch('/api/health', { cache: 'no-store' }).then((r) => setDown(!r.ok)).catch(() => setDown(true))
+    const timer = setInterval(check, 15_000)
+    window.addEventListener('online', check)
+    window.addEventListener('offline', check)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('online', check)
+      window.removeEventListener('offline', check)
+    }
+  }, [])
+  if (!down) return null
+  return <div role="alert" className="float fixed left-1/2 -translate-x-1/2 top-3 z-50 px-3 py-1.5 text-xs text-destructive">{t('Нет связи с сервером. Схема показана как при последней загрузке, новые правки могут не сохраниться')}</div>
 }

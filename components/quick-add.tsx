@@ -90,7 +90,7 @@ export function QuickAdd({ state, onClose }: { state: State; onClose: (createdId
         {choices && (
           <div className="flex gap-1 rounded-lg bg-muted p-1" role="radiogroup">
             {choices.map(([value, label]) => (
-              <button key={value} type="button" role="radio" aria-checked={type === value} className={cn('flex-1 h-8 rounded-md text-[13px]', type === value ? 'bg-background shadow-sm font-medium' : 'text-ink-soft')} onClick={() => setPicked(value)}>{t(label)}</button>
+              <button key={value} type="button" role="radio" aria-checked={type === value} className={cn('flex-1 h-9 rounded-md text-[13px]', type === value ? 'bg-background shadow-sm font-medium' : 'text-ink-soft')} onClick={() => setPicked(value)}>{t(label)}</button>
             ))}
           </div>
         )}

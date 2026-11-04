@@ -2,11 +2,9 @@ import { and, eq, or } from 'drizzle-orm'
 import { getDb, schema } from '../db'
 import type { Certainty, Claim, Fact, Graph, ParentKind, Person, Sex, Source, UnionKind } from '../types'
 import { personName, yearOf } from '../types'
-import { translate } from '../i18n'
-import { Actor, Changes, can, mutate, newId, OpError, requireRole } from './core'
-import { getSetting } from './settings'
+import { Actor, Changes, can, mutate, newId, OpError, requireRole, seesOnlyPublic } from './core'
+import { say } from './settings'
 
-const say = (key: string) => translate(getSetting('language') === 'en' ? 'en' : 'ru', key)
 const label = (p: { givenName: string; surname: string } | undefined) => (p && personName(p)) || say('Без названия')
 
 function isLikelyLiving(birthYear: number | null, deathDate: string, deathYear: number | null) {
@@ -15,7 +13,7 @@ function isLikelyLiving(birthYear: number | null, deathDate: string, deathYear: 
 }
 
 export function hiddenFor(actor: Actor, p: { id: string; living: boolean }) {
-  return actor.role === 'reader' && p.living && p.id !== actor.personId
+  return seesOnlyPublic(actor) && p.living && p.id !== actor.personId
 }
 
 export function getGraph(actor: Actor): Graph {
@@ -90,9 +88,12 @@ export function createPerson(
 ) {
   requireRole(actor, 'editor')
   const name = [input.givenName, input.surname].filter(Boolean).join(' ')
-  return mutate(actor, { summary: `${say('Добавить')}: ${name}`, personIds: relation ? [relation.to] : [] }, (c) => {
+  const personIds = relation ? [relation.to] : []
+  return mutate(actor, { summary: `${say('Добавить')}: ${name}`, personIds }, (c) => {
     const sex: Sex | undefined = relation?.type === 'father' || relation?.type === 'son' ? 'M' : relation?.type === 'mother' || relation?.type === 'daughter' ? 'F' : undefined
     const id = insertPerson(c, { ...input, sex: input.sex ?? sex })
+    // A reader's history leaves out entries naming nobody, so the new person must be named here.
+    personIds.push(id)
     if (relation) link(c, relation.type, relation.to, id, relation.otherParentId)
     return getPersonRow(id)
   })

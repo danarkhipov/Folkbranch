@@ -16,18 +16,20 @@ import { listWriter } from '@/lib/list-writes'
 import { ageWords, patronymicFrom } from '@/lib/names'
 import { cn } from '@/lib/utils'
 import { personName, type Certainty, type Fact, type Media, type ClaimField, type PageMeta, type Person, type Reliability, type Source, type Union } from '@/lib/types'
+import { PanelEdge, useStoredSize } from './assistant-setup'
 import { Mini, useEsc } from './person-pickers'
 
 const PageEditor = dynamic(() => import('./page-editor'), { ssr: false, loading: () => <div className="h-40" /> })
 
-function Field({ value, onSave, placeholder, className, readOnly, id, list }: { value: string; onSave: (v: string) => void; placeholder?: string; className?: string; readOnly?: boolean; id?: string; list?: string }) {
+function Field({ value, onSave, placeholder, className, readOnly, id, list, fit }: { fit?: boolean; value: string; onSave: (v: string) => void; placeholder?: string; className?: string; readOnly?: boolean; id?: string; list?: string }) {
   const [v, setV] = useState(value)
   useEffect(() => setV(value), [value])
   return (
     <input
       id={id}
       list={list}
-      className={cn('inline-input', className)}
+      className={cn('inline-input', fit && 'inline-fit', className)}
+      size={fit ? Math.max(v.length || (placeholder ?? '').length, 2) : undefined}
       value={v}
       aria-label={placeholder}
       placeholder={readOnly ? '' : placeholder}
@@ -40,12 +42,13 @@ function Field({ value, onSave, placeholder, className, readOnly, id, list }: { 
 }
 
 export function PersonPanel({ person, onClose, onDelete }: { person: Person; onClose: () => void; onDelete: (id: string) => void }) {
+  const [width, setWidth] = useStoredSize('person-panel-width', 480, (w) => Math.round(Math.max(360, Math.min(w, window.innerWidth - 80))))
+  const [height, setHeight] = useStoredSize('person-panel-height', 560, (h) => Math.round(Math.max(240, Math.min(h, window.innerHeight - 16))))
   const app = useApp()
   const { t, canEdit, me, family, lang, graph, byId } = app
   const [full, setFull] = useState(false)
   useEsc(onClose)
   const patch = useWrite((p: Partial<Person>) => api(`persons/${person.id}`, { method: 'PATCH', json: p }))
-  const claim = useWrite((personId: string | null) => api('me', { method: 'PATCH', json: { personId } }).then(() => location.reload()))
   const save = (key: keyof Person) => (v: string) => patch.mutate({ [key]: v })
   /** A name with versions keeps them in step: typing corrects the main one. */
   const saveName = (key: ClaimField) => (v: string) => patch.mutate(person.claims.some((c) => c.field === key) ? editValue(person, key, v) : { [key]: v })
@@ -61,37 +64,38 @@ export function PersonPanel({ person, onClose, onDelete }: { person: Person; onC
   const suggested = canEdit && lang === 'ru' && !person.patronymic && father ? patronymicFrom(father.givenName, person.sex) : ''
   const toMe = me.personId && me.personId !== person.id ? family.relation(me.personId, person.id, lang) : null
   const ro = !canEdit
+  const [addPatronymic, setAddPatronymic] = useState(false)
 
   return (
-    <aside className={cn('panel', full && 'full')}>
-      <div className="absolute right-3 top-3 flex gap-0.5 z-10">
+    <aside className={cn('panel', full && 'full')} style={{ '--panel-w': `${width}px`, '--panel-h': `${height}px` } as React.CSSProperties}>
+      <PanelEdge edge="left" label="Ширина карточки" width={width} home={480} onWidth={setWidth} className="max-sm:hidden" />
+      <PanelEdge edge="top" label="Высота карточки" width={height} home={Math.round((typeof window === 'undefined' ? 800 : window.innerHeight) * 0.7)} onWidth={setHeight} className="sm:hidden" />
+      <div className="absolute right-2 top-2 flex gap-0.5 z-10">
+        {canEdit && <button className="bar-btn !p-0 w-7 !h-7 hover:!text-destructive" aria-label={t('Удалить человека')} title={t('Удалить человека')} onClick={() => onDelete(person.id)}><Trash2 size={14} /></button>}
         <button className="bar-btn !p-0 w-7 !h-7" aria-label={t(full ? 'Свернуть' : 'Развернуть')} title={t(full ? 'Свернуть' : 'Развернуть')} onClick={() => setFull(!full)}>{full ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</button>
         <button className="bar-btn !p-0 w-7 !h-7" aria-label={t('Закрыть')} title={t('Закрыть')} onClick={onClose}><X size={15} /></button>
       </div>
 
-      <header className="px-6 pt-6 pb-3 flex gap-4 items-start max-sm:px-4 max-sm:pt-4 max-sm:pb-2 max-sm:gap-3">
+      <header className="flex items-center gap-3 pl-4 pr-24 pt-3 pb-2">
         <AvatarButton person={person} />
         <div className="min-w-0 flex-1">
-          <Field readOnly={ro} className="font-serif text-[22px] font-medium leading-tight !w-[calc(100%-56px)] max-sm:text-[19px]" value={person.givenName} placeholder={t('Имя')} onSave={saveName('givenName')} />
-          {person.patronymic && <Field readOnly={ro} className="font-serif text-[17px] leading-tight max-sm:text-[15px]" value={person.patronymic} placeholder={t('Отчество')} onSave={saveName('patronymic')} />}
-          <Field readOnly={ro} className="font-serif text-[22px] font-medium leading-tight max-sm:text-[19px]" value={person.surname} placeholder={t('Фамилия')} onSave={saveName('surname')} />
-          {!person.patronymic && !ro && lang === 'ru' && (
-            <div className="flex items-center text-ink-soft text-[13px] mt-0.5 gap-1.5 min-w-0">
-              <span className="flex-none max-sm:text-[12px]">{t('Отчество')}:</span>
-              <Field value="" placeholder={t('не указано')} className="min-w-0 flex-1" onSave={saveName('patronymic')} />
-              {suggested && <button className="pick flex-none text-xs rounded-full bg-muted px-2 h-6 hover:text-ink" title={t('По имени отца')} onClick={() => patch.mutate({ patronymic: suggested })}>{t('Заполнить')}: {suggested}</button>}
-            </div>
-          )}
-          {(person.maidenName || (!ro && person.sex === 'F')) && (
-            <div className="flex items-baseline text-ink-soft text-[13px] mt-0.5"><span className="flex-none mr-1.5 max-sm:text-[12px]">{t('Девичья фамилия')}:</span><Field readOnly={ro} value={person.maidenName} placeholder={t('не указана')} onSave={saveName('maidenName')} /></div>
-          )}
-          {toMe && <div className="text-rust text-[13px] mt-1">{yourTerm(toMe.label, person.sex, lang)}</div>}
-          {me.personId === person.id && <div className="text-rust text-[13px] mt-1">{t('Это вы')}</div>}
+          <div className="flex flex-wrap items-baseline gap-x-1.5 font-serif text-[18px] font-medium leading-snug">
+            <Field fit readOnly={ro} value={person.givenName} placeholder={t('Имя')} onSave={saveName('givenName')} />
+            {(person.patronymic || addPatronymic) && <Field id="f-patronymic" fit readOnly={ro} value={person.patronymic} placeholder={t('Отчество')} onSave={saveName('patronymic')} />}
+            <Field fit readOnly={ro} value={person.surname} placeholder={t('Фамилия')} onSave={saveName('surname')} />
+          </div>
+          <div className="flex flex-wrap sm:flex-wrap max-sm:flex-nowrap items-center gap-x-2 text-xs text-ink-soft [&>button]:whitespace-nowrap">
+            {(person.maidenName || (!ro && person.sex === 'F')) && <Field fit readOnly={ro} value={person.maidenName} placeholder={t('девичья фамилия')} onSave={saveName('maidenName')} />}
+            {!person.patronymic && !addPatronymic && !ro && lang === 'ru' && <button className="pick hover:text-ink" onClick={() => { setAddPatronymic(true); setTimeout(() => document.getElementById('f-patronymic')?.focus(), 30) }}>+ {t('отчество')}</button>}
+            {!person.patronymic && !ro && lang === 'ru' && suggested && <button className="pick underline decoration-dotted underline-offset-2 hover:text-ink" title={t('По имени отца')} onClick={() => patch.mutate({ patronymic: suggested })}>{suggested}?</button>}
+            {toMe && <span className="text-rust">{yourTerm(toMe.label, person.sex, lang)}</span>}
+            {me.personId === person.id && <span className="text-rust">{t('Это вы')}</span>}
+          </div>
         </div>
       </header>
 
       <Tabs value={tab ?? (pageList && !pageList.length && !canEdit ? 'family' : 'pages')} onValueChange={setTab} className="flex-1 min-h-0 flex flex-col gap-0">
-        <TabsList className="mx-6 max-sm:mx-4 w-fit bg-muted h-8">
+        <TabsList className="panel-tabs mx-4 w-fit bg-muted">
           <TabsTrigger value="pages" className="text-[13px]">{t('Биография')}</TabsTrigger>
           <TabsTrigger value="details" className="text-[13px]">{t('Сведения')}</TabsTrigger>
           <TabsTrigger value="family" className="text-[13px]">{t('Семья')}</TabsTrigger>
@@ -104,11 +108,6 @@ export function PersonPanel({ person, onClose, onDelete }: { person: Person; onC
         <TabsContent value="family" className="flex-1 min-h-0 overflow-auto"><FamilyTab person={person} /></TabsContent>
         <TabsContent value="photos" className="flex-1 min-h-0 overflow-auto"><PhotosTab person={person} /></TabsContent>
       </Tabs>
-      {canEdit && (
-        <div className="border-t border-border px-6 py-2.5 flex justify-end">
-          <button className="pick text-xs text-ink-soft hover:text-destructive" onClick={() => onDelete(person.id)}>{t('Удалить человека')}</button>
-        </div>
-      )}
     </aside>
   )
 }
@@ -135,7 +134,7 @@ function AvatarButton({ person }: { person: Person }) {
 
   return (
     <>
-      <button disabled={!canEdit} aria-label={t('Выбрать фото')} title={canEdit ? t('Выбрать фото') : undefined} className="w-[96px] h-[96px] max-sm:w-[64px] max-sm:h-[64px] rounded-full overflow-hidden bg-[#e7dfcd] flex-none shadow-[0_0_0_3px_#fffdf8,0_2px_10px_rgb(60_45_20/.25)] enabled:hover:opacity-85 transition" onClick={() => input.current?.click()}>
+      <button disabled={!canEdit} aria-label={t('Выбрать фото')} title={canEdit ? t('Выбрать фото') : undefined} className="w-[48px] h-[48px] flex-none rounded-full overflow-hidden bg-[#e7dfcd] flex-none shadow-[0_0_0_3px_#fffdf8,0_2px_10px_rgb(60_45_20/.25)] enabled:hover:opacity-85 transition" onClick={() => input.current?.click()}>
         <img src={avatarUrl(person)} alt="" className="w-full h-full object-cover" />
       </button>
       <input ref={input} type="file" accept="image/*" hidden onChange={(e) => {
@@ -203,13 +202,13 @@ function Pages({ person, full, onDetails }: { person: Person; full: boolean; onD
   )
   return (
     <div className={cn('h-full', full ? 'grid grid-cols-[260px_1fr]' : 'flex flex-col')}>
-      <div className={cn('px-4 pt-3 pb-2', full ? 'border-r border-border overflow-auto' : 'max-h-24 overflow-auto border-b border-border')}>
+      <div className={cn('px-3 py-1', full ? 'border-r border-border overflow-auto' : 'max-h-24 overflow-auto border-b border-border')}>
         {(pages.length > 1 || full) && tree}
         {canEdit && pages.length > 0 && <button className="flex items-center gap-1.5 text-ink-faint hover:text-ink text-[13px] px-2 py-1 mt-0.5" onClick={() => add()}><FilePlus2 size={14} /> {t('Новая страница')}</button>}
         {!canEdit && !pages.length && <p className="text-ink-faint text-[13px] px-2 py-1">{t('Страниц пока нет')}</p>}
       </div>
       <div className="flex-1 min-h-0 overflow-auto">
-        {selected && <div className={cn('mx-auto py-4', full ? 'max-w-3xl px-10' : 'px-3')}><PageEditor key={selected.id} pageId={selected.id} personId={person.id} onChanged={refresh} /></div>}
+        {selected && <div className={cn('mx-auto py-2', full ? 'max-w-3xl px-10' : '')}><PageEditor key={selected.id} pageId={selected.id} personId={person.id} onChanged={refresh} /></div>}
         {!selected && canEdit && (
           <div className="px-6 py-8 flex flex-col items-start gap-2">
             <p className="font-serif text-[17px] text-ink">{t('Расскажите о человеке')}</p>
@@ -249,7 +248,7 @@ function PageTree({ pages, selected, onOpen, onAdd, onRemove, onMove }: { pages:
           onClick={() => onOpen(p.id)}
         >
           <Popover>
-            <PopoverTrigger asChild disabled={!canEdit}><button className="w-5 text-center" onClick={(e) => e.stopPropagation()}>{p.icon || '📄'}</button></PopoverTrigger>
+            <PopoverTrigger asChild disabled={!canEdit}><button className="w-5 text-center" aria-label={t('Значок страницы')} title={t('Значок страницы')} onClick={(e) => e.stopPropagation()}>{p.icon || '📄'}</button></PopoverTrigger>
             <PopoverContent className="w-auto p-1.5 grid grid-cols-6 gap-0.5">
               {ICONS.map((i) => (
                 <button key={i} className="w-7 h-7 rounded hover:bg-muted" onClick={async (e) => {
@@ -300,7 +299,7 @@ function FamilyTab({ person }: { person: Person }) {
     )
   }
   const kindToggle = (l: { id: string; kind: string; certainty: string }) => canEdit && (
-    <select title={t('Уверенность')} value={`${l.kind}:${l.certainty}`} className="pick bg-transparent text-[11px] max-sm:text-[13px] text-ink-soft min-w-0 max-w-[130px] max-sm:max-w-full max-sm:basis-full max-sm:order-last truncate rounded hover:bg-background" onChange={(e) => {
+    <select title={t('Уверенность')} value={`${l.kind}:${l.certainty}`} className="pick bg-transparent text-[11px] max-sm:text-[13px] text-ink-soft min-w-0 max-w-[220px] max-sm:max-w-full max-sm:basis-full max-sm:order-last truncate rounded hover:bg-background" onChange={(e) => {
       const [kind, certainty] = e.target.value.split(':')
       setCertainty.mutate({ type: 'parent', id: l.id, kind, certainty })
     }}>
@@ -315,7 +314,7 @@ function FamilyTab({ person }: { person: Person }) {
       <div className="flex flex-wrap gap-1.5 items-center">
         {items}
         {canEdit && add && (
-          <button className="h-8 px-3 rounded-full border border-dashed border-ink-faint text-ink-soft hover:text-ink hover:border-ink flex items-center gap-1" onClick={() => quickAdd(add[0] as never, person.id)}><Plus size={14} /> {t(add[1])}</button>
+          <button className="h-9 px-3 rounded-full border border-dashed border-ink-faint text-ink-soft hover:text-ink hover:border-ink flex items-center gap-1" onClick={() => quickAdd(add[0] as never, person.id)}><Plus size={14} /> {t(add[1])}</button>
         )}
       </div>
     </section>
@@ -542,7 +541,7 @@ function Versions({ person, field, current, change, attach }: { person: Person; 
         })}
         {canEdit && (
           <form className="flex flex-col gap-1.5" onSubmit={(e) => { e.preventDefault(); const v = value.trim(); if (!v) return; change(addVersion(current(), field, v, pending)); setValue(''); setPending(null) }}>
-            <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={t('Другая версия значения')} aria-label={t('Другая версия значения')} className="h-8 rounded-md border border-input bg-white px-2" />
+            <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={t('Другая версия значения')} aria-label={t('Другая версия значения')} className="h-9 rounded-md border border-input bg-white px-2" />
             <div className="flex items-center gap-2 min-w-0">
               {sourceSelect(pending, setPending)}
               <button className="bar-btn border border-border ml-auto flex-none" disabled={!value.trim()}>{t('Добавить')}</button>
@@ -567,7 +566,7 @@ function DateField({ value, onSave, readOnly, placeholder, id }: { value: string
     <div className="flex items-baseline gap-1 min-w-0">
       {rest && (readOnly
         ? q && <span className="text-ink-soft">{t(QUALIFIERS.find(([k]) => k === q)![1])}</span>
-        : <select aria-label={t('Точность даты')} value={q} onChange={(e) => onSave(e.target.value + rest)} className="flex-none bg-transparent text-ink-soft text-[12px] rounded hover:bg-muted max-sm:min-h-8">{QUALIFIERS.map(([k, label]) => <option key={k} value={k}>{t(label)}</option>)}</select>)}
+        : <select aria-label={t('Точность даты')} value={q} onChange={(e) => onSave(e.target.value + rest)} className="flex-none bg-transparent text-ink-soft text-[12px] rounded hover:bg-muted max-sm:min-h-9">{QUALIFIERS.map(([k, label]) => <option key={k} value={k}>{t(label)}</option>)}</select>)}
       <Field id={id} readOnly={readOnly} value={rest} placeholder={placeholder} onSave={(v) => onSave(v.trim() ? (/^[~<>]/.test(v) ? v : q + v) : '')} />
     </div>
   )
@@ -590,17 +589,6 @@ function Details({ person, patch: send, go, photoCount, pageCount }: { person: P
   const places = useMemo(() => [...new Set(graph.persons.flatMap((p) => [p.birthPlace, p.deathPlace, ...p.facts.map((f) => f.place)]).concat(graph.unions.map((u) => u.place)).filter(Boolean))].sort().slice(0, 300), [graph])
   const hasParents = graph.parentChild.some((l) => l.childId === person.id)
   const alive = person.living
-  const todo: [string, boolean, string, string?][] = [
-    ['пол', person.sex !== 'U', 'details', 'f-sex'],
-    ['дату рождения', !!person.birthDate, 'details', 'f-birth-date'],
-    ['место рождения', !!person.birthPlace, 'details', 'f-birth-place'],
-    ...(alive ? [] : [['дату смерти', !!person.deathDate, 'details', 'f-death-date'], ['место смерти', !!person.deathPlace, 'details', 'f-death-place']] as [string, boolean, string, string?][]),
-    ['родителей', hasParents, 'family'],
-    ['фото', photoCount > 0 || !!person.avatarMediaId, 'photos'],
-    ['биографию', pageCount > 0, 'pages'],
-    ['источник', person.sources.length > 0, 'details', 'f-sources'],
-  ]
-  const done = todo.filter((x) => x[1]).length
   const now = new Date().getFullYear()
   const age = person.birthYear ? (alive ? now : person.deathYear) : null
   const years = person.birthYear && age ? age - person.birthYear : null
@@ -614,29 +602,15 @@ function Details({ person, patch: send, go, photoCount, pageCount }: { person: P
   }
 
   return (
-    <div className="px-6 max-sm:px-4 pb-5 flex flex-col gap-4 text-[13px]">
+    <div className="px-4 pb-5 flex flex-col gap-4 text-[13px]">
       <datalist id="fact-kinds">{FACT_KINDS.map((k) => <option key={k} value={t(k)} />)}</datalist>
       <datalist id="known-places">{places.map((p) => <option key={p} value={p} />)}</datalist>
 
-      {canEdit && done < todo.length && (
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-2 text-xs text-ink-soft">
-            <span className="whitespace-nowrap">{t('Заполнено')} {done} {t('из')} {todo.length}</span>
-            <span className="h-1 flex-1 rounded-full bg-muted overflow-hidden"><span className="block h-full bg-rust" style={{ width: `${(done / todo.length) * 100}%` }} /></span>
-          </div>
-          <div className="flex flex-wrap gap-1 items-center text-xs">
-            <span className="text-ink-faint">{t('Добавьте')}:</span>
-            {todo.filter((x) => !x[1]).map(([label, , tab, field]) => <button key={label} className="pick rounded-full bg-muted px-2 h-6 text-ink-soft hover:text-ink" onClick={() => go(tab, field)}>{t(label)}</button>)}
-          </div>
-        </div>
-      )}
-
-      {(card.documented + card.told + card.unsourced + card.conflict > 0) && (
+      {(card.documented + card.told + card.conflict > 0) && (
         <p className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
           {card.conflict > 0 && <span className="text-destructive">⚠ {t('расхождений')}: {card.conflict}</span>}
           {card.documented > 0 && <span className="text-ink-soft">{t('по документу')}: {card.documented}</span>}
           {card.told > 0 && <span className="text-ink-soft">{t('со слов')}: {card.told}</span>}
-          {card.unsourced > 0 && <span className="text-ink-faint">{t('без источника')}: {card.unsourced}</span>}
         </p>
       )}
 
@@ -713,11 +687,11 @@ function Details({ person, patch: send, go, photoCount, pageCount }: { person: P
             />
           ))}
           {!ro && (
-            <div className="flex flex-wrap gap-1">
-              {[...FACT_KINDS, ''].map((k) => (
-                <button key={k} className="pick rounded-full border border-dashed border-ink-faint px-2 h-6 text-xs text-ink-soft hover:text-ink hover:border-ink" onClick={() => { setFresh(writer.get('facts').length); edit('facts', (list) => [...list, { kind: k && t(k), date: '', place: '', note: '', source: '' }]) }}>+ {t(k || 'Другое')}</button>
-              ))}
-            </div>
+            <select aria-label={t('Добавить факт')} value="" className="h-9 max-w-64 rounded-lg border border-input bg-white px-2 text-xs text-ink-soft" onChange={(e) => { if (!e.target.value) return; const k = e.target.value === '__other' ? '' : e.target.value; setFresh(writer.get('facts').length); edit('facts', (list) => [...list, { kind: k && t(k), date: '', place: '', note: '', source: '' }]) }}>
+              <option value="">+ {t('Добавить факт')}</option>
+              {FACT_KINDS.map((k) => <option key={k} value={k}>{t(k)}</option>)}
+              <option value="__other">{t('Другое')}</option>
+            </select>
           )}
         </section>
       )}
@@ -736,11 +710,10 @@ function Details({ person, patch: send, go, photoCount, pageCount }: { person: P
             />
           ))}
           {!ro && (
-            <div className="flex flex-wrap gap-1">
-              {SOURCE_KINDS.map((k) => (
-                <button key={k} className="pick rounded-full border border-dashed border-ink-faint px-2 h-6 text-xs text-ink-soft hover:text-ink hover:border-ink" onClick={() => { setFreshSource(writer.get('sources').length); edit('sources', (list) => [...list, { id: Math.random().toString(36).slice(2, 10), title: k && t(k), ref: '', page: '', url: '', reliability: SOURCE_RELIABILITY[k] ?? 'copy' }]) }}>+ {t(k || 'Другое')}</button>
-              ))}
-            </div>
+            <select aria-label={t('Добавить источник')} value="" className="h-9 max-w-64 rounded-lg border border-input bg-white px-2 text-xs text-ink-soft" onChange={(e) => { const k = e.target.value === '__blank' ? '' : e.target.value; if (!e.target.value) return;  setFreshSource(writer.get('sources').length); edit('sources', (list) => [...list, { id: Math.random().toString(36).slice(2, 10), title: k && t(k), ref: '', page: '', url: '', reliability: SOURCE_RELIABILITY[k] ?? 'copy' }])  }}>
+              <option value="">+ {t('Добавить источник')}</option>
+              {SOURCE_KINDS.map((k) => <option key={k} value={k || '__blank'}>{k ? t(k) : t('Другой источник')}</option>)}
+            </select>
           )}
         </section>
       )}

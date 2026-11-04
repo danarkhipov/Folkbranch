@@ -88,8 +88,12 @@ export function parseFamilyText(text: string): ParsedText {
       out.title = s.slice(6).trim()
       return
     }
-    const { head, attrs } = splitAttrs(s)
-    if (attrs.sex && !SEX[attrs.sex.toLowerCase()]) out.errors.push({ line, message: `unknown sex: ${attrs.sex}` })
+    // In a couple, each side has its own attributes: `A id: x + B b: 1900, m: 1925`.
+    const sides = s.split(/\s\+\s/).map(splitAttrs)
+    const couple = sides.length === 2
+    const head = couple ? sides.map((p) => p.head).join(' + ') : splitAttrs(s).head
+    const attrs = couple ? { ...sides[0].attrs, ...sides[1].attrs } : splitAttrs(s).attrs
+    for (const a of couple ? sides.map((p) => p.attrs) : [attrs]) if (a.sex && !SEX[a.sex.toLowerCase()]) out.errors.push({ line, message: `unknown sex: ${a.sex}` })
     const terms = head.split(/\s\+\s/).map((t) => t.trim())
     if (terms.length > 2) out.errors.push({ line, message: 'a couple line has exactly two people' })
 
@@ -97,10 +101,10 @@ export function parseFamilyText(text: string): ParsedText {
     const up = stack.at(-1)
 
     const isPair = terms.length === 2
-    // On a couple line, dates belong to the marriage; on any other line, to the person.
+    // `m` and `end` are the marriage's; everything else belongs to the person beside it.
     // On an indented line, `c` is about the link to the parents, not about the person.
-    const own = up ? { ...attrs, c: '' } : attrs
-    const first = person(terms[0], isPair ? { id: attrs.id ?? '' } : own, line)
+    const firstAttrs = couple ? sides[0].attrs : attrs
+    const first = person(terms[0], up ? { ...firstAttrs, c: '' } : firstAttrs, line)
     if (!first) return
     if (up) {
       for (const parent of up.parents) {
@@ -110,7 +114,7 @@ export function parseFamilyText(text: string): ParsedText {
     }
     const members = [first]
     if (isPair) {
-      const second = person(terms[1], {}, line)
+      const second = person(terms[1], { ...sides[1].attrs, c: '' }, line)
       if (second) {
         members.push(second)
         out.unions.push({ a: first, b: second, attrs, line })

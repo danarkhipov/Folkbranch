@@ -2,12 +2,10 @@ import { asc, eq } from 'drizzle-orm'
 import { getDb, schema } from '../db'
 import type { Page, PageMeta } from '../types'
 import { personName } from '../types'
-import { translate } from '../i18n'
-import { Actor, Changes, mutate, newId, OpError, requireRole } from './core'
+import { Actor, Changes, mutate, newId, OpError, requireRole, seesOnlyPublic } from './core'
 import { getGraph, getPersonRow, hiddenFor } from './people'
-import { getSetting } from './settings'
+import { say } from './settings'
 
-const say = (key: string) => translate(getSetting('language') === 'en' ? 'en' : 'ru', key)
 
 function assertPersonVisible(actor: Actor, personId: string) {
   if (hiddenFor(actor, getPersonRow(personId))) throw new OpError(404, 'not found')
@@ -29,12 +27,13 @@ function row(id: string) {
 export function getPage(actor: Actor, id: string): Page {
   const page = row(id)
   assertPersonVisible(actor, page.personId)
-  return actor.role === 'reader' ? { ...page, content: scrubMentions(actor, page.content) } : page
+  return seesOnlyPublic(actor) ? { ...page, content: scrubMentions(hiddenPeople(actor), page.content) } : page
 }
 
-/** A mention stores the person's name; a reader must not learn it for a hidden relative. */
-function scrubMentions(actor: Actor, content: string) {
-  const hidden = new Set(getGraph(actor).persons.filter((p) => p.hidden).map((p) => p.id))
+/** A mention stores the person's name; whoever may not see a relative must not learn it. */
+const hiddenPeople = (actor: Actor) => new Set(getGraph(actor).persons.filter((p) => p.hidden).map((p) => p.id))
+
+function scrubMentions(hidden: Set<string>, content: string) {
   const walk = (node: unknown): unknown => {
     if (Array.isArray(node)) return node.map(walk)
     if (node && typeof node === 'object') {
@@ -45,6 +44,13 @@ function scrubMentions(actor: Actor, content: string) {
     return node
   }
   return JSON.stringify(walk(JSON.parse(content)))
+}
+
+/** Every page this actor may read, for searching across them. */
+export function readablePages(actor: Actor): Page[] {
+  const hidden = hiddenPeople(actor)
+  const rows = getDb().select().from(schema.pages).all().filter((p) => !hidden.has(p.personId))
+  return seesOnlyPublic(actor) ? rows.map((p) => ({ ...p, content: scrubMentions(hidden, p.content) })) : rows
 }
 
 export function insertPage(c: Changes, input: { personId: string; title: string; content?: unknown; icon?: string; parentPageId?: string | null; position?: number }) {
@@ -69,14 +75,18 @@ export function createPage(actor: Actor, input: { personId: string; title?: stri
   return mutate(actor, { summary: `${personName(person)}: ${say('Новая страница')}`, personIds: [input.personId] }, (c) => row(insertPage(c, { ...input, title })))
 }
 
-export function updatePage(actor: Actor, id: string, patch: { title?: string; icon?: string; content?: unknown; parentPageId?: string | null; position?: number }) {
+export function updatePage(actor: Actor, id: string, input: { title?: string; icon?: string; content?: unknown; parentPageId?: string | null; position?: number; baseUpdatedAt?: number }) {
   requireRole(actor, 'editor')
   const page = row(id)
+  const { baseUpdatedAt, ...patch } = input
+  if (baseUpdatedAt !== undefined && baseUpdatedAt !== page.updatedAt) throw new OpError(409, 'the page changed since this copy was read')
   if (patch.parentPageId && isDescendant(id, patch.parentPageId)) throw new OpError(400, 'cannot nest a page inside itself')
   const person = getPersonRow(page.personId)
-  const set: Record<string, unknown> = { ...patch, updatedAt: Date.now() }
+  const updatedAt = Math.max(Date.now(), page.updatedAt + 1)
+  const set: Record<string, unknown> = { ...patch, updatedAt }
   if (patch.content !== undefined) set.content = JSON.stringify(patch.content)
   mutate(actor, { summary: `${personName(person)}: «${patch.title ?? page.title ?? say('Без названия')}»`, personIds: [page.personId], key: `page:${id}` }, (c) => c.update('pages', id, set))
+  return { updatedAt }
 }
 
 function isDescendant(ancestor: string, candidate: string) {

@@ -56,6 +56,20 @@ git pull && ./install.sh
 
 Settings and data are kept, and the database migrates on start. Take a backup first.
 
+## Limits
+
+Measured in Chrome on a desktop:
+
+| People | Chart ready | Panning | Click to open |
+|---|---|---|---|
+| 100 | 0.4 s | smooth | under 0.1 s |
+| 500 | 0.9 s | smooth | 0.1 s |
+| 2000 | 4 s | mostly smooth | 0.5 s |
+
+Beyond a few thousand people, the first drawing takes tens of seconds. Files can be up to 40 MB. Allow about 1 GB of memory for batches of large photos. Answers are compressed only by a proxy in front, as with `--domain`.
+
+Without internet the app and its data need none, only face detection in photos downloads its model on first use. Open tabs keep the chart on screen and hold typed text until the server is back, but a new tab cannot open without reaching the server.
+
 ## Settings
 
 All of them are optional and explained in [.env.example](../.env.example). Change `.env`, then run `docker compose up -d`.

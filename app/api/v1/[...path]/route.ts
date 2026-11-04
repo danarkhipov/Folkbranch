@@ -1,5 +1,7 @@
 import { headers } from 'next/headers'
 import { z } from 'zod'
+import { fromOurPages } from '@/lib/same-origin'
+import { chooseModel, connectProvider, currentProvider, disconnectProvider, providerStatus } from '@/lib/agent/provider-key'
 import { getActor, hasBearer } from '@/lib/api-auth'
 import { parseFamilyText, planFamilyText, serializeFamilyText } from '@/lib/textformat'
 import { Actor, OpError, requireRole } from '@/lib/ops/core'
@@ -107,16 +109,20 @@ const routes: Route[] = [
   human('POST', 'tokens', 'Issue an API token', async ({ actor, body }) => tokens.createToken(actor, z.object({ expiresInDays: z.number().int().min(1).max(3650).nullish(), name: z.string().min(1), role: z.enum(['reader', 'editor']), review: z.boolean().default(true) }).parse(await body()))),
   human('DELETE', 'tokens/:id', 'Revoke an API token', ({ actor, params }) => tokens.revokeToken(actor, params.id)),
 
-  human('GET', 'settings', 'Archive settings', () => ({ familyName: settings.getSetting('familyName') ?? '', language: settings.getSetting('language') ?? 'ru' })),
+  human('GET', 'settings', 'Archive settings', () => ({ familyName: settings.getSetting('familyName') ?? '', language: settings.getSetting('language') ?? 'ru', assistantEnabled: settings.getSetting('assistantEnabled') === '1', assistantForReaders: settings.getSetting('assistantForReaders') === '1', assistantProvider: currentProvider()?.label ?? null, assistantModel: currentProvider()?.model ?? null })),
   human('PATCH', 'settings', 'Change archive settings', async ({ actor, body }) => {
     requireRole(actor, 'owner')
-    const b = z.object({ familyName: z.string().min(1), language: z.enum(['ru', 'en']) }).partial().parse(await body())
+    const b = z.object({ familyName: z.string().min(1), language: z.enum(['ru', 'en']), assistantEnabled: z.enum(['0', '1']), assistantForReaders: z.enum(['0', '1']), }).partial().parse(await body())
     Object.entries(b).forEach(([k, v]) => settings.setSetting(k, v!))
   }),
   human('GET', 'invites', 'Open invitations', ({ actor }) => settings.listInvites(actor)),
   human('POST', 'invites', 'Create an invitation', async ({ actor, body }) => settings.createInvite(actor, z.object({ name: z.string().min(1), role, personId: z.string().nullish(), userId: z.string().nullish() }).parse(await body()))),
   human('DELETE', 'invites/:id', 'Revoke an invitation', ({ actor, params }) => settings.revokeInvite(actor, params.id)),
   human('GET', 'users', 'People with access', ({ actor }) => settings.listUsers(actor)),
+  human('GET', 'assistant/provider', 'Which AI provider is connected', ({ actor }) => providerStatus(actor)),
+  human('PUT', 'assistant/provider', 'Connect an AI provider with a key', async ({ actor, body }) => connectProvider(actor, await body())),
+  human('PATCH', 'assistant/provider', 'Choose another model', async ({ actor, body }) => chooseModel(actor, await body())),
+  human('DELETE', 'assistant/provider', 'Remove the key set in the app', ({ actor }) => disconnectProvider(actor)),
   human('PATCH', 'users/:id', 'Change a role', async ({ actor, params, body }) => settings.setUserRole(actor, params.id, z.object({ role }).parse(await body()).role)),
   human('DELETE', 'users/:id', 'Remove access', ({ actor, params }) => settings.removeUser(actor, params.id)),
 ]
@@ -155,16 +161,22 @@ function match(method: string, path: string[]) {
   return null
 }
 
+/** The largest upload, as base64, with room for its envelope. */
+const MAX_BODY = 60 * 1024 * 1024
+
+const isDiskFull = (e: unknown) => ['ENOSPC', 'SQLITE_FULL'].includes((e as { code?: string })?.code ?? '')
+
 async function handle(req: Request, ctx: { params: Promise<{ path: string[] }> }) {
   const path = (await ctx.params).path
   if (req.method === 'GET' && path.join('/') === 'openapi.json') return Response.json(openApi())
   const found = match(req.method, path)
   if (!found) return Response.json({ error: 'not found' }, { status: 404 })
+  // Before the body is read into memory.
+  if (Number(req.headers.get('content-length') ?? 0) > MAX_BODY) return Response.json({ error: 'file too large' }, { status: 413 })
   try {
     const h = await headers()
     // Cookies travel on their own, so writes with a cookie must come from our own pages.
-    const origin = h.get('origin')
-    if (!hasBearer(h) && req.method !== 'GET' && origin && new URL(origin).host !== h.get('host')) return Response.json({ error: 'bad origin' }, { status: 403 })
+    if (!hasBearer(h) && req.method !== 'GET' && !fromOurPages(h)) return Response.json({ error: 'bad origin' }, { status: 403 })
     const actor = await getActor(h)
     if (!actor) return Response.json({ error: 'unauthorized' }, { status: 401 })
     if (actor.tokenId && found.route.human) return Response.json({ error: 'not available to tokens' }, { status: 403 })
@@ -175,6 +187,7 @@ async function handle(req: Request, ctx: { params: Promise<{ path: string[] }> }
     if (e instanceof OpError) return Response.json({ error: e.message }, { status: e.status })
     if (e instanceof z.ZodError) return Response.json({ error: e.issues }, { status: 400 })
     if (e instanceof SyntaxError) return Response.json({ error: 'invalid JSON' }, { status: 400 })
+    if (isDiskFull(e)) return Response.json({ error: 'the server disk is full' }, { status: 507 })
     console.error(e)
     return Response.json({ error: 'server error' }, { status: 500 })
   }
