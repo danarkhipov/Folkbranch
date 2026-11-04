@@ -64,6 +64,18 @@ describe('chart conventions', () => {
 })
 
 describe('layoutFamily', () => {
+  it('keeps bars out of tall captions, whichever way the tree grows', () => {
+    const long = { givenName: 'Екатерина Ивановна', surname: 'Волынкина' }
+    const g = graph(['a', 'b', 'c'], [['a', 'c'], ['b', 'c']], [['a', 'b']])
+    const tall = { ...g, persons: g.persons.map((p) => ({ ...p, ...long })) }
+    for (const rootsBelow of [false, true]) {
+      const l = layoutFamily(tall, { rootsBelow })
+      const e = l.edges[0]
+      const child = l.cards.get('c')!, parent = l.cards.get('a')!
+      const captionBottom = (rootsBelow ? child.y : parent.y) + 64 + 13 + 3 * 17 + 15 + 20
+      expect(e.barAt[1]).toBeGreaterThan(captionBottom)
+    }
+  })
   it('can grow upwards: elders below, the same columns, lines ending under the child', () => {
     const g = graph(['a', 'b', 'c', 'd', 'n'], [['a', 'c'], ['b', 'c'], ['a', 'd'], ['b', 'd'], ['c', 'n']], [['a', 'b']])
     const down = layoutFamily(g)
@@ -75,8 +87,14 @@ describe('layoutFamily', () => {
     expect(up.bounds).toEqual(down.bounds)
     const e = up.edges.find((x) => x.childId === 'n')!
     const end = Number(e.path.match(/(-?[\d.]+)$/)![1])
-    expect(end).toBeGreaterThan(y('n') + 100)
-    expect(end).toBeLessThan(y('c'))
+    // Behind the caption, whose background cuts it off at the text.
+    expect(end).toBeGreaterThan(y('n') + 64)
+    expect(end).toBeLessThan(y('n') + 90)
+    const named = (givenName: string, surname: string) => {
+      const l = layoutFamily({ ...g, persons: g.persons.map((p) => (p.id === 'n' ? { ...p, givenName, surname } : p)) }, { rootsBelow: true })
+      return Number(l.edges.find((x) => x.childId === 'n')!.own.match(/(-?[\d.]+)$/)![1])
+    }
+    expect(named('Екатерина', 'Соколова')).toBeGreaterThan(named('Анна', 'Ким'))
   })
   it('places everyone, spouses side by side, children below', () => {
     const l = layoutFamily(graph(['a', 'b', 'c', 'd'], [['a', 'c'], ['b', 'c'], ['a', 'd'], ['b', 'd']], [['a', 'b']]))

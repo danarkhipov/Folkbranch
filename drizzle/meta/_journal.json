@@ -29,6 +29,20 @@
       "when": 1793790947671,
       "tag": "0003_flowery_dakota_north",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793792846988,
+      "tag": "0004_slow_morgan_stark",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1793793624768,
+      "tag": "0005_mysterious_thor_girl",
+      "breakpoints": true
     }
   ]
 }

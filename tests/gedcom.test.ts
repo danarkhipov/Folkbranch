@@ -47,7 +47,7 @@ describe('gedcom', () => {
     const [p, a] = g.persons
     expect(p).toMatchObject({ givenName: 'Пётр', surname: 'Иванов', sex: 'M', birthDate: '~1880', birthPlace: 'Кострома', deathDate: '03.02.1950', dead: true })
     expect(p.notes).toEqual(['Общая заметка'])
-    expect(p.sources).toEqual(['Метрическая книга'])
+    expect(p.sources.map((x) => x.title)).toEqual(['Метрическая книга'])
     expect(a.maidenName).toBe('Смирнова')
     expect(g.families[0].children[0].adopted).toBe(true)
   })
@@ -94,8 +94,8 @@ describe('gedcom', () => {
 
   const graph = {
     persons: [
-      { facts: [], id: 'a', givenName: 'Пётр', surname: 'Иванов', maidenName: '', sex: 'M', birthDate: '1880', birthPlace: '', deathDate: '1950', deathPlace: '', living: false },
-      { facts: [], id: 'b', givenName: 'Анна', surname: 'Жива', maidenName: '', sex: 'F', birthDate: '1990', birthPlace: 'Москва', deathDate: '', deathPlace: '', living: true },
+      { facts: [], sources: [], id: 'a', givenName: 'Пётр', surname: 'Иванов', maidenName: '', sex: 'M', birthDate: '1880', birthPlace: '', deathDate: '1950', deathPlace: '', living: false },
+      { facts: [], sources: [], id: 'b', givenName: 'Анна', surname: 'Жива', maidenName: '', sex: 'F', birthDate: '1990', birthPlace: 'Москва', deathDate: '', deathPlace: '', living: true },
     ],
     parentChild: [{ id: '1', parentId: 'a', childId: 'b', kind: 'birth', certainty: 'family' }],
     unions: [],
@@ -113,9 +113,9 @@ describe('gedcom', () => {
 })
 
 describe('person fields in GEDCOM', () => {
-  const person = { id: 'a', givenName: 'Иван', patronymic: 'Петрович', surname: 'Белов', maidenName: '', otherNames: 'Ваня', sex: 'M', birthDate: '~1890', birthYear: 1890, birthPlace: '', deathDate: '', deathYear: null, deathPlace: '', living: false, certainty: 'family', avatarMediaId: null, avatarCrop: null, updatedAt: 0, tags: [],
+  const person = { id: 'a', givenName: 'Иван', patronymic: 'Петрович', surname: 'Белов', maidenName: '', otherNames: 'Ваня', sex: 'M', sources: [{ title: 'ГАПК', ref: 'ф. 1, оп. 2, д. 3', page: '12', url: 'https://example.org/a' }], birthDate: '~1890', birthYear: 1890, birthPlace: '', deathDate: '', deathYear: null, deathPlace: '', living: false, certainty: 'family', avatarMediaId: null, avatarCrop: null, updatedAt: 0, tags: [],
     facts: [{ kind: 'Профессия', date: '1912', place: 'Пермь', note: 'Столяр', source: 'Метрика' }, { kind: 'Служба', date: '', place: '', note: 'Флот', source: '' }] }
-  const out = writeGedcom({ persons: [person, { ...person, id: 'b', givenName: 'Анна', patronymic: '', otherNames: '', facts: [] }], parentChild: [], unions: [{ id: 'u', aId: 'a', bId: 'b', kind: 'marriage', startDate: '1915', endDate: '', place: 'Пермь', certainty: 'family' }] } as Graph, { hideLiving: false, source: 't' })
+  const out = writeGedcom({ persons: [person, { ...person, id: 'b', givenName: 'Анна', patronymic: '', otherNames: '', facts: [], sources: [] }], parentChild: [], unions: [{ id: 'u', aId: 'a', bId: 'b', kind: 'marriage', startDate: '1915', endDate: '', place: 'Пермь', certainty: 'family' }] } as unknown as Graph, { hideLiving: false, source: 't' })
 
   it('writes facts, the patronymic, other names and the marriage place', () => {
     expect(out).toContain('1 OCCU Столяр\n2 DATE 1912\n2 PLAC Пермь\n2 SOUR Метрика')
@@ -130,15 +130,15 @@ describe('person fields in GEDCOM', () => {
     const p = g.persons[0]
     expect([p.givenName, p.patronymic, p.otherNames, p.birthDate]).toEqual(['Иван', 'Петрович', 'Ваня', '~1890'])
     expect(p.facts).toEqual(person.facts)
-    expect(p.sources).toEqual([])
+    expect(p.sources).toEqual(person.sources)
     expect(g.families[0].place).toBe('Пермь')
   })
   it('hides the facts and names of the living', () => {
     const hidden = writeGedcom({ persons: [{ ...person, living: true }], parentChild: [], unions: [] } as unknown as Graph, { hideLiving: true, source: 't' })
-    for (const secret of ['Столяр', 'Петрович', 'Ваня', 'Метрика']) expect(hidden).not.toContain(secret)
+    for (const secret of ['Столяр', 'Петрович', 'Ваня', 'Метрика', 'ГАПК']) expect(hidden).not.toContain(secret)
   })
   it('keeps an ended union, with or without a date', () => {
-    const two = (endDate: string) => writeGedcom({ persons: [person, { ...person, id: 'b', facts: [] }], parentChild: [], unions: [{ id: 'u', aId: 'a', bId: 'b', kind: 'marriage', startDate: '', endDate, place: '', certainty: 'family' }] } as Graph, { hideLiving: false, source: 't' })
+    const two = (endDate: string) => writeGedcom({ persons: [person, { ...person, id: 'b', facts: [], sources: [] }], parentChild: [], unions: [{ id: 'u', aId: 'a', bId: 'b', kind: 'marriage', startDate: '', endDate, place: '', certainty: 'family' }] } as unknown as Graph, { hideLiving: false, source: 't' })
     expect(parseGedcom(two('?')).families[0].end).toBe('?')
     expect(parseGedcom(two('1960')).families[0].end).toBe('1960')
     expect(parseGedcom(two('')).families[0].end).toBe('')

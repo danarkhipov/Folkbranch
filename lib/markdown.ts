@@ -9,6 +9,9 @@ function inlineToMd(content: unknown): string {
   if (!Array.isArray(content)) return ''
   return (content as Inline[]).map((c) => {
     if (c.type === 'mention') return `[@${c.props?.label ?? ''}](person:${c.props?.personId ?? ''})`
+    if (c.type === 'tag') return `[#${c.props?.name ?? ''}](tag:)`
+    if (c.type === 'unverified') return '[не проверено](unverified:)'
+    if (c.type === 'citation') return `[${c.props?.label ?? ''}](source:${c.props?.sourceId ?? ''})`
     if (c.type === 'link') return `[${inlineToMd(c.content)}](${c.href})`
     let t = c.text ?? ''
     for (const [k, mark] of STYLE) if (c.styles?.[k]) t = `${mark}${t}${mark}`
@@ -46,6 +49,9 @@ function mdToInline(s: string): Inline[] {
     text(s.slice(last, m.index))
     last = m.index + m[0].length
     if (m[2] !== undefined) out.push({ type: 'mention', props: { personId: m[2], label: m[1] } })
+    else if (m[4] === 'tag:') out.push({ type: 'tag', props: { name: m[3].replace(/^#/, '') } })
+    else if (m[4] === 'unverified:') out.push({ type: 'unverified', props: {} })
+    else if (m[4]?.startsWith('source:')) out.push({ type: 'citation', props: { sourceId: m[4].slice(7), label: m[3] } })
     else if (m[4] !== undefined) out.push({ type: 'link', href: m[4], content: [{ type: 'text', text: m[3], styles: {} }] })
     else if (m[5] !== undefined) text(m[5], { bold: true })
     else if (m[6] !== undefined) text(m[6], { italic: true })

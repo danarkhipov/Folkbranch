@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { api, useApp } from '@/lib/client'
 import { layoutFamily, AVATAR_CY, CARD_H } from '@/lib/graph/layout'
 import type { Proposal } from '@/lib/ops/registry'
-import { parseFamilyText, parsedToGraph, planFamilyText, serializeFamilyText } from '@/lib/textformat'
+import { parseFamilyText, parsedToGraph, planFamilyText, serializeFamilyText, type TextPlan } from '@/lib/textformat'
 import { personName } from '@/lib/types'
 
 export function useProposals(enabled: boolean) {
@@ -61,6 +61,9 @@ export function ReviewPanel({ onClose }: { onClose: () => void }) {
 
 interface TokenRow { id: string; name: string; role: 'reader' | 'editor'; review: boolean; lastUsedAt: number | null; revokedAt: number | null }
 
+type Client = 'claude' | 'json' | 'prompt'
+const CLIENTS: Record<Client, string> = { claude: 'Claude Code', json: 'Cursor и другие', prompt: 'Задание агенту' }
+
 export function TokensTab() {
   const { t, lang } = useApp()
   const qc = useQueryClient()
@@ -72,7 +75,12 @@ export function TokensTab() {
   const [copied, setCopied] = useState(false)
   const refresh = () => qc.invalidateQueries({ queryKey: ['tokens'] })
   const origin = typeof location === 'undefined' ? '' : location.origin
-  const command = `claude mcp add --transport http family ${origin}/api/mcp --header "Authorization: Bearer ${made}"`
+  const [client, setClient] = useState<Client>('claude')
+  const snippet = client === 'claude'
+    ? `claude mcp add --transport http family ${origin}/api/mcp --header "Authorization: Bearer ${made}"`
+    : client === 'json'
+      ? JSON.stringify({ mcpServers: { family: { type: 'http', url: `${origin}/api/mcp`, headers: { Authorization: `Bearer ${made}` } } } }, null, 2)
+      : t('Подключись к семейному архиву по MCP. Сначала вызови get_overview, затем find_gaps. Прежде чем создавать человека, ищи его через search_people. Каждое найденное значение записывай через add_version с источником и его достоверностью, а не перезаписывай поля.')
   const fmt = new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short' })
   return (
     <div className="flex flex-col gap-4 pt-2 text-[13px]">
@@ -99,8 +107,11 @@ export function TokensTab() {
       {made && (
         <div className="rounded-lg bg-muted p-2 flex flex-col gap-1.5">
           <p className="text-xs text-ink-soft">{t('Токен показан один раз, сохраните его.')}</p>
-          <code className="text-xs break-all">{command}</code>
-          <button className="flex items-center gap-1 text-xs text-ink-soft hover:text-ink self-start" onClick={() => { navigator.clipboard.writeText(command); setCopied(true) }}>{copied ? <Check size={13} /> : <Copy size={13} />}{t(copied ? 'Скопировано' : 'Скопировать')}</button>
+          <div role="radiogroup" aria-label={t('Куда подключить')} className="inline-flex self-start rounded-lg bg-background p-0.5 gap-0.5 text-xs">
+            {(Object.keys(CLIENTS) as Client[]).map((c) => <button key={c} type="button" role="radio" aria-checked={client === c} className={client === c ? 'h-7 px-2 rounded-md bg-white shadow-sm font-medium' : 'h-7 px-2 rounded-md text-ink-soft hover:text-ink'} onClick={() => { setClient(c); setCopied(false) }}>{t(CLIENTS[c])}</button>)}
+          </div>
+          <code className="text-xs break-all whitespace-pre-wrap">{snippet}</code>
+          <button className="flex items-center gap-1 text-xs text-ink-soft hover:text-ink self-start" onClick={() => { navigator.clipboard.writeText(snippet); setCopied(true) }}>{copied ? <Check size={13} /> : <Copy size={13} />}{t(copied ? 'Скопировано' : 'Скопировать')}</button>
         </div>
       )}
       <section>
@@ -120,7 +131,7 @@ export function TokensTab() {
   )
 }
 
-function MiniGraph({ text }: { text: string }) {
+export function MiniGraph({ text }: { text: string }) {
   const { rootsBelow } = useApp()
   const layout = useMemo(() => {
     try {
@@ -153,6 +164,30 @@ function MiniGraph({ text }: { text: string }) {
   )
 }
 
+/** What a text import will do, and the questions it needs answered first. */
+export function PlanSummary({ plan, choices, onChoose }: { plan: TextPlan; choices: Record<string, string>; onChoose: (c: Record<string, string>) => void }) {
+  const { t } = useApp()
+  return (
+    <>
+      {plan.errors.map((e, i) => <p key={i} className="text-xs text-destructive">{t('Ошибка в строке')} {e.line}: {e.message}</p>)}
+      {plan.ambiguous.map((a) => (
+        <label key={a.ref} className="flex items-center gap-2 text-xs">
+          <span className="text-rust">{t('Несколько совпадений')}: {a.name}</span>
+          <select className="border border-input rounded bg-white px-1 py-0.5 min-w-0" value={choices[a.ref] ?? ''} onChange={(e) => onChoose({ ...choices, [a.ref]: e.target.value })}>
+            <option value="" disabled>—</option>
+            {a.candidates.map((c) => <option key={c.id} value={c.id}>{c.name} {c.years}</option>)}
+            <option value="new">{t('Новый человек')}</option>
+          </select>
+        </label>
+      ))}
+      {!plan.ops.length && !plan.errors.length && !plan.ambiguous.length && <p className="text-xs text-ink-faint">{t('Изменений нет')}</p>}
+      {plan.creates.length > 0 && <p className="text-xs"><b className="font-medium">{t('Добавится')} ({plan.creates.length}):</b> {plan.creates.slice(0, 12).join(', ')}{plan.creates.length > 12 ? '…' : ''}</p>}
+      {plan.updates.length > 0 && <p className="text-xs"><b className="font-medium">{t('Изменится')} ({plan.updates.length}):</b> {plan.updates.slice(0, 12).join(', ')}{plan.updates.length > 12 ? '…' : ''}</p>}
+      {plan.relations > 0 && <p className="text-xs"><b className="font-medium">{t('Связей')}:</b> +{plan.relations}</p>}
+    </>
+  )
+}
+
 /** The graph as editable text, with the result visible before anything is written. */
 export function TextDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const { t, graph, familyName, canEdit } = useApp()
@@ -179,21 +214,7 @@ export function TextDialog({ open, onOpenChange }: { open: boolean; onOpenChange
           <div className="min-h-0 flex flex-col gap-2">
             <div className="flex-1 min-h-0 rounded-lg bg-paper border border-border overflow-hidden"><MiniGraph text={text} /></div>
             <div className="text-[13px] flex flex-col gap-1 max-h-[40%] overflow-auto">
-              {plan.errors.map((e, i) => <p key={i} className="text-xs text-destructive">{t('Ошибка в строке')} {e.line}: {e.message}</p>)}
-              {plan.ambiguous.map((a) => (
-                <label key={a.ref} className="flex items-center gap-2 text-xs">
-                  <span className="text-rust">{t('Несколько совпадений')}: {a.name}</span>
-                  <select className="border border-input rounded bg-white px-1 py-0.5 min-w-0" value={choices[a.ref] ?? ''} onChange={(e) => setChoices({ ...choices, [a.ref]: e.target.value })}>
-                    <option value="" disabled>—</option>
-                    {a.candidates.map((c) => <option key={c.id} value={c.id}>{c.name} {c.years}</option>)}
-                    <option value="new">{t('Новый человек')}</option>
-                  </select>
-                </label>
-              ))}
-              {!plan.ops.length && !plan.errors.length && !plan.ambiguous.length && <p className="text-xs text-ink-faint">{t('Изменений нет')}</p>}
-              {plan.creates.length > 0 && <p className="text-xs"><b className="font-medium">{t('Добавится')} ({plan.creates.length}):</b> {plan.creates.slice(0, 12).join(', ')}{plan.creates.length > 12 ? '…' : ''}</p>}
-              {plan.updates.length > 0 && <p className="text-xs"><b className="font-medium">{t('Изменится')} ({plan.updates.length}):</b> {plan.updates.slice(0, 12).join(', ')}{plan.updates.length > 12 ? '…' : ''}</p>}
-              {plan.relations > 0 && <p className="text-xs"><b className="font-medium">{t('Связей')}:</b> +{plan.relations}</p>}
+              <PlanSummary plan={plan} choices={choices} onChoose={setChoices} />
             </div>
           </div>
         </div>

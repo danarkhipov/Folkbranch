@@ -5,8 +5,6 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import sharp from 'sharp'
 import type { Actor } from '../lib/ops/core'
 
-process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'family-ops-'))
-
 const owner: Actor = { userId: 'o', name: 'Owner', role: 'owner', personId: null }
 const reader: Actor = { userId: 'r', name: 'Reader', role: 'reader', personId: null }
 
@@ -117,10 +115,11 @@ describe('privacy for readers', () => {
     const photo = await media.uploadMedia(owner, png, 'a.png', alive.id)
     const openPhoto = await media.uploadMedia(owner, png, 'b.png', dead.id)
 
-    people.updatePerson(owner, alive.id, { patronymic: 'Петрович', otherNames: 'Ваня' })
+    people.updatePerson(owner, alive.id, { patronymic: 'Петрович', otherNames: 'Ваня', sources: [{ title: 'Архив', ref: '', page: '', url: '' }] })
     const seen = people.getGraph(reader).persons.find((p) => p.id === alive.id)!
     expect(seen.hidden).toBe(true)
     expect([seen.patronymic, seen.otherNames]).toEqual(['', ''])
+    expect(seen.sources).toEqual([])
     expect(JSON.stringify(seen)).not.toMatch(/Живая|Секретова|Москва|1990/)
     expect(() => pages.getPage(reader, secretPage.id)).toThrow()
     expect(() => pages.listPages(reader, alive.id)).toThrow()

@@ -121,7 +121,20 @@ export function orthogonal(points: [number, number][]) {
   return d
 }
 
-const ROW = CARD_H + RANK_SEP
+/** Lines end here, behind the caption's opaque background, which cuts them off at the text. */
+const UNDER_CAPTION = AVATAR_CY + AVATAR_R + 12
+const NAME_CHARS = 17
+const NAME_LINE = 17
+
+/** How tall a card's caption gets: names wrap by words, and a relation label may sit under the years. */
+function cardHeight(name: string) {
+  let lines = 1, used = 0
+  for (const word of name.split(/\s+/).filter(Boolean)) {
+    if (used && used + 1 + word.length > NAME_CHARS) { lines++; used = word.length }
+    else used += (used ? 1 : 0) + word.length
+  }
+  return AVATAR_CY + AVATAR_R + 13 + lines * NAME_LINE + 15 + 20
+}
 const mean = (xs: number[]) => xs.reduce((a, c) => a + c, 0) / xs.length
 
 /** `rootsBelow` draws the tree as it grows: elders at the bottom, the youngest at the top. */
@@ -137,6 +150,10 @@ export function layoutFamily(g: Graph, { rootsBelow = false }: { rootsBelow?: bo
   dagre.layout(d)
 
   const ys = [...new Set([...members.keys()].map((k) => d.node(k).y))].sort((a, b) => a - b)
+  // The tallest caption sets the row, so that bars in the gaps never run through text.
+  const heightOf = (id: string) => { const p = byId.get(id); return Math.max(CARD_H, cardHeight(p ? `${p.givenName ?? ''} ${p.surname ?? ''}` : '')) }
+  const tallest = Math.max(CARD_H, ...g.persons.map((p) => heightOf(p.id)))
+  const ROW = tallest + RANK_SEP
   const rowY = (rank: number) => (rootsBelow ? ys.length - 1 - rank : rank) * ROW
   const blocks = new Map<string, Block>()
   for (const [k, m] of members) {
@@ -263,7 +280,7 @@ export function layoutFamily(g: Graph, { rootsBelow = false }: { rootsBelow?: bo
     const [hi, lo] = l.y < r.y ? [l, r] : [r, l]
     const dir = lo.x >= hi.x ? 1 : -1
     const x = hi.x + dir * (CARD_W / 2)
-    const midY = hi.y + CARD_H + 14
+    const midY = hi.y + tallest + 14
     return [{ id: u.id, union: u, x, y: midY, path: orthogonal([[hi.x + dir * edge, hi.y + AVATAR_CY], [x, hi.y + AVATAR_CY], [x, midY], [lo.x - dir * edge, midY], [lo.x - dir * edge, lo.y + AVATAR_CY]]), x1: l.x, x2: r.x }]
   })
 
@@ -286,12 +303,14 @@ export function layoutFamily(g: Graph, { rootsBelow = false }: { rootsBelow?: bo
 
   const rankOf = (y: number) => (rootsBelow ? ys.length - 1 - Math.round(y / ROW) : Math.round(y / ROW))
   /** A bar's height in the gap before its children's row: lane 0 sits next to the children, higher lanes move towards the parents. */
-  const laneY = (rank: number, lane: number) => (rootsBelow ? rowY(rank) + CARD_H + RANK_SEP / 2 - 14 + lane * LANE : rowY(rank) - RANK_SEP / 2 + 14 - lane * LANE)
+  const laneY = (rank: number, lane: number) => (rootsBelow ? rowY(rank) + tallest + RANK_SEP / 2 - 14 + lane * LANE : rowY(rank) - RANK_SEP / 2 + 14 - lane * LANE)
   /** The middle of the gap a trunk crosses on its way through a generation. */
-  const gapY = (rank: number) => (rootsBelow ? rowY(rank) + CARD_H + RANK_SEP / 2 : rowY(rank) - RANK_SEP / 2)
+  const gapY = (rank: number) => (rootsBelow ? rowY(rank) + tallest + RANK_SEP / 2 : rowY(rank) - RANK_SEP / 2)
   /** The card is a portrait over a caption, so a line comes into the portrait from above or under the caption from below. */
-  const entryY = (c: CardPos) => (rootsBelow ? c.y + CARD_H - 6 : c.y + AVATAR_CY - AVATAR_R - 4)
-  const startOf = (f: (typeof families)[number]) => (f.dot ? f.dot.y : rootsBelow ? Math.min(...f.ps.map((p) => p.y)) + AVATAR_CY - AVATAR_R - 4 : Math.max(...f.ps.map((p) => p.y)) + CARD_H)
+  const entryY = (c: CardPos) => (rootsBelow ? c.y + UNDER_CAPTION : c.y + AVATAR_CY - AVATAR_R - 4)
+  /** The clickable part of a line stays outside the caption, so a click on a name is a click on the card. */
+  const hitEndY = (c: CardPos) => (rootsBelow ? c.y + heightOf(c.id) : entryY(c))
+  const startOf = (f: (typeof families)[number]) => (f.dot ? f.dot.y : rootsBelow ? Math.min(...f.ps.map((p) => p.y)) + AVATAR_CY - AVATAR_R - 4 : Math.max(...f.ps.map((p) => p.y)) + UNDER_CAPTION)
 
   type Group = { f: (typeof families)[number]; rank: number; kids: string[]; trunkX: number; lo: number; hi: number; path: [number, number][]; barY: number; start: number }
   const groupsList: Group[] = []
@@ -366,7 +385,7 @@ export function layoutFamily(g: Graph, { rootsBelow = false }: { rootsBelow?: bo
         path: orthogonal([...path, [x, barY], [t.x, barY], [t.x, entryY(t)]]),
         style: links.some((l) => l.kind !== 'birth') ? 'adopted' : links.some((l) => l.certainty === 'assumed') ? 'assumed' : 'solid',
         links,
-        own: `M${t.x} ${barY}V${entryY(t)}`,
+        own: `M${t.x} ${barY}V${hitEndY(t)}`,
         shared,
         group: `${f.key}@${g.rank}`,
         barAt: [t.x, barY],
@@ -377,6 +396,6 @@ export function layoutFamily(g: Graph, { rootsBelow = false }: { rootsBelow?: bo
 
   const all = [...cards.values()]
   const minX = Math.min(...all.map((c) => c.x)) - CARD_W / 2, maxX = Math.max(...all.map((c) => c.x)) + CARD_W / 2
-  const minY = Math.min(...all.map((c) => c.y)), maxY = Math.max(...all.map((c) => c.y)) + CARD_H
+  const minY = Math.min(...all.map((c) => c.y)), maxY = Math.max(...all.map((c) => c.y)) + tallest
   return { cards, unions, edges, bounds: all.length ? { x: minX, y: minY, w: maxX - minX, h: maxY - minY } : { x: 0, y: 0, w: 0, h: 0 } }
 }

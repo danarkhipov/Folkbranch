@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowUpDown, CircleHelp, Clock, FileText, GitFork, LogOut, Maximize, Minus, Plus, Search, Settings, Sparkles, Tags, UserPlus, X } from 'lucide-react'
+import { ArrowUpDown, CircleHelp, Clock, FileText, GitFork, LogOut, Maximize, Minus, Plus, Search, Settings, Sparkles, Tags, Upload, UserPlus, X } from 'lucide-react'
 import { App, api, useTr, useWrite, type AppCtx, type QuickType } from '@/lib/client'
 import { Family } from '@/lib/kinship'
 import { personName, type Graph, type HistoryEntry, type Lang, type Me } from '@/lib/types'
@@ -13,6 +13,7 @@ import { PhotoDialog } from './photo-dialog'
 import { ConfirmDialog, SearchDialog } from './person-pickers'
 import { HistoryPanel, HowRelated, SettingsDialog } from './side-panels'
 import { ReviewPanel, TextDialog, useProposals } from './ai-panels'
+import { ImportDialog } from './import-dialog'
 
 interface Props {
   me: Me
@@ -34,6 +35,22 @@ export function FamilyApp({ me, lang, familyName, providers }: Props) {
   const [settings, setSettings] = useState(false)
   const [path, setPath] = useState<string[] | null>(null)
   const [groups, setGroups] = useState<string[]>([])
+  const [importing, setImporting] = useState(false)
+  const [dropped, setDropped] = useState<File | null>(null)
+  // A file dropped on the chart opens the import; inside the editor it stays a picture in the text.
+  useEffect(() => {
+    const isFile = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files') && !(e.target as HTMLElement).closest?.('.panel, [role=dialog]')
+    const over = (e: DragEvent) => { if (isFile(e)) e.preventDefault() }
+    const drop = (e: DragEvent) => {
+      if (!isFile(e) || me.role === 'reader') return
+      e.preventDefault()
+      setDropped(e.dataTransfer!.files[0] ?? null)
+      setImporting(true)
+    }
+    window.addEventListener('dragover', over)
+    window.addEventListener('drop', drop)
+    return () => { window.removeEventListener('dragover', over); window.removeEventListener('drop', drop) }
+  }, [me.role])
   const [rootsBelow, setRootsBelow] = useState(true)
   useEffect(() => {
     try { if (localStorage.getItem('chart-direction') === 'down') setRootsBelow(false) } catch {}
@@ -144,6 +161,7 @@ export function FamilyApp({ me, lang, familyName, providers }: Props) {
         <button className={side === 'related' ? 'bar-btn on' : 'bar-btn'} aria-label={t('Кем приходится?')} onClick={() => { setSide(side === 'related' ? null : 'related'); setPath(null) }}><GitFork size={15} /> <span className="hidden lg:inline">{t('Кем приходится?')}</span></button>
         <button className={side === 'history' ? 'bar-btn on' : 'bar-btn'} aria-label={t('Что нового')} onClick={() => { setSide(side === 'history' ? null : 'history'); setPath(null) }}><Clock size={15} /> <span className="hidden lg:inline">{t('Что нового')}</span></button>
         <button className="bar-btn" title={t('Текст')} aria-label={t('Текст')} onClick={() => setTextOpen(true)}><FileText size={15} /></button>
+        {ctx.canEdit && <button className="bar-btn" title={t('Импорт')} aria-label={t('Импорт')} onClick={() => { setDropped(null); setImporting(true) }}><Upload size={15} /></button>}
         {(draftOps > 0 || side === 'review') && <button className={side === 'review' ? 'bar-btn on' : 'bar-btn !text-rust'} onClick={() => { setSide(side === 'review' ? null : 'review'); setPath(null) }}><Sparkles size={15} /> <span className="hidden lg:inline">{t('Правки ИИ')}</span> {draftOps}</button>}
         <button className="bar-btn" title={t('Настройки')} aria-label={t('Настройки')} onClick={() => setSettings(true)}><Settings size={15} /></button>
         <button className="bar-btn" title={t('Выйти')} aria-label={t('Выйти')} onClick={async () => { if (!(await ctx.confirm(t('После выхода войти снова можно будет только по новой ссылке или через привязанный Google и Яндекс ID.'), t('Выйти')))) return; await fetch('/api/auth/sign-out', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); location.href = '/login' }}><LogOut size={15} /></button>
@@ -197,6 +215,7 @@ export function FamilyApp({ me, lang, familyName, providers }: Props) {
         </div>
       )}
       <TextDialog open={textOpen} onOpenChange={setTextOpen} />
+      <ImportDialog open={importing} file={dropped} onOpenChange={setImporting} />
       <ConfirmDialog state={confirmState} onClose={() => setConfirm(null)} />
       <SettingsDialog open={settings} onOpenChange={setSettings} familyName={familyName} providers={providers} />
     </App.Provider>

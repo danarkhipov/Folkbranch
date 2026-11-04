@@ -130,7 +130,7 @@
 .pcard.sex-F .ava { --ring: var(--female); }
 .pcard .ava img { width: 100%; height: 100%; object-fit: cover; display: block; -webkit-user-drag: none; }
 .pcard:hover .ava { transform: translateY(-1px); }
-.pcard .nm { font-family: var(--font-serif); font-weight: 560; font-size: 13.5px; line-height: 1.22; margin-top: 9px; padding: 0 6px; color: var(--ink); text-wrap: balance; }
+.pcard .nm { max-width: 136px; text-wrap: balance; font-family: var(--font-serif); font-weight: 560; font-size: 13.5px; line-height: 1.22; padding: 0 6px; color: var(--ink); text-wrap: balance; }
 .pcard .yr { font-size: 11px; color: var(--ink-soft); margin-top: 2px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .pcard .rel { font-size: 10.5px; line-height: 1.5; margin-top: 3px; padding: 0 7px; border-radius: 99px; max-width: 150px; }
 .pcard .rel.me { color: var(--accent); }
@@ -140,21 +140,23 @@
 .pcard.assumed .ava { outline: 1.5px dashed var(--ink-faint); outline-offset: 6px; }
 .pcard.focus .ava { box-shadow: 0 0 0 3px var(--accent), 0 0 0 6px #fffdf8, 0 6px 16px 4px rgb(60 45 20 / .25); }
 .pcard.isme .nm { color: var(--accent); }
-.focused .pcard.dim { opacity: .42; }
+.focused .pcard.dim .ava, .focused .pcard.dim .cap > * { opacity: .42; }
+.pcard .cap { margin-top: 7px; padding: 2px 6px 5px; border-radius: 6px; background: var(--paper); display: flex; flex-direction: column; align-items: center; }
 
 /* Buttons belong to the card: a small fixed share of the avatar at any zoom. Only when very far
    out do they stop shrinking at 12px on screen, so they can still be hit. */
 .pcard .tools { position: absolute; inset: 0; opacity: 0; transition: opacity .12s; pointer-events: none; --s: max(1, calc(0.667 / var(--k, 1))); --half: calc(9px * var(--s)); }
-.pcard:hover .tools, .pcard:focus-within .tools, .pcard .tools:has([data-state="open"]) { opacity: 1; pointer-events: auto; }
-@media (hover: none) { .pcard.focus .tools { opacity: 1; pointer-events: auto; } }
+.pcard:hover .tools, .pcard:focus-within .tools, .pcard .tools:has([data-state="open"]) { opacity: 1; }
+/* The layer covers the whole card, so only the buttons take the mouse: a click on the portrait opens the editor. */
+.pcard:hover .tool, .pcard:focus-within .tool, .pcard .tools:has([data-state="open"]) .tool { pointer-events: auto; }
+@media (hover: none) { .pcard.focus .tools { opacity: 1; } .pcard.focus .tool { pointer-events: auto; } }
 .tool { position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: #fffdf8; border: 1px solid var(--line); display: grid; place-items: center; color: var(--ink-soft); box-shadow: 0 1px 2px rgb(60 45 20 / .18); cursor: pointer; transform: scale(var(--s)); }
 .tool svg { display: block; width: 11px; height: 11px; }
 .tool:hover { color: #fffdf8; background: var(--accent); border-color: var(--accent); }
 .tool.top { left: 50%; top: calc(2px - var(--half)); }
 .tool.right { left: calc(50% + 32px + var(--half)); top: 34px; }
 .tool.bottom { left: 50%; top: calc(100% + var(--half)); }
-.tool.more { left: calc(50% - 32px - var(--half)); top: 34px; }
-.tool.more:hover { background: var(--ink); border-color: var(--ink); }
+.tool.left { left: calc(50% - 32px - var(--half)); top: 34px; }
 
 .legend-svg { overflow: visible; }
 .legend-ring { width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid var(--neutral); background: #e7dfcd; display: block; }
@@ -205,5 +207,20 @@ kbd { font: 11px var(--font-sans); color: var(--ink-faint); border: 1px solid va
 .bn-container[data-color-scheme], .bn-editor { background: transparent !important; font-family: var(--font-sans) !important; --bn-colors-editor-background: transparent; --bn-colors-editor-text: var(--ink); }
 .bn-block-content[data-content-type="heading"] { font-family: var(--font-serif); }
 .bn-block-content[data-content-type="quote"] { font-family: var(--font-serif); font-style: italic; }
-.mention-chip { background: #efe5d3; border-radius: 5px; padding: 0 5px; color: var(--accent); cursor: pointer; font-weight: 500; }
-.mention-chip:hover { background: #e7d9c0; }
+/* Inside the text, the Notion way: quiet until the cursor comes near. */
+.mention-chip { border-radius: 4px; padding: 0 2px; color: var(--ink); font-weight: 500; cursor: pointer; border-bottom: 1px solid var(--ink-faint); }
+.mention-chip:hover { background: #efe9dc; }
+.mention-at { color: var(--ink-faint); margin-right: 1px; font-weight: 400; }
+.bn-editor a { color: var(--ink-soft); text-decoration: none; border-bottom: 1px solid var(--ink-faint); cursor: pointer; transition: color .1s, border-color .1s; }
+.bn-editor a:hover { color: var(--accent); border-color: var(--accent); }
+.tag-chip { display: inline-block; border-radius: 4px; padding: 0 6px; font-size: .88em; line-height: 1.45; white-space: nowrap; }
+.tag-0 { background: #f1e9df; color: #6e5240; }
+.tag-1 { background: #f6e4d3; color: #8a4b1f; }
+.tag-2 { background: #f5ecc9; color: #75601a; }
+.tag-3 { background: #e2eddc; color: #41633c; }
+.tag-4 { background: #dfe9ef; color: #38596c; }
+.tag-5 { background: #ebe2ef; color: #5f4570; }
+.mark-chip { background: #efe5d3; border-radius: 5px; padding: 0 5px; font-size: 12px; font-family: var(--font-sans, inherit); font-weight: 400; color: var(--ink-soft); white-space: nowrap; }
+.mark-chip[data-citation] { cursor: pointer; }
+.mark-chip[data-citation]:hover { color: var(--accent); }
+.mark-chip.unverified { background: #f7e3d3; color: var(--accent); }

@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, FilePlus2, Maximize2, Minimize2, Plus, Trash2, UserCheck, X } from 'lucide-react'
@@ -11,9 +11,11 @@ import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { api, avatarUrl, mediaUrl, useApp, useWrite } from '@/lib/client'
 import { yourTerm } from '@/lib/kinship'
+import { accept, addVersion, editValue, hasConflict, NAME_FIELDS, reject, RELIABILITY, restore, setSource, sourceOf, summary, versions, type ClaimPatch } from '@/lib/claims'
+import { listWriter } from '@/lib/list-writes'
 import { ageWords, patronymicFrom } from '@/lib/names'
 import { cn } from '@/lib/utils'
-import { personName, type Certainty, type Fact, type Media, type PageMeta, type Person, type Union } from '@/lib/types'
+import { personName, type Certainty, type Fact, type Media, type ClaimField, type PageMeta, type Person, type Reliability, type Source, type Union } from '@/lib/types'
 import { Mini, useEsc } from './person-pickers'
 
 const PageEditor = dynamic(() => import('./page-editor'), { ssr: false, loading: () => <div className="h-40" /> })
@@ -45,6 +47,8 @@ export function PersonPanel({ person, onClose, onDelete }: { person: Person; onC
   const patch = useWrite((p: Partial<Person>) => api(`persons/${person.id}`, { method: 'PATCH', json: p }))
   const claim = useWrite((personId: string | null) => api('me', { method: 'PATCH', json: { personId } }).then(() => location.reload()))
   const save = (key: keyof Person) => (v: string) => patch.mutate({ [key]: v })
+  /** A name with versions keeps them in step: typing corrects the main one. */
+  const saveName = (key: ClaimField) => (v: string) => patch.mutate(person.claims.some((c) => c.field === key) ? editValue(person, key, v) : { [key]: v })
   const { data: pageList } = useQuery({ queryKey: ['pages', person.id], queryFn: () => api<PageMeta[]>(`persons/${person.id}/pages`) })
   const { data: photos = [] } = useQuery({ queryKey: ['media', person.id], queryFn: () => api<Media[]>(`persons/${person.id}/media`) })
   const [tab, setTab] = useState<string | null>(null)
@@ -68,18 +72,18 @@ export function PersonPanel({ person, onClose, onDelete }: { person: Person; onC
       <header className="px-6 pt-6 pb-3 flex gap-4 items-start max-sm:px-4 max-sm:pt-4 max-sm:pb-2 max-sm:gap-3">
         <AvatarButton person={person} />
         <div className="min-w-0 flex-1">
-          <Field readOnly={ro} className="font-serif text-[22px] font-medium leading-tight !w-[calc(100%-56px)] max-sm:text-[19px]" value={person.givenName} placeholder={t('Имя')} onSave={save('givenName')} />
-          {person.patronymic && <Field readOnly={ro} className="font-serif text-[17px] leading-tight max-sm:text-[15px]" value={person.patronymic} placeholder={t('Отчество')} onSave={save('patronymic')} />}
-          <Field readOnly={ro} className="font-serif text-[22px] font-medium leading-tight max-sm:text-[19px]" value={person.surname} placeholder={t('Фамилия')} onSave={save('surname')} />
+          <Field readOnly={ro} className="font-serif text-[22px] font-medium leading-tight !w-[calc(100%-56px)] max-sm:text-[19px]" value={person.givenName} placeholder={t('Имя')} onSave={saveName('givenName')} />
+          {person.patronymic && <Field readOnly={ro} className="font-serif text-[17px] leading-tight max-sm:text-[15px]" value={person.patronymic} placeholder={t('Отчество')} onSave={saveName('patronymic')} />}
+          <Field readOnly={ro} className="font-serif text-[22px] font-medium leading-tight max-sm:text-[19px]" value={person.surname} placeholder={t('Фамилия')} onSave={saveName('surname')} />
           {!person.patronymic && !ro && lang === 'ru' && (
             <div className="flex items-center text-ink-soft text-[13px] mt-0.5 gap-1.5 min-w-0">
               <span className="flex-none max-sm:text-[12px]">{t('Отчество')}:</span>
-              <Field value="" placeholder={t('не указано')} className="min-w-0 flex-1" onSave={save('patronymic')} />
+              <Field value="" placeholder={t('не указано')} className="min-w-0 flex-1" onSave={saveName('patronymic')} />
               {suggested && <button className="pick flex-none text-xs rounded-full bg-muted px-2 h-6 hover:text-ink" title={t('По имени отца')} onClick={() => patch.mutate({ patronymic: suggested })}>{t('Заполнить')}: {suggested}</button>}
             </div>
           )}
           {(person.maidenName || (!ro && person.sex === 'F')) && (
-            <div className="flex items-baseline text-ink-soft text-[13px] mt-0.5"><span className="flex-none mr-1.5 max-sm:text-[12px]">{t('Девичья фамилия')}:</span><Field readOnly={ro} value={person.maidenName} placeholder={t('не указана')} onSave={save('maidenName')} /></div>
+            <div className="flex items-baseline text-ink-soft text-[13px] mt-0.5"><span className="flex-none mr-1.5 max-sm:text-[12px]">{t('Девичья фамилия')}:</span><Field readOnly={ro} value={person.maidenName} placeholder={t('не указана')} onSave={saveName('maidenName')} /></div>
           )}
           {toMe && <div className="text-rust text-[13px] mt-1">{yourTerm(toMe.label, person.sex, lang)}</div>}
           {me.personId === person.id && <div className="text-rust text-[13px] mt-1">{t('Это вы')}</div>}
@@ -95,7 +99,7 @@ export function PersonPanel({ person, onClose, onDelete }: { person: Person; onC
         </TabsList>
         <TabsContent value="pages" className="flex-1 min-h-0 overflow-hidden"><Pages person={person} full={full} onDetails={() => go('details')} /></TabsContent>
         <TabsContent value="details" className="flex-1 min-h-0 overflow-auto pt-2">
-          <Details person={person} patch={(p) => patch.mutate(p)} go={go} photoCount={photos.length} pageCount={pageList?.length ?? 0} />
+          <Details person={person} patch={patch.mutateAsync} go={go} photoCount={photos.length} pageCount={pageList?.length ?? 0} />
         </TabsContent>
         <TabsContent value="family" className="flex-1 min-h-0 overflow-auto"><FamilyTab person={person} /></TabsContent>
         <TabsContent value="photos" className="flex-1 min-h-0 overflow-auto"><PhotosTab person={person} /></TabsContent>
@@ -431,14 +435,125 @@ function FactRow({ fact, readOnly, fresh, onChange, onRemove }: { fact: Fact; re
   )
 }
 
-const CERTAINTY_HINT: Record<Certainty, string> = {
-  documented: 'есть запись или документ',
-  family: 'со слов родных, без документа',
-  assumed: 'пока не подтверждено, нужно проверить',
-}
-
 /** Common kinds of fact, one click each, so the same wording is reused and GEDCOM gets its tags. */
 const FACT_KINDS = ['Профессия', 'Место жительства', 'Образование', 'Служба', 'Награда', 'Переезд', 'Крещение', 'Погребение', 'Причина смерти', 'Вероисповедание', 'Национальность']
+
+/** Where genealogical records usually come from; the kind fills the title in one click. */
+const SOURCE_RELIABILITY: Record<string, Reliability> = { 'Метрическая книга': 'original', 'Перепись': 'original', 'Архив ЗАГС': 'original', 'Военный архив': 'original', 'Семейный документ': 'original', 'Рассказ родных': 'witness' }
+const SOURCE_KINDS = ['Метрическая книга', 'Перепись', 'Архив ЗАГС', 'Военный архив', 'Семейный документ', 'Рассказ родных', '']
+
+/** One source: where it is, its reference, the sheet and a link. Saved when a field loses focus. */
+function SourceRow({ source, readOnly, fresh, onChange, onRemove }: { source: Source; readOnly: boolean; fresh: boolean; onChange: (s: Source) => void; onRemove: () => void }) {
+  const { t } = useApp()
+  const [s, setS] = useState(source)
+  // A family account has no archive reference to ask for.
+  const personal = [t('Рассказ родных'), t('Семейный документ')].includes(s.title)
+  useEffect(() => setS(source), [source])
+  const commit = () => { if (JSON.stringify(s) !== JSON.stringify(source)) onChange(s) }
+  const field = (key: keyof Source, placeholder: string, cls: string, auto?: boolean) => (
+    <input value={s[key]} readOnly={readOnly} autoFocus={auto} placeholder={readOnly ? '' : t(placeholder)} aria-label={t(placeholder)} onChange={(e) => setS({ ...s, [key]: e.target.value })} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} className={cn('inline-input min-w-0', cls)} />
+  )
+  const row = (label: string, key: keyof Source, placeholder: string, auto?: boolean) => (!readOnly || s[key]) && (
+    <>
+      <span className="text-xs text-ink-faint">{t(label)}</span>
+      {readOnly && key === 'url' && /^https?:\/\//.test(s.url) ? <a href={s.url} target="_blank" rel="noreferrer noopener" className="underline truncate">{s.url}</a> : field(key, placeholder, 'text-ink', auto)}
+    </>
+  )
+  return (
+    <div className="group relative rounded-md border border-border px-2.5 py-1.5 flex flex-col gap-1">
+      <div className="pr-5">{field('title', 'Название источника', 'font-medium', fresh && !source.title)}</div>
+      <div className="grid grid-cols-[64px_1fr] gap-x-2 gap-y-0.5 items-baseline">
+        <span className="text-xs text-ink-faint">{t('Что это')}</span>
+        {readOnly
+          ? <span className="text-ink-soft">{t(RELIABILITY[s.reliability ?? 'copy'])}</span>
+          : <select aria-label={t('Что это')} value={s.reliability ?? 'copy'} onChange={(e) => { const next = { ...s, reliability: e.target.value as Reliability }; setS(next); onChange(next) }} className="pick bg-transparent text-ink rounded hover:bg-muted max-w-full">{(Object.keys(RELIABILITY) as Reliability[]).map((r) => <option key={r} value={r}>{t(RELIABILITY[r])}</option>)}</select>}
+        {row(personal ? 'Подробнее' : 'Шифр', 'ref', personal ? 'кто рассказал или где хранится' : 'фонд, опись, дело', fresh && !!source.title)}
+        {!personal && row('Лист', 'page', 'напр. 12')}
+        {row('Ссылка', 'url', 'https://…')}
+      </div>
+      {!readOnly && <button aria-label={t('Удалить')} title={t('Удалить')} className="absolute right-1.5 top-1.5 p-0.5 max-sm:p-2 max-sm:right-0 max-sm:top-0 opacity-0 group-hover:opacity-100 focus:opacity-100 [@media(hover:none)]:opacity-100 text-ink-faint hover:text-destructive" onClick={onRemove}><X size={13} /></button>}
+    </div>
+  )
+}
+
+const NAME_LABELS: Partial<Record<ClaimField, string>> = { givenName: 'Имя', patronymic: 'Отчество', surname: 'Фамилия', maidenName: 'Девичья фамилия' }
+
+const REJECT_REASONS = ['опечатка', 'другой человек', 'опровергнуто документом']
+
+/** Under a value: where it comes from and whether others disagree. A click opens all its versions. */
+function Versions({ person, field, current, change, attach }: { person: Person; field: ClaimField; current: () => Person; change: (p: ClaimPatch) => void; attach: (s: Source) => void }) {
+  const { t, canEdit, graph } = useApp()
+  const [open, setOpen] = useState(false)
+  const [value, setValue] = useState('')
+  const [rejecting, setRejecting] = useState<string | null>(null)
+  const [pending, setPending] = useState<string | null>(null)
+  const list = versions(person, field)
+  if (!list.length && !canEdit) return <span />
+  const main = list.find((c) => c.status === 'accepted')
+  const mainSource = main && sourceOf(person, main)
+  const conflict = hasConflict(person, field)
+  const others = list.filter((c) => c.status === 'possible').length
+  // Sources from every card, so one document serves everyone it names.
+  const known = [...new Map([...person.sources, ...graph.persons.flatMap((p) => p.sources)].filter((s) => s.id).map((s) => [s.id!, s])).values()]
+  const pick = (id: string, then: (sourceId: string | null) => void) => {
+    const s = known.find((x) => x.id === id)
+    if (s) attach(s)
+    then(id || null)
+  }
+  const sourceSelect = (selected: string | null, onPick: (id: string | null) => void) => (
+    <select aria-label={t('Источник')} value={selected ?? ''} onChange={(e) => pick(e.target.value, onPick)} className="pick bg-transparent text-xs text-ink-soft rounded hover:bg-muted min-w-0 max-w-full truncate">
+      <option value="">{t('без источника')}</option>
+      {known.map((s) => <option key={s.id} value={s.id}>{s.title || t('Без названия')}</option>)}
+    </select>
+  )
+  const unclaimedName = NAME_FIELDS.includes(field) && !person.claims.some((c) => c.field === field)
+  const label = conflict ? `⚠ ${mainSource?.title ?? t('без источника')} +${others}` : mainSource ? `${mainSource.title}${others ? ` +${others}` : ''}` : unclaimedName ? t('указать источник') : main ? t('без источника') : t('добавить версию')
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button className={cn('pick text-left text-[11px] -mt-1.5 max-sm:mt-0 min-w-0 truncate rounded hover:text-ink', conflict ? 'text-destructive' : main && !mainSource ? 'text-ink-faint' : 'text-ink-soft')}>{label}</button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[min(320px,calc(100vw-32px))] p-2.5 text-[13px] flex flex-col gap-2">
+        {list.map((c) => {
+          const source = sourceOf(person, c)
+          const off = c.status === 'rejected'
+          return (
+            <div key={c.id} className={cn('rounded-md border border-border px-2 py-1.5 flex flex-col gap-1', off && 'opacity-60')}>
+              <label className="flex items-center gap-2 min-w-0">
+                {!off && canEdit && <input type="radio" name={`main-${field}`} className="accent-[var(--ink)] size-4 flex-none" checked={c.status === 'accepted'} aria-label={t('Основное значение')} onChange={() => change(accept(current(), field, c.id))} />}
+                <span className={cn('truncate', off ? 'line-through' : 'font-medium')}>{c.value}</span>
+                <span className="ml-auto flex-none text-[11px] text-ink-faint">{t(off ? 'отвергнуто' : c.status === 'accepted' ? 'основное' : 'возможно')}</span>
+              </label>
+              {off && c.reason && <span className="text-xs text-ink-soft">{t('Причина')}: {c.reason}</span>}
+              <div className="flex flex-wrap items-center gap-x-2 min-w-0 text-xs text-ink-soft">
+                {canEdit && !off ? sourceSelect(c.sourceId, (id) => change(setSource(current(), field, c.id, id))) : <span className="truncate">{source?.title ?? t('без источника')}</span>}
+                {source && <span className="flex-none text-ink-faint">{t(RELIABILITY[source.reliability ?? 'copy'])}</span>}
+                {canEdit && (off
+                  ? <button className="pick ml-auto flex-none hover:text-ink" onClick={() => change(restore(current(), field, c.id))}>{t('Вернуть')}</button>
+                  : <button className="pick ml-auto flex-none hover:text-destructive" onClick={() => setRejecting(rejecting === c.id ? null : c.id)}>{t('Отвергнуть')}</button>)}
+              </div>
+              {rejecting === c.id && (
+                <div className="flex flex-wrap gap-1">
+                  {REJECT_REASONS.map((r) => <button key={r} className="pick rounded-full bg-muted px-2 h-6 text-xs hover:text-ink" onClick={() => { change(reject(current(), field, c.id, t(r))); setRejecting(null) }}>{t(r)}</button>)}
+                </div>
+              )}
+            </div>
+          )
+        })}
+        {canEdit && (
+          <form className="flex flex-col gap-1.5" onSubmit={(e) => { e.preventDefault(); const v = value.trim(); if (!v) return; change(addVersion(current(), field, v, pending)); setValue(''); setPending(null) }}>
+            <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={t('Другая версия значения')} aria-label={t('Другая версия значения')} className="h-8 rounded-md border border-input bg-white px-2" />
+            <div className="flex items-center gap-2 min-w-0">
+              {sourceSelect(pending, setPending)}
+              <button className="bar-btn border border-border ml-auto flex-none" disabled={!value.trim()}>{t('Добавить')}</button>
+            </div>
+            {!known.length && <p className="text-xs text-ink-faint">{t('Источники добавляются ниже, в разделе «Источники»')}</p>}
+          </form>
+        )}
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 const QUALIFIERS: [string, string][] = [['', 'точно'], ['~', 'около'], ['<', 'до'], ['>', 'после']]
 
@@ -458,11 +573,20 @@ function DateField({ value, onSave, readOnly, placeholder, id }: { value: string
   )
 }
 
-function Details({ person, patch, go, photoCount, pageCount }: { person: Person; patch: (p: Partial<Person>) => void; go: (tab: string, fieldId?: string) => void; photoCount: number; pageCount: number }) {
-  const { t, canEdit, graph, lang } = useApp()
+function Details({ person, patch: send, go, photoCount, pageCount }: { person: Person; patch: (p: Partial<Person>) => Promise<unknown>; go: (tab: string, fieldId?: string) => void; photoCount: number; pageCount: number }) {
+  const { t, canEdit, graph, lang, notify } = useApp()
   const ro = !canEdit
+  const writer = useRef(listWriter({ facts: person.facts, sources: person.sources, tags: person.tags, claims: person.claims }, send, (e) => notify(`${t('Не удалось сохранить')}: ${(e as Error).message}`))).current
+  useEffect(() => writer.sync({ facts: person.facts, sources: person.sources, tags: person.tags, claims: person.claims }), [writer, person.facts, person.sources, person.tags, person.claims])
+  /** The person as the next change must see it: lists as last written. */
+  const current = (): Person => ({ ...person, claims: writer.get('claims'), sources: writer.get('sources') })
+  const change = (patch: ClaimPatch) => writer.merge(patch)
+  const saveClaimField = (field: ClaimField) => (v: string) => change(editValue(current(), field, v))
+  const patch = writer.write as (p: Partial<Person>) => void
+  const edit = writer.edit
   const save = (key: keyof Person) => (v: string) => patch({ [key]: v })
   const [fresh, setFresh] = useState(-1)
+  const [freshSource, setFreshSource] = useState(-1)
   const places = useMemo(() => [...new Set(graph.persons.flatMap((p) => [p.birthPlace, p.deathPlace, ...p.facts.map((f) => f.place)]).concat(graph.unions.map((u) => u.place)).filter(Boolean))].sort().slice(0, 300), [graph])
   const hasParents = graph.parentChild.some((l) => l.childId === person.id)
   const alive = person.living
@@ -474,6 +598,7 @@ function Details({ person, patch, go, photoCount, pageCount }: { person: Person;
     ['родителей', hasParents, 'family'],
     ['фото', photoCount > 0 || !!person.avatarMediaId, 'photos'],
     ['биографию', pageCount > 0, 'pages'],
+    ['источник', person.sources.length > 0, 'details', 'f-sources'],
   ]
   const done = todo.filter((x) => x[1]).length
   const now = new Date().getFullYear()
@@ -482,6 +607,11 @@ function Details({ person, patch, go, photoCount, pageCount }: { person: Person;
   const badOrder = !!(person.birthYear && person.deathYear && person.deathYear < person.birthYear)
   const tooOld = alive && !!person.birthYear && now - person.birthYear > 110
   const f = person.sex === 'F', u = person.sex === 'U'
+  const card = summary(person)
+  /** A source found on another person's card is the same document: it joins this card too. */
+  const attachSource = (source: Source) => {
+    if (!writer.get('sources').some((x) => x.id === source.id)) writer.merge({ sources: [...writer.get('sources'), source] })
+  }
 
   return (
     <div className="px-6 max-sm:px-4 pb-5 flex flex-col gap-4 text-[13px]">
@@ -501,6 +631,15 @@ function Details({ person, patch, go, photoCount, pageCount }: { person: Person;
         </div>
       )}
 
+      {(card.documented + card.told + card.unsourced + card.conflict > 0) && (
+        <p className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
+          {card.conflict > 0 && <span className="text-destructive">⚠ {t('расхождений')}: {card.conflict}</span>}
+          {card.documented > 0 && <span className="text-ink-soft">{t('по документу')}: {card.documented}</span>}
+          {card.told > 0 && <span className="text-ink-soft">{t('со слов')}: {card.told}</span>}
+          {card.unsourced > 0 && <span className="text-ink-faint">{t('без источника')}: {card.unsourced}</span>}
+        </p>
+      )}
+
       <dl className="grid grid-cols-[92px_1fr_1fr] max-sm:grid-cols-[72px_1fr_1fr] gap-x-3 max-sm:gap-x-2 gap-y-2 items-center">
         <dt className="text-ink-soft max-sm:col-span-3 max-sm:-mb-1">{t('Пол')}</dt>
         <dd className="col-span-2 max-sm:col-span-3"><Segmented id="f-sex" label={t('Пол')} disabled={ro} value={person.sex} onChange={(sex) => patch({ sex })} options={[['M', t('Мужской')], ['F', t('Женский')], ['U', t('Неизвестно')]]} /></dd>
@@ -516,14 +655,20 @@ function Details({ person, patch, go, photoCount, pageCount }: { person: Person;
         <span className="text-[11px] uppercase tracking-wide text-ink-faint">{t('Место')}</span>
 
         <dt className="text-ink-soft">{t('Рождение')}</dt>
-        <DateField id="f-birth-date" readOnly={ro} value={person.birthDate} placeholder={t('напр. 1890')} onSave={save('birthDate')} />
-        <Field id="f-birth-place" list="known-places" readOnly={ro} value={person.birthPlace} placeholder={t('напр. Пермь')} onSave={save('birthPlace')} />
+        <DateField id="f-birth-date" readOnly={ro} value={person.birthDate} placeholder={t('напр. 1890')} onSave={saveClaimField('birthDate')} />
+        <Field id="f-birth-place" list="known-places" readOnly={ro} value={person.birthPlace} placeholder={t('напр. Пермь')} onSave={saveClaimField('birthPlace')} />
+        <span />
+        <Versions person={person} field="birthDate" current={current} change={change} attach={attachSource} />
+        <Versions person={person} field="birthPlace" current={current} change={change} attach={attachSource} />
 
         {!alive && (
           <>
             <dt className="text-ink-soft">{t('Смерть')}</dt>
-            <DateField id="f-death-date" readOnly={ro} value={person.deathDate} placeholder={t('напр. 1950')} onSave={save('deathDate')} />
-            <Field id="f-death-place" list="known-places" readOnly={ro} value={person.deathPlace} placeholder={t('напр. Пермь')} onSave={save('deathPlace')} />
+            <DateField id="f-death-date" readOnly={ro} value={person.deathDate} placeholder={t('напр. 1950')} onSave={saveClaimField('deathDate')} />
+            <Field id="f-death-place" list="known-places" readOnly={ro} value={person.deathPlace} placeholder={t('напр. Пермь')} onSave={saveClaimField('deathPlace')} />
+            <span />
+            <Versions person={person} field="deathDate" current={current} change={change} attach={attachSource} />
+            <Versions person={person} field="deathPlace" current={current} change={change} attach={attachSource} />
           </>
         )}
 
@@ -534,12 +679,22 @@ function Details({ person, patch, go, photoCount, pageCount }: { person: Person;
           </>
         )}
 
-        <dt className="text-ink-soft self-start pt-1 max-sm:col-span-3 max-sm:-mb-1">{t('Уверенность')}</dt>
-        <dd className="col-span-2 max-sm:col-span-3">
-          <Segmented label={t('Уверенность')} disabled={ro} value={person.certainty} onChange={(certainty) => patch({ certainty })} options={(Object.keys(CERTAINTY) as Certainty[]).map((c) => [c, t(CERTAINTY[c])] as [Certainty, string])} />
-          <p className="mt-1 text-[12px] text-ink-soft">{t(CERTAINTY_HINT[person.certainty])}</p>
-        </dd>
       </dl>
+
+      {(canEdit || person.claims.some((c) => NAME_LABELS[c.field])) && (
+        <details open={NAME_FIELDS.some((f) => hasConflict(person, f))} className="text-[13px]">
+          <summary className="cursor-pointer text-xs text-ink-soft min-h-6">{t('Откуда известно имя')}</summary>
+          <div className="grid grid-cols-[92px_1fr_1fr] max-sm:grid-cols-[72px_1fr_1fr] gap-x-3 gap-y-1 items-center mt-1">
+            {NAME_FIELDS.filter((f) => person[f as keyof Person]).map((f) => (
+              <Fragment key={f}>
+                <span className="text-ink-soft">{t(NAME_LABELS[f]!)}</span>
+                <span className="truncate">{String(person[f as keyof Person])}</span>
+                <Versions person={person} field={f} current={current} change={change} attach={attachSource} />
+              </Fragment>
+            ))}
+          </div>
+        </details>
+      )}
 
       {badOrder && <p role="alert" className="text-xs text-destructive">{t('Дата смерти раньше даты рождения: проверьте годы')}</p>}
       {tooOld && canEdit && <p className="text-xs text-ink-soft">{t('Больше 110 лет.')} <button className="underline hover:text-ink" onClick={() => patch({ living: false })}>{t('Отметить как умершего')}</button></p>}
@@ -553,14 +708,37 @@ function Details({ person, patch, go, photoCount, pageCount }: { person: Person;
               fact={fact}
               readOnly={ro}
               fresh={fresh === i}
-              onChange={(next) => patch({ facts: person.facts.map((x, j) => (j === i ? next : x)) })}
-              onRemove={() => patch({ facts: person.facts.filter((_, j) => j !== i) })}
+              onChange={(next) => edit('facts', (list) => list.map((x, j) => (j === i ? next : x)))}
+              onRemove={() => edit('facts', (list) => list.filter((_, j) => j !== i))}
             />
           ))}
           {!ro && (
             <div className="flex flex-wrap gap-1">
               {[...FACT_KINDS, ''].map((k) => (
-                <button key={k} className="pick rounded-full border border-dashed border-ink-faint px-2 h-6 text-xs text-ink-soft hover:text-ink hover:border-ink" onClick={() => { setFresh(person.facts.length); patch({ facts: [...person.facts, { kind: k && t(k), date: '', place: '', note: '', source: '' }] }) }}>+ {t(k || 'Другое')}</button>
+                <button key={k} className="pick rounded-full border border-dashed border-ink-faint px-2 h-6 text-xs text-ink-soft hover:text-ink hover:border-ink" onClick={() => { setFresh(writer.get('facts').length); edit('facts', (list) => [...list, { kind: k && t(k), date: '', place: '', note: '', source: '' }]) }}>+ {t(k || 'Другое')}</button>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {(person.sources.length > 0 || !ro) && (
+        <section className="flex flex-col gap-1.5">
+          <h4 id="f-sources" tabIndex={-1} className="text-xs text-ink-soft">{t('Источники')}</h4>
+          {person.sources.map((source, i) => (
+            <SourceRow
+              key={i}
+              source={source}
+              readOnly={ro}
+              fresh={freshSource === i}
+              onChange={(next) => edit('sources', (list) => list.map((x, j) => (j === i ? next : x)))}
+              onRemove={() => edit('sources', (list) => list.filter((_, j) => j !== i))}
+            />
+          ))}
+          {!ro && (
+            <div className="flex flex-wrap gap-1">
+              {SOURCE_KINDS.map((k) => (
+                <button key={k} className="pick rounded-full border border-dashed border-ink-faint px-2 h-6 text-xs text-ink-soft hover:text-ink hover:border-ink" onClick={() => { setFreshSource(writer.get('sources').length); edit('sources', (list) => [...list, { id: Math.random().toString(36).slice(2, 10), title: k && t(k), ref: '', page: '', url: '', reliability: SOURCE_RELIABILITY[k] ?? 'copy' }]) }}>+ {t(k || 'Другое')}</button>
               ))}
             </div>
           )}
@@ -574,10 +752,10 @@ function Details({ person, patch, go, photoCount, pageCount }: { person: Person;
             {person.tags.map((tag) => (
               <span key={tag} className="flex items-center gap-1 rounded-full bg-muted pl-2.5 pr-1.5 h-6 text-xs">
                 {tag}
-                {!ro && <button aria-label={t('Удалить')} className="text-ink-faint hover:text-destructive" onClick={() => patch({ tags: person.tags.filter((x) => x !== tag) })}><X size={11} /></button>}
+                {!ro && <button aria-label={t('Удалить')} className="text-ink-faint hover:text-destructive" onClick={() => edit('tags', (list) => list.filter((x) => x !== tag))}><X size={11} /></button>}
               </span>
             ))}
-            {!ro && <TagInput existing={person.tags} onAdd={(tag) => patch({ tags: [...person.tags, tag] })} />}
+            {!ro && <TagInput existing={person.tags} onAdd={(tag) => edit('tags', (list) => [...list, tag])} />}
           </div>
         </section>
       )}

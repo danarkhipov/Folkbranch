@@ -7,7 +7,8 @@ import { getDb, schema } from '../db'
 import { translate } from '../i18n'
 import { markdownToBlocks } from '../markdown'
 import { parseFamilyText, planFamilyText, type PlannedOp } from '../textformat'
-import { personName, type Certainty, type ParentKind, type UnionKind } from '../types'
+import * as claims from '../claims'
+import { personName, type Certainty, type ClaimField, type ParentKind, type Person, type UnionKind } from '../types'
 import { Actor, mutateGroup, newId, OpError, requireRole, undo } from './core'
 import { importGedcom } from './gedcom'
 import * as media from './media'
@@ -29,7 +30,22 @@ const personInput = z.object({
     kind: z.string().max(80).describe('What happened: "Профессия", "Переезд", "Служба"'),
     date: z.string().max(60), place: z.string().max(120), note: z.string().max(800), source: z.string().max(300).optional(),
   })).max(100),
+  sources: z.array(z.object({
+    title: z.string().max(200).describe('Archive, book or who told it'), ref: z.string().max(120).describe('Fond, inventory, file'),
+    page: z.string().max(40), url: z.string().max(500), id: z.string().max(40).optional(),
+    reliability: z.enum(['original', 'copy', 'transcript', 'witness', 'hearsay', 'guess']).optional().describe('What kind of evidence the source is'),
+  })).max(100),
+  claims: z.array(z.object({
+    id: z.string().max(40), field: z.enum(['birthDate', 'birthPlace', 'deathDate', 'deathPlace', 'givenName', 'patronymic', 'surname', 'maidenName']), value: z.string().max(120),
+    sourceId: z.string().max(40).nullable(), status: z.enum(['accepted', 'possible', 'rejected']), reason: z.string().max(200), at: z.number(),
+  })).max(200).describe('Versions of a value; the person field holds the accepted one'),
 }).partial()
+const claimField = z.enum(['birthDate', 'birthPlace', 'deathDate', 'deathPlace', 'givenName', 'patronymic', 'surname', 'maidenName'])
+const sourceInput = z.object({
+  title: z.string().min(1).max(200).describe('Archive, book or who told it'), ref: z.string().max(120).optional().describe('Fond, inventory, file'),
+  page: z.string().max(40).optional(), url: z.string().max(500).optional(),
+  reliability: z.enum(['original', 'copy', 'transcript', 'witness', 'hearsay', 'guess']).default('copy').describe('original: the document itself; copy: copy or extract; transcript: someone typed it out; witness: told by someone who saw it; hearsay: passed on; guess: an assumption'),
+})
 const relationType = z.enum(['father', 'mother', 'son', 'daughter', 'spouse'])
 const box = z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), w: z.number().min(0).max(1), h: z.number().min(0).max(1) })
 const blocks = z.array(z.record(z.string(), z.unknown()))
@@ -57,6 +73,16 @@ interface Def<S extends z.ZodType = z.ZodType> {
 }
 
 const def = <S extends z.ZodType>(d: Def<S>) => d as Def
+
+function personFor(actor: Actor, id: string) {
+  const p = people.getGraph(actor).persons.find((x) => x.id === id)
+  if (!p || p.hidden) throw new OpError(404, `person ${id} not found`)
+  return p
+}
+
+function assertVersion(p: Person, field: ClaimField, id: string) {
+  if (!claims.versions(p, field).some((c) => c.id === id)) throw new OpError(404, `version ${id} not found for ${field}`)
+}
 
 /** A token may only embed our own photos: an outside image would report every viewer to a stranger. */
 function assertSafeBlocks(actor: Actor, content: unknown) {
@@ -227,6 +253,47 @@ export const OPS: Record<string, Def> = {
     refs: { personId: 'persons' },
     apply: (a, x) => people.setAvatar(a, x.personId, x.mediaId, x.crop),
     describe: (x, c) => ({ text: `${c.name(x.personId)}: ${say('Сделать аватаркой')}` }),
+  }),
+  add_version: def({
+    description: 'Record a value found for a person: birth or death date or place, or a name. Keeps what was there; the first value of an empty field becomes the main one, otherwise a person chooses. Prefer this to update_person for anything found in a source. Give `source` to say where it comes from: reuse a source by `sourceId` from get_person.',
+    input: z.object({
+      personId: z.string(),
+      field: claimField,
+      value: z.string().min(1).max(120),
+      sourceId: z.string().max(40).optional(),
+      source: sourceInput.optional().describe('A new source for this person'),
+    }),
+    refs: { personId: 'persons' },
+    apply: (a, x) => {
+      const p = personFor(a, x.personId)
+      const source = x.source ? { ...x.source, id: newId(), ref: x.source.ref ?? '', page: x.source.page ?? '', url: x.source.url ?? '' } : null
+      const sources = source ? [...p.sources, source] : p.sources
+      if (x.sourceId && !sources.some((s) => s.id === x.sourceId)) throw new OpError(404, `source ${x.sourceId} not found on this person`)
+      return people.updatePerson(a, x.personId, { sources, ...claims.addVersion({ ...p, sources }, x.field, x.value, source?.id ?? x.sourceId ?? null) })
+    },
+    describe: (x, c) => ({ text: `${c.name(x.personId)}: ${x.field} = ${x.value}`, details: [x.source?.title].filter(Boolean) }),
+  }),
+  choose_version: def({
+    description: 'Make one version of a value the main one. Version ids come from get_person (`claims`). A value not yet saved as a version has the id cur:<field>:<value>.',
+    input: z.object({ personId: z.string(), field: claimField, versionId: z.string() }),
+    refs: { personId: 'persons' },
+    apply: (a, x) => {
+      const p = personFor(a, x.personId)
+      assertVersion(p, x.field, x.versionId)
+      return people.updatePerson(a, x.personId, claims.accept(p, x.field, x.versionId))
+    },
+    describe: (x, c) => ({ text: `${c.name(x.personId)}: ${x.field} → ${x.versionId}` }),
+  }),
+  reject_version: def({
+    description: 'Mark a version as wrong, with the reason. It is kept, so nobody accepts it again. If it was the main one, the next version takes over.',
+    input: z.object({ personId: z.string(), field: claimField, versionId: z.string(), reason: z.string().min(1).max(200) }),
+    refs: { personId: 'persons' },
+    apply: (a, x) => {
+      const p = personFor(a, x.personId)
+      assertVersion(p, x.field, x.versionId)
+      return people.updatePerson(a, x.personId, claims.reject(p, x.field, x.versionId, x.reason))
+    },
+    describe: (x, c) => ({ text: `${c.name(x.personId)}: ${x.field} ✕ ${x.reason}` }),
   }),
   import_text: def({
     description: 'Add people and links from the text graph format (see export_text). Only adds and changes, never deletes. Always goes to review for tokens.',

@@ -3,7 +3,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState }
 import { select } from 'd3-selection'
 import { zoom as d3zoom, zoomIdentity, type ZoomBehavior } from 'd3-zoom'
 import { useQueryClient } from '@tanstack/react-query'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { AVATAR_CY, layoutFamily, CARD_H, CARD_W } from '@/lib/graph/layout'
 import { api, avatarUrl, useApp, type QuickType } from '@/lib/client'
 import { yourTerm } from '@/lib/kinship'
@@ -29,6 +29,7 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
     const zoomRef = useRef<ZoomBehavior<HTMLDivElement, unknown>>(null)
     /** Set once the person has panned or zoomed; from then on the view is theirs. */
     const moved = useRef(false)
+    const [clipped, setClipped] = useState(false)
     const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null)
 
     const apply = (x: number, y: number, k: number) => {
@@ -48,6 +49,7 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
           if (e.sourceEvent) {
             world.current?.classList.remove('animate')
             moved.current = true
+            setClipped(false)
           }
           apply(e.transform.x, e.transform.y, e.transform.k)
         })
@@ -75,6 +77,7 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
       const fitK = Math.min((w - 120) / b.w, (h - 170) / b.h, 1.1)
       // Below half size the names stop being readable: keep 50% and let the chart scroll under the hand.
       const fits = fitK >= 0.5
+      setClipped(!fits)
       const k = fits ? fitK : 0.5
       if (fits) go((w - b.w * k) / 2 - b.x * k, (h - b.h * k) / 2 - b.y * k + 20, k, animate)
       else go(60 - b.x * k, 80 - b.y * k, k, animate)
@@ -418,11 +421,14 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
                 onMouseLeave={() => hoverSoon(null)}
               >
                 <div className={cn('ava', app.canEdit && !p.hidden && 'link-start')} onPointerDown={app.canEdit && !p.hidden ? (e) => startFromPerson(e, p.id) : undefined}><img src={avatarUrl(p)} alt="" draggable={false} /></div>
-                <div className="nm">{p.hidden ? t('Живой родственник') : personName(p) || t('Без названия')}</div>
-                {!p.hidden && <div className="yr">{lifeYears(p)}</div>}
-                {label && <div className="rel kin">{label}</div>}
-                {!label && mine && <div className="rel me">{yourTerm(mine.label, p.sex, lang)}</div>}
-                {app.canEdit && !p.hidden && <CardTools person={p} onDelete={onDelete} onRemoveRelation={onRemoveRelation} onDrag={startFromPerson} />}
+                {/* Opaque, so a line coming from below stops at the text however tall it wraps. */}
+                <div className="cap">
+                  <div className="nm">{p.hidden ? t('Живой родственник') : personName(p) || t('Без названия')}</div>
+                  {!p.hidden && <div className="yr">{lifeYears(p)}</div>}
+                  {label && <div className="rel kin">{label}</div>}
+                  {!label && mine && <div className="rel me">{yourTerm(mine.label, p.sex, lang)}</div>}
+                </div>
+                {app.canEdit && !p.hidden && <CardTools person={p} onDrag={startFromPerson} />}
               </div>
             )
           })}
@@ -500,6 +506,7 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
           )}
         </div>
         {draft && <div className="fixed z-50 pointer-events-none float px-2 py-1 text-xs" style={{ left: draft.cx + 14, top: draft.cy + 14 }}>{draft.label}</div>}
+        {clipped && !panelOpen && <div className="float fixed left-1/2 -translate-x-1/2 bottom-[68px] z-10 px-3 py-1.5 text-xs text-ink-soft pointer-events-none whitespace-nowrap">{t('Схема шире экрана: тяните, чтобы сдвинуть')}</div>}
         {tip && <div className="fixed z-50 pointer-events-none float px-2 py-1 text-xs" style={{ left: tip.x + 12, top: tip.y + 12 }}>{tip.text}</div>}
       </div>
     )
@@ -507,27 +514,26 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
 )
 
 function Add({ type, label, person, side, onDrag }: { type: QuickType; label: string; person: Person; side: string; onDrag: (e: React.PointerEvent, id: string) => void }) {
-  const { t, quickAdd } = useApp()
+  const { t, quickAdd, family, notify } = useApp()
+  const add = () => {
+    if (type === 'parent' && (family.parents.get(person.id) ?? []).length >= 2) return notify(t('У этого человека уже двое родителей'))
+    quickAdd(type, person.id)
+  }
   return (
-    <button tabIndex={-1} className={`tool add ${side}`} title={`${t(label)}. ${t('Протяните к человеку, чтобы связать')}`} aria-label={t(label)} onPointerDown={(e) => onDrag(e, person.id)} onClick={() => quickAdd(type, person.id)}><Plus strokeWidth={2.5} /></button>
+    <button tabIndex={-1} className={`tool add ${side}`} title={`${t(label)}. ${t('Протяните к человеку, чтобы связать')}`} aria-label={t(label)} onPointerDown={(e) => onDrag(e, person.id)} onClick={add}><Plus strokeWidth={2.5} /></button>
   )
 }
 
-/** Where a relative goes on the chart is where the button is: partner beside, parents and children on the sides of their rows. */
-function CardTools({ person, onDelete, onRemoveRelation, onDrag }: { person: Person; onDelete: (id: string) => void; onRemoveRelation: (type: 'parent' | 'union', id: string) => void; onDrag: (e: React.PointerEvent, id: string) => void }) {
-  const { t, graph, family, byId, lang, focus, rootsBelow } = useApp()
+/** A plus on every side, placed where the relative will stand. A click on the portrait opens the editor. */
+function CardTools({ person, onDrag }: { person: Person; onDrag: (e: React.PointerEvent, id: string) => void }) {
+  const { rootsBelow } = useApp()
   const stop = (e: React.SyntheticEvent) => e.stopPropagation()
-  const links = [
-    ...graph.parentChild.filter((l) => l.parentId === person.id || l.childId === person.id).map((l) => ({ type: 'parent' as const, id: l.id, other: l.parentId === person.id ? l.childId : l.parentId })),
-    ...graph.unions.filter((u) => u.aId === person.id || u.bId === person.id).map((u) => ({ type: 'union' as const, id: u.id, other: u.aId === person.id ? u.bId : u.aId })),
-  ]
-  const parents = family.parents.get(person.id)?.length ?? 0
   return (
     <div className="tools" onClick={stop} onPointerDown={stop} onMouseDown={stop} onDoubleClick={stop} onKeyDown={stop}>
-      {parents < 2 && <Add type="parent" label="Добавить родителя" person={person} side={rootsBelow ? 'bottom' : 'top'} onDrag={onDrag} />}
+      <Add type="parent" label="Добавить родителя" person={person} side={rootsBelow ? 'bottom' : 'top'} onDrag={onDrag} />
+      <Add type="spouse" label="Добавить супруга" person={person} side="left" onDrag={onDrag} />
       <Add type="spouse" label="Добавить супруга" person={person} side="right" onDrag={onDrag} />
       <Add type="child" label="Добавить ребёнка" person={person} side={rootsBelow ? 'top' : 'bottom'} onDrag={onDrag} />
-      <button tabIndex={-1} className="tool more" title={t('Редактировать')} aria-label={t('Редактировать')} onClick={(e) => { e.stopPropagation(); focus(person.id) }}><Pencil strokeWidth={2.5} /></button>
     </div>
   )
 }

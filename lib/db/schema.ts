@@ -94,6 +94,10 @@ export const persons = sqliteTable('persons', {
   // Labels that group people ("Соколовы", "Фронт"), and dated facts (job, move, service).
   tags: text('tags').notNull().default('[]'),
   facts: text('facts').notNull().default('[]'),
+  // Where the record comes from: archive, file reference, sheet, link.
+  sources: text('sources').notNull().default('[]'),
+  // Versions of a value, each with its source and status.
+  claims: text('claims').notNull().default('[]'),
 })
 
 // Tracked tables deliberately have no foreign keys: undo re-creates rows in any order,

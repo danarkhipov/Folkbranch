@@ -1,0 +1,1 @@
+ALTER TABLE `persons` ADD `claims` text DEFAULT '[]' NOT NULL;
