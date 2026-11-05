@@ -3,12 +3,15 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Copy } from 'lucide-react'
 import { api, useApp } from '@/lib/client'
+import { Brand, type BrandName } from '../brand-icons'
 
 interface TokenRow { id: string; name: string; role: 'reader' | 'editor'; review: boolean; lastUsedAt: number | null; revokedAt: number | null; expiresAt: number | null }
 
-type Client = 'claude' | 'json' | 'prompt'
+type Client = 'claude' | 'codex' | 'cursor' | 'windsurf' | 'json' | 'prompt'
 
-const CLIENTS: Record<Client, string> = { claude: 'Claude Code', json: 'Cursor и другие', prompt: 'Задание агенту' }
+const CLIENTS: [Client, string, BrandName | null][] = [['claude', 'Claude Code', 'claudecode'], ['codex', 'Codex', 'codex'], ['cursor', 'Cursor', 'cursor'], ['windsurf', 'Windsurf', 'windsurf'], ['json', 'Другая программа', 'mcp'], ['prompt', 'Задание агенту', null]]
+/** Where each program keeps its connections, for the ones with no command for it. */
+const FILES: Partial<Record<Client, string>> = { cursor: '~/.cursor/mcp.json', windsurf: '~/.codeium/windsurf/mcp_config.json' }
 
 export function TokensTab() {
   const { t, lang } = useApp()
@@ -25,13 +28,15 @@ export function TokensTab() {
   const [client, setClient] = useState<Client>('claude')
   const snippet = client === 'claude'
     ? `claude mcp add --transport http family ${origin}/api/mcp --header "Authorization: Bearer ${made}"`
-    : client === 'json'
+    : client === 'codex'
+      ? `export FOLKBRANCH_TOKEN=${made}\ncodex mcp add family --url ${origin}/api/mcp --bearer-token-env-var FOLKBRANCH_TOKEN`
+    : client !== 'prompt'
       ? JSON.stringify({ mcpServers: { family: { type: 'http', url: `${origin}/api/mcp`, headers: { Authorization: `Bearer ${made}` } } } }, null, 2)
       : t('Подключись к семейному архиву по MCP. Сначала вызови get_overview, затем find_gaps. Прежде чем создавать человека, ищи его через search_people. Каждое найденное значение записывай через add_version с источником и его достоверностью, а не перезаписывай поля.')
   const fmt = new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short' })
   return (
     <div className="flex flex-col gap-4 text-sm">
-      <p className="text-xs text-ink-soft">{t('Подключение других программ к архиву. Обычно это не нужно.')}</p>
+      <p className="text-xs text-ink-soft">{t('Ключ нужен программе, чтобы подключиться к архиву. Он показывается один раз.')}</p>
       <form className="flex flex-col gap-2" onSubmit={async (e) => {
         e.preventDefault()
         if (!name.trim()) return
@@ -67,9 +72,11 @@ export function TokensTab() {
       {made && (
         <div className="rounded-lg bg-muted p-2 flex flex-col gap-1.5">
           <p className="text-xs text-ink-soft">{t('Ключ показан один раз, сохраните его.')}</p>
-          <div role="radiogroup" aria-label={t('Куда подключить')} className="inline-flex self-start rounded-lg bg-background p-0.5 gap-0.5 text-xs">
-            {(Object.keys(CLIENTS) as Client[]).map((c) => <button key={c} type="button" role="radio" aria-checked={client === c} className={client === c ? 'h-7 px-2 rounded-md bg-white shadow-sm font-medium' : 'h-7 px-2 rounded-md text-ink-soft hover:text-ink'} onClick={() => { setClient(c); setCopied(false) }}>{t(CLIENTS[c])}</button>)}
+          <div role="radiogroup" aria-label={t('Куда подключить')} className="inline-flex flex-wrap self-start rounded-lg bg-background p-0.5 gap-0.5 text-xs">
+            {CLIENTS.map(([c, title, logo]) => <button key={c} type="button" role="radio" aria-checked={client === c} className={client === c ? 'inline-flex items-center gap-1 h-7 px-2 rounded-md bg-white shadow-sm font-medium' : 'inline-flex items-center gap-1 h-7 px-2 rounded-md text-ink-soft hover:text-ink'} onClick={() => { setClient(c); setCopied(false) }}>{logo && <Brand name={logo} size={13} />}{title === 'Другая программа' || title === 'Задание агенту' ? t(title) : title}</button>)}
           </div>
+          {FILES[client] && <p className="text-xs text-ink-soft">{t('Вставьте это в файл')} <code>{FILES[client]}</code></p>}
+          {client === 'codex' && <p className="text-xs text-ink-soft">{t('Первую строку добавьте и в настройки оболочки, чтобы ключ был при каждом запуске.')}</p>}
           <code className="text-xs break-all whitespace-pre-wrap">{snippet}</code>
           <button className="flex items-center gap-1 text-xs text-ink-soft hover:text-ink self-start" onClick={() => { navigator.clipboard.writeText(snippet); setCopied(true) }}>{copied ? <Check size={13} /> : <Copy size={13} />}{t(copied ? 'Скопировано' : 'Скопировать')}</button>
         </div>

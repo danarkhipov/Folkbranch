@@ -1,0 +1,7 @@
+name: An idea
+description: Something the app should do
+body:
+  - type: textarea
+    id: need
+    attributes: { label: What you are trying to do, description: The need, more than the solution. }
+    validations: { required: true }

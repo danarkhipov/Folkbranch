@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { PRESETS, type PresetId } from '@/lib/agent/presets'
 import { api, useApp } from '@/lib/client'
 import type { AssistantState } from '@/lib/types'
+import { Brand } from './brand-icons'
 import { PanelEdge } from './panel-size'
 
 export interface ProviderStatus { connected: boolean; provider: PresetId | 'local' | null; label: string | null; model: string | null; source: 'server' | 'app' | null; keyEnding: string | null }
@@ -69,7 +70,7 @@ export function ProviderForm({ onDone }: { onDone?: () => void }) {
         {PRESETS.map((p) => (
           <label key={p.id} className={`flex cursor-pointer items-start gap-2 rounded-lg border px-2.5 py-2 ${p.id === id ? 'border-ink bg-white' : 'border-border'}`}>
             <input type="radio" name="provider" className="mt-0.5 accent-[var(--ink)]" checked={p.id === id} onChange={() => { setId(p.id); setError(''); setModel('') }} />
-            <span className="min-w-0"><span className="block font-medium">{p.label}</span>{p.pitch && <span className="block text-xs text-ink-soft">{t(p.pitch)}</span>}</span>
+            <span className="min-w-0"><span className="flex items-center gap-1.5 font-medium"><Brand name={p.icon} />{p.label}</span>{p.pitch && <span className="block text-xs text-ink-soft">{t(p.pitch)}</span>}</span>
           </label>
         ))}
       </fieldset>

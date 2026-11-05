@@ -3,17 +3,17 @@
 ## On your own computer
 
 ```bash
-./install.sh
+curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh
 ```
 
-Add `--port 8080` for another port. The app listens on this computer only.
+Settings and scripts go to `~/folkbranch` (`--dir` for another folder), the data to a Docker volume. Add `--port 8080` for another port: `... | sh -s -- --port 8080`. The app listens on this computer only. From a clone, `./install.sh` does the same in place.
 
 ## On a server with a domain
 
 Point the domain's DNS at the server, open ports 80 and 443, then:
 
 ```bash
-./install.sh --domain family.example.com
+curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh -s -- --domain family.example.com
 ```
 
 Caddy starts next to the app and obtains the certificate by itself. Do not expose the app over plain HTTP: passwords do not exist here, but sign-in links and sessions would travel in the open.

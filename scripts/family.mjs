@@ -57,8 +57,11 @@ function tokenCreate(o) {
   console.log(`  ${token}\n`)
   console.log('Claude Code:\n')
   console.log(`  claude mcp add --transport http family ${url} --header "Authorization: Bearer ${token}"\n`)
-  console.log('Any other MCP client:\n')
+  console.log('Cursor, Windsurf and any other MCP client:\n')
   console.log(JSON.stringify({ mcpServers: { family: { type: 'http', url, headers: { Authorization: `Bearer ${token}` } } } }, null, 2).replace(/^/gm, '  '))
+  console.log('\nCodex:\n')
+  console.log(`  export FOLKBRANCH_TOKEN=${token}`)
+  console.log(`  codex mcp add family --url ${url} --bearer-token-env-var FOLKBRANCH_TOKEN`)
 }
 
 function tokenList() {
