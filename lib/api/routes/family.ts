@@ -5,9 +5,15 @@ import * as media from '@/lib/ops/media'
 import * as pages from '@/lib/ops/pages'
 import * as people from '@/lib/ops/people'
 import * as settings from '@/lib/ops/settings'
+import * as views from '@/lib/ops/views'
 import { get, human, op, type Route } from '../router'
 
 export const familyRoutes: Route[] = [
+  get('views', 'Saved ways to look at the family', ({ actor }) => views.listViews(actor)),
+  human('POST', 'views', 'Save a view', async ({ actor, body }) => views.createView(actor, await body())),
+  human('DELETE', 'views/:id', 'Delete a view', ({ actor, params }) => views.deleteView(actor, params.id)),
+  human('PUT', 'views/:id/pin', 'Place a card by hand, or let it go', async ({ actor, params, body }) => views.setPin(actor, params.id, await body())),
+  human('DELETE', 'views/:id/pins', 'Let every card go', ({ actor, params }) => views.clearPins(actor, params.id)),
   get('me', 'Who is calling', ({ actor }) => ({ id: actor.userId, name: actor.name, role: actor.role, personId: actor.personId })),
   human('PATCH', 'me', 'Link my account to a card', async ({ actor, body }) => settings.setMyPerson(actor, z.object({ personId: z.string().nullable() }).parse(await body()).personId)),
   get('graph', 'Everyone and all links', ({ actor, req }) => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { layoutFamily, PITCH } from '../lib/graph/layout'
+import { CARD_W, layoutFamily, PITCH } from '../lib/graph/layout'
 import { orderRows, type OrderEdge, type OrderNode } from '../lib/graph/order'
 import { assignTracks, type Net } from '../lib/graph/tracks'
 import { buildGraph, quality, randomFamily, TANGLE } from './layout-quality'
@@ -94,5 +94,38 @@ describe('heights of the bars', () => {
   it('gives a tall gap as many tracks as the bars need', () => {
     const nets = Array.from({ length: 5 }, (_, i) => net([i * 10], [500 + i * 10]))
     expect(assignTracks(nets)).toBe(5)
+  })
+})
+
+describe('cards placed by hand', () => {
+  const family = randomFamily(4, 60)
+  const plain = layoutFamily(family)
+  const someone = [...plain.cards.values()][Math.floor(plain.cards.size / 2)]
+
+  it('stay exactly where they were put', () => {
+    const x = someone.x + 700
+    expect(layoutFamily(family, { pins: { [someone.id]: x } }).cards.get(someone.id)!.x).toBeCloseTo(x, 1)
+  })
+
+  it('do not change who is in which generation, and nobody overlaps', () => {
+    const l = layoutFamily(family, { pins: { [someone.id]: someone.x + 700 } })
+    expect(l.cards.get(someone.id)!.y).toBe(plain.cards.get(someone.id)!.y)
+    const cards = [...l.cards.values()]
+    for (const a of cards) for (const b of cards) if (a !== b && a.y === b.y) expect(Math.abs(a.x - b.x)).toBeGreaterThanOrEqual(CARD_W - 0.01)
+    expect(l.edges.length).toBe(plain.edges.length)
+  })
+
+  it('a card dragged past its neighbour stands on the other side', () => {
+    const g = buildGraph([['a', 'M'], ['b', 'M'], ['c', 'M']], [], [])
+    const base = layoutFamily(g)
+    const left = [...base.cards.values()].sort((p, q) => p.x - q.x)[0]
+    const far = Math.max(...[...base.cards.values()].map((c) => c.x)) + 500
+    const l = layoutFamily(g, { pins: { [left.id]: far } })
+    expect(l.cards.get(left.id)!.x).toBeCloseTo(far, 1)
+    expect(Math.max(...[...l.cards.values()].map((c) => c.x))).toBeCloseTo(far, 1)
+  })
+
+  it('a placement for someone not on this chart changes nothing', () => {
+    expect([...layoutFamily(family, { pins: { nobody: 5 } }).cards.values()]).toEqual([...plain.cards.values()])
   })
 })

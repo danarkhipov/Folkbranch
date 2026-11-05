@@ -7,6 +7,8 @@ import { yourTerm } from '@/lib/kinship'
 import { cn } from '@/lib/utils'
 import { personName } from '@/lib/types'
 import { useChartLight } from './chart-light'
+import { useCardMove } from './chart-move'
+import type { ChartScope } from './chart-scope'
 import { useLinkDrawing } from './chart-links'
 import { useLineSelection } from './chart-selection'
 import { useChartView } from './chart-view'
@@ -18,11 +20,12 @@ export interface CanvasHandle {
   center: (id: string) => void
 }
 
-export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; groupIds: Set<string> | null; panelOpen: boolean; leftInset?: number }>(
-  function GraphCanvas({ pathIds, groupIds, panelOpen, leftInset = 0 }, ref) {
+export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; groupIds: Set<string> | null; panelOpen: boolean; leftInset?: number; scope: ChartScope }>(
+  function GraphCanvas({ pathIds, groupIds, panelOpen, leftInset = 0, scope }, ref) {
     const app = useApp()
     const { graph, family, focusId, me, lang, t, byId } = app
-    const layout = useMemo(() => layoutFamily(graph, { rootsBelow: app.rootsBelow }), [graph, app.rootsBelow])
+    const drawn = scope.shown ?? graph
+    const layout = useMemo(() => layoutFamily(drawn, { rootsBelow: app.rootsBelow, pins: scope.pins }), [drawn, app.rootsBelow, scope.pins])
     const view = useChartView(layout, panelOpen, leftInset)
     const { canvas, world, clipped, shown, center } = view
     const light = useChartLight(layout, pathIds, groupIds, view.isFar)
@@ -30,6 +33,8 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
     const { draft, startLink, startFromPerson } = useLinkDrawing(layout, view.toChart, () => light.setHoverId(null))
     const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null)
     const { sel, setSel, selIds, selEdges, selUnion, hoverIds, setHoverIds, pick, removeSelected, patchSelected } = useLineSelection(layout, () => setTip(null))
+
+    const { moving, startMove } = useCardMove(layout, scope.pins, view.zoom, scope.pin)
 
     useImperativeHandle(ref, () => ({ fit: view.refit, center, zoomBy: view.zoomBy }))
 
@@ -50,6 +55,8 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
       center,
       hover: hoverSoon,
       drag: startFromPerson,
+      move: startMove,
+      unfold: scope.toggleCollapse,
       add(type, id) {
         if (type === 'parent' && (family.parents.get(id) ?? []).length >= 2) return app.notify(t('У этого человека уже двое родителей. Чтобы заменить одного, сначала удалите связь с ним'))
         app.quickAdd(type, id)
@@ -83,10 +90,11 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
               <PersonCard
                 key={p.id}
                 p={p}
-                left={c.x - CARD_W / 2}
+                left={c.x - CARD_W / 2 + (moving?.id === p.id ? moving.dx : 0)}
                 top={c.y}
                 selected={p.id === focusId}
-                className={cn('pcard', `sex-${p.sex}`, !p.living && 'dead', p.certainty === 'assumed' && 'assumed', p.hidden && 'hidden-p', p.id === focusId && 'focus', p.id === me.personId && 'isme', active && !isActive && 'dim', draft?.target === p.id && 'drop-target')}
+                className={cn('pcard', `sex-${p.sex}`, !p.living && 'dead', p.certainty === 'assumed' && 'assumed', p.hidden && 'hidden-p', p.id === focusId && 'focus', p.id === me.personId && 'isme', active && !isActive && 'dim', draft?.target === p.id && 'drop-target', moving?.id === p.id && 'moving')}
+                folded={scope.folded.get(p.id)}
                 label={label}
                 mine={!label && mine ? yourTerm(mine.label, p.sex, lang) : undefined}
                 canEdit={app.canEdit}

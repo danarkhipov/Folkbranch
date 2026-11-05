@@ -307,3 +307,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
 @media (pointer: coarse) { .pcard .tools { --s: 1.55; } }
 @media (max-width: 640px) { .panel-tabs { width: auto; align-self: stretch; } .panel-tabs [role=tab] { padding-inline: 6px; flex: 1 1 auto; } }
 .inline-input:placeholder-shown { border-bottom: 1px dashed var(--ink-faint); }
+.pcard.moving { transition: none; z-index: 5; cursor: grabbing; opacity: .9; }
+.pcard .movable { cursor: grab; }
+.pcard .folded { margin-top: 3px; padding: 0 7px; border-radius: 99px; border: 1px solid var(--line); background: #fffdf8; color: var(--ink); font-size: calc(13px * var(--lbl, 1)); line-height: 1.5; white-space: nowrap; }
+.pcard .folded:hover { background: var(--muted); }

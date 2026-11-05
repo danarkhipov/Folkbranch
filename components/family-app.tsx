@@ -8,6 +8,7 @@ import { Family } from '@/lib/kinship'
 import { personName, type Graph, type HistoryEntry, type Lang, type Me } from '@/lib/types'
 import { GraphCanvas, type CanvasHandle } from './graph-canvas'
 import { ConnectionNotice, MainBar, ViewBar, type Side } from './chart-bars'
+import { useChartScope } from './chart-scope'
 import { PersonPanel } from './person-panel'
 import { QuickAdd } from './quick-add'
 import { ConfirmDialog, SearchDialog } from './person-pickers'
@@ -33,6 +34,7 @@ const SettingsDialog = dynamic(() => import('./settings/settings-dialog').then((
 const HistoryPanel = dynamic(() => import('./side-panels').then((m) => m.HistoryPanel), { ssr: false })
 const HowRelated = dynamic(() => import('./side-panels').then((m) => m.HowRelated), { ssr: false })
 const ReviewPanel = dynamic(() => import('./review-panel').then((m) => m.ReviewPanel), { ssr: false })
+const PrintDialog = dynamic(() => import('./print-dialog').then((m) => m.PrintDialog), { ssr: false })
 const TextDialog = dynamic(() => import('./text-dialog').then((m) => m.TextDialog), { ssr: false })
 
 /** Below this, the chat and the card do not fit side by side. */
@@ -65,6 +67,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
   const [path, setPath] = useState<string[] | null>(null)
   const [groups, setGroups] = useState<string[]>([])
   const [importing, setImporting] = useState(false)
+  const [printing, setPrinting] = useState(false)
   const [dropped, setDropped] = useState<File | null>(null)
   // A file dropped on the chart opens the import; inside the editor it stays a picture in the text.
   useEffect(() => {
@@ -165,6 +168,8 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
 
   const delPerson = useWrite((id: string) => api(`persons/${id}`, { method: 'DELETE' }))
 
+  const scope = useChartScope(graph, lookups?.family, focusId, () => requestAnimationFrame(() => requestAnimationFrame(() => canvas.current?.fit())))
+
   const allGroups = useMemo(() => {
     const counts = new Map<string, number>()
     for (const p of graph?.persons ?? []) for (const tag of p.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1)
@@ -213,10 +218,10 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
     <App.Provider value={ctx}>
       <Presence.Provider value={present}>
       <ConnectionNotice t={t} />
-      <GraphCanvas ref={canvas} pathIds={path} groupIds={groupIds} panelOpen={panelOpen} leftInset={side === 'assistant' ? assistantWidth + 12 : 0}/>
+      <GraphCanvas ref={canvas} scope={scope} pathIds={path} groupIds={groupIds} panelOpen={panelOpen} leftInset={side === 'assistant' ? assistantWidth + 12 : 0}/>
 
       <MainBar familyName={familyName} present={present} mode={barMode} navRef={nav} side={side} draftOps={draftOps} onSearch={() => setSearch(true)} onSide={(next) => { setSide(next); setPath(null) }} onAssistant={toggleAssistant} onSettings={() => setSettings(true)} />
-      <ViewBar canvas={canvas} rootsBelow={rootsBelow} onFlip={flipChart} groups={groups} onGroups={setGroups} allGroups={allGroups} left={side === 'assistant' ? assistantWidth + 24 : side === 'history' ? 344 : side === 'review' ? 408 : 12} crowded={panelOpen || !!side} />
+      <ViewBar onPrint={() => setPrinting(true)} scope={scope} canvas={canvas} rootsBelow={rootsBelow} onFlip={flipChart} groups={groups} onGroups={setGroups} allGroups={allGroups} left={side === 'assistant' ? assistantWidth + 24 : side === 'history' ? 344 : side === 'review' ? 408 : 12} crowded={panelOpen || !!side} />
 
       {!ctx.graph.persons.length && ctx.canEdit && (
         <div className="fixed inset-0 grid place-items-center pointer-events-none">
@@ -243,6 +248,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       )}
       {textOpen && <TextDialog open onOpenChange={setTextOpen} />}
       {importing && <ImportDialog open file={dropped} onOpenChange={setImporting} />}
+      {printing && <PrintDialog graph={scope.shown ?? ctx.graph} onClose={() => setPrinting(false)} />}
       <ConfirmDialog state={confirmState} onClose={() => setConfirm(null)} />
       {settings && <SettingsDialog open onOpenChange={setSettings} familyName={familyName} providers={providers} onText={() => setTextOpen(true)} />}
       </Presence.Provider>

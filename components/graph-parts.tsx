@@ -18,6 +18,8 @@ export interface ChartActions {
   center: (id: string) => void
   hover: (id: string | null) => void
   drag: (e: React.PointerEvent, id: string) => void
+  move: (e: React.PointerEvent, id: string) => void
+  unfold: (id: string) => void
   add: (type: QuickType, id: string) => void
   enterLine: (familyKey: string | null, ids: string[]) => void
   leaveLine: () => void
@@ -54,7 +56,7 @@ export const Lines = memo(function Lines({ families, unions, active, hotPairs, l
   )
 })
 
-export const PersonCard = memo(function PersonCard({ p, left, top, className, selected, label, mine, canEdit, rootsBelow, lang, acts }: { p: Person; left: number; top: number; className: string; selected: boolean; label?: string; mine?: string; canEdit: boolean; rootsBelow: boolean; lang: Lang; acts: Acts }) {
+export const PersonCard = memo(function PersonCard({ p, left, top, className, selected, label, mine, folded, canEdit, rootsBelow, lang, acts }: { p: Person; left: number; top: number; className: string; selected: boolean; label?: string; mine?: string; folded?: number; canEdit: boolean; rootsBelow: boolean; lang: Lang; acts: Acts }) {
   const t = (key: string) => translate(lang, key)
   const open = () => acts.current.open(p.id)
   // The plus buttons exist only on the card in use: on every card they would be most of the page.
@@ -83,11 +85,12 @@ export const PersonCard = memo(function PersonCard({ p, left, top, className, se
     >
       <div className={cn('ava', canEdit && !p.hidden && 'link-start')} onPointerDown={canEdit && !p.hidden ? (e) => acts.current.drag(e, p.id) : undefined}><img src={avatarUrl(p)} alt="" decoding="async" draggable={false} /></div>
       {/* Opaque, so a line coming from below stops at the text however tall it wraps. */}
-      <div className="cap">
+      <div className={cn('cap', canEdit && 'movable')} onPointerDown={canEdit ? (e) => acts.current.move(e, p.id) : undefined}>
         <div className="nm">{p.hidden ? t('Живой родственник') : personName(p) || t('Без названия')}</div>
         {!p.hidden && <div className="yr">{lifeYears(p)}</div>}
         {label && <div className="rel kin">{label}</div>}
         {mine && <div className="rel me">{mine}</div>}
+        {folded !== undefined && <button className="folded" onClick={(e) => { e.stopPropagation(); acts.current.unfold(p.id) }}>{t('Показать потомков')}: {folded}</button>}
       </div>
       {canEdit && !p.hidden && (hovered || focused || selected) && <CardTools id={p.id} rootsBelow={rootsBelow} lang={lang} acts={acts} />}
     </div>
@@ -191,6 +194,7 @@ export function Legend() {
         <li>{t('Нажмите на человека, чтобы открыть карточку.')}</li>
         <li>{t('Кнопка + рядом с человеком добавляет родственника.')}</li>
         <li>{t('Перетащите + на другого человека, чтобы связать их.')}</li>
+        <li>{t('Перетащите подпись человека, чтобы сдвинуть его карточку.')}</li>
         {fine && <li>{t('Чтобы удалить связь, нажмите на линию и клавишу Delete.')}</li>}
         {fine && <li>{(/Mac/.test(navigator.platform) ? (k: string) => k : (k: string) => k.replaceAll('⌘', 'Ctrl+'))(t('Клавиши: ⌘K поиск, ⌘J ассистент, ⌘Z отмена.'))}</li>}
       </ul>
