@@ -7,16 +7,18 @@ import { api, useApp } from '@/lib/client'
 import { COLUMN_FIELDS, detectKind, guessMapping, jsonToTable, parseCsv, rowsToText, sheetCell, type ColumnField, type ImportKind, type Mapping } from '@/lib/import-formats'
 import { familyWords, peopleWords } from '@/lib/names'
 import { parseFamilyText, planFamilyText } from '@/lib/textformat'
-import { MiniGraph, PlanSummary } from './ai-panels'
+import { MiniGraph, PlanSummary } from './text-dialog'
 
 const KIND_LABEL: Record<ImportKind, string> = { gedcom: 'GEDCOM', table: 'таблица CSV', xlsx: 'таблица Excel', json: 'JSON', text: 'текстовый формат' }
 
 type Loaded =
-  | { kind: 'gedcom'; name: string; text: string; preview: { version: string; persons: number; families: number; sample: string[]; existing: number } }
+  | { kind: 'gedcom'; name: string; text: string; preview: { version: string; persons: number; families: number; sample: string[]; existing: number; unread: { tag: string; count: number }[] } }
   | { kind: 'text'; name: string; text: string }
   | { kind: 'table' | 'xlsx' | 'json'; name: string; headers: string[]; rows: string[][] }
 
 /** One way in for every format: pick or drop a file, see what will change, then decide. */
+const TAG_WORDS: Record<string, string> = { OBJE: 'ссылки на файлы', ASSO: 'связи с другими людьми', ALIA: 'другие записи о человеке', SUBM: 'сведения об авторе' }
+
 export function ImportDialog({ open, file, onOpenChange }: { open: boolean; file?: File | null; onOpenChange: (v: boolean) => void }) {
   const { t, graph, familyName, lang, notify, undoLast } = useApp()
   const qc = useQueryClient()
@@ -134,6 +136,7 @@ export function ImportDialog({ open, file, onOpenChange }: { open: boolean; file
           <div className="rounded-lg bg-muted p-3 flex flex-col gap-1">
             <p>{t('Будет добавлено')}: <b>{peopleWords(loaded.preview.persons, lang)}</b>, <b>{familyWords(loaded.preview.families, lang)}</b> <span className="text-ink-faint">(GEDCOM {loaded.preview.version})</span></p>
             <p className="text-xs text-ink-soft truncate">{loaded.preview.sample.join(', ')}</p>
+            {loaded.preview.unread.length > 0 && <p className="text-xs text-rust">⚠ {t('Не перенесётся')}: {loaded.preview.unread.map((u) => `${TAG_WORDS[u.tag] ? t(TAG_WORDS[u.tag]) : u.tag} (${u.count})`).join(', ')}</p>}
             {loaded.preview.existing > 0 && <p className="text-xs text-rust">⚠ {t('Совпадают по имени с уже имеющимися, GEDCOM добавит их как новых')}: {loaded.preview.existing}</p>}
           </div>
         )}

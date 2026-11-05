@@ -7,6 +7,8 @@ export async function register() {
   sweepOrphanFiles().then((n) => { if (n) console.log(`Removed ${n} files left by an interrupted upload.`) }).catch(console.error)
   const { sweepAttachments } = await import('./lib/agent/attachments')
   sweepAttachments().catch(console.error)
+  const { sweepArchiveLeftovers } = await import('./lib/ops/archive')
+  sweepArchiveLeftovers().catch(console.error)
   const { tidyDatabase } = await import('./lib/db')
   setInterval(tidyDatabase, 6 * 60 * 60 * 1000).unref()
   if (hasUsers()) return

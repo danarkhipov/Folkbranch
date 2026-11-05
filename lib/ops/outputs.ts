@@ -19,7 +19,7 @@ const fullPerson = z.object({
 const written = z.object({ id, givenName: text, surname: text, birthDate: text, deathDate: text, living: z.boolean() })
 const relative = z.object({ name: text.optional() })
 const pageMeta = z.object({ id, personId: id, parentPageId: id.nullable(), title: text, icon: text, updatedAt: z.number() })
-const photo = z.object({ id, kind: text, originalName: text, caption: text, date: text, place: text, tags: z.array(z.object({ id, personId: id })).optional() })
+const photo = z.object({ id, kind: text, originalName: text, caption: text, date: text, place: text, tags: z.array(z.object({ id, personId: id.nullable(), label: text.nullable() })).optional() })
 const proposal = z.object({ id, status: text, error: text.nullable(), ops: z.array(z.object({ op: text, text })) })
 const applied = z.object({ applied: z.number(), ids: z.record(z.string(), z.string()), people: z.array(z.object({ name: text, id, parents: z.array(text).optional(), spouses: z.array(text).optional() })).optional(), check: z.object({ unlinked: z.array(text) }).optional() })
 const importCount = z.object({ persons: z.number() })
@@ -74,7 +74,7 @@ export const OUTPUTS: Record<string, z.ZodType> = {
   upload_photo: write(z.object({ id, kind: text, originalName: text })),
   update_photo: write(ok),
   delete_photo: write(ok),
-  tag_photo: write(z.object({ id, mediaId: id, personId: id })),
+  tag_photo: write(z.object({ id, mediaId: id, personId: id.nullable(), label: text.nullable() })),
   untag_photo: write(ok),
   set_avatar: write(ok),
   add_version: write(written),

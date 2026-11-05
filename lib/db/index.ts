@@ -3,6 +3,7 @@ import path from 'node:path'
 import Database from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
+import { applyPendingRestore } from './restore'
 import * as schema from './schema'
 
 // Never traced into the build: that would copy the archive into the build output.
@@ -14,6 +15,7 @@ function open() {
   if (process.env.VITEST && DATA_DIR === path.resolve(/*turbopackIgnore: true*/ './data')) throw new Error('tests must not open ./data')
   // A container's own disk is wiped on every deploy: without a volume the archive would vanish with the next update.
   if (process.env.RAILWAY_PROJECT_ID && !process.env.RAILWAY_VOLUME_MOUNT_PATH) throw new Error('No volume is attached, so nothing would survive a deploy. In Railway, add a volume to this service with the mount path /data.')
+  applyPendingRestore(DATA_DIR)
   fs.mkdirSync(MEDIA_DIR, { recursive: true })
   const sqlite = new Database(path.join(/*turbopackIgnore: true*/ DATA_DIR, 'family.db'))
   sqlite.pragma('journal_mode = WAL')

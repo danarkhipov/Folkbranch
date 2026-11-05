@@ -66,6 +66,12 @@ An empty instance can be claimed only with a code, so a stranger who finds it fi
 
 ## Backups
 
+**From the app.** Settings → Files → Download a full copy: one file with the database, photos and files, and a checksum for each. It leaves out sign-in sessions and can be restored on a clean install from the setup screen, or over an archive from the same place in settings. The previous archive stays in `backups/before-restore` on the volume. An assistant key set in the app has to be entered again unless the server keeps the same secret.
+
+Restoring restarts the process, so something must start it again: Docker Compose and Railway do. Under plain `pnpm dev` start it by hand.
+
+**From the command line.**
+
 `./family backup` writes to `backups/` inside the data volume. To take a copy off the server:
 
 ```bash

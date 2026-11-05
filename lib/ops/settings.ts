@@ -4,7 +4,7 @@ import { getDb, schema } from '../db'
 import type { HistoryEntry, Role } from '../types'
 import { Actor, newId, OpError, requireRole, seesOnlyPublic } from './core'
 import { say } from './app-config'
-import { getGraph } from './people'
+import { hiddenPeople } from './people'
 
 export { getSetting, say, setSetting } from './app-config'
 
@@ -102,7 +102,7 @@ export function listHistory(actor: Actor, limit = 100): HistoryEntry[] {
   // Without `changes`: it can hold whole page texts, and this list only shows who did what.
   const h = schema.history
   const rows = db.select({ id: h.id, at: h.at, actorName: h.actorName, summary: h.summary, personIds: h.personIds, undoOf: h.undoOf, undoneAt: h.undoneAt }).from(h).orderBy(desc(h.at)).limit(limit).all()
-  const hidden = seesOnlyPublic(actor) ? new Set(getGraph(actor).persons.filter((p) => p.hidden).map((p) => p.id)) : new Set<string>()
+  const hidden = hiddenPeople(actor)
   return rows
     .map((r) => ({ id: r.id, at: r.at, actorName: r.actorName, summary: r.summary, personIds: JSON.parse(r.personIds) as string[], undoOf: r.undoOf, undoneAt: r.undoneAt }))
     // Summaries contain names, so a reader sees only entries about people visible to them

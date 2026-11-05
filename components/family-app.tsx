@@ -29,11 +29,11 @@ const AssistantSetup = dynamic(() => import('./assistant-setup'), { ssr: false }
 // Opened now and then, and they bring the photo viewer, the importers and the settings along.
 const PhotoDialog = dynamic(() => import('./photo-dialog').then((m) => m.PhotoDialog), { ssr: false })
 const ImportDialog = dynamic(() => import('./import-dialog').then((m) => m.ImportDialog), { ssr: false })
-const SettingsDialog = dynamic(() => import('./side-panels').then((m) => m.SettingsDialog), { ssr: false })
+const SettingsDialog = dynamic(() => import('./settings/settings-dialog').then((m) => m.SettingsDialog), { ssr: false })
 const HistoryPanel = dynamic(() => import('./side-panels').then((m) => m.HistoryPanel), { ssr: false })
 const HowRelated = dynamic(() => import('./side-panels').then((m) => m.HowRelated), { ssr: false })
-const ReviewPanel = dynamic(() => import('./ai-panels').then((m) => m.ReviewPanel), { ssr: false })
-const TextDialog = dynamic(() => import('./ai-panels').then((m) => m.TextDialog), { ssr: false })
+const ReviewPanel = dynamic(() => import('./review-panel').then((m) => m.ReviewPanel), { ssr: false })
+const TextDialog = dynamic(() => import('./text-dialog').then((m) => m.TextDialog), { ssr: false })
 
 /** Below this, the chat and the card do not fit side by side. */
 const NARROW = 960

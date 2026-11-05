@@ -57,6 +57,13 @@
       "when": 1793798936709,
       "tag": "0007_chemical_drax",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1793869607998,
+      "tag": "0008_lazy_speedball",
+      "breakpoints": true
     }
   ]
 }

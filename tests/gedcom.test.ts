@@ -149,3 +149,11 @@ describe('person fields in GEDCOM', () => {
     expect(toGedDate('>1890')).toBe('AFT 1890')
   })
 })
+
+describe('what will not come across', () => {
+  it('names what the importer does not read, and not what it does', async () => {
+    const { unreadTags } = await import('../lib/gedcom')
+    const text = '0 HEAD\n0 @I1@ INDI\n1 NAME Анна /Лес/\n1 BIRT\n2 DATE 1900\n1 OBJE @M1@\n1 OBJE @M2@\n1 _WEIRD x\n1 CHAN\n0 @F1@ FAM\n1 HUSB @I1@\n0 TRLR'
+    expect(unreadTags(text)).toEqual([{ tag: 'OBJE', count: 2 }, { tag: '_WEIRD', count: 1 }])
+  })
+})

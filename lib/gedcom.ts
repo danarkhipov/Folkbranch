@@ -113,6 +113,23 @@ function uniqueSources(list: Source[]) {
   return list.filter((s) => { const k = JSON.stringify(s); return !seen.has(k) && !!seen.add(k) })
 }
 
+/** What the importer reads; housekeeping tags say nothing about the family. */
+const READ_TAGS = new Set(['NAME', 'SEX', 'BIRT', 'DEAT', 'FAMC', 'FAMS', 'NOTE', 'SNOTE', 'SOUR', 'ADOP', 'EVEN', 'HUSB', 'WIFE', 'CHIL', 'MARR', 'DIV'])
+const HOUSEKEEPING = new Set(['CHAN', 'RIN', 'REFN', 'UID', '_UID', 'CREA', 'RFN', 'AFN'])
+
+/** What a file holds that will not come across: said before importing, so nothing is lost silently. */
+export function unreadTags(text: string) {
+  const counts = new Map<string, number>()
+  for (const root of parseLines(text)) {
+    if (root.tag !== 'INDI' && root.tag !== 'FAM') continue
+    for (const c of root.children) {
+      if (READ_TAGS.has(c.tag) || c.tag in FACT_TAGS || HOUSEKEEPING.has(c.tag)) continue
+      counts.set(c.tag, (counts.get(c.tag) ?? 0) + 1)
+    }
+  }
+  return [...counts].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count)
+}
+
 export function parseGedcom(text: string, lang: 'ru' | 'en' = 'ru'): Imported {
   const roots = parseLines(text)
   const head = roots.find((r) => r.tag === 'HEAD')

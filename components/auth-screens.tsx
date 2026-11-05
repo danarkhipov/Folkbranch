@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { translate } from '@/lib/i18n'
 import type { Lang } from '@/lib/types'
+import { RestoreForm } from './settings/restore-form'
 
 const shell = 'canvas !overflow-auto !cursor-default grid place-items-center p-4'
 const card = 'float w-full max-w-sm p-6 flex flex-col gap-3'
@@ -40,6 +41,10 @@ export function SetupScreen({ needsCode, initialCode = '' }: { needsCode: boolea
         <label className="flex items-center gap-2 text-ink-soft text-sm"><input type="checkbox" checked={demo} onChange={(e) => setDemo(e.target.checked)} /> {t('Загрузить пример: вымышленная семья')}</label>
         {error && <p className="text-xs text-destructive">{error}</p>}
         <button className={primary} disabled={busy}>{t('Создать архив')}</button>
+        <details className="text-sm">
+          <summary className="cursor-pointer text-ink-soft">{t('У меня есть копия архива')}</summary>
+          <div className="mt-2"><RestoreForm t={t} code={code} warning={t('Архив будет создан из этого файла.')} /></div>
+        </details>
       </form>
     </main>
   )

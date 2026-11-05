@@ -1,4 +1,4 @@
-import { parseGedcom, writeGedcom } from '../gedcom'
+import { parseGedcom, unreadTags, writeGedcom } from '../gedcom'
 import type { Certainty } from '../types'
 import { yearOf } from '../types'
 import { peopleWords } from '../names'
@@ -18,6 +18,7 @@ export function previewGedcom(actor: Actor, text: string) {
     families: g.families.length,
     sample: g.persons.slice(0, 6).map((p) => [p.givenName, p.surname].filter(Boolean).join(' ')),
     existing: g.persons.filter((p) => known.has(`${p.givenName} ${p.surname}`.toLowerCase())).length,
+    unread: unreadTags(text),
   }
 }
 
