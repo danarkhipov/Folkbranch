@@ -9,7 +9,6 @@ import { personName, type Graph, type HistoryEntry, type Lang, type Me } from '@
 import { GraphCanvas, type CanvasHandle } from './graph-canvas'
 import { ConnectionNotice, MainBar, ViewBar, type Side } from './chart-bars'
 import { useChartScope } from './chart-scope'
-import { PersonPanel } from './person-panel'
 import { QuickAdd } from './quick-add'
 import { ConfirmDialog, SearchDialog } from './person-pickers'
 import type { AssistantState } from '@/lib/types'
@@ -35,6 +34,9 @@ const HistoryPanel = dynamic(() => import('./side-panels').then((m) => m.History
 const HowRelated = dynamic(() => import('./side-panels').then((m) => m.HowRelated), { ssr: false })
 const ReviewPanel = dynamic(() => import('./review-panel').then((m) => m.ReviewPanel), { ssr: false })
 const PrintDialog = dynamic(() => import('./print-dialog').then((m) => m.PrintDialog), { ssr: false })
+// The card opens on a press, so its tabs need not come with the first screen.
+const PersonPanel = dynamic(() => import('./person-panel').then((m) => m.PersonPanel), { ssr: false })
+const Onboarding = dynamic(() => import('./onboarding').then((m) => m.Onboarding), { ssr: false })
 const TextDialog = dynamic(() => import('./text-dialog').then((m) => m.TextDialog), { ssr: false })
 
 /** Below this, the chat and the card do not fit side by side. */
@@ -68,6 +70,9 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
   const [groups, setGroups] = useState<string[]>([])
   const [importing, setImporting] = useState(false)
   const [printing, setPrinting] = useState(false)
+  // Only straight after the archive is made: it says so in the address, once.
+  const [welcome, setWelcome] = useState(() => typeof location !== 'undefined' && me.role === 'owner' && new URLSearchParams(location.search).has('welcome'))
+  const endWelcome = () => { setWelcome(false); const url = new URL(location.href); url.searchParams.delete('welcome'); history.replaceState(null, '', url) }
   const [dropped, setDropped] = useState<File | null>(null)
   // A file dropped on the chart opens the import; inside the editor it stays a picture in the text.
   useEffect(() => {
@@ -248,6 +253,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       )}
       {textOpen && <TextDialog open onOpenChange={setTextOpen} />}
       {importing && <ImportDialog open file={dropped} onOpenChange={setImporting} />}
+      {welcome && <Onboarding onClose={endWelcome} onImport={() => { endWelcome(); setDropped(null); setImporting(true) }} onFirstPerson={() => { endWelcome(); setQuick({ type: null, to: null }) }} />}
       {printing && <PrintDialog graph={scope.shown ?? ctx.graph} onClose={() => setPrinting(false)} />}
       <ConfirmDialog state={confirmState} onClose={() => setConfirm(null)} />
       {settings && <SettingsDialog open onOpenChange={setSettings} familyName={familyName} providers={providers} onText={() => setTextOpen(true)} />}

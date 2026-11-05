@@ -1,5 +1,34 @@
 #!/bin/sh
 # Runs a server command inside the running app, for example: ./family token create --name my-agent
+# ./family connect   makes a key and connects the agent programs found on this computer over MCP.
 cd "$(dirname "$0")" || exit 1
+
+connect() {
+  name="agent-$(hostname -s 2>/dev/null || echo here)"
+  out=$(docker compose exec -T family node family.mjs token create --name "$name" --role editor --json) || { echo "$out"; echo "Is the app running? Start it with: docker compose up -d"; exit 1; }
+  token=$(printf '%s' "$out" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+  url=$(printf '%s' "$out" | sed -n 's/.*"url":"\([^"]*\)".*/\1/p')
+  done=""
+  if command -v claude >/dev/null 2>&1; then
+    claude mcp add --scope user --transport http family "$url" --header "Authorization: Bearer $token" && done="$done Claude Code"
+  fi
+  if command -v codex >/dev/null 2>&1; then
+    if codex mcp add family --url "$url" --bearer-token-env-var FAMILY_GRAPH_TOKEN; then
+      done="$done Codex"
+      echo "Codex reads the key from your shell. Add this line to ~/.zshrc or ~/.bashrc:"
+      echo
+      echo "  export FAMILY_GRAPH_TOKEN=$token"
+      echo
+    fi
+  fi
+  if [ -n "$done" ]; then echo "Connected:$done. Edits wait for your review in the app."; return; fi
+  echo "No Claude Code or Codex here. For Cursor, Windsurf or another MCP client, use:"
+  echo
+  printf '  {"mcpServers":{"family":{"type":"http","url":"%s","headers":{"Authorization":"Bearer %s"}}}}\n' "$url" "$token"
+  echo
+  echo "On another computer, use its address instead of localhost. The app shows all of this: Settings > Agents and MCP."
+}
+
+[ "${1:-}" = connect ] && { connect; exit 0; }
 [ -t 0 ] && [ -t 1 ] && exec docker compose exec family node family.mjs "$@"
 exec docker compose exec -T family node family.mjs "$@"

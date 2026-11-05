@@ -4,6 +4,7 @@ import { requireRole } from '@/lib/ops/core'
 import { acceptProposal, listProposals, myProposals, rejectProposal, removeProposalOp } from '@/lib/ops/proposals'
 import * as settings from '@/lib/ops/settings'
 import { createShare, listShares, revokeShare } from '@/lib/ops/share'
+import { setupStatus } from '@/lib/ops/setup-status'
 import { suggest } from '@/lib/ops/suggest'
 import * as tokens from '@/lib/ops/tokens'
 import { get, human, role, type Route } from '../router'
@@ -20,6 +21,8 @@ export const accessRoutes: Route[] = [
   human('GET', 'shares', 'Links for viewing without an account', ({ actor }) => listShares(actor)),
   human('POST', 'shares', 'Make a link for viewing', async ({ actor, body }) => createShare(actor, await body())),
   human('DELETE', 'shares/:id', 'Close a link for viewing', ({ actor, params }) => revokeShare(actor, params.id)),
+
+  human('GET', 'setup/status', 'What is set up and what is missing', ({ actor, req }) => setupStatus(actor, req.headers)),
 
   human('GET', 'tokens', 'API tokens', ({ actor }) => tokens.listTokens(actor)),
   human('POST', 'tokens', 'Issue an API token', async ({ actor, body }) => tokens.createToken(actor, z.object({ expiresInDays: z.number().int().min(1).max(3650).nullish(), name: z.string().min(1), role: z.enum(['reader', 'editor']), review: z.boolean().default(true) }).parse(await body()))),

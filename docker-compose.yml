@@ -1,6 +1,7 @@
 # ./install.sh writes .env and starts this. Add --profile https for automatic certificates.
 services:
   family:
+    image: ${FAMILY_IMAGE:-ghcr.io/dp-arhipov/family-graph:latest}
     build: .
     env_file:
       - path: .env

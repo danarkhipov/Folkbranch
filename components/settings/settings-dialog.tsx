@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { Archive as Archive_, ArrowLeftRight, KeyRound, UserRound, Users, type LucideIcon } from 'lucide-react'
+import { Archive as Archive_, ArrowLeftRight, KeyRound, ListChecks, UserRound, Users, type LucideIcon } from 'lucide-react'
 import { AssistantIcon } from '../assistant-icon'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { useApp } from '@/lib/client'
@@ -9,19 +9,21 @@ import { Access } from './access'
 import { Archive } from './archive'
 import { Files } from './files'
 import { AssistantSettings } from './assistant'
+import { SetupGuide } from './setup-guide'
 import { TokensTab } from './tokens'
 
-type Section = 'account' | 'people' | 'archive' | 'assistant' | 'agents' | 'data'
+type Section = 'setup' | 'account' | 'people' | 'archive' | 'assistant' | 'agents' | 'data'
 
 export function SettingsDialog({ open, onOpenChange, familyName, providers, onText }: { open: boolean; onOpenChange: (v: boolean) => void; familyName: string; providers: { google: boolean; yandex: boolean }; onText: () => void }) {
   const { t, me, lang } = useApp()
   const isOwner = me.role === 'owner'
-  const [section, setSection] = useState<Section>('account')
+  const [section, setSection] = useState<Section>(isOwner ? 'setup' : 'account')
   const items: [Section, string, LucideIcon][] = [
+    ...(isOwner ? [['setup', 'Настройка', ListChecks]] as [Section, string, LucideIcon][] : []),
     ['account', 'Мой аккаунт', UserRound],
     ...(isOwner ? [['people', 'Люди и доступ', Users], ['archive', 'Архив', Archive_], ['assistant', 'Ассистент', AssistantIcon]] as [Section, string, LucideIcon][] : []),
     ['data', 'Файлы', ArrowLeftRight],
-    ...(isOwner ? [['agents', 'Для разработчиков', KeyRound]] as [Section, string, LucideIcon][] : []),
+    ...(isOwner ? [['agents', 'Агенты и MCP', KeyRound]] as [Section, string, LucideIcon][] : []),
   ]
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -34,6 +36,7 @@ export function SettingsDialog({ open, onOpenChange, familyName, providers, onTe
             ))}
           </nav>
           <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-5 py-4">
+            {section === 'setup' && isOwner && <SetupGuide />}
             {section === 'account' && <Account providers={providers} />}
             {section === 'people' && isOwner && <Access />}
             {section === 'archive' && isOwner && <Archive familyName={familyName} lang={lang} />}

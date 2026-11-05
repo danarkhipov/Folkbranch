@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { translate } from '@/lib/i18n'
 import type { Lang } from '@/lib/types'
+import { Brand } from './brand-icons'
 import { RestoreForm } from './settings/restore-form'
 
 const shell = 'canvas !overflow-auto !cursor-default grid place-items-center p-4'
@@ -11,13 +12,13 @@ const primary = 'h-10 rounded-lg bg-ink text-white disabled:opacity-40'
 
 const post = (url: string, body: unknown) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
 
-export function SetupScreen({ needsCode, initialCode = '' }: { needsCode: boolean; initialCode?: string }) {
+export function SetupScreen({ needsCode, initialCode = '', wrongAddress }: { needsCode: boolean; initialCode?: string; wrongAddress: string | null }) {
   const [lang, setLang] = useState<Lang>('ru')
   const t = (k: string) => translate(lang, k)
   const [name, setName] = useState('')
   const [familyName, setFamilyName] = useState('')
   const [code, setCode] = useState(initialCode)
-  const [demo, setDemo] = useState(true)
+  const [demo, setDemo] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   return (
@@ -26,11 +27,12 @@ export function SetupScreen({ needsCode, initialCode = '' }: { needsCode: boolea
         e.preventDefault()
         setBusy(true)
         const r = await post('/api/auth/family/setup', { name, familyName, language: lang, demo, code })
-        if (r.ok) location.href = '/'
+        if (r.ok) location.href = '/?welcome=1'
         else { setBusy(false); setError((await r.json().catch(() => null))?.message ?? 'error') }
       }}>
         <h1 className="font-serif text-2xl font-medium">{t('Семейный архив')}</h1>
         <p className="text-ink-soft -mt-2 text-sm">{t('Вы станете владельцем архива.')}</p>
+        {wrongAddress && <p role="alert" className="rounded-lg bg-muted px-3 py-2 text-sm text-destructive break-anywhere">{t('Вы открыли не тот адрес, что указан в настройках, и вход работать не будет. В настройках')}: <b>{wrongAddress}</b>. {t('Откройте этот адрес или поменяйте BETTER_AUTH_URL.')}</p>}
         <div className="flex gap-1">
           {(['ru', 'en'] as const).map((l) => <button type="button" key={l} onClick={() => setLang(l)} className={lang === l ? 'bar-btn on' : 'bar-btn'}>{l === 'ru' ? 'Русский' : 'English'}</button>)}
         </div>
@@ -62,8 +64,8 @@ export function LoginScreen({ lang, familyName, providers }: { lang: Lang; famil
         <h1 className="font-serif text-2xl font-medium">{familyName || t('Семейный архив')}</h1>
         <p className="font-medium">{t('Вход только по приглашению')}</p>
         <p className="text-ink-soft text-sm -mt-2">{t('Попросите родственника, который уже в архиве, прислать вам ссылку.')}</p>
-        {providers.google && <button className="bar-btn border border-border !h-10" onClick={() => go('/api/auth/sign-in/social', { provider: 'google', callbackURL: '/' })}>{t('Войти через Google')}</button>}
-        {providers.yandex && <button className="bar-btn border border-border !h-10" onClick={() => go('/api/auth/sign-in/oauth2', { providerId: 'yandex', callbackURL: '/' })}>{t('Войти через Яндекс ID')}</button>}
+        {providers.google && <button className="bar-btn border border-border !h-10" onClick={() => go('/api/auth/sign-in/social', { provider: 'google', callbackURL: '/' })}><Brand name="google" /> {t('Войти через Google')}</button>}
+        {providers.yandex && <button className="bar-btn border border-border !h-10" onClick={() => go('/api/auth/sign-in/oauth2', { providerId: 'yandex', callbackURL: '/' })}><Brand name="yandex" className="text-[#fc3f1d]" /> {t('Войти через Яндекс ID')}</button>}
       </div>
     </main>
   )

@@ -136,7 +136,7 @@ await br.close(); stub.kill()
 try { sh('docker rm -fv fg-typ fg-typ2') } catch {}
 
 // ---- Measures.
-const BAD_WORDS = /(^|[^а-яёa-z])(токен\w*|MCP|REST|API|провайдер\w*|JSON|CSV|SSE|OAuth|URL|эндпоинт\w*|промпт\w*|Parameters|Result|Submit|Close)($|[^а-яёa-z])|(?<!файл |\()GEDCOM/i
+const BAD_WORDS = /(^|[^а-яёa-z])(токен\w*|REST|API|провайдер\w*|JSON|CSV|SSE|OAuth|URL|эндпоинт\w*|промпт\w*|Parameters|Result|Submit|Close)($|[^а-яёa-z])|(?<!файл |\()GEDCOM/i
 const all = Object.entries(inventory)
 const list = (fn) => [...new Set(all.flatMap(([s, a]) => fn(a, s)))]
 const uiTexts = (a) => a.texts

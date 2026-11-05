@@ -1,56 +1,85 @@
 #!/bin/sh
 # Installs Family Graph with Docker. Safe to run again: it keeps your settings and data.
 #
-#   ./install.sh                         on this computer
-#   ./install.sh --domain family.example.com   on a server, with automatic HTTPS
+#   curl -fsSL https://raw.githubusercontent.com/dp-arhipov/family-graph/main/install.sh | sh
+#   ... | sh -s -- --domain family.example.com      on a server, with automatic HTTPS
+#   ... | sh -s -- --port 8080 --dir ~/family       another port or folder
 set -eu
-cd "$(dirname "$0")"
 
+REPO=https://raw.githubusercontent.com/dp-arhipov/family-graph/main
 DOMAIN=""
 PORT=3000
+DIR=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --domain) DOMAIN="${2:-}"; shift 2 ;;
     --port) PORT="${2:-}"; shift 2 ;;
-    -h|--help) sed -n '2,6p' "$0"; exit 0 ;;
+    --dir) DIR="${2:-}"; shift 2 ;;
+    -h|--help) sed -n '2,6p' "$0" 2>/dev/null; exit 0 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
 
 command -v docker >/dev/null 2>&1 || { echo "Docker is needed: https://docs.docker.com/get-docker/"; exit 1; }
 docker compose version >/dev/null 2>&1 || { echo "Docker Compose is needed: https://docs.docker.com/compose/install/"; exit 1; }
+docker info >/dev/null 2>&1 || { echo "Docker is installed but not running. Start it and run this again."; exit 1; }
+
+# Run from a clone it works in place; run through curl it fetches the few files it needs.
+HERE=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd || echo .)
+if [ -z "$DIR" ] && [ -f "$HERE/docker-compose.yml" ]; then
+  DIR=$HERE
+else
+  DIR=${DIR:-$HOME/family-graph}
+  mkdir -p "$DIR"
+  for f in docker-compose.yml Caddyfile family; do
+    [ -f "$DIR/$f" ] || curl -fsSL "$REPO/$f" -o "$DIR/$f"
+  done
+  chmod +x "$DIR/family"
+fi
+cd "$DIR"
 
 random() { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$1"; }
 
 if [ ! -f .env ]; then
-  if [ -n "$DOMAIN" ]; then URL="https://$DOMAIN"; BIND=127.0.0.1; else URL="http://localhost:$PORT"; BIND=127.0.0.1; fi
+  if [ -n "$DOMAIN" ]; then URL="https://$DOMAIN"; else URL="http://localhost:$PORT"; fi
   umask 077
   cat > .env <<EOF
-# Made by install.sh. Everything you can change is explained in .env.example.
+# Made by install.sh. Everything you can change: https://github.com/dp-arhipov/family-graph/blob/main/.env.example
 BETTER_AUTH_URL=$URL
 BETTER_AUTH_SECRET=$(random 48)
 SETUP_TOKEN=$(random 24)
 RECOVERY_TOKEN=$(random 32)
 PORT=$PORT
-BIND=$BIND
+BIND=127.0.0.1
 DOMAIN=$DOMAIN
 EOF
-  echo "Settings written to .env"
+  echo "Settings written to $DIR/.env"
 fi
 
 value() { sed -n "s/^$1=//p" .env | head -n 1; }
 DOMAIN=$(value DOMAIN)
 PORT=$(value PORT)
+IMAGE=${FAMILY_IMAGE:-ghcr.io/dp-arhipov/family-graph:latest}
+export FAMILY_IMAGE="$IMAGE"
 
 if [ -n "$DOMAIN" ]; then COMPOSE="docker compose --profile https"; else COMPOSE="docker compose"; fi
-echo "Building and starting. The first time takes a few minutes."
-$COMPOSE up -d --build
+echo "Getting the app. The first time takes a minute."
+# A ready image needs no build and no build machine. A clone can still build its own, say for an unreleased change.
+if docker compose pull -q family 2>/dev/null || docker image inspect "$IMAGE" >/dev/null 2>&1; then
+  $COMPOSE up -d --no-build
+elif [ -f Dockerfile ]; then
+  echo "No ready image: building here, which takes a few minutes and about 2 GB of memory."
+  $COMPOSE up -d --build
+else
+  echo "Could not download $IMAGE. Check the connection and run this again."
+  exit 1
+fi
 
 printf "Waiting for the app"
 i=0
 until docker compose exec -T family node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1; do
   i=$((i + 1))
-  [ "$i" -gt 60 ] && { echo; echo "It did not start. See: docker compose logs family"; exit 1; }
+  [ "$i" -gt 60 ] && { echo; echo "It did not start. See: cd $DIR && docker compose logs family"; exit 1; }
   printf "."
   sleep 2
 done
@@ -67,5 +96,5 @@ else
   echo "Running at $URL"
 fi
 echo
-echo "Connect an agent:  ./family token create --name my-agent --role editor"
-echo "All commands:      ./family help"
+echo "Connect Claude Code or Codex:  cd $DIR && ./family connect"
+echo "All commands:                  ./family help"

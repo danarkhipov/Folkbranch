@@ -1,0 +1,16 @@
+name: Something does not work
+description: A bug in the app, the install or the MCP connection
+body:
+  - type: textarea
+    id: what
+    attributes: { label: What happened, description: What you did and what you saw. Please no real family data in screenshots. }
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes: { label: What you expected }
+  - type: input
+    id: version
+    attributes: { label: Version, description: From the image tag or `git describe` }
+  - type: dropdown
+    id: where
+    attributes: { label: Where it runs, options: [This computer with Docker, Server with Docker, Railway, Other] }

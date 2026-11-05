@@ -2,6 +2,7 @@
 import { LogOut } from 'lucide-react'
 import { api, useApp } from '@/lib/client'
 import { personName } from '@/lib/types'
+import { Brand } from '../brand-icons'
 import { PersonPopover } from '../person-pickers'
 import { roleHelp } from './roles'
 
@@ -40,8 +41,8 @@ export function Account({ providers }: { providers: { google: boolean; yandex: b
           <h3 className="text-base font-medium">{t('Вход без ссылки')}</h3>
           <p className="text-xs text-ink-soft">{t('Привяжите аккаунт, чтобы входить снова без новой ссылки.')}</p>
           <div className="flex flex-wrap gap-2">
-            {providers.google && <button className="bar-btn border border-border" onClick={() => linkAccount('/api/auth/link-social', { provider: 'google', callbackURL: '/' })}>{t('Привязать Google')}</button>}
-            {providers.yandex && <button className="bar-btn border border-border" onClick={() => linkAccount('/api/auth/oauth2/link', { providerId: 'yandex', callbackURL: '/' })}>{t('Привязать Яндекс ID')}</button>}
+            {providers.google && <button className="bar-btn border border-border" onClick={() => linkAccount('/api/auth/link-social', { provider: 'google', callbackURL: '/' })}><Brand name="google" /> {t('Привязать Google')}</button>}
+            {providers.yandex && <button className="bar-btn border border-border" onClick={() => linkAccount('/api/auth/oauth2/link', { providerId: 'yandex', callbackURL: '/' })}><Brand name="yandex" className="text-[#fc3f1d]" /> {t('Привязать Яндекс ID')}</button>}
           </div>
         </section>
       )}
