@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CARD_W, layoutFamily } from '../lib/graph/layout'
+import { CARD_W, layoutFamily, PITCH } from '../lib/graph/layout'
 import type { Graph, Person } from '../lib/types'
 
 const graph = (ids: string[], pc: [string, string][], un: [string, string][]) => ({
@@ -101,7 +101,7 @@ describe('layoutFamily', () => {
     expect(l.cards.size).toBe(4)
     const [a, b, c] = ['a', 'b', 'c'].map((i) => l.cards.get(i)!)
     expect(a.y).toBe(b.y)
-    expect(Math.abs(a.x - b.x)).toBe(CARD_W)
+    expect(Math.abs(a.x - b.x)).toBe(PITCH)
     expect(c.y).toBeGreaterThan(a.y)
     expect(l.unions).toHaveLength(1)
     expect(l.unions[0].x).toBe((a.x + b.x) / 2)

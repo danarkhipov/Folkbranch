@@ -14,7 +14,8 @@ import { listAllMedia, listPersonMedia, updateMedia, uploadMedia } from './media
 import { getPage, listPages } from './pages'
 import { getGraph } from './people'
 import { OUTPUTS } from './outputs'
-import { describeOp, dispatch, myProposals, OPS } from './registry'
+import { describeOp, dispatch, myProposals } from './proposals'
+import { OPS } from './registry'
 import { findPeople, queryPeople, queryInput, searchArchive } from './search'
 import { createInvite, getSetting, say, listHistory, listInvites, listUsers, revokeInvite, setSetting, setUserRole } from './settings'
 

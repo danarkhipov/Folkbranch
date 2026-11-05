@@ -2,23 +2,18 @@
 import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowUpDown, CircleHelp, Clock, Minus, Plus, Search, Settings, Tags, UserPlus, Users, X } from 'lucide-react'
-import { App, api, undoFailure, useTr, useWrite, type AppCtx, type QuickType } from '@/lib/client'
+import { UserPlus, X } from 'lucide-react'
+import { App, Presence, api, undoFailure, useProposals, useTr, useWrite, type AppCtx, type QuickType } from '@/lib/client'
 import { Family } from '@/lib/kinship'
 import { personName, type Graph, type HistoryEntry, type Lang, type Me } from '@/lib/types'
-import { GraphCanvas, Legend, type CanvasHandle } from './graph-canvas'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { GraphCanvas, type CanvasHandle } from './graph-canvas'
+import { ConnectionNotice, MainBar, ViewBar, type Side } from './chart-bars'
 import { PersonPanel } from './person-panel'
 import { QuickAdd } from './quick-add'
-import { PhotoDialog } from './photo-dialog'
 import { ConfirmDialog, SearchDialog } from './person-pickers'
-import { HistoryPanel, HowRelated, SettingsDialog } from './side-panels'
 import type { AssistantState } from '@/lib/types'
-import { AssistantIcon } from './assistant-icon'
-import { cn } from '@/lib/utils'
-import { useAssistantWidth } from './assistant-setup'
-import { ReviewPanel, TextDialog, useProposals } from './ai-panels'
-import { ImportDialog } from './import-dialog'
+import { useLive } from '@/lib/use-live'
+import { useAssistantWidth } from './panel-size'
 
 interface Props {
   me: Me
@@ -31,6 +26,14 @@ interface Props {
 // Its libraries are heavy and most visits never open it.
 const AssistantPanel = dynamic(() => import('./assistant-panel'), { ssr: false })
 const AssistantSetup = dynamic(() => import('./assistant-setup'), { ssr: false })
+// Opened now and then, and they bring the photo viewer, the importers and the settings along.
+const PhotoDialog = dynamic(() => import('./photo-dialog').then((m) => m.PhotoDialog), { ssr: false })
+const ImportDialog = dynamic(() => import('./import-dialog').then((m) => m.ImportDialog), { ssr: false })
+const SettingsDialog = dynamic(() => import('./side-panels').then((m) => m.SettingsDialog), { ssr: false })
+const HistoryPanel = dynamic(() => import('./side-panels').then((m) => m.HistoryPanel), { ssr: false })
+const HowRelated = dynamic(() => import('./side-panels').then((m) => m.HowRelated), { ssr: false })
+const ReviewPanel = dynamic(() => import('./ai-panels').then((m) => m.ReviewPanel), { ssr: false })
+const TextDialog = dynamic(() => import('./ai-panels').then((m) => m.TextDialog), { ssr: false })
 
 /** Below this, the chat and the card do not fit side by side. */
 const NARROW = 960
@@ -40,8 +43,9 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
   const { data: graph } = useQuery({ queryKey: ['graph'], queryFn: () => api<Graph>('graph') })
   const canvas = useRef<CanvasHandle>(null)
   const [focusId, setFocusId] = useState<string | null>(() => (typeof location !== 'undefined' ? new URLSearchParams(location.search).get('p') : null))
+  const present = useLive(focusId)
   const [search, setSearch] = useState(false)
-  const [side, setSide] = useState<'related' | 'history' | 'review' | 'assistant' | null>(null)
+  const [side, setSide] = useState<Side>(null)
   // Mounted on first use and kept, so the conversation survives closing the panel.
   const [assistantUsed, setAssistantUsed] = useState(false)
   const [assistantWidth, setAssistantWidth] = useAssistantWidth()
@@ -88,7 +92,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
   const flipChart = () => directChart(!rootsBelow)
   const [photo, setPhoto] = useState<{ id: string; list?: string[] } | null>(null)
   const [quick, setQuick] = useState<{ type: QuickType; to: string; otherParent?: string } | { type: null; to: null } | null>(null)
-  const [confirmState, setConfirm] = useState<{ text: string; action: string; resolve: (v: boolean) => void } | null>(null)
+  const [confirmState, setConfirm] = useState<{ text: string; action: string; note?: string; resolve: (v: boolean) => void } | null>(null)
 
   const focus = useCallback((id: string | null, opts?: { center?: boolean }) => {
     setFocusId(id)
@@ -142,24 +146,24 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
   const undoRef = useRef(undoLast)
   undoRef.current = undoLast
 
+  // Rebuilt when the family changes, not on each click.
+  const lookups = useMemo(() => (graph ? { byId: new Map(graph.persons.map((p) => [p.id, p])), family: new Family(graph) } : null), [graph])
   const ctx = useMemo<AppCtx | null>(() => {
-    if (!graph) return null
+    if (!graph || !lookups) return null
     return {
       me, lang, familyName, t, graph, focusId, focus,
       canEdit: me.role !== 'reader',
       rootsBelow,
-      byId: new Map(graph.persons.map((p) => [p.id, p])),
-      family: new Family(graph),
+      ...lookups,
       openPhoto: (id, list) => setPhoto({ id, list }),
-      confirm: (text, action) => new Promise((resolve) => setConfirm({ text, action, resolve })),
+      confirm: (text, action, note) => new Promise((resolve) => setConfirm({ text, action, note, resolve })),
       quickAdd: (type, to, otherParent) => setQuick({ type, to, otherParent }),
       notify,
       undoLast,
     }
-  }, [graph, me, lang, familyName, focusId, focus, rootsBelow]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [graph, lookups, me, lang, familyName, focusId, focus, rootsBelow]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const delPerson = useWrite((id: string) => api(`persons/${id}`, { method: 'DELETE' }))
-  const delRelation = useWrite(({ type, id }: { type: string; id: string }) => api(`relations/${type}/${id}`, { method: 'DELETE' }))
 
   const allGroups = useMemo(() => {
     const counts = new Map<string, number>()
@@ -199,7 +203,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
 
   const onDelete = async (id: string) => {
     const p = ctx.byId.get(id)
-    if (await ctx.confirm(`${t('Удалить человека')} «${personName(p!) || t('Без названия')}»? ${t('Отменить можно в «Что нового».')}`, t('Удалить'))) {
+    if (await ctx.confirm(`${t('Удалить человека')} «${personName(p!) || t('Без названия')}»?`, t('Удалить'), t('Вернуть можно в разделе «История».'))) {
       await delPerson.mutateAsync(id)
       if (focusId === id) focus(null)
     }
@@ -207,44 +211,12 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
 
   return (
     <App.Provider value={ctx}>
+      <Presence.Provider value={present}>
       <ConnectionNotice t={t} />
-      <GraphCanvas ref={canvas} pathIds={path} groupIds={groupIds} panelOpen={panelOpen} leftInset={side === 'assistant' ? assistantWidth + 12 : 0} onDelete={onDelete} onRemoveRelation={(type, id) => delRelation.mutate({ type, id })} />
+      <GraphCanvas ref={canvas} pathIds={path} groupIds={groupIds} panelOpen={panelOpen} leftInset={side === 'assistant' ? assistantWidth + 12 : 0}/>
 
-      <nav aria-label={t('Главное меню')} ref={nav} className={cn('float main-bar fixed left-3 top-3 z-10 flex items-center gap-0.5 p-1', barMode !== 'full' && barMode)}>
-        <span className="family-name font-serif font-medium text-[15px] px-2.5 max-w-[220px] truncate">{familyName}</span>
-        <span className="sep w-px h-5 bg-border mx-0.5" />
-        <button className="bar-btn" title={`${t('Поиск людей')} (⌘K)`} aria-label={t('Поиск людей')} onClick={() => setSearch(true)}><Search size={16} /> <span className="nav-label">{t('Поиск')}</span></button>
-        <button className={side === 'related' ? 'bar-btn on' : 'bar-btn'} title={t('Кем приходится?')} aria-label={t('Кем приходится?')} onClick={() => { setSide(side === 'related' ? null : 'related'); setPath(null) }}><Users size={16} /> <span className="nav-label">{t('Родство')}</span></button>
-        <button className={side === 'assistant' ? 'bar-btn on' : 'bar-btn'} title={`${t('Ассистент')} (⌘J)`} aria-label={t('Ассистент')} onClick={toggleAssistant}><AssistantIcon /> <span className="nav-label">{t('Ассистент')}</span></button>
-        <button className={side === 'history' || side === 'review' ? 'bar-btn on relative' : 'bar-btn relative'} title={draftOps > 0 ? `${t('Что нового')}: ${t('Правки ассистента')} ${draftOps}` : t('Что нового')} aria-label={t('Что нового')} onClick={() => { setSide(side === 'review' ? 'history' : side === 'history' ? null : draftOps > 0 ? 'review' : 'history'); setPath(null) }}><Clock size={16} /> <span className="nav-label">{t('Что нового')}</span>{draftOps > 0 && <span className="absolute right-1 top-1 min-w-4 rounded-full bg-rust px-1 text-center text-[11px] leading-4 text-white">{draftOps}</span>}</button>
-        <button className="bar-btn" title={t('Настройки')} aria-label={t('Настройки')} onClick={() => setSettings(true)}><Settings size={16} /> <span className="nav-label">{t('Настройки')}</span></button>
-      </nav>
-
-      {/* Only about how the chart looks; it steps aside for a panel on the left. */}
-      <div aria-label={t('Вид схемы')} role="group" className={cn('float view-bar fixed bottom-3 z-10 flex items-center gap-0.5 p-1', (panelOpen || side) && 'crowded')} style={{ left: side === 'assistant' ? assistantWidth + 24 : side === 'history' ? 344 : side === 'review' ? 408 : 12 }}>
-        <button className="bar-btn" title={t('Отдалить')} aria-label={t('Отдалить')} onClick={() => canvas.current?.zoomBy(0.75)}><Minus size={15} /></button>
-        <button className="bar-btn" title={t('Приблизить')} aria-label={t('Приблизить')} onClick={() => canvas.current?.zoomBy(1.33)}><Plus size={15} /></button>
-        <button className="bar-btn" title={t(rootsBelow ? 'Сейчас старшие снизу. Показать старших сверху' : 'Сейчас старшие сверху. Показать старших снизу')} aria-label={t(rootsBelow ? 'Сейчас старшие снизу. Показать старших сверху' : 'Сейчас старшие сверху. Показать старших снизу')} onClick={flipChart}><ArrowUpDown size={15} /></button>
-        {allGroups.length > 0 && (
-          <Popover>
-            <PopoverTrigger asChild><button className={groups.length ? 'bar-btn on' : 'bar-btn'} title={t('Группы')} aria-label={t('Группы')}><Tags size={15} />{groups.length > 0 && ` ${groups.length}`}</button></PopoverTrigger>
-            <PopoverContent side="top" align="start" className="w-56 text-[13px] flex flex-col gap-0.5 p-2 max-h-72 overflow-auto">
-              {allGroups.map(([name, count]) => (
-                <label key={name} className="flex items-center gap-2 min-h-7 px-1 rounded hover:bg-muted cursor-pointer">
-                  <input type="checkbox" className="accent-[var(--ink)] size-4" checked={groups.includes(name)} onChange={(e) => setGroups(e.target.checked ? [...groups, name] : groups.filter((g) => g !== name))} />
-                  <span className="truncate flex-1">{name}</span>
-                  <span className="text-ink-faint">{count}</span>
-                </label>
-              ))}
-              {groups.length > 0 && <button className="bar-btn self-start mt-1" onClick={() => setGroups([])}>{t('Показать всех')}</button>}
-            </PopoverContent>
-          </Popover>
-        )}
-        <Popover>
-          <PopoverTrigger asChild><button className="bar-btn" title={t('Условные обозначения')} aria-label={t('Условные обозначения')}><CircleHelp size={15} /></button></PopoverTrigger>
-          <PopoverContent side="top" align="start" className="w-64 text-[13px]"><Legend /></PopoverContent>
-        </Popover>
-      </div>
+      <MainBar familyName={familyName} present={present} mode={barMode} navRef={nav} side={side} draftOps={draftOps} onSearch={() => setSearch(true)} onSide={(next) => { setSide(next); setPath(null) }} onAssistant={toggleAssistant} onSettings={() => setSettings(true)} />
+      <ViewBar canvas={canvas} rootsBelow={rootsBelow} onFlip={flipChart} groups={groups} onGroups={setGroups} allGroups={allGroups} left={side === 'assistant' ? assistantWidth + 24 : side === 'history' ? 344 : side === 'review' ? 408 : 12} crowded={panelOpen || !!side} />
 
       {!ctx.graph.persons.length && ctx.canEdit && (
         <div className="fixed inset-0 grid place-items-center pointer-events-none">
@@ -261,36 +233,19 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
 
       <SearchDialog open={search} onOpenChange={setSearch} onPick={(id) => focus(id)} />
       <QuickAdd state={quick} onClose={(id) => { setQuick(null); if (id) focus(id) }} />
-      <PhotoDialog state={photo} onClose={() => setPhoto(null)} />
+      {photo && <PhotoDialog state={photo} onClose={() => setPhoto(null)} />}
       {toast && (
-        <div role="status" className="float fixed left-1/2 -translate-x-1/2 bottom-3 max-lg:bottom-[68px] z-30 flex items-center gap-1 pl-3 pr-1 py-1 text-[13px] max-w-[calc(100vw-24px)]">
+        <div role="status" className="float fixed left-1/2 -translate-x-1/2 bottom-3 max-lg:bottom-[68px] z-30 flex items-center gap-1 pl-3 pr-1 py-1 text-sm max-w-[calc(100vw-24px)]">
           <span className="truncate mr-1">{toast.text}</span>
           {toast.actions.map((a) => <button key={a.label} className="bar-btn !h-7 whitespace-nowrap" onClick={() => { setToast(null); a.run() }}>{a.label}</button>)}
-          <button className="bar-btn !h-7 !min-w-7 !p-0" aria-label={t('Закрыть')} onClick={() => setToast(null)}><X size={13} /></button>
+          <button className="bar-btn !h-7 !min-w-7 !p-0" aria-label={t('Закрыть')} title={t('Закрыть')} onClick={() => setToast(null)}><X size={13} /></button>
         </div>
       )}
-      <TextDialog open={textOpen} onOpenChange={setTextOpen} />
-      <ImportDialog open={importing} file={dropped} onOpenChange={setImporting} />
+      {textOpen && <TextDialog open onOpenChange={setTextOpen} />}
+      {importing && <ImportDialog open file={dropped} onOpenChange={setImporting} />}
       <ConfirmDialog state={confirmState} onClose={() => setConfirm(null)} />
-      <SettingsDialog open={settings} onOpenChange={setSettings} familyName={familyName} providers={providers} onText={() => setTextOpen(true)} />
+      {settings && <SettingsDialog open onOpenChange={setSettings} familyName={familyName} providers={providers} onText={() => setTextOpen(true)} />}
+      </Presence.Provider>
     </App.Provider>
   )
-}
-
-/** Says so when the server cannot be reached, so nobody types into a chart that will not save. */
-function ConnectionNotice({ t }: { t: (key: string) => string }) {
-  const [down, setDown] = useState(false)
-  useEffect(() => {
-    const check = () => fetch('/api/health', { cache: 'no-store' }).then((r) => setDown(!r.ok)).catch(() => setDown(true))
-    const timer = setInterval(check, 15_000)
-    window.addEventListener('online', check)
-    window.addEventListener('offline', check)
-    return () => {
-      clearInterval(timer)
-      window.removeEventListener('online', check)
-      window.removeEventListener('offline', check)
-    }
-  }, [])
-  if (!down) return null
-  return <div role="alert" className="float fixed left-1/2 -translate-x-1/2 top-3 z-50 px-3 py-1.5 text-xs text-destructive">{t('Нет связи с сервером. Схема показана как при последней загрузке, новые правки могут не сохраниться')}</div>
 }

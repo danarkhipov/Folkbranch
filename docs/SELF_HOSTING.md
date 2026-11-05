@@ -20,9 +20,35 @@ Caddy starts next to the app and obtains the certificate by itself. Do not expos
 
 Already have a reverse proxy? Run `./install.sh --port 3000`, set `BETTER_AUTH_URL=https://your.domain` in `.env`, run `docker compose up -d`, and proxy to `127.0.0.1:3000`.
 
-## Railway and similar platforms
+## Railway
 
-The repository includes `railway.json`. Attach a volume at `/data`, set `RAILWAY_RUN_UID=0` so the app can write to it, and read the claim link from the deploy logs. The address is picked up from `RAILWAY_PUBLIC_DOMAIN`. Any platform that runs a Dockerfile and gives you a persistent `/data` works the same way; set `BETTER_AUTH_URL` there.
+The repository is ready for Railway: `.railway/railway.ts` describes one service with a volume at `/data` and a health check. Nothing is needed beyond the [Railway CLI](https://docs.railway.com/cli) and a Hobby plan.
+
+```bash
+railway login
+railway init --name family-archive
+railway config apply
+railway variable set --service family "BETTER_AUTH_SECRET=$(openssl rand -hex 32)"
+railway domain --service family
+railway up --service family
+railway logs --service family
+```
+
+The logs print the link that claims the empty archive. Open it and create the owner. The link's code stops working after that.
+
+**What is kept, and where.** The database, photos and agent files live on the volume, so they survive restarts and new deploys. Without a volume the app refuses to start and says so, because a container's own disk is wiped on every deploy; the previous deploy keeps running. Run one replica only: SQLite and the photos live on that one volume.
+
+**Keys.** `BETTER_AUTH_SECRET` signs sessions and encrypts the assistant's provider key in the database. Keep it in Railway's variables, not in the volume, so that a copy of the volume alone cannot decrypt the key. Changing it signs everyone out and asks for the provider key again; no family data is lost. Without it, the app generates one on the volume. Sign-in has no passwords: the first person uses the claim link, relatives use one-time invitations.
+
+**Your own domain.** Add it in Railway, then set `BETTER_AUTH_URL=https://your.domain` and redeploy. The old Railway address keeps working. Google or Yandex sign-in also need `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `YANDEX_CLIENT_ID`, `YANDEX_CLIENT_SECRET`, with the callbacks `/api/auth/callback/google` and `/api/auth/oauth2/callback/yandex` at your address.
+
+**Locked out or need a copy.** `railway ssh --service family`, then `node family.mjs login-link` or `node family.mjs backup`. Backups land in `/data/backups`, on the same volume, so also take one off the server or turn on volume backups in Railway.
+
+**Memory.** With a family of 1000 and 20 people looking at it, the app stays near 130 MB, and 256 MB is enough for a family of this size including uploads and an import. It holds one parsed copy of the family, rebuilt only after a change. The image limits the JavaScript heap to 256 MB through `NODE_OPTIONS`; an archive with very many people or very large uploads may need more.
+
+## Other platforms
+
+Any platform that runs a Dockerfile and gives you a persistent `/data` works the same way; set `BETTER_AUTH_URL` there. The container starts as root only to hand the volume to the `node` user, then runs the app as `node`.
 
 ## The first person
 

@@ -112,10 +112,10 @@ function Photo({ id, list, index, setIndex, onClose }: { id: string; list?: stri
         )}
       </div>
 
-      <div className="flex flex-col p-4 gap-3 text-[13px] overflow-auto">
+      <div className="flex flex-col p-4 gap-3 text-sm overflow-auto">
         <div className="flex justify-end -mt-1 -mr-1 gap-0.5">
           <button className="bar-btn !p-0 w-7 !h-7" title={t('На весь экран')} onClick={() => setFull(true)}><Expand size={14} /></button>
-          {canEdit && <button className="bar-btn !p-0 w-7 !h-7" title={t('Удалить')} onClick={async () => { if (await confirm(t('Удалить это фото? Отменить можно в «Что нового».'), t('Удалить'))) { await del.mutateAsync(); qc.invalidateQueries({ queryKey: ['pages'] }); onClose() } }}><Trash2 size={14} /></button>}
+          {canEdit && <button className="bar-btn !p-0 w-7 !h-7" title={t('Удалить')} onClick={async () => { if (await confirm(t('Удалить это фото? Отменить можно в «Истории».'), t('Удалить'))) { await del.mutateAsync(); qc.invalidateQueries({ queryKey: ['pages'] }); onClose() } }}><Trash2 size={14} /></button>}
           <button className="bar-btn !p-0 w-7 !h-7" title={t('Закрыть')} onClick={onClose}><X size={15} /></button>
         </div>
         <MetaField readOnly={!canEdit} className="font-serif text-base" placeholder={t('Подпись')} value={m.caption} onSave={(caption) => meta.mutate({ caption })} />

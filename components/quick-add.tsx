@@ -83,22 +83,22 @@ export function QuickAdd({ state, onClose }: { state: State; onClose: (createdId
   return (
     <Dialog open={!!state} onOpenChange={(o) => !o && reset()}>
       <DialogContent className="max-w-sm gap-3" showCloseButton={false} onInteractOutside={(e) => { if (name.trim()) e.preventDefault() }}>
-        <DialogTitle className="font-serif font-medium text-[17px]">
+        <DialogTitle className="font-serif font-medium text-lg">
           {type ? t(TITLE[type]) : t('Первый человек в архиве')}
           {target && <span className="block font-sans font-normal text-xs text-ink-soft mt-0.5">{personName(target)}</span>}
         </DialogTitle>
         {choices && (
           <div className="flex gap-1 rounded-lg bg-muted p-1" role="radiogroup">
             {choices.map(([value, label]) => (
-              <button key={value} type="button" role="radio" aria-checked={type === value} className={cn('flex-1 h-9 rounded-md text-[13px]', type === value ? 'bg-background shadow-sm font-medium' : 'text-ink-soft')} onClick={() => setPicked(value)}>{t(label)}</button>
+              <button key={value} type="button" role="radio" aria-checked={type === value} className={cn('flex-1 h-9 rounded-md text-sm', type === value ? 'bg-background shadow-sm font-medium' : 'text-ink-soft')} onClick={() => setPicked(value)}>{t(label)}</button>
             ))}
           </div>
         )}
         <form onSubmit={(e) => { e.preventDefault(); submit() }} className="flex flex-col gap-2">
-          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={t('Имя и фамилия')} className="h-10 rounded-lg border border-input bg-white px-3 text-[15px] font-serif outline-none focus:ring-2 focus:ring-ring/40" />
+          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={t('Имя и фамилия')} aria-label={t('Имя и фамилия')} className="h-10 rounded-lg border border-input bg-white px-3 text-base font-serif outline-none focus:ring-2 focus:ring-ring/40" />
           {matches.length > 0 && (
             <div className="flex flex-col rounded-lg border border-border overflow-hidden">
-              <span className="px-2 pt-1 text-[11px] text-ink-soft">{t('Уже есть в архиве')}</span>
+              <span className="px-2 pt-1 text-xs text-ink-soft">{t('Уже есть в архиве')}</span>
               {matches.map((m) => (
                 <button type="button" key={m.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted text-left" onClick={async () => { await linkExisting.mutateAsync(m.id); reset(m.id) }}>
                   <Mini person={m} size={22} /> <span className="truncate">{personName(m)}</span> <span className="ml-auto text-xs text-ink-faint">{lifeYears(m)}</span>
@@ -106,10 +106,10 @@ export function QuickAdd({ state, onClose }: { state: State; onClose: (createdId
               ))}
             </div>
           )}
-          <input value={years} onChange={(e) => setYears(e.target.value)} placeholder={t('например 1920 – 1985')} className="h-9 rounded-lg border border-input bg-white px-3 outline-none focus:ring-2 focus:ring-ring/40" />
+          <input value={years} onChange={(e) => setYears(e.target.value)} placeholder={t('например 1920 – 1985')} aria-label={t('Годы жизни')} title={t('Годы жизни')} className="h-9 rounded-lg border border-input bg-white px-3 outline-none focus:ring-2 focus:ring-ring/40" />
           {isChild && spouses.length > 0 && (
             <label className="flex items-center gap-2 text-xs text-ink-soft">{t('Второй родитель')}
-              <select value={otherParent ?? ''} onChange={(e) => setOther(e.target.value || null)} className="h-9 flex-1 min-w-0 rounded-lg border border-input bg-white px-2 text-[13px] text-ink">
+              <select value={otherParent ?? ''} onChange={(e) => setOther(e.target.value || null)} className="h-9 flex-1 min-w-0 rounded-lg border border-input bg-white px-2 text-sm text-ink">
                 {spouses.map((s) => <option key={s} value={s}>{personName(byId.get(s)!) || t('Скрыто')}</option>)}
                 <option value="">—</option>
               </select>
@@ -117,7 +117,7 @@ export function QuickAdd({ state, onClose }: { state: State; onClose: (createdId
           )}
           {(create.error || linkExisting.error) && <p className="text-xs text-destructive">{t('Не удалось сохранить')}: {String((create.error ?? linkExisting.error)?.message)}</p>}
           <button className="h-10 rounded-lg bg-ink text-white disabled:opacity-40 mt-1" disabled={!name.trim() || create.isPending}>
-            {t('Добавить')} <kbd className="ml-1 border-white/30 text-white/70">↵</kbd>
+            {t('Добавить')}
           </button>
         </form>
       </DialogContent>

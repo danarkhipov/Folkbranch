@@ -1,6 +1,5 @@
 import { eq } from 'drizzle-orm'
 import fs from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
@@ -17,13 +16,13 @@ let people: typeof import('../lib/ops/people')
 let pages: typeof import('../lib/ops/pages')
 let media: typeof import('../lib/ops/media')
 let tokens: typeof import('../lib/ops/tokens')
-let reg: typeof import('../lib/ops/registry')
+let reg: typeof import('../lib/ops/proposals')
 let core: typeof import('../lib/ops/core')
 let settings: typeof import('../lib/ops/settings')
 let db: typeof import('../lib/db')
 
 beforeAll(async () => {
-  ;[people, pages, media, tokens, reg, core, settings, db] = await Promise.all([import('../lib/ops/people'), import('../lib/ops/pages'), import('../lib/ops/media'), import('../lib/ops/tokens'), import('../lib/ops/registry'), import('../lib/ops/core'), import('../lib/ops/settings'), import('../lib/db')])
+  ;[people, pages, media, tokens, reg, core, settings, db] = await Promise.all([import('../lib/ops/people'), import('../lib/ops/pages'), import('../lib/ops/media'), import('../lib/ops/tokens'), import('../lib/ops/proposals'), import('../lib/ops/core'), import('../lib/ops/settings'), import('../lib/db')])
 })
 
 function issue(role: 'reader' | 'editor', review = true) {

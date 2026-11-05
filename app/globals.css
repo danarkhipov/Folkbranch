@@ -38,6 +38,17 @@
 }
 
 @theme inline {
+  /* One scale for the whole interface: caption, text, subheading, panel title, screen title. */
+  --text-xs: 14px;
+  --text-xs--line-height: 1.4;
+  --text-sm: 15px;
+  --text-sm--line-height: 1.45;
+  --text-base: 16px;
+  --text-base--line-height: 1.4;
+  --text-lg: 18px;
+  --text-lg--line-height: 1.3;
+  --text-2xl: 24px;
+  --text-2xl--line-height: 1.25;
   --font-sans: "Golos Text Variable", ui-sans-serif, sans-serif;
   --font-serif: "Literata Variable", ui-serif, Georgia, serif;
   --color-background: var(--background);
@@ -72,7 +83,7 @@
 @layer base {
   * { @apply border-border outline-ring/50; }
   html, body { height: 100%; }
-  body { @apply bg-paper text-ink font-sans antialiased; font-size: 14px; }
+  body { @apply bg-paper text-ink font-sans antialiased; font-size: 15px; line-height: 1.45; }
 }
 
 /* Where someone types, the caret is the sign of focus; a frame around text only gets in the way. */
@@ -97,6 +108,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
 .world > svg { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
 .world.animate { transition: transform .45s cubic-bezier(.22, .8, .24, 1); }
+/* Too small to read: drawing the text would only slow the pan. */
+.world.far .cap { visibility: hidden; }
+.world.far > svg.hits { display: none; }
 
 /* One line weight, one colour; meaning comes from the dash, explained in the legend. */
 .line, .union { fill: none; stroke: var(--line); stroke-linejoin: round; stroke-linecap: round; transition: opacity .15s, stroke .15s; }
@@ -109,7 +123,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .line.hover, .union.hover { stroke: var(--accent); }
 .linkbar { position: absolute; transform: translate(-50%, calc(-100% - 8px)) scale(calc(1 / var(--k, 1))); transform-origin: 50% 100%; display: flex; align-items: center; gap: 2px; padding: 3px; white-space: nowrap; font-size: 12px; z-index: 5; cursor: default; }
 .linkbar select { height: 26px; background: transparent; border-radius: 6px; padding: 0 4px; color: var(--ink); }
-.linkbar-count { color: var(--ink-soft); padding: 0 4px; font-variant-numeric: tabular-nums; }
+.linkbar-count { font-size: 14px; color: var(--ink-soft); padding: 0 4px; font-variant-numeric: tabular-nums; }
 .linkbar-del { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 6px; color: var(--ink-soft); }
 .linkbar-del:hover { color: var(--destructive); background: var(--muted); }
 .pcard:focus-visible { outline: none; }
@@ -137,18 +151,17 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .pcard.sex-F .ava { --ring: var(--female); }
 .pcard .ava img { width: 100%; height: 100%; object-fit: cover; display: block; -webkit-user-drag: none; }
 .pcard:hover .ava { transform: translateY(-1px); }
-.pcard .nm { width: max-content; max-width: 150px; text-wrap: balance; font-family: var(--font-serif); font-weight: 560; font-size: calc(13.5px * var(--lbl, 1)); line-height: 1.22; padding: 0 6px; color: var(--ink); text-wrap: balance; }
-.pcard .yr { font-size: calc(11.5px * var(--lbl, 1)); color: var(--ink-soft); margin-top: 2px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.pcard .rel { font-size: calc(10.5px * var(--lbl, 1)); line-height: 1.5; margin-top: 3px; padding: 0 7px; border-radius: 99px; white-space: nowrap; }
+.pcard .nm { width: max-content; max-width: 150px; overflow-wrap: anywhere; hyphens: auto; hyphenate-limit-chars: 14 6 6; text-wrap: balance; font-family: var(--font-serif); font-weight: 600; font-size: calc(15px * var(--lbl, 1)); line-height: 1.25; padding: 0 6px; color: var(--ink); text-wrap: balance; }
+.pcard .yr { font-size: calc(14px * var(--lbl, 1)); line-height: 1.3; color: #5c564a; margin-top: 2px; font-variant-numeric: tabular-nums; text-wrap: balance; }
+.pcard .rel { font-size: calc(13px * var(--lbl, 1)); line-height: 1.5; margin-top: 3px; padding: 0 7px; border-radius: 99px; white-space: nowrap; }
 .pcard .rel.me { color: var(--accent); }
 .pcard .rel.kin { background: var(--ink); color: #fffdf8; }
 .pcard.dead .ava img { filter: saturate(.5) sepia(.15); }
-.pcard.dead .nm { color: #57503f; }
 .pcard.assumed .ava { outline: 1.5px dashed var(--ink-faint); outline-offset: 6px; }
 .pcard.focus .ava { box-shadow: 0 0 0 3px var(--accent), 0 0 0 6px #fffdf8, 0 6px 16px 4px rgb(60 45 20 / .25); }
 .pcard.isme .nm { color: var(--accent); }
 .focused .pcard.dim .ava, .focused .pcard.dim .cap > * { opacity: .42; }
-.pcard .cap { width: max-content; margin-top: 7px; padding: 2px 6px 1px; border-radius: 6px; background: var(--paper); display: flex; flex-direction: column; align-items: center; }
+.pcard .cap { width: max-content; max-width: 162px; margin-top: 7px; padding: 2px 6px 1px; border-radius: 6px; background: var(--paper); display: flex; flex-direction: column; align-items: center; }
 
 /* Buttons belong to the card: a small fixed share of the avatar at any zoom. Only when very far
    out do they stop shrinking at 12px on screen, so they can still be hit. */
@@ -171,15 +184,15 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .legend-ring.sex-F { border-color: var(--female); background: #efdccf; }
 
 .float { background: rgb(255 253 248 / .92); backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 1px 2px rgb(60 45 20 / .06), 0 8px 24px rgb(60 45 20 / .08); }
-.bar-btn { height: 36px; min-width: 36px; padding: 0 9px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: var(--ink-soft); font-size: 13px; cursor: pointer; white-space: nowrap; }
+.bar-btn { height: 36px; min-width: 36px; padding: 0 9px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: var(--ink-soft); font-size: 14px; cursor: pointer; white-space: nowrap; }
 .bar-btn:hover { background: #efe9dc; color: var(--ink); }
 .bar-btn.on { background: var(--ink); color: #fffdf8; }
-kbd { font: 11px var(--font-sans); color: var(--ink-faint); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+kbd { font: 14px var(--font-sans); color: var(--ink-faint); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
 
 [cmdk-input]:focus-visible { outline: none; }
 .inline-input { background: transparent; border-radius: 0; padding: 0; width: 100%; outline: none; text-overflow: ellipsis; }
 .inline-fit { width: auto; min-width: 2ch; max-width: 100%; field-sizing: content; }
-.inline-input::placeholder { color: var(--ink-faint); font-style: italic; }
+.inline-input::placeholder { color: #787162; font-style: italic; }
 
 .panel { position: fixed; top: 12px; right: 12px; bottom: 12px; width: min(var(--panel-w, 480px), calc(100vw - 24px)); background: #fffdf8; border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 2px 6px rgb(60 45 20 / .07), 0 24px 60px rgb(60 45 20 / .16); display: flex; flex-direction: column; overflow: hidden; z-index: 20; animation: panel-in .28s cubic-bezier(.22, .8, .24, 1); transition: width .25s cubic-bezier(.22, .8, .24, 1); }
 .panel.full { width: calc(100vw - 24px); }
@@ -202,7 +215,7 @@ kbd { font: 11px var(--font-sans); color: var(--ink-faint); border: 1px solid va
 /* Photo tags */
 .tagbox { position: absolute; border: 1.5px solid rgb(255 255 255 / .9); box-shadow: 0 0 0 1px rgb(0 0 0 / .35); border-radius: 4px; opacity: 0; transition: opacity .15s; cursor: pointer; }
 .photo-stage:hover .tagbox, .tagbox.show { opacity: 1; }
-.tagbox .tagname { position: absolute; left: -1px; top: calc(100% + 4px); background: var(--ink); color: #fffdf8; font-size: 11px; padding: 0 6px; border-radius: 4px; white-space: nowrap; }
+.tagbox .tagname { position: absolute; left: -1px; top: calc(100% + 4px); background: var(--ink); color: #fffdf8; font-size: 14px; padding: 0 6px; border-radius: 4px; white-space: nowrap; }
 .tagbox.suggest { border-style: dashed; border-color: #ffd79c; opacity: 1; }
 
 /* BlockNote: use the app's paper and fonts */
@@ -222,7 +235,7 @@ kbd { font: 11px var(--font-sans); color: var(--ink-faint); border: 1px solid va
 .tag-3 { background: #e2eddc; color: #41633c; }
 .tag-4 { background: #dfe9ef; color: #38596c; }
 .tag-5 { background: #ebe2ef; color: #5f4570; }
-.mark-chip { background: #efe5d3; border-radius: 5px; padding: 0 5px; font-size: 12px; font-family: var(--font-sans, inherit); font-weight: 400; color: var(--ink-soft); white-space: nowrap; }
+.mark-chip { background: #efe5d3; border-radius: 5px; padding: 0 5px; font-size: 14px; font-family: var(--font-sans, inherit); font-weight: 400; color: var(--ink-soft); white-space: nowrap; }
 .mark-chip[data-citation] { cursor: pointer; }
 .mark-chip[data-citation]:hover { color: var(--accent); }
 .mark-chip.unverified { background: #f7e3d3; color: #8f4426; }
@@ -240,12 +253,12 @@ kbd { font: 11px var(--font-sans); color: var(--ink-faint); border: 1px solid va
 .panel-edge:focus-visible { outline: none; }
 .composer [data-slot="input-group"] { height: auto; flex-direction: column; align-items: stretch; border-radius: 16px; border: 1px solid var(--border) !important; background: #fff; box-shadow: 0 1px 4px rgb(60 45 20 / .07) !important; transition: border-color .12s, box-shadow .12s; }
 .composer [data-slot="input-group"]:has(textarea:focus) { border-color: color-mix(in oklab, var(--ink) 35%, var(--border)) !important; box-shadow: 0 2px 10px rgb(60 45 20 / .12) !important; }
-.composer textarea { width: 100%; min-height: 24px; max-height: 200px; overflow-y: auto; padding: 10px 14px 2px; font-size: 13.5px; line-height: 1.45; outline: none !important; border: 0 !important; box-shadow: none !important; background: transparent !important; }
+.composer textarea { width: 100%; min-height: 24px; max-height: 200px; overflow-y: auto; padding: 10px 14px 2px; font-size: 15px; line-height: 1.45; outline: none !important; border: 0 !important; box-shadow: none !important; background: transparent !important; }
 .composer textarea:focus, .composer textarea:focus-visible { outline: none !important; box-shadow: none !important; }
 .composer [data-align="block-end"] { padding: 2px 6px 6px; border: 0; }
 .composer [data-align="block-end"] button { height: 28px; width: 28px; border-radius: 999px; }
 .composer button:focus-visible { outline-offset: 1px; }
-.tool-row > summary { display: flex; align-items: center; gap: 6px; list-style: none; cursor: pointer; font-size: 12px; color: var(--ink-soft, #6b6355); padding: 1px 0; }
+.tool-row > summary { display: flex; align-items: center; gap: 6px; list-style: none; font-size: 14px; color: var(--ink-soft, #6b6355); padding: 1px 0; }
 .tool-row > summary::-webkit-details-marker { display: none; }
 .tool-row > summary:hover { color: var(--ink); }
 
@@ -262,7 +275,8 @@ kbd { font: 11px var(--font-sans); color: var(--ink-faint); border: 1px solid va
 @media (max-width: 640px) {
   .main-bar { top: auto; left: 8px; right: 8px; bottom: 8px; justify-content: space-around; z-index: 40; }
   .main-bar .family-name, .main-bar .sep { display: none; }
-  .main-bar .bar-btn { flex: 1; flex-direction: column; gap: 2px; height: 48px; padding: 0 2px; font-size: 11px; line-height: 1.1; }
+  .main-bar .bar-btn { flex: 1; flex-direction: column; gap: 2px; height: 48px; min-width: 0; height: 48px; padding: 0 2px; font-size: 13px; line-height: 1.35; white-space: normal; text-align: center; }
+  .main-bar .bar-btn .nav-label { white-space: normal; }
   .main-bar .nav-label { display: block; white-space: nowrap; }
   .view-bar { left: 8px !important; bottom: 72px; }
   .chart-hint { display: none; }
@@ -279,3 +293,17 @@ kbd { font: 11px var(--font-sans); color: var(--ink-faint); border: 1px solid va
 .panel-tabs { height: 36px; padding: 4px; }
 .panel-tabs [role=tab] { height: 28px; }
 .legend-ring.assumed { outline: 1.5px dashed var(--ink-faint); outline-offset: 2px; }
+.presence { display: inline-flex; padding-inline: 4px; }
+.presence > span { width: 24px; height: 24px; margin-left: -6px; border-radius: 50%; border: 2px solid var(--paper); background: var(--ink); color: #fffdf8; display: grid; place-items: center; font-size: 11px; font-weight: 500; }
+.presence > span:first-child { margin-left: 0; }
+@media (max-width: 640px) { .main-bar .presence { display: none; } }
+
+/* Secondary buttons read the same everywhere, and form marks take the ink colour. */
+.bar-btn.border { color: var(--ink); }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
+/* A phone zooms the page into anything smaller while typing. */
+@media (max-width: 640px) { input, select, textarea { font-size: 16px; } .inline-input { font-size: inherit; } }
+/* A finger needs more than a mouse: the plus buttons grow and the tabs keep inside the card. */
+@media (pointer: coarse) { .pcard .tools { --s: 1.55; } }
+@media (max-width: 640px) { .panel-tabs { width: auto; align-self: stretch; } .panel-tabs [role=tab] { padding-inline: 6px; flex: 1 1 auto; } }
+.inline-input:placeholder-shown { border-bottom: 1px dashed var(--ink-faint); }

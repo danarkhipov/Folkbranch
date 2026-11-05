@@ -11,7 +11,6 @@ import { assistantResponse } from '../lib/agent/respond'
 import { DATA_DIR } from '../lib/db'
 import { listPersonMedia, getMedia } from '../lib/ops/media'
 import { getGraph } from '../lib/ops/people'
-import { setSetting } from '../lib/ops/settings'
 import { toolsFor } from '../lib/ops/tools'
 import { editor, loadFamily, owner, reader } from './fixture-family'
 

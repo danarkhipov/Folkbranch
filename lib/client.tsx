@@ -1,8 +1,9 @@
 'use client'
-import { createContext, useContext } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { createContext, useContext, useRef } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { Proposal } from '@/lib/ops/proposals'
 import type { Family } from './kinship'
-import type { Graph, Lang, Me, Person } from './types'
+import type { Graph, HistoryEntry, Lang, Me, Person } from './types'
 import { translate } from './i18n'
 import { drawnAvatar } from './avatar'
 
@@ -30,7 +31,7 @@ export interface AppCtx {
   focusId: string | null
   focus: (id: string | null, opts?: { center?: boolean }) => void
   openPhoto: (mediaId: string, list?: string[]) => void
-  confirm: (text: string, action: string) => Promise<boolean>
+  confirm: (text: string, action: string, note?: string) => Promise<boolean>
   quickAdd: (type: QuickType, to: string, otherParent?: string) => void
   notify: (text: string, actions?: { label: string; run: () => void }[]) => void
   /** Rolls back the most recent change that is not already undone. */
@@ -42,19 +43,48 @@ export type QuickType = 'parent' | 'father' | 'mother' | 'child' | 'son' | 'daug
 export const App = createContext<AppCtx>(null as never)
 export const useApp = () => useContext(App)
 
+/** Who else has the archive open. Apart from App, so someone arriving does not redraw the chart. */
+export const Presence = createContext<{ id: string; name: string; focusId: string | null }[]>([])
+
 export const useTr = (lang: Lang) => (key: string) => translate(lang, key)
 
 /** Any write refreshes everything derived from it: the graph and history at least. */
-export function useWrite<V = void, R = unknown>(fn: (v: V) => Promise<R>, also: unknown[][] = []) {
+/** The change just made, to offer taking it back. */
+export const lastChangeId = async () => (await api<HistoryEntry[]>('history?limit=1'))[0]?.id
+
+/** The live channel refreshes these, so there is nothing to poll. */
+export const useProposals = (enabled: boolean) => useQuery({ queryKey: ['proposals'], queryFn: () => api<Proposal[]>('proposals'), enabled })
+
+export function useWrite<V = void, R = unknown>(fn: (v: V) => Promise<R>, also: unknown[][] = [], onError?: (e: Error) => void) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: fn,
+    onError,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['graph'] })
       qc.invalidateQueries({ queryKey: ['history'] })
       also.forEach((queryKey) => qc.invalidateQueries({ queryKey }))
     },
   })
+}
+
+/**
+ * Saves a person's fields and says what each one held when this editor last saw it. Then the server
+ * can merge lists and refuse to overwrite a value somebody changed meanwhile.
+ */
+export function usePersonSave(person: Person, onError: (e: Error) => void) {
+  const latest = useRef(person)
+  const wrote = useRef<Record<string, unknown>>({})
+  if (latest.current !== person) {
+    latest.current = person
+    wrote.current = {}
+  }
+  return useWrite(async (patch: Partial<Person>) => {
+    const seen = Object.fromEntries(Object.keys(patch).map((k) => [k, k in wrote.current ? wrote.current[k] : latest.current[k as keyof Person]]))
+    const result = await api(`persons/${person.id}`, { method: 'PATCH', json: { ...patch, seen } })
+    Object.assign(wrote.current, patch)
+    return result
+  }, [], onError)
 }
 
 /** Why an undo was refused, in words a person can act on. */

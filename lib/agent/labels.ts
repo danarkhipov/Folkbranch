@@ -7,7 +7,7 @@ const READ: Record<string, [string, string]> = {
   find_gaps: ['Ищет, что не заполнено', 'Looking for gaps'],
   parse_table: ['Разбирает таблицу', 'Reading the table'],
   search_people: ['Ищет людей', 'Searching people'],
-  query_people: ['Выбирает людей по условиям', 'Selecting people'],
+  query_people: ['Ищет людей', 'Selecting people'],
   search_archive: ['Ищет по всему архиву', 'Searching the archive'],
   get_person: ['Читает карточку', 'Reading a card'],
   get_relatives: ['Смотрит родню', 'Looking at relatives'],

@@ -68,6 +68,11 @@ describe('cross-site writes', () => {
     expect(fromOurPages(h({ 'sec-fetch-site': 'same-origin' }))).toBe(true)
     expect(fromOurPages(h({ origin: 'https://evil.test' }))).toBe(false)
     expect(fromOurPages(h({ origin: 'null' }))).toBe(false)
+    expect(fromOurPages(h({ origin: 'https://family.up.railway.app', host: 'internal:8080', 'x-forwarded-host': 'family.up.railway.app' }))).toBe(true)
+    process.env.RAILWAY_PUBLIC_DOMAIN = 'family.up.railway.app'
+    expect(fromOurPages(h({ origin: 'https://family.up.railway.app', host: 'internal:8080' }))).toBe(true)
+    expect(fromOurPages(h({ origin: 'https://evil.test', host: 'internal:8080' }))).toBe(false)
+    delete process.env.RAILWAY_PUBLIC_DOMAIN
     expect(fromOurPages(h({ 'sec-fetch-site': 'cross-site' }))).toBe(false)
     expect(fromOurPages(h({}))).toBe(false)
   })

@@ -3,14 +3,13 @@ import { useEffect, useRef, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { DefaultChatTransport, getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithApprovalResponses, type ToolUIPart, type UIMessage } from 'ai'
-import { ArrowUp, Check, ChevronRight, Circle, CircleCheck, CircleX, Copy, FileText, Loader2, Paperclip, Plus, Undo2, X } from 'lucide-react'
+import { ArrowUp, Check, Circle, CircleCheck, CircleX, Copy, FileText, Loader2, Paperclip, Plus, Undo2, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Confirmation, ConfirmationAction, ConfirmationActions, ConfirmationRequest } from '@/components/ai-elements/confirmation'
 import { Conversation, ConversationContent, ConversationScrollButton } from '@/components/ai-elements/conversation'
 import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message'
 import { PromptInput, PromptInputBody, PromptInputButton, PromptInputFooter, PromptInputSubmit, PromptInputTextarea, PromptInputTools, usePromptInputAttachments, type PromptInputMessage } from '@/components/ai-elements/prompt-input'
-import { ToolInput, ToolOutput } from '@/components/ai-elements/tool'
-import { PanelEdge } from './assistant-setup'
+import { PanelEdge } from './panel-size'
 import { changesData, isOrdinaryEdit, toolLabel } from '@/lib/agent/labels'
 import { api, undoFailure, useApp } from '@/lib/client'
 
@@ -27,7 +26,7 @@ function plainError(e: Error, t: (k: string) => string) {
 const historyIds = (m: UIMessage) => [...new Set(m.parts.flatMap((p) => (isToolUIPart(p) && p.state === 'output-available' && (p.output as { historyId?: string } | null)?.historyId ? [(p.output as { historyId: string }).historyId] : [])))]
 
 export default function AssistantPanel({ open, width, onWidth, onClose, onPath, onDirection }: { open: boolean; width: number; onWidth: (w: number) => void; onClose: () => void; onPath: (path: string[]) => void; onDirection: (rootsBelow: boolean) => void }) {
-  const { t, lang, focusId, focus, notify } = useApp()
+  const { t, focusId, focus, notify } = useApp()
   const qc = useQueryClient()
   const router = useRouter()
   const trust = useRef(false)
@@ -104,11 +103,11 @@ export default function AssistantPanel({ open, width, onWidth, onClose, onPath, 
   }
 
   return (
-    <aside hidden={!open} aria-label={t('Ассистент')} style={{ width: `min(${width}px, calc(100vw - 24px))` }} className="assistant side-sheet float fixed left-3 top-[60px] bottom-3 z-10 flex flex-col !bg-[#fffdf8] text-[13.5px] [&[hidden]]:hidden">
+    <aside hidden={!open} aria-label={t('Ассистент')} style={{ width: `min(${width}px, calc(100vw - 24px))` }} className="assistant side-sheet float fixed left-3 top-[60px] bottom-3 z-10 flex flex-col !bg-[#fffdf8] text-sm [&[hidden]]:hidden">
       <PanelEdge width={width} onWidth={onWidth} />
       <header className="flex items-center gap-1 border-b border-border py-1 pl-3 pr-1">
-        <h2 className="flex-1 font-serif text-[15px] font-medium">{t('Ассистент')}</h2>
-        {messages.length > 0 && <button className="bar-btn" title={t('Новый разговор')} aria-label={t('Новый разговор')} onClick={restart}><Plus size={15} /></button>}
+        <h2 className="flex-1 font-serif text-lg font-medium">{t('Ассистент')}</h2>
+        {messages.length > 0 && <button className="bar-btn" onClick={restart}><Plus size={15} /> {t('Новый разговор')}</button>}
         <button className="bar-btn" title={t('Закрыть')} aria-label={t('Закрыть')} onClick={onClose}><X size={15} /></button>
       </header>
       <Conversation className="min-h-0 flex-1">
@@ -150,7 +149,7 @@ export default function AssistantPanel({ open, width, onWidth, onClose, onPath, 
       </Conversation>
       {!messages.length && (
         <div className="flex flex-col items-center gap-2 px-3 pb-2 text-center">
-          <h3 className="font-serif text-[15px] font-medium">{t('Спросите о семье')}</h3>
+          <h3 className="font-serif text-base font-medium">{t('Спросите о семье')}</h3>
           <div className="flex flex-wrap justify-center gap-1.5">
             {['Кто самый старший в семье?', 'Чего не хватает в архиве?', 'Кто родился до 1900 года?'].map((q) => <button key={q} className="h-7 rounded-full border border-border bg-white px-3 text-xs text-ink-soft hover:text-ink" onClick={() => sendMessage({ text: t(q) })}>{t(q)}</button>)}
           </div>
@@ -165,11 +164,11 @@ export default function AssistantPanel({ open, width, onWidth, onClose, onPath, 
       <PromptInput className="composer px-2 pb-2 pt-1" multiple maxFileSize={40 * 1024 * 1024} onError={(e) => notify(e.message)} onSubmit={submit}>
         <AttachedFiles />
         <PromptInputBody>
-          <PromptInputTextarea placeholder={t(pending.length ? 'Сначала ответьте на вопрос выше' : 'Спросите или попросите изменить…')} disabled={pending.length > 0} />
+          <PromptInputTextarea aria-label={t('Сообщение ассистенту')} placeholder={t(pending.length ? 'Сначала ответьте на вопрос выше' : 'Спросите или попросите изменить…')} disabled={pending.length > 0} />
         </PromptInputBody>
         <PromptInputFooter>
           <PromptInputTools><AttachButton /></PromptInputTools>
-          <PromptInputSubmit status={status} onStop={stop} disabled={pending.length > 0} className="size-7 rounded-full">{busy ? undefined : <ArrowUp className="size-4" />}</PromptInputSubmit>
+          <PromptInputSubmit labels={{ send: t('Отправить'), stop: t('Остановить') }} status={status} onStop={stop} disabled={pending.length > 0} className="size-7 rounded-full">{busy ? undefined : <ArrowUp className="size-4" />}</PromptInputSubmit>
         </PromptInputFooter>
       </PromptInput>
     </aside>
@@ -207,14 +206,15 @@ function ToolCall({ part, onAnswer, onAllowEdits }: { part: ToolUIPart; onAnswer
     return (
       <Confirmation approval={part.approval as never} state={part.state} className="flex flex-col gap-2">
         <ConfirmationRequest>
-          <p className="font-medium">{label}</p>
-          {reason && <p className="mt-1 whitespace-pre-wrap text-ink-soft">{reason}</p>}
+          <p className="font-medium">{t('Ассистент просит разрешения')}</p>
+          <p className="mt-1 whitespace-pre-wrap text-ink-soft">{reason || label}</p>
         </ConfirmationRequest>
         <ConfirmationActions className="flex-wrap justify-start">
-          <ConfirmationAction onClick={() => onAnswer(true)}>{t('Разрешить')}</ConfirmationAction>
-          {onAllowEdits && <ConfirmationAction variant="outline" onClick={onAllowEdits}>{t('Разрешать правки в этом разговоре')}</ConfirmationAction>}
-          <ConfirmationAction variant="outline" onClick={() => onAnswer(false)}>{t('Отказать')}</ConfirmationAction>
+          <ConfirmationAction className="h-9" onClick={() => onAnswer(true)}>{t('Разрешить один раз')}</ConfirmationAction>
+          {onAllowEdits && <ConfirmationAction className="h-9" variant="outline" onClick={onAllowEdits}>{t('Разрешить до конца разговора')}</ConfirmationAction>}
+          <ConfirmationAction className="h-9" variant="outline" onClick={() => onAnswer(false)}>{t('Отказать')}</ConfirmationAction>
         </ConfirmationActions>
+        {onAllowEdits && <p className="text-xs text-ink-soft">{t('«Разрешить до конца разговора»: правки пойдут без вопросов, пока вы не начнёте новый разговор.')}</p>}
       </Confirmation>
     )
   }
@@ -222,17 +222,12 @@ function ToolCall({ part, onAnswer, onAllowEdits }: { part: ToolUIPart; onAnswer
   const link = part.state === 'output-available' ? (part.output as { link?: string } | null)?.link : undefined
   return (
     <>
-      <details className="tool-row group">
-        <summary title={t(STATUS[part.state])}>
+      <div className="tool-row" title={t(STATUS[part.state])}>
+        <div className="flex items-center gap-1.5">
           {part.state === 'output-available' ? <CircleCheck size={13} className="text-ink-faint" /> : part.state === 'output-error' ? <CircleX size={13} className="text-destructive" /> : <Loader2 size={13} className="animate-spin" />}
           <span className="min-w-0 flex-1 truncate">{label}</span>
-          <ChevronRight size={12} className="opacity-50 transition-transform group-open:rotate-90" />
-        </summary>
-        <div className="mt-1 space-y-2 rounded-md bg-muted/50 p-2">
-          <ToolInput input={part.input} />
-          <ToolOutput output={part.output} errorText={part.errorText} />
         </div>
-      </details>
+      </div>
       {part.state === 'output-error' && <p className="text-xs text-destructive">{part.errorText}</p>}
       {link && <InviteLink link={link} />}
     </>

@@ -18,3 +18,13 @@ export function overLimit(userId: string, now = Date.now()) {
 export function countTokens(used: number) {
   if (used > 0) setSetting(dayKey(), String(Number(getSetting(dayKey()) ?? 0) + used))
 }
+
+const MAX_RUNS = 4
+const running = new Set<string>()
+
+/** Answers run one per person and a few at a time, whatever else the server is doing. Returns how to give the place back, or null. */
+export function takeRun(userId: string) {
+  if (running.has(userId) || running.size >= MAX_RUNS) return null
+  running.add(userId)
+  return () => { running.delete(userId) }
+}

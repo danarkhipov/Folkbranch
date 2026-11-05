@@ -3,17 +3,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Check, Copy, X } from 'lucide-react'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { api, useApp } from '@/lib/client'
+import { api, useApp, useProposals } from '@/lib/client'
 import { ModelSelect, ProviderForm, useProviderStatus } from './assistant-setup'
 import type { PresetId } from '@/lib/agent/presets'
 import { layoutFamily, AVATAR_CY, CARD_H } from '@/lib/graph/layout'
-import type { Proposal } from '@/lib/ops/registry'
 import { parseFamilyText, parsedToGraph, planFamilyText, serializeFamilyText, type TextPlan } from '@/lib/textformat'
 import { personName } from '@/lib/types'
-
-export function useProposals(enabled: boolean) {
-  return useQuery({ queryKey: ['proposals'], queryFn: () => api<Proposal[]>('proposals'), enabled, refetchInterval: 30_000 })
-}
 
 /** The drafts a token has written: every line in words, accepted or rejected by a person. */
 export function ReviewPanel({ onClose }: { onClose: () => void }) {
@@ -31,19 +26,19 @@ export function ReviewPanel({ onClose }: { onClose: () => void }) {
   }
   return (
     <div className="float side-sheet fixed left-3 top-[60px] bottom-3 w-96 max-w-[calc(100vw-24px)] flex flex-col z-10">
-      <div className="flex items-center justify-between px-3 pt-3 pb-2"><h3 className="font-serif font-medium text-[15px]">{t('Правки ассистента')}</h3><button className="text-ink-faint hover:text-ink" aria-label={t('Закрыть')} title={t('Закрыть')} onClick={onClose}><X size={15} /></button></div>
+      <div className="flex items-center justify-between px-3 pt-3 pb-2"><h3 className="font-serif font-medium text-lg">{t('Правки ассистента')}</h3><button className="text-ink-faint hover:text-ink" aria-label={t('Закрыть')} title={t('Закрыть')} onClick={onClose}><X size={15} /></button></div>
       <div className="flex-1 overflow-auto px-3 pb-3 flex flex-col gap-4">
-        {!drafts.length && <p className="text-[13px] text-ink-faint">{t('Правок на проверку нет')}</p>}
+        {!drafts.length && <p className="text-sm text-ink-faint">{t('Правок на проверку нет')}</p>}
         {drafts.map((d) => (
           <section key={d.id} className="flex flex-col gap-1.5">
             <div className="flex items-baseline justify-between text-xs text-ink-soft"><b className="font-medium text-ink">{d.tokenName}</b><span>{d.ops.length} {t('правок')}</span></div>
             {d.error && <p className="text-xs text-destructive flex gap-1"><AlertTriangle size={13} className="flex-none mt-px" /> {d.error}</p>}
             <div className="flex flex-col rounded-lg border border-border divide-y divide-border max-h-[50vh] overflow-auto bg-white/60">
               {d.ops.map((o, i) => (
-                <div key={i} className="group flex gap-2 px-2 py-1.5 text-[13px]">
+                <div key={i} className="group flex gap-2 px-2 py-1.5 text-sm">
                   <div className="min-w-0 flex-1">
                     <div className="leading-snug break-words">{o.text}</div>
-                    {o.details?.map((line, j) => <div key={j} className="text-[11px] text-ink-soft break-words">{line}</div>)}
+                    {o.details?.map((line, j) => <div key={j} className="text-xs text-ink-soft break-words">{line}</div>)}
                   </div>
                   <button title={t('Удалить')} disabled={busy} className="hidden group-hover:block text-ink-faint hover:text-destructive flex-none self-start" onClick={() => act(() => api(`proposals/${d.id}/ops/${i}`, { method: 'DELETE' }))}><X size={13} /></button>
                 </div>
@@ -92,8 +87,8 @@ function ProviderSettings() {
   return (
     <div className="my-1 flex flex-col gap-2">
       {data.connected ? (
-        <p className="text-xs text-ink-soft">{data.label}: {data.model}{data.keyEnding ? `, ${t('ключ')} …${data.keyEnding}` : ''}{data.source === 'server' ? `. ${t('Ключ задан на сервере')}` : ''}</p>
-      ) : <p className="text-xs text-destructive">{t('Ключ провайдера не задан: ассистент не может отвечать')}</p>}
+        <p className="text-xs text-ink-soft">{t('Сервис')}: {data.label}{data.keyEnding ? `, ${t('ключ')} …${data.keyEnding}` : ''}{data.source === 'server' ? `. ${t('Ключ уже настроен')}` : ''}</p>
+      ) : <p className="text-xs text-destructive">{t('Ключ не задан: ассистент не может отвечать')}</p>}
       {data.source === 'app' && !changing && <ModelSelect key={data.provider} presetId={data.provider as PresetId} value={data.model ?? ''} onChange={changeModel} />}
       {modelError && <p role="alert" className="text-xs text-destructive">{modelError}</p>}
       {data.source !== 'server' && (changing || !data.connected ? <ProviderForm onDone={() => setChanging(false)} /> : (
@@ -121,11 +116,11 @@ export function AssistantSettings() {
     <label className="flex items-center gap-2 min-h-7"><input type="checkbox" className="accent-[var(--ink)] size-4" disabled={off} checked={data[key]} onChange={(e) => set(key, e.target.checked)} /> {t(label)}</label>
   )
   return (
-    <section className="flex flex-col gap-2 text-[13px]">
+    <section className="flex flex-col gap-2 text-sm">
       <p className="text-xs text-ink-soft">{t('Чат внутри приложения: отвечает на вопросы о семье и вносит правки с вашего подтверждения.')}</p>
       <ProviderSettings />
       {row('assistantEnabled', 'Включить ассистента')}
-      {row('assistantForReaders', 'Разрешить читателям', !data.assistantEnabled)}
+      {row('assistantForReaders', 'Разрешить читателям пользоваться ассистентом', !data.assistantEnabled)}
     </section>
   )
 }
@@ -150,8 +145,8 @@ export function TokensTab() {
       : t('Подключись к семейному архиву по MCP. Сначала вызови get_overview, затем find_gaps. Прежде чем создавать человека, ищи его через search_people. Каждое найденное значение записывай через add_version с источником и его достоверностью, а не перезаписывай поля.')
   const fmt = new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short' })
   return (
-    <div className="flex flex-col gap-4 text-[13px]">
-      <p className="text-xs text-ink-soft">{t('Для Claude Code, Cursor и других программ со своей моделью: они подключаются к архиву по токену. Обычному пользователю это не нужно.')}</p>
+    <div className="flex flex-col gap-4 text-sm">
+      <p className="text-xs text-ink-soft">{t('Подключение других программ к архиву. Обычно это не нужно.')}</p>
       <form className="flex flex-col gap-2" onSubmit={async (e) => {
         e.preventDefault()
         if (!name.trim()) return
@@ -161,26 +156,32 @@ export function TokensTab() {
         setName('')
         refresh()
       }}>
-        <div className="flex gap-2 flex-wrap">
-          <input className="h-9 flex-1 min-w-32 rounded-lg border border-input bg-white px-3" placeholder={t('Название токена')} value={name} onChange={(e) => setName(e.target.value)} />
-          <select className="h-9 rounded-lg border border-input bg-white px-2" value={role} onChange={(e) => setRole(e.target.value as 'reader' | 'editor')}>
-            <option value="reader">{t('только чтение')}</option>
-            <option value="editor">{t('редактор')}</option>
-          </select>
-          <select aria-label={t('Срок действия')} className="h-9 rounded-lg border border-input bg-white px-2" value={days} onChange={(e) => setDays(e.target.value)}>
-            <option value="">{t('бессрочно')}</option>
-            <option value="1">{t('на день')}</option>
-            <option value="30">{t('на месяц')}</option>
-            <option value="365">{t('на год')}</option>
-          </select>
-          <button className="h-9 px-3 rounded-lg bg-ink text-white whitespace-nowrap disabled:opacity-40" disabled={!name.trim()}>{t('Создать токен')}</button>
+                <div className="grid grid-cols-3 gap-2 max-sm:grid-cols-1">
+          <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Название ключа')}
+            <input className="h-9 min-w-0 rounded-lg border border-input bg-white px-3 text-sm text-ink" value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Что сможет делать')}
+            <select className="h-9 rounded-lg border border-input bg-white px-2 text-sm text-ink" value={role} onChange={(e) => setRole(e.target.value as 'reader' | 'editor')}>
+              <option value="reader">{t('читатель')}</option>
+              <option value="editor">{t('редактор')}</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Срок действия')}
+            <select className="h-9 rounded-lg border border-input bg-white px-2 text-sm text-ink" value={days} onChange={(e) => setDays(e.target.value)}>
+              <option value="">{t('бессрочно')}</option>
+              <option value="1">{t('на день')}</option>
+              <option value="30">{t('на месяц')}</option>
+              <option value="365">{t('на год')}</option>
+            </select>
+          </label>
         </div>
+        <button className="h-9 self-start px-3 rounded-lg bg-ink text-white whitespace-nowrap disabled:opacity-40" disabled={!name.trim()}>{t('Создать ключ доступа')}</button>
         {role === 'editor' && <label className="flex items-center gap-2 text-ink-soft"><input type="checkbox" checked={review} onChange={(e) => setReview(e.target.checked)} /> {t('Правки через проверку')}</label>}
-        <p className="text-xs text-ink-soft">{t(role === 'editor' ? 'Токен редактора видит живых родственников, и эти данные уйдут к поставщику нейросети.' : 'Токен только для чтения не видит живых родственников.')}</p>
+        <p className="text-xs text-ink-soft">{t(role === 'editor' ? 'Ключ редактора видит живых родственников, и эти данные уйдут к поставщику нейросети.' : 'Ключ только для чтения не видит живых родственников.')}</p>
       </form>
       {made && (
         <div className="rounded-lg bg-muted p-2 flex flex-col gap-1.5">
-          <p className="text-xs text-ink-soft">{t('Токен показан один раз, сохраните его.')}</p>
+          <p className="text-xs text-ink-soft">{t('Ключ показан один раз, сохраните его.')}</p>
           <div role="radiogroup" aria-label={t('Куда подключить')} className="inline-flex self-start rounded-lg bg-background p-0.5 gap-0.5 text-xs">
             {(Object.keys(CLIENTS) as Client[]).map((c) => <button key={c} type="button" role="radio" aria-checked={client === c} className={client === c ? 'h-7 px-2 rounded-md bg-white shadow-sm font-medium' : 'h-7 px-2 rounded-md text-ink-soft hover:text-ink'} onClick={() => { setClient(c); setCopied(false) }}>{t(CLIENTS[c])}</button>)}
           </div>
@@ -193,15 +194,15 @@ export function TokensTab() {
           <div key={r.id} className="flex items-center gap-2 py-1">
             <span className="truncate flex-1">{r.name}</span>
             <span className="text-xs text-ink-faint whitespace-nowrap">
-              {t(r.role === 'reader' ? 'только чтение' : r.review ? 'Правки через проверку' : 'Правит сразу')}
+              {t(r.role === 'reader' ? 'читатель' : r.review ? 'Правки через проверку' : 'Правит сразу')}
               {r.lastUsedAt ? ` · ${t('последнее использование')} ${fmt.format(r.lastUsedAt)}` : ''}
               {r.expiresAt ? ` · ${t(r.expiresAt < Date.now() ? 'истёк' : 'действует до')} ${fmt.format(r.expiresAt)}` : ''}
             </span>
-            {r.revokedAt ? <span className="text-xs text-ink-faint">{t('Отозван')}</span> : <button className="text-xs text-ink-soft hover:text-destructive" onClick={async () => { await api(`tokens/${r.id}`, { method: 'DELETE' }); refresh() }}>{t('Отозвать')}</button>}
+            {r.revokedAt ? <span className="text-xs text-ink-faint">{t('Отозван')}</span> : <button className="text-xs text-ink-soft hover:text-destructive" onClick={async () => { await api(`tokens/${r.id}`, { method: 'DELETE' }); refresh() }}>{t('Отменить')}</button>}
           </div>
         ))}
       </section>
-      <p className="text-xs text-ink-faint">REST: <a className="underline" href="/api/v1/openapi.json" target="_blank">/api/v1/openapi.json</a></p>
+      <p className="text-xs"><a className="underline" href="/api/v1/openapi.json" target="_blank">{t('Описание для разработчиков')}</a></p>
     </div>
   )
 }
@@ -288,7 +289,7 @@ export function TextDialog({ open, onOpenChange }: { open: boolean; onOpenChange
           <textarea value={text} readOnly={!canEdit} spellCheck={false} onChange={(e) => setText(e.target.value)} className="min-h-0 h-full resize-none rounded-lg border border-input bg-white p-3 font-mono text-xs leading-5 outline-none focus:ring-2 focus:ring-ring/40 whitespace-pre" />
           <div className="min-h-0 flex flex-col gap-2">
             <div className="flex-1 min-h-0 rounded-lg bg-paper border border-border overflow-hidden"><MiniGraph text={text} /></div>
-            <div className="text-[13px] flex flex-col gap-1 max-h-[40%] overflow-auto">
+            <div className="text-sm flex flex-col gap-1 max-h-[40%] overflow-auto">
               <PlanSummary plan={plan} choices={choices} onChoose={setChoices} />
             </div>
           </div>

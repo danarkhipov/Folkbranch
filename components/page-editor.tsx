@@ -208,7 +208,7 @@ function Editor({ page, personId, onChanged }: { page: Page; personId: string; o
           <button className="pick rounded-full border border-border px-2.5 h-7 text-ink-soft hover:text-ink" onClick={toggleUnverified}>⚠ {t('Не проверено')}</button>
           <Popover open={picking} onOpenChange={setPicking}>
             <PopoverTrigger asChild><button className="pick rounded-full border border-border px-2.5 h-7 text-ink-soft hover:text-ink">🔗 {t('Источник')}</button></PopoverTrigger>
-            <PopoverContent align="start" className="w-64 p-2 text-[13px] flex flex-col gap-1" onOpenAutoFocus={(e) => e.preventDefault()} onCloseAutoFocus={(e) => e.preventDefault()}>
+            <PopoverContent align="start" className="w-64 p-2 text-sm flex flex-col gap-1" onOpenAutoFocus={(e) => e.preventDefault()} onCloseAutoFocus={(e) => e.preventDefault()}>
               {sources.filter((s) => s.id).map((s) => <button key={s.id} className="text-left rounded px-2 py-1.5 hover:bg-muted truncate" onMouseDown={(e) => e.preventDefault()} onClick={() => cite(s.id!, s.title || t('Без названия'))}>{s.title || t('Без названия')}</button>)}
               {!sources.some((s) => s.id) && <p className="px-2 py-1 text-xs text-ink-faint">{t('У этого человека пока нет источников')}</p>}
               <form className="flex gap-1 pt-1 border-t border-border" onSubmit={(e) => { e.preventDefault(); createSource() }}>

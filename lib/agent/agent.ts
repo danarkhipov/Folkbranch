@@ -40,8 +40,8 @@ const SELF_CHECK = `After any change, compare what the tool answered with what t
 const FILES = `Files are attached, each with its id. Pictures and PDFs you can see; read_attachment gets the rest of a long text. To keep a file call save_attachment with personId, and to make a picture an avatar pass its answer's id to set_avatar. When the person says who is in a picture, believe them. A GEDCOM file goes in with import_gedcom_attachment, other tables and notes with import_text.`
 
 /** Fixed per archive: living relatives stay away from the model unless the owner decided otherwise. */
-export function assistantActor(actor: Actor): Actor {
-  return { ...actor, name: `${say('Ассистент')} → ${actor.name}`, assistant: true }
+export function assistantActor(actor: Actor, since?: number): Actor {
+  return { ...actor, name: `${say('Ассистент')} → ${actor.name}`, assistant: true, since }
 }
 
 export const externalLinks = (input: unknown) => [...new Set(JSON.stringify(input ?? '').match(/https?:\/\/[^\s"')\\]+/gi) ?? [])]
@@ -155,8 +155,8 @@ export function approvalFor(risk: ToolDef['risk'] | undefined, trustWrites: bool
   return 'user-approval' as const
 }
 
-export function buildAgent(person: Actor, opts: { model?: LanguageModel; trustWrites?: boolean; focusId?: string | null; hasFiles?: boolean } = {}) {
-  const actor = assistantActor(person)
+export function buildAgent(person: Actor, opts: { model?: LanguageModel; trustWrites?: boolean; focusId?: string | null; hasFiles?: boolean; since?: number } = {}) {
+  const actor = assistantActor(person, opts.since)
   const provider = opts.model ? null : currentProvider()
   if (!opts.model && !provider) throw new OpError(503, 'no AI provider is set up')
   const defs = new Map(toolsFor(actor, 'assistant').map((d) => [d.name, d]))

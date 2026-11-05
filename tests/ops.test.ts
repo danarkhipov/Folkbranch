@@ -1,6 +1,3 @@
-import fs from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import sharp from 'sharp'
 import type { Actor } from '../lib/ops/core'
