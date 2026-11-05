@@ -64,6 +64,13 @@
       "when": 1793869607998,
       "tag": "0008_lazy_speedball",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1793870612100,
+      "tag": "0009_yielding_green_goblin",
+      "breakpoints": true
     }
   ]
 }

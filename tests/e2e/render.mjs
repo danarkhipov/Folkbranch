@@ -40,6 +40,18 @@ if (v) {
 await run('zoomOutFull', async () => { await page.mouse.move(C.x, C.y); for (let i = 0; i < 30; i++) { await page.mouse.wheel(0, 200); await page.waitForTimeout(16) } await page.waitForTimeout(300) })
 out.farOut = await snap()
 await run('panFar', async () => { await page.mouse.move(C.x, C.y); await page.mouse.down(); for (let i = 0; i < 60; i++) { await page.mouse.move(C.x + i * 4, C.y + i); await page.waitForTimeout(16) } await page.mouse.up() })
+// The whole family on paper, in both modes: the largest thing the browser is asked to make.
+for (const [name, mode] of [['printOne', 'На одном листе'], ['printSheets', 'Склеить из листов']]) {
+  await page.getByRole('button', { name: 'Печать схемы' }).click()
+  await page.getByRole('dialog').waitFor()
+  await page.getByText(mode).click()
+  const t = Date.now()
+  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 180000 }), page.getByRole('button', { name: 'Скачать PDF' }).click()])
+  const f = await dl.path()
+  out[name] = { ms: Date.now() - t, MB: +(fs.statSync(f).size / 1e6).toFixed(1) }
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+}
 out.errs = errs
 for (const [k, val] of Object.entries(out)) console.log(k, JSON.stringify(val))
 await br.close()

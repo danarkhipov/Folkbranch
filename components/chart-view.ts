@@ -58,7 +58,7 @@ export function useChartView(layout: Layout, panelOpen: boolean, leftInset: numb
     const z = d3zoom<HTMLDivElement, unknown>()
       .scaleExtent([0.12, 2.4])
       .clickDistance(4)
-      .filter((e) => e.type === 'wheel' || (!e.button && !e.target.closest?.('.tools, .link-start, .linkbar')))
+      .filter((e) => e.type === 'wheel' || (!e.button && !e.target.closest?.('.tools, .link-start, .linkbar') && !(e.type === 'mousedown' && e.target.closest?.('.movable'))))
       .on('zoom', (e) => {
         if (e.sourceEvent) {
           world.current?.classList.remove('animate')
@@ -180,5 +180,5 @@ export function useChartView(layout: Layout, panelOpen: boolean, leftInset: numb
     moved.current = false
     fit()
   }
-  return { canvas, world, clipped, shown, center, zoomBy, refit, toChart, isFar: () => !!world.current?.classList.contains('far') }
+  return { canvas, world, clipped, shown, center, zoomBy, refit, toChart, zoom: () => transform.current.k, isFar: () => !!world.current?.classList.contains('far') }
 }

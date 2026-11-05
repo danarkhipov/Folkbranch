@@ -206,3 +206,17 @@ export const proposals = sqliteTable('proposals', {
   resolvedBy: text('resolved_by'),
   historyId: text('history_id'),
 }, (t) => [index('proposals_status').on(t.status)])
+
+// Which part of the family to show and how. Nothing here is a fact about the family, so it is not in the history.
+// The row with the id `main` holds hand placements for the chart with nothing filtered.
+export const views = sqliteTable('views', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull().default(''),
+  scope: text('scope').notNull().default('all'),
+  focusId: text('focus_id'),
+  collapsed: text('collapsed').notNull().default('[]'),
+  pins: text('pins').notNull().default('{}'),
+  createdBy: text('created_by').notNull().default(''),
+  updatedAt: integer('updated_at').notNull().default(0),
+})
+

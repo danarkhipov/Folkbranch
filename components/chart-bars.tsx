@@ -1,12 +1,14 @@
 'use client'
 import { useEffect, useState, type RefObject } from 'react'
-import { ArrowUpDown, CircleHelp, Clock, Minus, Plus, Search, Settings, Tags, Users } from 'lucide-react'
+import { ArrowUpDown, CircleHelp, Clock, Minus, Plus, Printer, Search, Settings, Tags, Users } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useApp } from '@/lib/client'
 import type { Present } from '@/lib/use-live'
 import { cn } from '@/lib/utils'
 import { AssistantIcon } from './assistant-icon'
 import type { CanvasHandle } from './graph-canvas'
+import type { ChartScope } from './chart-scope'
+import { ViewMenu } from './chart-view-menu'
 import { Legend } from './graph-parts'
 
 export type Side = 'related' | 'history' | 'review' | 'assistant' | null
@@ -30,13 +32,14 @@ export function MainBar({ familyName, present, mode, navRef, side, draftOps, onS
 }
 
 /** Only about how the chart looks; it steps aside for a panel on the left. */
-export function ViewBar({ canvas, rootsBelow, onFlip, groups, onGroups, allGroups, left, crowded }: { canvas: RefObject<CanvasHandle | null>; rootsBelow: boolean; onFlip: () => void; groups: string[]; onGroups: (next: string[]) => void; allGroups: [string, number][]; left: number; crowded: boolean }) {
+export function ViewBar({ onPrint, scope, canvas, rootsBelow, onFlip, groups, onGroups, allGroups, left, crowded }: { onPrint: () => void; scope: ChartScope; canvas: RefObject<CanvasHandle | null>; rootsBelow: boolean; onFlip: () => void; groups: string[]; onGroups: (next: string[]) => void; allGroups: [string, number][]; left: number; crowded: boolean }) {
   const { t } = useApp()
   return (
       <div aria-label={t('Вид схемы')} role="group" className={cn('float view-bar fixed bottom-3 z-10 flex items-center gap-0.5 p-1', crowded && 'crowded')} style={{ left }}>
         <button className="bar-btn" title={t('Отдалить')} aria-label={t('Отдалить')} onClick={() => canvas.current?.zoomBy(0.75)}><Minus size={15} /></button>
         <button className="bar-btn" title={t('Приблизить')} aria-label={t('Приблизить')} onClick={() => canvas.current?.zoomBy(1.33)}><Plus size={15} /></button>
         <button className="bar-btn" title={t(rootsBelow ? 'Сейчас старшие снизу. Показать старших сверху' : 'Сейчас старшие сверху. Показать старших снизу')} aria-label={t('Перевернуть схему')} onClick={onFlip}><ArrowUpDown size={15} /></button>
+        <ViewMenu scope={scope} />
         {allGroups.length > 0 && (
           <Popover>
             <PopoverTrigger asChild><button className={groups.length ? 'bar-btn on' : 'bar-btn'} title={t('Группы')} aria-label={t('Группы')}><Tags size={15} />{groups.length > 0 && ` ${groups.length}`}</button></PopoverTrigger>
@@ -52,6 +55,7 @@ export function ViewBar({ canvas, rootsBelow, onFlip, groups, onGroups, allGroup
             </PopoverContent>
           </Popover>
         )}
+        <button className="bar-btn" title={t('Печать схемы')} aria-label={t('Печать схемы')} onClick={onPrint}><Printer size={15} /></button>
         <Popover>
           <PopoverTrigger asChild><button className="bar-btn" title={t('Как читать схему')} aria-label={t('Как читать схему')}><CircleHelp size={15} /></button></PopoverTrigger>
           <PopoverContent side="top" align="start" className="w-80 text-sm"><Legend /></PopoverContent>

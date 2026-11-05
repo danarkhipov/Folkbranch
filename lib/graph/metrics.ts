@@ -29,8 +29,16 @@ function wrappedLines(text: string, width: number) {
   }
   return lines
 }
+/** On paper the captions stay at one size, carry no relation label, and may be narrower: the same family takes less room. */
+export const PRINT_PITCH = 128
+export const PRINT_GAP = 8
+const PRINT_NAME_CHARS = 13
+const PRINT_NAME_LINE = 19
+const PRINT_YEAR_LINE = 18
+
 /** How tall a card's caption gets: names and long dates wrap, and a relation label may sit under the years. */
-export function cardHeight(p: Person | undefined) {
+export function cardHeight(p: Person | undefined, print = false) {
+  if (print) return AVATAR_CY + AVATAR_R + 13 + wrappedLines(p ? `${p.givenName ?? ''} ${p.surname ?? ''}` : '', PRINT_NAME_CHARS) * PRINT_NAME_LINE + wrappedLines(p ? lifeYears(p) : '', PRINT_NAME_CHARS) * PRINT_YEAR_LINE
   const years = p ? lifeYears(p) : ''
   return AVATAR_CY + AVATAR_R + 13 + wrappedLines(p ? `${p.givenName ?? ''} ${p.surname ?? ''}` : '', NAME_CHARS) * TEXT_LINE + wrappedLines(years, YEAR_CHARS) * YEAR_LINE + LABEL_LINE
 }

@@ -5,7 +5,7 @@
 // to cross least, and `tracks.ts` the heights of the bars; both are named after the methods they use.
 import dagre from '@dagrejs/dagre'
 import type { Graph, ParentLink, Person, Union } from '../types'
-import { AVATAR_CY, AVATAR_R, CARD_H, CARD_W, cardHeight, PITCH, UNDER_CAPTION } from './metrics'
+import { AVATAR_CY, AVATAR_R, CARD_H, CARD_W, cardHeight, PITCH, PRINT_GAP, PRINT_PITCH, UNDER_CAPTION } from './metrics'
 import { orderRows, type OrderEdge, type OrderNode } from './order'
 import { assignTracks, type Net } from './tracks'
 import { boxOf, type Box } from './visible'
@@ -16,6 +16,8 @@ const NODE_SEP = 22
 /** A line passing through a row takes this little room, and stays clear of captions on both sides. */
 const PASS_W = 12
 const LANE = 10
+/** A card placed by hand stays put: everyone else in its row gives way. */
+const PIN_WEIGHT = 1e6
 /** Between a bar and the rows above and below it. */
 const GAP_EDGE = 26
 const CORNER = 8
@@ -92,12 +94,12 @@ function chainOrder(ids: string[], adjacency: Map<string, string[]>) {
  * The closest positions to `want` that keep the blocks in order and apart: pool adjacent
  * violators. It treats everyone fairly, unlike pushing blocks along in one direction.
  */
-function placeInOrder(blocks: Block[], want: number[]) {
+function placeInOrder(blocks: Block[], want: number[], gap: number, weight: (b: Block) => number = () => 1) {
   const pools: { sum: number; n: number; offset: number[] }[] = []
   let shift = 0
   blocks.forEach((b, i) => {
-    shift += i ? blocks[i - 1].width / 2 + NODE_SEP + b.width / 2 : 0
-    pools.push({ sum: want[i] - shift, n: 1, offset: [shift] })
+    shift += i ? blocks[i - 1].width / 2 + gap + b.width / 2 : 0
+    pools.push({ sum: (want[i] - shift) * weight(b), n: weight(b), offset: [shift] })
     while (pools.length > 1 && pools.at(-2)!.sum / pools.at(-2)!.n > pools.at(-1)!.sum / pools.at(-1)!.n) {
       const top = pools.pop()!
       const under = pools.at(-1)!
@@ -201,7 +203,7 @@ function arrangeRows(g: Graph, members: Map<string, Set<string>>, blockOf: Map<s
 }
 
 /** `rootsBelow` draws the tree as it grows: elders at the bottom, the youngest at the top. */
-export function layoutFamily(g: Graph, { rootsBelow = false }: { rootsBelow?: boolean } = {}): Layout {
+export function layoutFamily(g: Graph, { rootsBelow = false, pins = {}, print = false }: { rootsBelow?: boolean; /** Where people were placed by hand: person id to x. */ pins?: Record<string, number>; /** Tighter, for paper. */ print?: boolean } = {}): Layout {
   if (!g.persons.length) return { cards: new Map(), unions: [], edges: [], bounds: { x: 0, y: 0, w: 0, h: 0 } }
   const { members, blockOf, adjacency, parentsOf } = buildBlocks(g)
   const byId = new Map(g.persons.map((p) => [p.id, p]))
@@ -218,8 +220,10 @@ export function layoutFamily(g: Graph, { rootsBelow = false }: { rootsBelow?: bo
     byFamily.set(key, fam)
   }
 
+  const pitch = print ? PRINT_PITCH : PITCH
+  const gap = print ? PRINT_GAP : NODE_SEP
   const arranged = arrangeRows(g, members, blockOf, adjacency, parentsOf, byFamily, byId)
-  const rows: Block[][] = arranged.rows.map((row) => row.map((b) => ({ ...b })))
+  const rows: Block[][] = arranged.rows.map((row) => row.map((b) => ({ ...b, width: b.key.startsWith('pass:') ? PASS_W : b.slots.length * pitch })))
 
   /** Where each person, or passing line, stands relative to the centre of its block. */
   const offsetOf = new Map<string, number>()
@@ -234,6 +238,9 @@ export function layoutFamily(g: Graph, { rootsBelow = false }: { rootsBelow?: bo
   const leaving = new Map<string, OrderEdge[]>()
   for (const e of arranged.edges) for (const k of new Set(e.up.map((s) => blockFor.get(s)!.key))) leaving.set(k, [...(leaving.get(k) ?? []), e])
 
+  /** Where each block must stand because someone in it was placed by hand. */
+  const pinned = new Map<Block, number>()
+
   // Alternate up and down so parents settle above the middle of their children.
   const settle = (row: Block[], up: boolean) => {
     const want = row.map((b) => {
@@ -243,14 +250,28 @@ export function layoutFamily(g: Graph, { rootsBelow = false }: { rootsBelow?: bo
       } else {
         for (const e of entering.get(b.key) ?? []) targets.push(edgeTop(e) - offsetOf.get(e.down)!)
       }
-      return targets.length ? mean(targets) : b.x
+      return pinned.get(b) ?? (targets.length ? mean(targets) : b.x)
     })
-    placeInOrder(row, want)
+    placeInOrder(row, want, gap, (b) => (pinned.has(b) ? PIN_WEIGHT : 1))
   }
   for (const row of rows) settle(row, false)
   for (let i = 0; i < 6; i++) {
     for (let r = rows.length - 2; r >= 0; r--) settle(rows[r], true)
     for (let r = 1; r < rows.length; r++) settle(rows[r], false)
+  }
+  // First where everyone would stand by themselves, so that a card dragged past its neighbours can be seen to be
+  // on their other side. Then everyone else adjusts around it.
+  for (const [id, x] of Object.entries(pins)) {
+    const b = byId.has(id) ? blockFor.get(id) : undefined
+    if (b && !pinned.has(b)) pinned.set(b, x - offsetOf.get(id)!)
+  }
+  if (pinned.size) {
+    for (const row of rows) if (row.some((b) => pinned.has(b))) row.sort((p, q) => (pinned.get(p) ?? p.x) - (pinned.get(q) ?? q.x))
+    for (const row of rows) settle(row, false)
+    for (let i = 0; i < 3; i++) {
+      for (let r = rows.length - 2; r >= 0; r--) settle(rows[r], true)
+      for (let r = 1; r < rows.length; r++) settle(rows[r], false)
+    }
   }
 
   /** The rows as they stand on the page, top first. */
@@ -260,7 +281,7 @@ export function layoutFamily(g: Graph, { rootsBelow = false }: { rootsBelow?: bo
   /** The gap on the parents' side of a row, as the page's rows it lies between: gap v is under page row v. */
   const gapBefore = (rank: number) => (rootsBelow ? visual(rank) : visual(rank) - 1)
 
-  const heightOf = (id: string) => Math.max(CARD_H, cardHeight(byId.get(id)))
+  const heightOf = (id: string) => Math.max(CARD_H, cardHeight(byId.get(id), print))
   const rowHeight: number[] = []
   for (const row of rows) rowHeight[visual(row[0]?.rank ?? 0)] = Math.max(CARD_H, ...row.flatMap((b) => b.slots.filter((s) => byId.has(s)).map(heightOf)))
 
@@ -269,7 +290,7 @@ export function layoutFamily(g: Graph, { rootsBelow = false }: { rootsBelow?: bo
     const row = rows[rank] ?? []
     const blocked = (c: number) => row.some((b) => c > b.x - b.width / 2 - 8 && c < b.x + b.width / 2 + 8)
     if (!blocked(x)) return x
-    const options = row.flatMap((b) => [b.x - b.width / 2 - NODE_SEP / 2, b.x + b.width / 2 + NODE_SEP / 2]).filter((c) => !blocked(c) && c > lo && c < hi)
+    const options = row.flatMap((b) => [b.x - b.width / 2 - gap / 2, b.x + b.width / 2 + gap / 2]).filter((c) => !blocked(c) && c > lo && c < hi)
     return options.length ? options.reduce((a, c) => (Math.abs(c - x) < Math.abs(a - x) ? c : a)) : x
   }
 
@@ -288,13 +309,13 @@ export function layoutFamily(g: Graph, { rootsBelow = false }: { rootsBelow?: bo
     const lx = xOf(l), rx = xOf(r)
     const base = { u, a: u.aId, b: u.bId, l, r }
     if (rankOfPerson(l) === rankOfPerson(r)) {
-      if (rx - lx <= PITCH + 1) return [{ ...base, kind: 'side', x: (lx + rx) / 2 }]
+      if (rx - lx <= pitch + 1) return [{ ...base, kind: 'side', x: (lx + rx) / 2 }]
       return [{ ...base, kind: 'over', x: corridor(rankOfPerson(l)!, (lx + rx) / 2, lx, rx) }]
     }
     // Across generations: leave sideways, go along a gap, come in from the side.
     const [hi, lo] = visual(rankOfPerson(l)!) < visual(rankOfPerson(r)!) ? [l, r] : [r, l]
     const dir = xOf(lo) >= xOf(hi) ? 1 : -1
-    const x = xOf(hi) + dir * (PITCH / 2)
+    const x = xOf(hi) + dir * (pitch / 2)
     const side = xOf(lo) - dir * edge
     const gap = visual(rankOfPerson(hi)!)
     return [{ ...base, kind: 'across', x, hi, lo, dir, side, gap, net: addNet(gap, [x], [side]) }]
