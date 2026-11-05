@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { setFocus } from '@/lib/live'
 import { OpError } from '@/lib/ops/core'
 import * as media from '@/lib/ops/media'
+import { dismissDuplicate, duplicateCandidates, mergePeople, previewMerge } from '@/lib/ops/merge-people'
 import * as pages from '@/lib/ops/pages'
 import * as people from '@/lib/ops/people'
 import * as settings from '@/lib/ops/settings'
@@ -27,6 +28,11 @@ export const familyRoutes: Route[] = [
     setFocus(actor.userId, b.client, b.focusId)
     return { ok: true }
   }),
+
+  human('GET', 'duplicates', 'People who may be the same person', ({ actor }) => duplicateCandidates(actor)),
+  human('POST', 'duplicates/dismiss', 'These are two different people', async ({ actor, body }) => { const b = z.object({ a: z.string(), b: z.string() }).parse(await body()); dismissDuplicate(actor, b.a, b.b) }),
+  human('GET', 'merge/preview', 'What merging two cards would do', ({ actor, query }) => previewMerge(actor, query.get('keep') ?? '', query.get('drop') ?? '')),
+  human('POST', 'merge', 'Merge two cards into one', async ({ actor, body }) => mergePeople(actor, await body())),
 
   op('POST', 'persons', 'create_person'),
   op('PATCH', 'persons/:id', 'update_person', ({ params }, { seen, ...patch }) => ({ id: params.id, patch, seen })),

@@ -4,7 +4,7 @@ const PORT = 3499, O = `http://127.0.0.1:${PORT}`
 const q = (c) => { try { return sh(c, { stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim() } catch (e) { return 'ERR ' + e.stderr } }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const ok = (n, c, x = '') => console.log(`${c ? 'PASS' : 'FAIL'}  ${n}${x ? '  ' + x : ''}`)
-q('docker rm -f fgb'); q(`docker run -d --name fgb -p 127.0.0.1:${PORT}:3000 -e BETTER_AUTH_URL=${O} -e BETTER_AUTH_SECRET=${'c'.repeat(64)} ${process.env.FG_IMAGE ?? 'folkbranch:check'}`)
+q('docker rm -fv fgb'); q(`docker run -d --name fgb -p 127.0.0.1:${PORT}:3000 -e BETTER_AUTH_URL=${O} -e BETTER_AUTH_SECRET=${'c'.repeat(64)} ${process.env.FG_IMAGE ?? 'folkbranch:check'}`)
 for (let i = 0; i < 60; i++) { try { if ((await fetch(O + '/api/health')).ok) break } catch {} await sleep(500) }
 await sleep(1000); const code = q('docker logs fgb').match(/setup\?code=(\S+)/)[1]
 const br = await chromium.launch({ channel: 'chrome', headless: true })
@@ -32,7 +32,7 @@ ok('conflict: told plainly', notice.includes('только что изменил
 ok('conflict: shows the value that stands', (await B.locator('#f-death-place').inputValue()) === 'Москва', await B.locator('#f-death-place').inputValue())
 const server = await A.evaluate(async () => { const g = await (await fetch('/api/v1/graph')).json(); return g.persons.find((p) => p.givenName === 'Иван') })
 ok('conflict: first edit kept on the server', server.deathPlace === 'Москва')
-const addFact = (p, kind) => p.locator('aside.panel select[aria-label="Добавить факт"]').selectOption(kind)
+const addFact = async (p, kind) => { await p.locator('aside.panel').getByRole('button', { name: 'Добавить факт' }).click(); await p.locator('[data-slot=popover-content]').getByRole('button', { name: kind, exact: true }).click() }
 await Promise.all([addFact(A, 'Служба'), addFact(B, 'Награда')]); await sleep(1800)
 const facts = (await A.evaluate(async () => (await (await fetch('/api/v1/graph')).json()).persons.find((p) => p.givenName === 'Иван').facts)).map((f) => f.kind)
 ok('lists: two facts added at once both survive', facts.includes('Служба') && facts.includes('Награда'), facts.join(','))
@@ -65,4 +65,4 @@ await sleep(1500); const after = q(`docker stats fgb --no-stream --format '{{.Me
 ok('30 MB upload: server survives under the ceiling', up && big < 500, `status ${big}, ${before}→${after}`)
 ok('no page or server errors in any browser', errs.length === 0, errs.slice(0, 4).join(' | '))
 console.log('table sizes:', q(`docker exec fgb node -e "const D=require('better-sqlite3');const d=new D('/data/family.db',{readonly:true});try{console.log(JSON.stringify(d.prepare('select name,sum(pgsize) s from dbstat group by name order by s desc limit 6').all()))}catch(e){console.log(e.message)}"`).slice(0, 300))
-await br.close(); q('docker rm -f fgb')
+await br.close(); q('docker rm -fv fgb')

@@ -12,7 +12,9 @@ import '@blocknote/mantine/style.css'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { api, useApp } from '@/lib/client'
 import { autosave, clearDraft, loadDraft, type SaveStatus } from '@/lib/autosave'
+import { decorateBlocks } from '@/lib/linkify'
 import { personName, type Media, type Page } from '@/lib/types'
+import { GrowText, ReadText } from './person-fields'
 
 const Mention = createReactInlineContentSpec(
   { type: 'mention', propSchema: { personId: { default: '' }, label: { default: '' } }, content: 'none' } as const,
@@ -70,7 +72,7 @@ function Editor({ page, personId, onChanged }: { page: Page; personId: string; o
   const [status, setStatus] = useState<SaveStatus>('')
   const initial = useMemo(() => {
     const blocks = (draft?.content as unknown[] | undefined) ?? JSON.parse(page.content)
-    return blocks.length ? blocks : undefined
+    return blocks.length ? (decorateBlocks(blocks) as never) : undefined
   }, [page.content, draft])
 
   const editor = useCreateBlockNote({
@@ -132,6 +134,9 @@ function Editor({ page, personId, onChanged }: { page: Page; personId: string; o
   const sources = person?.sources ?? []
   const [picking, setPicking] = useState(false)
   const [newSource, setNewSource] = useState('')
+  // The marks are for someone writing; someone reading gets the text alone.
+  const [writing, setWriting] = useState(false)
+  const [marked, setMarked] = useState(false)
 
   // Without focus the editor answers with its first block, so the paragraph is remembered here.
   const lastBlock = useRef<string | null>(null)
@@ -148,6 +153,7 @@ function Editor({ page, personId, onChanged }: { page: Page; personId: string; o
     const content = block.content as { type: string }[]
     const next = content.some((c) => c.type === 'unverified') ? content.filter((c) => c.type !== 'unverified') : [...content, { type: 'text', text: ' ', styles: {} }, { type: 'unverified', props: {} }]
     editor.updateBlock(block, { content: next } as never)
+    setMarked(!content.some((c) => c.type === 'unverified'))
   }
   const cite = (sourceId: string, label: string) => {
     const block = currentBlock()
@@ -172,6 +178,9 @@ function Editor({ page, personId, onChanged }: { page: Page; personId: string; o
 
   return (
     <div
+      className={canEdit ? '' : 'page-read'}
+      onFocusCapture={() => setWriting(true)}
+      onBlurCapture={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setWriting(false) }}
       onClick={(e) => {
         const el = e.target as HTMLElement
         const mention = el.closest<HTMLElement>('[data-mention]')?.dataset.mention
@@ -191,41 +200,23 @@ function Editor({ page, personId, onChanged }: { page: Page; personId: string; o
         if (id) openPhoto(id)
       }}
     >
-      <input
-        className="w-full bg-transparent outline-none font-serif text-[20px] font-medium px-9 pb-1 placeholder:text-ink-faint"
-        value={title}
-        readOnly={!canEdit}
-        placeholder={t('Без названия')}
-        onChange={(e) => {
-          setTitle(e.target.value)
-          latestTitle.current = e.target.value
-          schedule()
-        }}
-      />
-      {canEdit && (
-        <div className="sticky top-0 z-10 bg-[#fffdf8] flex flex-wrap items-center gap-1.5 px-9 py-1 text-xs" onMouseDown={(e) => { if ((e.target as HTMLElement).tagName !== 'INPUT') e.preventDefault() }}>
-          <span className="text-ink-faint">{t('К этому абзацу')}:</span>
-          <button className="pick rounded-full border border-border px-2.5 h-7 text-ink-soft hover:text-ink" onClick={toggleUnverified}>⚠ {t('Не проверено')}</button>
-          <Popover open={picking} onOpenChange={setPicking}>
-            <PopoverTrigger asChild><button className="pick rounded-full border border-border px-2.5 h-7 text-ink-soft hover:text-ink">🔗 {t('Источник')}</button></PopoverTrigger>
-            <PopoverContent align="start" className="w-64 p-2 text-sm flex flex-col gap-1" onOpenAutoFocus={(e) => e.preventDefault()} onCloseAutoFocus={(e) => e.preventDefault()}>
-              {sources.filter((s) => s.id).map((s) => <button key={s.id} className="text-left rounded px-2 py-1.5 hover:bg-muted truncate" onMouseDown={(e) => e.preventDefault()} onClick={() => cite(s.id!, s.title || t('Без названия'))}>{s.title || t('Без названия')}</button>)}
-              {!sources.some((s) => s.id) && <p className="px-2 py-1 text-xs text-ink-faint">{t('У этого человека пока нет источников')}</p>}
-              <form className="flex gap-1 pt-1 border-t border-border" onSubmit={(e) => { e.preventDefault(); createSource() }}>
-                <input value={newSource} onChange={(e) => setNewSource(e.target.value)} placeholder={t('Новый источник')} aria-label={t('Новый источник')} className="h-9 min-w-0 flex-1 rounded-md border border-input bg-white px-2" />
-                <button className="bar-btn border border-border flex-none" disabled={!newSource.trim()}>{t('Добавить')}</button>
-              </form>
-            </PopoverContent>
-          </Popover>
-        </div>
-      )}
+      <div className={`font-serif text-[20px] font-medium pb-1 leading-snug ${canEdit ? 'pl-14 pr-5 [@media(hover:none)]:px-4' : 'px-4'}`}>
+        {canEdit
+          ? <GrowText value={title} aria-label={t('Название')} placeholder={t('Без названия')} onChange={(e) => { setTitle(e.target.value); latestTitle.current = e.target.value; schedule() }} onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault() }} />
+          : <ReadText value={title} />}
+      </div>
       <BlockNoteView
         editor={editor}
         editable={canEdit}
         theme="light"
         slashMenu
         onChange={schedule}
-        onSelectionChange={() => { if (editor.isFocused()) lastBlock.current = editor.getTextCursorPosition().block.id }}
+        onSelectionChange={() => {
+          if (!editor.isFocused()) return
+          const block = editor.getTextCursorPosition().block
+          lastBlock.current = block.id
+          setMarked(Array.isArray(block.content) && (block.content as { type: string }[]).some((c) => c.type === 'unverified'))
+        }}
       >
         <SuggestionMenuController
           triggerCharacter="#"
@@ -248,6 +239,23 @@ function Editor({ page, personId, onChanged }: { page: Page; personId: string; o
           }
         />
       </BlockNoteView>
+      {canEdit && (writing || picking) && (
+        <div className="sticky bottom-0 z-10 border-t border-border bg-[#fffdf8] flex flex-wrap items-center gap-1.5 px-4 py-1.5 text-xs" onMouseDown={(e) => { if ((e.target as HTMLElement).tagName !== 'INPUT') e.preventDefault() }}>
+          <span className="text-ink-faint">{t('Отметить абзац')}:</span>
+          <button className="pick rounded-full border border-border px-2.5 h-7 text-ink-soft hover:text-ink" onClick={toggleUnverified}>{marked ? `✓ ${t('Не проверено')}` : `⚠ ${t('Не проверено')}`}</button>
+          <Popover open={picking} onOpenChange={setPicking}>
+            <PopoverTrigger asChild><button className="pick rounded-full border border-border px-2.5 h-7 text-ink-soft hover:text-ink">🔗 {t('Источник')}</button></PopoverTrigger>
+            <PopoverContent align="start" className="w-64 p-2 text-sm flex flex-col gap-1" onOpenAutoFocus={(e) => e.preventDefault()} onCloseAutoFocus={(e) => e.preventDefault()}>
+              {sources.filter((s) => s.id).map((s) => <button key={s.id} className="text-left rounded px-2 py-1.5 hover:bg-muted break-anywhere" onMouseDown={(e) => e.preventDefault()} onClick={() => cite(s.id!, s.title || t('Без названия'))}>{s.title || t('Без названия')}</button>)}
+              {!sources.some((s) => s.id) && <p className="px-2 py-1 text-xs text-ink-faint">{t('У этого человека пока нет источников')}</p>}
+              <form className="flex gap-1 pt-1 border-t border-border" onSubmit={(e) => { e.preventDefault(); createSource() }}>
+                <input value={newSource} onChange={(e) => setNewSource(e.target.value)} placeholder={t('Новый источник')} aria-label={t('Новый источник')} className="h-9 min-w-0 flex-1 rounded-md border border-input bg-white px-2" />
+                <button className="bar-btn border border-border flex-none" disabled={!newSource.trim()}>{t('Добавить')}</button>
+              </form>
+            </PopoverContent>
+          </Popover>
+        </div>
+      )}
       {status === 'waiting' && <p role="status" className="px-9 text-xs text-destructive">{t('Нет связи. Текст сохранён в этом браузере и отправится сам, когда связь вернётся')}</p>}
       {status === 'failed' && <p role="alert" className="px-9 text-xs text-destructive">{t('Не удалось сохранить')}. {t('Текст остался в этом браузере')}</p>}
       {status === 'conflict' && (

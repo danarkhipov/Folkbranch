@@ -56,7 +56,7 @@ ok('garbage is refused and the server lives', garbage.status === 400 && (await f
 
 // A clean server.
 const Bname = 'fg-backup-b', Bport = 3451, BB = `http://localhost:${Bport}`
-try { sh(`docker rm -f ${Bname}`) } catch {}
+try { sh(`docker rm -fv ${Bname}`) } catch {}
 try { sh(`docker volume rm ${Bname}-data`) } catch {}
 sh(`docker run -d --name ${Bname} --restart=on-failure -p 127.0.0.1:${Bport}:3000 -v ${Bname}-data:/data -e BETTER_AUTH_URL=${BB} -e SETUP_TOKEN=clean-code ${IMAGE}`)
 await waitUp(BB)
@@ -96,7 +96,7 @@ ok('the previous archive is kept', sh(`docker exec ${Bname} sh -c 'ls /data/back
 // By hand, in a browser: the setup screen of a third, clean server.
 const { chromium } = await import('playwright-core')
 const Cname = 'fg-backup-c', Cport = 3452, CC = `http://localhost:${Cport}`
-try { sh(`docker rm -f ${Cname}`) } catch {}
+try { sh(`docker rm -fv ${Cname}`) } catch {}
 try { sh(`docker volume rm ${Cname}-data`) } catch {}
 sh(`docker run -d --name ${Cname} --restart=on-failure -p 127.0.0.1:${Cport}:3000 -v ${Cname}-data:/data -e BETTER_AUTH_URL=${CC} -e SETUP_TOKEN=clean-code ${IMAGE}`)
 await waitUp(CC)
@@ -112,7 +112,7 @@ await page.getByRole('button', { name: 'Принять приглашение' }
 await page.locator('.pcard').first().waitFor({ timeout: 30000 })
 ok('in a browser: copy chosen on the setup screen, then signed in and the chart is there', true)
 await page.locator('nav button[aria-label="История"]').click()
-await page.getByRole('radio', { name: 'Что проверить' }).click()
+await page.getByRole('radio', { name: 'Проверить' }).click()
 await page.getByText('Нет:').first().waitFor({ timeout: 10000 })
 ok('the list of what to check opens', true)
 await page.locator('nav button[aria-label="Настройки"]').click()
@@ -121,8 +121,8 @@ const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 60000 }
 await dl.cancel()
 ok('the owner finds the download in settings', dl.suggestedFilename().startsWith('family-archive-'), dl.suggestedFilename())
 await br.close()
-sh(`docker rm -f ${Cname}`)
+sh(`docker rm -fv ${Cname}`)
 try { sh(`docker volume rm ${Cname}-data`) } catch {}
-sh(`docker rm -f fg-backup-a ${Bname}`)
+sh(`docker rm -fv fg-backup-a ${Bname}`)
 try { sh(`docker volume rm fg-backup-a-data ${Bname}-data`) } catch {}
 fs.rmSync(work, { recursive: true, force: true })

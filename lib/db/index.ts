@@ -2,8 +2,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import Database from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { applyPendingRestore } from './restore'
+import { migrateWithCopy } from './safe-migrate'
 import * as schema from './schema'
 
 // Never traced into the build: that would copy the archive into the build output.
@@ -26,7 +26,7 @@ function open() {
   // The write-ahead file shrinks back after a big import instead of staying at its largest.
   sqlite.pragma('journal_size_limit = 4194304')
   const db = drizzle(sqlite, { schema })
-  migrate(db, { migrationsFolder: path.resolve(/*turbopackIgnore: true*/ 'drizzle') })
+  migrateWithCopy(sqlite, db, DATA_DIR, path.resolve(/*turbopackIgnore: true*/ 'drizzle'))
   return db
 }
 

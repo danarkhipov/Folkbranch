@@ -1,10 +1,11 @@
 'use client'
+import dynamic from 'next/dynamic'
 import { useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, Undo2, X } from 'lucide-react'
 import { api, undoFailure, useApp, useWrite } from '@/lib/client'
 import { cn } from '@/lib/utils'
-import { personName, type HistoryEntry } from '@/lib/types'
+import { lifeYears, personName, type HistoryEntry } from '@/lib/types'
 import { Mini, PersonPopover } from './person-pickers'
 import { Segmented } from './person-fields'
 
@@ -62,16 +63,17 @@ export function HistoryPanel({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient()
   const undo = useWrite((id: string) => api(`history/${id}/undo`, { json: {} }).then(() => { qc.invalidateQueries() }).catch((e) => notify(undoFailure(e, t))))
   const fmt = new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-  const [view, setView] = useState<'history' | 'gaps'>('history')
+  const [view, setView] = useState<'history' | 'gaps' | 'same'>('history')
   return (
     <div className="float side-sheet fixed left-3 top-[60px] bottom-3 w-80 flex flex-col z-10">
-      <div className="flex items-center justify-between px-3 pt-3 pb-2"><h3 className="font-serif font-medium text-lg">{t(view === 'gaps' ? 'Что проверить' : 'История')}</h3><button className="text-ink-faint hover:text-ink" aria-label={t('Закрыть')} title={t('Закрыть')} onClick={onClose}><X size={15} /></button></div>
+      <div className="flex items-center justify-between px-3 pt-3 pb-2"><h3 className="font-serif font-medium text-lg">{t(view === 'gaps' ? 'Что проверить' : view === 'same' ? 'Похожие люди' : 'История')}</h3><button className="text-ink-faint hover:text-ink" aria-label={t('Закрыть')} title={t('Закрыть')} onClick={onClose}><X size={15} /></button></div>
       {canEdit && (
         <div className="px-3 pb-2">
-          <Segmented label={t('Что показать')} value={view} onChange={setView} options={[['history', t('История')], ['gaps', t('Что проверить')]]} />
+          <Segmented label={t('Что показать')} value={view} onChange={setView} options={[['history', t('История')], ['gaps', t('Проверить')], ['same', t('Похожие')]]} />
         </div>
       )}
       {view === 'gaps' && <GapsList />}
+      {view === 'same' && <SameList />}
       <div hidden={view !== 'history'} className="flex-1 overflow-auto px-1.5 pb-2">
         {!rows.length && <p className="px-2 text-sm text-ink-faint">{t('Пока ничего не менялось')}</p>}
         {rows.map((r) => (
@@ -87,6 +89,36 @@ export function HistoryPanel({ onClose }: { onClose: () => void }) {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+const MergeDialog = dynamic(() => import('./merge-dialog').then((m) => m.MergeDialog), { ssr: false })
+
+/** Cards that may be one person. Only a person decides: nothing here merges by itself. */
+function SameList() {
+  const { t, byId } = useApp()
+  const qc = useQueryClient()
+  const { data = [], isLoading } = useQuery({ queryKey: ['duplicates'], queryFn: () => api<{ a: string; b: string; why: string[] }[]>('duplicates') })
+  const [pair, setPair] = useState<{ a: string; b: string } | null>(null)
+  const person = (id: string) => { const p = byId.get(id); return p ? [personName(p) || t('Без названия'), lifeYears(p)].join(', ') : '' }
+  /** The fuller card stays by default. */
+  const fuller = (a: string, b: string) => { const n = (id: string) => Object.values(byId.get(id) ?? {}).filter((v) => (Array.isArray(v) ? v.length : !!v)).length; return n(a) >= n(b) ? { a, b } : { a: b, b: a } }
+  return (
+    <div className="flex-1 overflow-auto px-1.5 pb-2">
+      {!isLoading && !data.length && <p className="px-2 text-sm text-ink-soft">{t('Похожих людей не нашлось')}</p>}
+      {data.map((d) => (
+        <div key={`${d.a}.${d.b}`} className="rounded-md px-2 py-1.5 text-sm flex flex-col gap-0.5">
+          <span className="font-medium break-anywhere">{person(d.a)}</span>
+          <span className="font-medium break-anywhere">{person(d.b)}</span>
+          {d.why.length > 0 && <span className="text-xs text-ink-soft">{t('Совпадает')}: {d.why.join(', ')}</span>}
+          <span className="mt-0.5 flex flex-wrap gap-1.5">
+            <button className="bar-btn border border-border !h-7" onClick={() => setPair(fuller(d.a, d.b))}>{t('Сравнить')}</button>
+            <button className="bar-btn !h-7 text-ink-soft" onClick={async () => { await api('duplicates/dismiss', { json: { a: d.a, b: d.b } }); qc.invalidateQueries({ queryKey: ['duplicates'] }) }}>{t('Это разные люди')}</button>
+          </span>
+        </div>
+      ))}
+      {pair && <MergeDialog a={pair.a} b={pair.b} onClose={() => { setPair(null); qc.invalidateQueries({ queryKey: ['duplicates'] }) }} />}
     </div>
   )
 }

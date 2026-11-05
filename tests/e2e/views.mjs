@@ -4,7 +4,7 @@ import { IMAGE, sh, sleep, waitUp } from './lib.mjs'
 
 const ok = (n, c, x = '') => { console.log(`${c ? 'PASS' : 'FAIL'} ${n}${x ? ' · ' + x : ''}`); if (!c) process.exitCode = 1 }
 const O = 'http://localhost:3442'
-try { sh('docker rm -f fg-views') } catch {}
+try { sh('docker rm -fv fg-views') } catch {}
 sh(`docker run -d --name fg-views -p 127.0.0.1:3442:3000 -e BETTER_AUTH_URL=${O} -e SETUP_TOKEN=x ${IMAGE}`)
 await waitUp(O)
 const r = await fetch(O + '/api/auth/family/setup', { method: 'POST', headers: { 'content-type': 'application/json', origin: O }, body: JSON.stringify({ name: 'Анна', familyName: 'Лесные', language: 'ru', demo: true, code: 'x' }) })
@@ -102,5 +102,5 @@ await menu(R)
 ok('a reader cannot save a view', await R.getByPlaceholder('Например, мамина ветка').count() === 0)
 await closeMenu(R)
 ok('no page errors', errs.length === 0, errs.join(' | '))
-await br.close(); sh('docker rm -f fg-views')
+await br.close(); sh('docker rm -fv fg-views')
 process.exit(process.exitCode ?? 0)

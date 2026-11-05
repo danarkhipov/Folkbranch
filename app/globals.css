@@ -190,8 +190,14 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 kbd { font: 14px var(--font-sans); color: var(--ink-faint); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
 
 [cmdk-input]:focus-visible { outline: none; }
-.inline-input { background: transparent; border-radius: 0; padding: 0; width: 100%; outline: none; text-overflow: ellipsis; }
-.inline-fit { width: auto; min-width: 2ch; max-width: 100%; field-sizing: content; }
+.inline-input { background: transparent; border-radius: 0; padding: 0; width: 100%; outline: none; }
+.break-anywhere { overflow-wrap: anywhere; }
+/* A field as tall and, when asked, as wide as its text: a hidden copy of the text sets the size. */
+.grow-text { position: relative; display: grid; width: 100%; min-width: 0; }
+.grow-text.fit { display: inline-grid; width: auto; max-width: 100%; min-width: 2ch; }
+.grow-text.fit::after { content: attr(data-value); padding-inline-end: .15em; }
+.grow-text::after { content: attr(data-value) ' '; visibility: hidden; white-space: pre-wrap; overflow-wrap: anywhere; grid-area: 1 / 1; min-width: 0; }
+.grow-text > textarea { position: absolute; inset: 0; width: 100%; height: 100%; display: block; resize: none; overflow: hidden; border: 0; min-width: 0; font: inherit; color: inherit; line-height: inherit; letter-spacing: inherit; overflow-wrap: anywhere; }
 .inline-input::placeholder { color: #787162; font-style: italic; }
 
 .panel { position: fixed; top: 12px; right: 12px; bottom: 12px; width: min(var(--panel-w, 480px), calc(100vw - 24px)); background: #fffdf8; border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 2px 6px rgb(60 45 20 / .07), 0 24px 60px rgb(60 45 20 / .16); display: flex; flex-direction: column; overflow: hidden; z-index: 20; animation: panel-in .28s cubic-bezier(.22, .8, .24, 1); transition: width .25s cubic-bezier(.22, .8, .24, 1); }
@@ -235,7 +241,7 @@ kbd { font: 14px var(--font-sans); color: var(--ink-faint); border: 1px solid va
 .tag-3 { background: #e2eddc; color: #41633c; }
 .tag-4 { background: #dfe9ef; color: #38596c; }
 .tag-5 { background: #ebe2ef; color: #5f4570; }
-.mark-chip { background: #efe5d3; border-radius: 5px; padding: 0 5px; font-size: 14px; font-family: var(--font-sans, inherit); font-weight: 400; color: var(--ink-soft); white-space: nowrap; }
+.mark-chip { background: #efe5d3; border-radius: 5px; padding: 0 5px; font-size: 14px; font-family: var(--font-sans, inherit); font-weight: 400; color: var(--ink-soft); overflow-wrap: anywhere; }
 .mark-chip[data-citation] { cursor: pointer; }
 .mark-chip[data-citation]:hover { color: var(--accent); }
 .mark-chip.unverified { background: #f7e3d3; color: #8f4426; }
@@ -262,8 +268,23 @@ kbd { font: 14px var(--font-sans); color: var(--ink-faint); border: 1px solid va
 .tool-row > summary::-webkit-details-marker { display: none; }
 .tool-row > summary:hover { color: var(--ink); }
 
-/* Pages in the narrow panel: the handles beside each paragraph need no more room than this. */
-.panel .bn-editor { padding-inline: 36px !important; }
+/* Room on the left for the two handles beside a paragraph, which appear on hover, so neither is cut by the edge of the card. */
+.panel .bn-editor { padding-left: 56px !important; padding-right: 20px !important; overflow-wrap: anywhere; }
+.panel .page-read .bn-editor { padding-left: 16px !important; padding-right: 16px !important; }
+.panel .bn-editor table { max-width: 100%; }
+/* The editor's menu scrolls by itself; at its own 600 px it runs off the bottom of the window. */
+.bn-suggestion-menu { max-height: min(320px, 45dvh) !important; }
+.panel .bn-editor h1, .panel .bn-editor h2, .panel .bn-editor h3 { overflow-wrap: anywhere; }
+/* Every way of adding something looks the same, so one look says "this adds". */
+.add-btn { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding-inline: 12px; border: 1px dashed var(--ink-faint); border-radius: 999px; font-size: 14px; color: var(--ink-soft); }
+.add-btn:hover { color: var(--ink); border-color: var(--ink); }
+/* A filled field looks like text; pointing at it says it can be changed. */
+textarea.inline-input:hover, textarea.inline-input:focus { box-shadow: 0 1px 0 var(--ink-faint); }
+/* A file name or a record number in a text: there for whoever checks, quiet for whoever reads. */
+.bn-editor code { font-family: var(--font-sans) !important; font-size: .84em !important; background: none !important; padding: 0 !important; color: var(--ink-soft) !important; overflow-wrap: anywhere; }
+/* Everything in the card that can be pressed is at least 24 px, on a screen with a mouse too. */
+.panel button, .panel select, .panel summary, [data-slot=popover-content] button, [data-slot=popover-content] select { min-height: 24px; }
+.panel .bn-editor button, .panel .bn-side-menu button { min-height: 0; }
 
 /* The main bar: words where there is room, icons with tooltips where not, and on phones a tab bar. */
 .nav-label { display: none; }
@@ -286,11 +307,14 @@ kbd { font: 14px var(--font-sans); color: var(--ink-faint); border: 1px solid va
 }
 /* Fingers need room: everything that can be tapped is at least 40 px. */
 @media (pointer: coarse) {
+  .panel summary { padding-block: 8px; }
   .panel button, .side-sheet button, [role=dialog] button, [role=dialog] select, .view-bar button, .main-bar button, .panel select, [data-slot=popover-content] button { min-height: 40px; min-width: 40px; }
   .composer [data-align="block-end"] button { height: 40px; width: 40px; }
 }
 
-.panel-tabs { height: 36px; padding: 4px; }
+.panel-tabs { height: 36px; padding: 4px; flex: none; }
+/* The row of tabs can scroll, so a ring outside a tab would be cut: it goes inside. */
+.panel-tabs [role=tab]:focus-visible { box-shadow: none !important; --tw-ring-shadow: 0 0 #0000 !important; outline: 2px solid var(--ring); outline-offset: -2px; }
 .panel-tabs [role=tab] { height: 28px; }
 .legend-ring.assumed { outline: 1.5px dashed var(--ink-faint); outline-offset: 2px; }
 .presence { display: inline-flex; padding-inline: 4px; }
@@ -305,7 +329,14 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
 @media (max-width: 640px) { input, select, textarea { font-size: 16px; } .inline-input { font-size: inherit; } }
 /* A finger needs more than a mouse: the plus buttons grow and the tabs keep inside the card. */
 @media (pointer: coarse) { .pcard .tools { --s: 1.55; } }
-@media (max-width: 640px) { .panel-tabs { width: auto; align-self: stretch; } .panel-tabs [role=tab] { padding-inline: 6px; flex: 1 1 auto; } }
+/* By the card's own width, not the window's: a narrow card on a wide screen has the same five tabs to fit. */
+.panel { container-type: inline-size; }
+@container (max-width: 440px) {
+  .panel-tabs { width: auto; height: auto; align-self: stretch; padding: 2px; scrollbar-width: none; }
+  .panel-tabs [role=tab] { padding-inline: 2px; flex: 1 0 auto; font-size: 14px; }
+}
+@container (max-width: 320px) { .panel-tabs [role=tab] { padding-inline: 1px; font-size: 13px; } }
+@media (hover: none) { .panel .bn-editor { padding-left: 16px !important; padding-right: 16px !important; } }
 .inline-input:placeholder-shown { border-bottom: 1px dashed var(--ink-faint); }
 .pcard.moving { transition: none; z-index: 5; cursor: grabbing; opacity: .9; }
 .pcard .movable { cursor: grab; }

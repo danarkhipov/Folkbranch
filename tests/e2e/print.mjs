@@ -10,7 +10,7 @@ const ok = (n, c, x = '') => { console.log(`${c ? 'PASS' : 'FAIL'} ${n}${x ? ' �
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'family-print-'))
 const gs = (args, file) => execSync(`gs -q -dNOPAUSE -dBATCH ${args} "${file}" 2>&1`, { maxBuffer: 1e8 }).toString()
 const O = 'http://localhost:3444'
-try { sh('docker rm -f fg-print') } catch {}
+try { sh('docker rm -fv fg-print') } catch {}
 sh(`docker run -d --name fg-print -p 127.0.0.1:3444:3000 -e BETTER_AUTH_URL=${O} -e SETUP_TOKEN=x ${IMAGE}`)
 await waitUp(O)
 const r = await fetch(O + '/api/auth/family/setup', { method: 'POST', headers: { 'content-type': 'application/json', origin: O }, body: JSON.stringify({ name: 'Анна', familyName: 'Лесные', language: 'ru', demo: true, code: 'x' }) })
@@ -95,6 +95,6 @@ const rf = await download(R, 'reader.pdf')
 const t4 = check('reader', rf)
 ok('a reader\'s print holds no living names', !living.some((x) => t4.includes(x)) && t4.includes(dead.givenName))
 ok('no page errors', errs.length === 0, errs.join(' | '))
-await br.close(); sh('docker rm -f fg-print')
+await br.close(); sh('docker rm -fv fg-print')
 fs.rmSync(work, { recursive: true, force: true })
 process.exit(process.exitCode ?? 0)
