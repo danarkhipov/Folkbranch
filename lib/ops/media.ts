@@ -5,7 +5,7 @@ import path from 'node:path'
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
 import sharp from 'sharp'
-import { desc, eq, inArray, sql } from 'drizzle-orm'
+import { desc, eq, inArray, ne, sql } from 'drizzle-orm'
 import { getDb, schema } from '../db'
 import { listMediaFiles, mediaFile, removeMediaFiles, writeAtomic } from '../storage'
 import type { Box, Media } from '../types'
@@ -14,6 +14,10 @@ import { hiddenPeople } from './people'
 import { say } from './settings'
 
 const MAX_SIZE = 40 * 1024 * 1024
+/** About three hours of speech as a browser records it. */
+export const MAX_AUDIO = 50 * 1024 * 1024
+/** Voices are the one thing that can fill a small volume unnoticed. */
+export const audioLimit = () => Number(process.env.MAX_AUDIO_MB || 5000) * 1024 * 1024
 const SIZES = { thumb: 360, medium: 1600 } as const
 export type MediaSize = keyof typeof SIZES | 'orig'
 
@@ -23,11 +27,16 @@ function row(id: string) {
   return r
 }
 
+const isModel = (a: Actor) => !!(a.assistant || a.tokenId)
+
 /** Readers lose access to any photo that shows a relative hidden from them. */
 export function canSeeMedia(actor: Actor, mediaId: string) {
+  // A voice is reached through its story, which has its own rules, and never by a model.
+  if ((seesOnlyPublic(actor) || isModel(actor)) && getDb().select({ kind: schema.media.kind }).from(schema.media).where(eq(schema.media.id, mediaId)).get()?.kind === 'audio') return false
   const hidden = hiddenPeople(actor)
   if (!hidden.size) return true
-  return !getDb().select().from(schema.mediaTags).where(eq(schema.mediaTags.mediaId, mediaId)).all().some((t) => t.personId && hidden.has(t.personId))
+  const tags = getDb().select().from(schema.mediaTags).where(eq(schema.mediaTags.mediaId, mediaId)).all()
+  return !tags.some((t) => t.personId && hidden.has(t.personId)) && (!actor.guest?.only || tags.some((t) => t.personId))
 }
 
 function withTags(rows: (typeof schema.media.$inferSelect)[], actor: Actor): Media[] {
@@ -43,7 +52,8 @@ function withTags(rows: (typeof schema.media.$inferSelect)[], actor: Actor): Med
 
 function visible(actor: Actor, list: Media[]) {
   const hidden = hiddenPeople(actor)
-  return hidden.size ? list.filter((m) => !m.tags.some((t) => t.personId && hidden.has(t.personId))) : list
+  // A link to one branch shows photos of that branch, not the untagged rest of the archive.
+  return hidden.size ? list.filter((m) => !m.tags.some((t) => t.personId && hidden.has(t.personId)) && (!actor.guest?.only || m.tags.some((t) => t.personId))) : list
 }
 
 export function listPersonMedia(actor: Actor, personId: string): Media[] {
@@ -106,6 +116,35 @@ export async function storeUpload(buf: Buffer, originalName: string, uploadedBy:
   }
 }
 
+/** What a sound file says it is, from its first bytes: a browser's recording, a phone's, or an old tape turned into a file. */
+function soundType(b: Buffer): { mime: string; ext: string } | null {
+  const ascii = (from: number, to: number) => b.subarray(from, to).toString('latin1')
+  if (b.length < 12) return null
+  if (b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) return { mime: 'audio/webm', ext: '.webm' }
+  if (ascii(0, 4) === 'OggS') return { mime: 'audio/ogg', ext: '.ogg' }
+  if (ascii(4, 8) === 'ftyp') return { mime: 'audio/mp4', ext: '.m4a' }
+  if (ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WAVE') return { mime: 'audio/wav', ext: '.wav' }
+  if (ascii(0, 4) === 'fLaC') return { mime: 'audio/flac', ext: '.flac' }
+  if (ascii(0, 3) === 'ID3' || (b[0] === 0xff && (b[1] & 0xe0) === 0xe0)) return { mime: 'audio/mpeg', ext: '.mp3' }
+  return null
+}
+
+export function audioUsed() {
+  return getDb().select({ n: sql<number>`coalesce(sum(${schema.media.size}), 0)` }).from(schema.media).where(eq(schema.media.kind, 'audio')).get()!.n
+}
+
+/** Kept exactly as recorded. Nothing here plays it or converts it. */
+export async function storeAudio(buf: Buffer, originalName: string, uploadedBy: string) {
+  if (buf.length > MAX_AUDIO) throw new OpError(413, say('Запись слишком большая: можно до 50 МБ'))
+  const type = soundType(buf)
+  if (!type) throw new OpError(400, say('Этот файл не похож на звукозапись'))
+  if (audioUsed() + buf.length > audioLimit()) throw new OpError(507, say('Место для записей голоса закончилось'))
+  const id = newId()
+  const filename = `${id}.voice${type.ext}`
+  await writeAtomic(mediaFile(filename), buf)
+  return { id, kind: 'audio', filename, originalName, mime: type.mime, width: 0, height: 0, size: buf.length, uploadedBy, createdAt: Date.now() }
+}
+
 export type StoredUpload = Awaited<ReturnType<typeof storeUpload>>
 
 export function commitUpload(actor: Actor, r: StoredUpload, personId?: string | null) {
@@ -155,7 +194,7 @@ export async function sweepOrphanFiles(now = Date.now()) {
 export const discardUpload = removeMediaFiles
 
 export function listAllMedia(actor: Actor, limit = 200): Media[] {
-  return visible(actor, withTags(getDb().select().from(schema.media).orderBy(desc(schema.media.createdAt)).limit(limit).all(), actor))
+  return visible(actor, withTags(getDb().select().from(schema.media).where(ne(schema.media.kind, 'audio')).orderBy(desc(schema.media.createdAt)).limit(limit).all(), actor))
 }
 
 /** Fetches a photo for an upload-by-link, refusing addresses inside our own network. */
@@ -248,6 +287,7 @@ export function deleteMedia(actor: Actor, id: string) {
   requireRole(actor, 'editor')
   const db = getDb()
   const r = row(id)
+  if (r.kind === 'audio') throw new OpError(400, 'a voice is removed with its story')
   // Files stay on disk so the deletion can be rolled back.
   const tags = db.select().from(schema.mediaTags).where(eq(schema.mediaTags.mediaId, id)).all()
   mutate(actor, { summary: `${say('Удалить')}: ${r.originalName}`, personIds: tags.flatMap((t) => t.personId ?? []) }, (c: Changes) => {

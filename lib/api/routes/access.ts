@@ -3,6 +3,8 @@ import { chooseModel, connectProvider, currentProvider, disconnectProvider, prov
 import { requireRole } from '@/lib/ops/core'
 import { acceptProposal, listProposals, myProposals, rejectProposal, removeProposalOp } from '@/lib/ops/proposals'
 import * as settings from '@/lib/ops/settings'
+import { createShare, listShares, revokeShare } from '@/lib/ops/share'
+import { suggest } from '@/lib/ops/suggest'
 import * as tokens from '@/lib/ops/tokens'
 import { get, human, role, type Route } from '../router'
 
@@ -12,6 +14,12 @@ export const accessRoutes: Route[] = [
   human('POST', 'proposals/:id/accept', 'Apply a draft', ({ actor, params }) => acceptProposal(actor, params.id)),
   human('POST', 'proposals/:id/reject', 'Reject a draft', ({ actor, params }) => rejectProposal(actor, params.id)),
   human('DELETE', 'proposals/:id/ops/:index', 'Drop one line of a draft', ({ actor, params }) => removeProposalOp(actor, params.id, Number(params.index))),
+
+  human('POST', 'proposals/suggest', 'A reader suggests a correction', async ({ actor, body }) => suggest(actor, await body())),
+
+  human('GET', 'shares', 'Links for viewing without an account', ({ actor }) => listShares(actor)),
+  human('POST', 'shares', 'Make a link for viewing', async ({ actor, body }) => createShare(actor, await body())),
+  human('DELETE', 'shares/:id', 'Close a link for viewing', ({ actor, params }) => revokeShare(actor, params.id)),
 
   human('GET', 'tokens', 'API tokens', ({ actor }) => tokens.listTokens(actor)),
   human('POST', 'tokens', 'Issue an API token', async ({ actor, body }) => tokens.createToken(actor, z.object({ expiresInDays: z.number().int().min(1).max(3650).nullish(), name: z.string().min(1), role: z.enum(['reader', 'editor']), review: z.boolean().default(true) }).parse(await body()))),

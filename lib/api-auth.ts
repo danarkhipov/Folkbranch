@@ -1,5 +1,6 @@
 import { getAuth } from './auth'
 import { ownCard } from './ops/settings'
+import { guestFromCookie, SHARE_COOKIE } from './ops/share'
 import { actorFromToken } from './ops/tokens'
 import type { Actor } from './ops/core'
 import type { Role } from './types'
@@ -20,4 +21,11 @@ export async function getActor(headers: Headers): Promise<Actor | null> {
   if (!session) return null
   const u = session.user as typeof session.user & { role: Role; personId: string | null }
   return { userId: u.id, name: u.name, role: u.role, personId: ownCard(u.personId) }
+}
+
+/** Someone who opened a link for viewing. Asked only by the routes built for it, so nothing else can meet a guest. */
+export function guestActor(headers: Headers): Actor | null {
+  if (hasBearer(headers)) return null
+  const cookie = headers.get('cookie')?.split(/;\s*/).find((c) => c.startsWith(`${SHARE_COOKIE}=`))
+  return cookie ? guestFromCookie(decodeURIComponent(cookie.slice(SHARE_COOKIE.length + 1))) : null
 }

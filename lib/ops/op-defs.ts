@@ -71,6 +71,8 @@ export interface Def<S extends z.ZodType = z.ZodType> {
   describe: (args: any, ctx: Ctx) => { text: string; details?: string[] }
   /** The result's id can be referred to by a temporary id until the draft is accepted. */
   creates?: boolean
+  /** Only for people's own suggestions: no model and no token is offered it. */
+  internal?: boolean
   /** Mass change: queued even for tokens allowed to write directly. */
   bulk?: boolean
   /** Never queued. */

@@ -99,6 +99,8 @@ export interface Me {
   name: string
   role: Role
   personId: string | null
+  /** Came through a link for viewing and has no account. */
+  guest?: boolean
 }
 
 export interface PageMeta {
@@ -174,3 +176,20 @@ export function yearOf(date: string): number | null {
   const m = date.match(/\b(\d{4})\b/) ?? date.match(/(\d{3,4})/)
   return m ? Number(m[1]) : null
 }
+
+/** Someone's words. Not a fact, even when it is the only thing known. */
+export interface Story {
+  id: string
+  title: string
+  body: string
+  tellerId: string | null
+  tellerName: string
+  toldOn: string
+  about: string[]
+  hasAudio: boolean
+  durationSec: number | null
+  createdBy: string
+  createdAt: number
+  updatedAt: number
+}
+

@@ -1,7 +1,8 @@
 'use client'
 import { useState, useContext } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Maximize2, Minimize2, Trash2, X } from 'lucide-react'
+import dynamic from 'next/dynamic'
+import { Maximize2, Minimize2, PencilLine, Trash2, X } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { api, Presence, useApp, usePersonSave } from '@/lib/client'
 import { yourTerm } from '@/lib/kinship'
@@ -17,6 +18,9 @@ import { Pages } from './person-pages'
 import { FamilyTab } from './person-family'
 import { PhotosTab } from './person-photos'
 import { Details } from './person-details'
+import { StoriesTab } from './person-stories'
+
+const SuggestDialog = dynamic(() => import('./suggest-dialog').then((m) => m.SuggestDialog), { ssr: false })
 
 export function PersonPanel({ person, onClose, onDelete }: { person: Person; onClose: () => void; onDelete: (id: string) => void }) {
   const [width, setWidth] = useStoredSize('person-panel-width', 480, (w) => Math.round(Math.max(360, Math.min(w, window.innerWidth - 80))))
@@ -49,6 +53,7 @@ export function PersonPanel({ person, onClose, onDelete }: { person: Person; onC
   const toMe = me.personId && me.personId !== person.id ? family.relation(me.personId, person.id, lang) : null
   const ro = !canEdit
   const [addPatronymic, setAddPatronymic] = useState(false)
+  const [suggesting, setSuggesting] = useState(false)
 
   return (
     <aside className={cn('panel', full && 'full')} style={{ '--panel-w': `${width}px`, '--panel-h': `${height}px` } as React.CSSProperties}>
@@ -75,16 +80,18 @@ export function PersonPanel({ person, onClose, onDelete }: { person: Person; onC
             {toMe && <span className="text-rust">{yourTerm(toMe.label, person.sex, lang)}</span>}
             {me.personId === person.id && <span className="text-rust">{t('Это вы')}</span>}
             {hereToo.length > 0 && <span className="whitespace-nowrap">{t('Здесь также')}: {hereToo.join(', ')}</span>}
+            {ro && !me.guest && <button className="pick !px-0 flex items-center gap-1 underline underline-offset-2 hover:text-ink" onClick={() => setSuggesting(true)}><PencilLine size={12} /> {t('Предложить правку')}</button>}
           </div>
         </div>
       </header>
 
       <Tabs value={tab ?? (pageList && !pageList.length && !canEdit ? 'family' : 'pages')} onValueChange={setTab} className="flex-1 min-h-0 flex flex-col gap-0">
-        <TabsList className="panel-tabs mx-4 w-fit bg-muted">
+        <TabsList className="panel-tabs mx-4 w-fit max-w-[calc(100%-2rem)] overflow-x-auto justify-start bg-muted">
           <TabsTrigger value="pages" className="text-sm">{t('Биография')}</TabsTrigger>
           <TabsTrigger value="details" className="text-sm">{t('Сведения')}</TabsTrigger>
           <TabsTrigger value="family" className="text-sm">{t('Семья')}</TabsTrigger>
           <TabsTrigger value="photos" className="text-sm">{t('Фото')}</TabsTrigger>
+          <TabsTrigger value="stories" className="text-sm">{t('Рассказы')}</TabsTrigger>
         </TabsList>
         <TabsContent value="pages" className="flex-1 min-h-0 overflow-hidden"><Pages person={person} full={full} onDetails={() => go('details')} /></TabsContent>
         <TabsContent value="details" className="flex-1 min-h-0 overflow-auto pt-3">
@@ -92,7 +99,9 @@ export function PersonPanel({ person, onClose, onDelete }: { person: Person; onC
         </TabsContent>
         <TabsContent value="family" className="flex-1 min-h-0 overflow-auto pt-3"><FamilyTab person={person} /></TabsContent>
         <TabsContent value="photos" className="flex-1 min-h-0 overflow-auto"><PhotosTab person={person} /></TabsContent>
+        <TabsContent value="stories" className="flex-1 min-h-0 overflow-auto"><StoriesTab person={person} /></TabsContent>
       </Tabs>
+      {suggesting && <SuggestDialog person={person} onClose={() => setSuggesting(false)} />}
     </aside>
   )
 }

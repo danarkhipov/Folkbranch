@@ -26,6 +26,8 @@ const shape = (r: typeof schema.views.$inferSelect): ChartView => ({ id: r.id, n
 /** A reader does not get a view built around someone hidden from them: its name could say who. */
 export function listViews(actor: Actor): ChartView[] {
   const rows = getDb().select().from(schema.views).all().map(shape)
+  // Someone with a link gets the cards as placed, not the names the family gave its other views.
+  if (actor.guest) return rows.filter((v) => v.id === (actor.guest!.viewId ?? MAIN_VIEW)).map((v) => ({ ...v, id: MAIN_VIEW, name: '', scope: 'all', focusId: null, collapsed: [] }))
   if (!seesOnlyPublic(actor)) return rows
   const hidden = hiddenPeople(actor)
   return rows.filter((v) => !v.focusId || !hidden.has(v.focusId))

@@ -313,7 +313,7 @@ export const TOOLS: ToolDef[] = ([
   { name: 'search_archive', risk: 'read', minRole: 'reader', surfaces: surfaces('search_archive'), input: z.object({ query: z.string().min(1), limit: z.number().int().min(1).max(50).default(20) }),
     description: 'Search everything written: people, facts, sources, page text and photo captions. Forgives typos and word endings. Use when you do not know where something is written.',
     run: (a, x) => searchArchive(a, x.query, x.limit) },
-  ...Object.entries(OPS).map(([name, d]): Untyped => ({ name, description: d.description, input: (d.agentInput ?? d.input) as z.ZodObject, risk: d.risk, minRole: 'editor', surfaces: surfaces(name), run: (a, x) => dispatch(a, name, x), describe: (a, x) => describeOp(a, name, x) })),
+  ...Object.entries(OPS).filter(([, d]) => !d.internal).map(([name, d]): Untyped => ({ name, description: d.description, input: (d.agentInput ?? d.input) as z.ZodObject, risk: d.risk, minRole: 'editor', surfaces: surfaces(name), run: (a, x) => dispatch(a, name, x), describe: (a, x) => describeOp(a, name, x) })),
   ...ASSISTANT_ONLY,
   ...ATTACHMENT_TOOLS,
 ] as Untyped[]).map(typed)

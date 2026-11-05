@@ -2,13 +2,29 @@ import { z } from 'zod'
 import { OpError } from '@/lib/ops/core'
 import * as media from '@/lib/ops/media'
 import * as pages from '@/lib/ops/pages'
+import { queuedAudio } from '@/lib/ops/proposals'
+import * as stories from '@/lib/ops/stories'
+import { addStory } from '@/lib/ops/suggest'
+import { audioResponse } from '../audio'
 import { dispatch } from '@/lib/ops/proposals'
 import { OPS } from '@/lib/ops/registry'
-import { get, op, type Route } from '../router'
+import { get, human, op, open, type Route } from '../router'
 
 export const contentRoutes: Route[] = [
+  open('persons/:id/stories', 'Stories told about a person', ({ actor, params }) => stories.listStories(actor, params.id)),
+  open('stories/:id/audio', 'The voice of a story, with seeking', ({ actor, params, req }) => audioResponse(stories.storyAudio(actor, params.id), req)),
+  human('GET', 'stories/usage', 'Room taken by voices', ({ actor }) => stories.voiceUsage(actor)),
+  human('POST', 'stories', 'Add a story, or suggest one', async ({ actor, req }) => {
+    const form = await req.formData()
+    const file = form.get('audio')
+    return addStory(actor, JSON.parse(String(form.get('story') ?? '{}')), file instanceof File ? { buf: Buffer.from(await file.arrayBuffer()), name: file.name } : null)
+  }),
+  human('PATCH', 'stories/:id', 'Change a story', async ({ actor, params, body }) => stories.updateStory(actor, params.id, await body())),
+  human('DELETE', 'stories/:id', 'Delete a story', ({ actor, params }) => stories.deleteStory(actor, params.id)),
+  human('GET', 'proposals/:id/ops/:index/audio', 'Hear a story before accepting it', ({ actor, params, req }) => audioResponse(queuedAudio(actor, params.id, Number(params.index)), req)),
+
   op('POST', 'pages', 'create_page'),
-  get('pages/:id', 'A page with its text', ({ actor, params }) => pages.getPage(actor, params.id)),
+  open('pages/:id', 'A page with its text', ({ actor, params }) => pages.getPage(actor, params.id)),
   op('PATCH', 'pages/:id', 'update_page', ({ params }, b) => ({ ...b, id: params.id })),
   op('POST', 'pages/:id/move', 'move_page', ({ params }, b) => ({ ...b, id: params.id })),
   op('DELETE', 'pages/:id', 'delete_page', ({ params }) => ({ id: params.id })),
@@ -25,10 +41,10 @@ export const contentRoutes: Route[] = [
       : media.uploadMedia(actor, buf, file.name, personId)
   } },
   get('media', 'All photos', ({ actor }) => media.listAllMedia(actor)),
-  get('media/:id', 'A photo with its tags', ({ actor, params }) => media.getMedia(actor, params.id)),
+  open('media/:id', 'A photo with its tags', ({ actor, params }) => media.getMedia(actor, params.id)),
   op('PATCH', 'media/:id', 'update_photo', ({ params }, b) => ({ ...b, id: params.id })),
   op('DELETE', 'media/:id', 'delete_photo', ({ params }) => ({ id: params.id })),
-  get('media/:id/file', 'The file itself; size=thumb, medium or orig', async ({ actor, params, query }) => {
+  open('media/:id/file', 'The file itself; size=thumb, medium or orig', async ({ actor, params, query }) => {
     const size = z.enum(['thumb', 'medium', 'orig']).catch('medium').parse(query.get('size'))
     const f = await media.readMediaFile(actor, params.id, size)
     const headers: Record<string, string> = { 'Content-Type': f.mime, 'Cache-Control': 'private, max-age=31536000, immutable' }

@@ -22,7 +22,7 @@ const config: NextConfig = {
       { key: 'Referrer-Policy', value: 'no-referrer' },
       { key: 'X-Frame-Options', value: 'DENY' },
       { key: 'Content-Security-Policy', value: CSP },
-      { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+      { key: 'Permissions-Policy', value: 'camera=(), microphone=(self), geolocation=()' },
     ] }]
   },
 }

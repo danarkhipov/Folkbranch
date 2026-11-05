@@ -2,9 +2,10 @@ import { and, eq, or } from 'drizzle-orm'
 import { dataStamp, getDb, schema } from '../db'
 import type { Certainty, Claim, Fact, Graph, ParentKind, Person, Sex, Source, UnionKind } from '../types'
 import { personName, yearOf } from '../types'
-import { Actor, Changes, can, mutate, newId, OpError, requireRole, seesOnlyPublic } from './core'
+import { Actor, Changes, can, mutate, newId, OpError, requireRole, seesOnlyPublic, dropStoriesAboutNobody } from './core'
 import { say } from './app-config'
 import { reconcile } from './merge'
+import { subgraph } from '../graph/select'
 import { hiddenFor, hiddenIn, maskPerson } from './privacy'
 
 export { hiddenFor }
@@ -47,16 +48,23 @@ function deepFreeze(o: unknown) {
 /** One masked copy of each living person per change, however many readers ask. */
 const maskedOf = (entry: GraphEntry) => (entry.hidden ??= new Map(entry.graph.persons.filter((p) => p.living).map((p) => [p.id, maskPerson(p)])))
 
-export function getGraph(actor: Actor): Graph {
+function maskedGraph(actor: Actor): Graph {
   const entry = wholeGraph()
   const { graph } = entry
   if (!seesOnlyPublic(actor)) return graph
   const hidden = maskedOf(entry)
-  return { ...graph, persons: graph.persons.map((p) => (hiddenFor(actor, p) ? hidden.get(p.id)! : p)) }
+  return { ...graph, persons: graph.persons.map((p) => (hiddenFor(actor, p) ? hidden.get(p.id) ?? maskPerson(p) : p)) }
+}
+
+/** A link to one branch does not say the rest exists: those people are gone, not masked. */
+export function getGraph(actor: Actor): Graph {
+  const graph = maskedGraph(actor)
+  const only = actor.guest?.only
+  return only ? subgraph(graph, (id) => only.has(id)) : graph
 }
 
 /** Everyone masked for this person. */
-export const hiddenPeople = (actor: Actor) => hiddenIn(actor, getGraph(actor))
+export const hiddenPeople = (actor: Actor) => hiddenIn(actor, maskedGraph(actor))
 
 /** Whether this person may know that someone has a card open. Asked often, so it builds no graph. */
 export function canSeePerson(actor: Actor, id: string) {
@@ -69,7 +77,7 @@ export function canSeePerson(actor: Actor, id: string) {
 export function graphForPage(actor: Actor): { etag: string | null; body: () => string } {
   const entry = wholeGraph()
   const stamp = dataStamp()
-  const etag = stamp ? `"${BOOT}.${stamp}.${seesOnlyPublic(actor) ? `r${actor.personId}` : 'all'}"` : null
+  const etag = stamp ? `"${BOOT}.${stamp}.${seesOnlyPublic(actor) ? `r${actor.personId}${actor.guest ? `.${actor.userId}.${actor.guest.only?.size}` : ''}` : 'all'}"` : null
   return { etag, body: () => (seesOnlyPublic(actor) ? JSON.stringify(getGraph(actor)) : (entry.json ??= JSON.stringify(entry.graph))) }
 }
 
@@ -214,6 +222,8 @@ export function deletePerson(actor: Actor, id: string) {
     for (const r of db.select().from(schema.unions).where(or(eq(schema.unions.aId, id), eq(schema.unions.bId, id))).all()) c.remove('unions', r.id)
     for (const r of db.select().from(schema.mediaTags).where(eq(schema.mediaTags.personId, id)).all()) c.remove('mediaTags', r.id)
     for (const r of db.select().from(schema.pages).where(eq(schema.pages.personId, id)).all()) c.remove('pages', r.id)
+    for (const r of db.select().from(schema.storyPeople).where(eq(schema.storyPeople.personId, id)).all()) c.remove('storyPeople', r.id)
+    dropStoriesAboutNobody(c)
     c.remove('persons', id)
   })
 }

@@ -6,6 +6,7 @@ import { api, useApp } from '@/lib/client'
 import { personName, type Role } from '@/lib/types'
 import { PersonPopover } from '../person-pickers'
 import { INVITE_ROLES, ROLES, roleName } from './roles'
+import { ShareLinks } from './share-links'
 
 export function Access() {
   const { t, me, confirm: ask } = useApp()
@@ -84,6 +85,7 @@ export function Access() {
           ))}
         </section>
       )}
+      <ShareLinks />
     </div>
   )
 }
