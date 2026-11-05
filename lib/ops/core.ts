@@ -1,7 +1,8 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { getDb, schema } from '../db'
+import { announceChange } from '../live'
 import type { Role } from '../types'
 
 export interface Actor {
@@ -14,6 +15,8 @@ export interface Actor {
   review?: boolean
   /** The app's built-in assistant, acting for this person. */
   assistant?: boolean
+  /** When the assistant last read the archive: anything newer from someone else makes it look again. */
+  since?: number
 }
 
 /** Sees only people who have died: a reader, or a model the data would be sent to. */
@@ -49,6 +52,16 @@ export interface Change {
   after: Row | null
 }
 
+/** Every change reads its row back, so the query is built once per table. */
+const rowQueries = new Map<Tracked, { db: unknown; query: { get: (args: { id: string }) => unknown } }>()
+function rowQuery(db: ReturnType<typeof getDb>, table: Tracked) {
+  const ready = rowQueries.get(table)
+  if (ready?.db === db) return ready.query
+  const query = db.select().from(TRACKED[table] as typeof schema.persons).where(eq(TRACKED[table].id, sql.placeholder('id'))).prepare()
+  rowQueries.set(table, { db, query })
+  return query
+}
+
 /** Records each row change so that any operation can be rolled back generically. */
 export class Changes {
   list: Change[] = []
@@ -80,7 +93,7 @@ export class Changes {
   }
 
   private get(table: Tracked, id: string) {
-    return (this.db.select().from(TRACKED[table]).where(eq(TRACKED[table].id, id)).get() as Row | undefined) ?? null
+    return (rowQuery(this.db, table).get({ id }) as Row | undefined) ?? null
   }
 }
 
@@ -108,22 +121,24 @@ const COALESCE_MS = 10 * 60 * 1000
 /** The one write path: UI, REST and (later) MCP all go through here. */
 export function mutate<T>(actor: Actor, meta: Meta, fn: (c: Changes) => T): T {
   const db = getDb()
-  return db.transaction(() => {
+  const result = db.transaction(() => {
     const c = new Changes()
-    const result = fn(c)
+    const out = fn(c)
     if (group) {
       group.changes.push(...c.list)
       meta.personIds?.forEach((id) => group!.personIds.add(id))
     } else if (c.list.length) writeHistory(actor, meta, c.list)
-    return result
+    return out
   })
+  announceChange()
+  return result
 }
 
 let group: { changes: Change[]; personIds: Set<string> } | null = null
 
 /** Several operations become one transaction and one history entry, undone with one click. */
 export function mutateGroup<T>(actor: Actor, summary: string, fn: () => T): { result: T; historyId: string | null } {
-  return getDb().transaction(() => {
+  const done = getDb().transaction(() => {
     group = { changes: [], personIds: new Set() }
     try {
       const result = fn()
@@ -133,6 +148,8 @@ export function mutateGroup<T>(actor: Actor, summary: string, fn: () => T): { re
       group = null
     }
   })
+  announceChange()
+  return done
 }
 
 const historyScope = new AsyncLocalStorage<{ id: string | null }>()
@@ -156,7 +173,8 @@ function recordHistory(actor: Actor, meta: Meta, changes: Change[], undoOf?: str
   const now = Date.now()
   if (meta.key) {
     // Only onto the newest entry: merging past somebody else's edit would take it along on undo.
-    const last = db.select().from(schema.history).orderBy(desc(schema.history.at)).limit(1).get()
+    const newest = db.select({ id: schema.history.id, key: schema.history.key }).from(schema.history).orderBy(desc(schema.history.at)).limit(1).get()
+    const last = newest?.key === meta.key ? db.select().from(schema.history).where(eq(schema.history.id, newest.id)).get() : undefined
     // The assistant's edits stay apart: undoing one answer must not take the person's own edit along.
     if (!actor.assistant && last && !last.actorName.includes('→') && last.key === meta.key && last.userId === actor.userId && (last.tokenId ?? undefined) === actor.tokenId && !last.undoneAt && now - last.at < COALESCE_MS) {
       const prev = JSON.parse(last.changes) as Change[]
@@ -192,15 +210,16 @@ export function purgeOrphans(c: Changes) {
   const db = getDb()
   const people = new Set(db.select({ id: schema.persons.id }).from(schema.persons).all().map((r) => r.id))
   const photos = new Set(db.select({ id: schema.media.id }).from(schema.media).all().map((r) => r.id))
-  for (const r of db.select().from(schema.parentChild).all())
+  // Only the columns compared: this runs on every undo, and pages hold whole texts.
+  for (const r of db.select({ id: schema.parentChild.id, parentId: schema.parentChild.parentId, childId: schema.parentChild.childId }).from(schema.parentChild).all())
     if (!people.has(r.parentId) || !people.has(r.childId)) c.remove('parentChild', r.id)
-  for (const r of db.select().from(schema.unions).all())
+  for (const r of db.select({ id: schema.unions.id, aId: schema.unions.aId, bId: schema.unions.bId }).from(schema.unions).all())
     if (!people.has(r.aId) || !people.has(r.bId)) c.remove('unions', r.id)
-  for (const r of db.select().from(schema.pages).all())
+  for (const r of db.select({ id: schema.pages.id, personId: schema.pages.personId }).from(schema.pages).all())
     if (!people.has(r.personId)) c.remove('pages', r.id)
-  for (const r of db.select().from(schema.mediaTags).all())
+  for (const r of db.select({ id: schema.mediaTags.id, personId: schema.mediaTags.personId, mediaId: schema.mediaTags.mediaId }).from(schema.mediaTags).all())
     if (!people.has(r.personId) || !photos.has(r.mediaId)) c.remove('mediaTags', r.id)
-  for (const r of db.select().from(schema.persons).all())
+  for (const r of db.select({ id: schema.persons.id, avatarMediaId: schema.persons.avatarMediaId }).from(schema.persons).all())
     if (r.avatarMediaId && !photos.has(r.avatarMediaId)) c.update('persons', r.id, { avatarMediaId: null, avatarCrop: null })
 }
 
@@ -232,4 +251,5 @@ export function undo(actor: Actor, historyId: string, summary: string) {
     db.update(schema.history).set({ undoneAt: Date.now() }).where(eq(schema.history.id, historyId)).run()
     writeHistory(actor, { summary, personIds: JSON.parse(entry.personIds) }, c.list, historyId)
   })
+  announceChange()
 }

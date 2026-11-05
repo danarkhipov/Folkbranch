@@ -1,0 +1,6 @@
+# Already in .gitignore; repeated here so the archive can never be uploaded by `railway up`.
+data/
+.next/
+.env*
+*.ged
+START_PROMPT.md

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { fromOurPages } from '@/lib/same-origin'
 import { chooseModel, connectProvider, currentProvider, disconnectProvider, providerStatus } from '@/lib/agent/provider-key'
 import { getActor, hasBearer } from '@/lib/api-auth'
+import { setFocus } from '@/lib/live'
 import { parseFamilyText, planFamilyText, serializeFamilyText } from '@/lib/textformat'
 import { Actor, OpError, requireRole } from '@/lib/ops/core'
 import * as people from '@/lib/ops/people'
@@ -11,7 +12,8 @@ import * as media from '@/lib/ops/media'
 import * as settings from '@/lib/ops/settings'
 import * as gedcom from '@/lib/ops/gedcom'
 import * as tokens from '@/lib/ops/tokens'
-import { acceptProposal, dispatch, listProposals, myProposals, OPS, rejectProposal, removeProposalOp } from '@/lib/ops/registry'
+import { acceptProposal, dispatch, listProposals, myProposals, rejectProposal, removeProposalOp } from '@/lib/ops/proposals'
+import { OPS } from '@/lib/ops/registry'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,10 +35,20 @@ const op = (method: string, path: string, name: string, toArgs: (c: Ctx, body: a
 const routes: Route[] = [
   get('me', 'Who is calling', ({ actor }) => ({ id: actor.userId, name: actor.name, role: actor.role, personId: actor.personId })),
   human('PATCH', 'me', 'Link my account to a card', async ({ actor, body }) => settings.setMyPerson(actor, z.object({ personId: z.string().nullable() }).parse(await body()).personId)),
-  get('graph', 'Everyone and all links', ({ actor }) => people.getGraph(actor)),
+  get('graph', 'Everyone and all links', ({ actor, req }) => {
+    const page = people.graphForPage(actor)
+    const tag: Record<string, string> = page.etag ? { ETag: page.etag, 'Cache-Control': 'private, no-cache' } : {}
+    if (page.etag && req.headers.get('if-none-match') === page.etag) return new Response(null, { status: 304, headers: tag })
+    return new Response(page.body(), { headers: { 'Content-Type': 'application/json', ...tag } })
+  }),
+  human('POST', 'presence', 'Which card this page has open', async ({ actor, body }) => {
+    const b = z.object({ client: z.string(), focusId: z.string().nullable() }).parse(await body())
+    setFocus(actor.userId, b.client, b.focusId)
+    return { ok: true }
+  }),
 
   op('POST', 'persons', 'create_person'),
-  op('PATCH', 'persons/:id', 'update_person', ({ params }, patch) => ({ id: params.id, patch })),
+  op('PATCH', 'persons/:id', 'update_person', ({ params }, { seen, ...patch }) => ({ id: params.id, patch, seen })),
   op('DELETE', 'persons/:id', 'delete_person', ({ params }) => ({ id: params.id })),
   get('persons/:id/avatar', 'Avatar image', async ({ actor, params }) => {
     const p = people.getPersonRow(params.id)

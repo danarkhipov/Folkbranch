@@ -2,9 +2,10 @@ import { headers } from 'next/headers'
 import { fromOurPages } from '@/lib/same-origin'
 import { z } from 'zod'
 import { assistantRefusal } from '@/lib/agent/agent'
-import { overLimit } from '@/lib/agent/limits'
+import { overLimit, takeRun } from '@/lib/agent/limits'
 import { assistantResponse } from '@/lib/agent/respond'
 import { getActor, hasBearer } from '@/lib/api-auth'
+import { say } from '@/lib/ops/settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,9 +23,15 @@ export async function POST(req: Request) {
   if (refusal) return Response.json({ error: refusal }, { status: 403 })
   const limited = overLimit(actor.userId)
   if (limited) return Response.json({ error: limited }, { status: 429 })
+  const release = takeRun(actor.userId)
+  if (!release) return Response.json({ error: say('Ассистент сейчас отвечает на другой запрос. Подождите немного и повторите.') }, { status: 429 })
+  req.signal.addEventListener('abort', release, { once: true })
   try {
-    return await assistantResponse(actor, await req.json(), { abortSignal: req.signal })
+    const res = await assistantResponse(actor, await req.json(), { abortSignal: req.signal })
+    if (!res.body) { release(); return res }
+    return new Response(res.body.pipeThrough(new TransformStream({ flush: release })), res)
   } catch (e) {
+    release()
     if (e instanceof z.ZodError || e instanceof SyntaxError) return Response.json({ error: 'bad request' }, { status: 400 })
     console.error(e)
     return Response.json({ error: 'server error' }, { status: 500 })

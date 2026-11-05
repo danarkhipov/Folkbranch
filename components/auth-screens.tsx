@@ -29,14 +29,15 @@ export function SetupScreen({ needsCode, initialCode = '' }: { needsCode: boolea
         else { setBusy(false); setError((await r.json().catch(() => null))?.message ?? 'error') }
       }}>
         <h1 className="font-serif text-2xl font-medium">{t('Семейный архив')}</h1>
-        <p className="text-ink-soft -mt-2 text-[13px]">{t('Вы станете владельцем архива.')}</p>
+        <p className="text-ink-soft -mt-2 text-sm">{t('Вы станете владельцем архива.')}</p>
         <div className="flex gap-1">
           {(['ru', 'en'] as const).map((l) => <button type="button" key={l} onClick={() => setLang(l)} className={lang === l ? 'bar-btn on' : 'bar-btn'}>{l === 'ru' ? 'Русский' : 'English'}</button>)}
         </div>
-        <input required autoFocus className={field} placeholder={t('Ваше имя')} value={name} onChange={(e) => setName(e.target.value)} />
-        <input required className={field} placeholder={t('Название семьи')} value={familyName} onChange={(e) => setFamilyName(e.target.value)} />
-        {needsCode && <input required className={field} placeholder={t('Код настройки')} value={code} onChange={(e) => setCode(e.target.value)} />}
-        <label className="flex items-center gap-2 text-ink-soft text-[13px]"><input type="checkbox" checked={demo} onChange={(e) => setDemo(e.target.checked)} /> {t('Загрузить демо-семью')}</label>
+        <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Ваше имя')}<input required autoFocus className={field} value={name} onChange={(e) => setName(e.target.value)} /></label>
+        <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Название семьи')}<input required className={field} value={familyName} onChange={(e) => setFamilyName(e.target.value)} /></label>
+        {needsCode && <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Код настройки')}<input required className={field} value={code} onChange={(e) => setCode(e.target.value)} /></label>}
+        {needsCode && <p className="text-xs text-ink-soft -mt-1">{t('Его показывает программа при первом запуске. Не нашли: спросите того, кто установил архив.')}</p>}
+        <label className="flex items-center gap-2 text-ink-soft text-sm"><input type="checkbox" checked={demo} onChange={(e) => setDemo(e.target.checked)} /> {t('Загрузить пример: вымышленная семья')}</label>
         {error && <p className="text-xs text-destructive">{error}</p>}
         <button className={primary} disabled={busy}>{t('Создать архив')}</button>
       </form>
@@ -55,7 +56,7 @@ export function LoginScreen({ lang, familyName, providers }: { lang: Lang; famil
       <div className={card}>
         <h1 className="font-serif text-2xl font-medium">{familyName || t('Семейный архив')}</h1>
         <p className="font-medium">{t('Вход только по приглашению')}</p>
-        <p className="text-ink-soft text-[13px] -mt-2">{t('Попросите родственника прислать ссылку.')}</p>
+        <p className="text-ink-soft text-sm -mt-2">{t('Попросите родственника, который уже в архиве, прислать вам ссылку.')}</p>
         {providers.google && <button className="bar-btn border border-border !h-10" onClick={() => go('/api/auth/sign-in/social', { provider: 'google', callbackURL: '/' })}>{t('Войти через Google')}</button>}
         {providers.yandex && <button className="bar-btn border border-border !h-10" onClick={() => go('/api/auth/sign-in/oauth2', { providerId: 'yandex', callbackURL: '/' })}>{t('Войти через Яндекс ID')}</button>}
       </div>
@@ -71,21 +72,21 @@ export function InviteScreen({ token, lang, familyName, name, valid }: { token: 
       <div className={card}>
         {valid ? (
           <>
-            <p className="text-ink-soft text-[13px]">{t('Вас пригласили в семейный архив')}</p>
+            <p className="text-ink-soft text-base">{t('Вас пригласили в семейный архив')}</p>
             <h1 className="font-serif text-2xl font-medium -mt-2">{familyName}</h1>
-            <p>{name}</p>
+            {name && <p>{t('Вы войдёте как')}: {name}. {t('Если это не вы, попросите новую ссылку.')}</p>}
             {/* A button, not an automatic sign-in: link previews in messengers must not burn the one-time link. */}
             <button className={primary} disabled={busy} onClick={async () => {
               setBusy(true)
               const r = await post('/api/auth/family/accept', { token })
               if (r.ok) location.href = '/'
               else location.reload()
-            }}>{t('Войти')}</button>
+            }}>{t('Принять приглашение')}</button>
           </>
         ) : (
           <>
             <h1 className="font-serif text-xl font-medium">{t('Ссылка недействительна')}</h1>
-            <p className="text-ink-soft text-[13px]">{t('Ссылка устарела или уже использована. Попросите новую.')}</p>
+            <p className="text-ink-soft text-sm">{t('Ссылка устарела или уже использована. Попросите новую.')}</p>
           </>
         )}
       </div>

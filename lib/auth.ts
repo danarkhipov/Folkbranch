@@ -1,5 +1,3 @@
-import fs from 'node:fs'
-import path from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { betterAuth, type BetterAuthPlugin } from 'better-auth'
 import { drizzleAdapter } from '@better-auth/drizzle-adapter'
@@ -9,17 +7,12 @@ import { genericOAuth } from 'better-auth/plugins'
 import { nextCookies } from 'better-auth/next-js'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { DATA_DIR, getDb, schema } from './db'
+import { getDb, schema } from './db'
 import { findInvite, findOwnerId, hasUsers, isRecoveryToken, setSetting } from './ops/settings'
 import { loadDemo } from './demo'
+import { publicOrigins, publicUrl } from './public-url'
 import { serverSecret } from './server-secret'
 import { setupCodeMatches } from './setup-code'
-
-function baseURL() {
-  if (process.env.BETTER_AUTH_URL) return process.env.BETTER_AUTH_URL
-  if (process.env.RAILWAY_PUBLIC_DOMAIN) return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
-  return `http://localhost:${process.env.PORT || 3417}`
-}
 
 export const providers = () => ({
   google: !!process.env.GOOGLE_CLIENT_ID,
@@ -106,7 +99,10 @@ function build() {
     : []
   return betterAuth({
     secret: serverSecret(),
-    baseURL: baseURL(),
+    baseURL: publicUrl(),
+    trustedOrigins: publicOrigins(),
+    // X-Real-IP is set by the platform's edge; the first entry of X-Forwarded-For can be typed by anyone.
+    advanced: { ipAddress: { ipAddressHeaders: ['x-real-ip', 'x-forwarded-for'] } },
     database: drizzleAdapter(getDb(), { provider: 'sqlite', schema }),
     // Stays alive while in use; a lost phone stops working after three months without it.
     session: { expiresIn: 90 * 24 * 3600, updateAge: 24 * 3600 },

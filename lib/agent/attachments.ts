@@ -19,12 +19,12 @@ const MODEL_IMAGE_SIDE = 1568
 export type AttachmentKind = 'image' | 'pdf' | 'text' | 'binary'
 export interface Attachment { id: string; name: string; kind: AttachmentKind; size: number; createdAt: number }
 
-const ROOT = () => path.join(DATA_DIR, 'agent-files')
+const ROOT = () => path.join(/*turbopackIgnore: true*/ DATA_DIR, 'agent-files')
 const ID = /^[A-Za-z0-9_-]{12}$/
-const dirOf = (userId: string) => path.join(ROOT(), createHash('sha256').update(userId).digest('hex').slice(0, 24))
+const dirOf = (userId: string) => path.join(/*turbopackIgnore: true*/ ROOT(), createHash('sha256').update(userId).digest('hex').slice(0, 24))
 const fileOf = (userId: string, id: string, part: string) => {
   if (!ID.test(id)) throw new OpError(404, 'no such attachment')
-  return path.join(dirOf(userId), `${id}.${part}`)
+  return path.join(/*turbopackIgnore: true*/ dirOf(userId), `${id}.${part}`)
 }
 
 /** Legacy Russian files are often not UTF-8, GEDCOM especially. */
@@ -90,7 +90,7 @@ export async function findAttachment(actor: Actor, ref: string): Promise<Attachm
   if (direct) return direct
   const dir = dirOf(actor.userId)
   const files = (await fs.readdir(dir).catch(() => [] as string[])).filter((f) => f.endsWith('.json'))
-  const all = await Promise.all(files.map(async (f) => JSON.parse(await fs.readFile(path.join(dir, f), 'utf8')) as Attachment))
+  const all = await Promise.all(files.map(async (f) => JSON.parse(await fs.readFile(path.join(/*turbopackIgnore: true*/ dir, f), 'utf8')) as Attachment))
   const named = all.filter((a) => a.name === ref).sort((a, b) => b.createdAt - a.createdAt)[0]
   if (!named) throw new OpError(404, `no attachment ${ref}. Use the id given with the file in the person's message.`)
   return named
@@ -111,9 +111,9 @@ export async function sweepAttachments(now = Date.now()) {
   const users = await fs.readdir(ROOT()).catch(() => [] as string[])
   let removed = 0
   for (const user of users) {
-    const dir = path.join(ROOT(), user)
+    const dir = path.join(/*turbopackIgnore: true*/ ROOT(), user)
     for (const f of await fs.readdir(dir)) {
-      const file = path.join(dir, f)
+      const file = path.join(/*turbopackIgnore: true*/ dir, f)
       if (now - (await fs.stat(file)).mtimeMs > MAX_AGE) {
         await fs.unlink(file)
         removed++

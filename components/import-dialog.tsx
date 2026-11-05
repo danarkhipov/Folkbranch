@@ -81,8 +81,8 @@ export function ImportDialog({ open, file, onOpenChange }: { open: boolean; file
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[min(1000px,calc(100vw-32px))] sm:max-w-[min(1000px,calc(100vw-32px))] max-h-[calc(100vh-64px)] overflow-auto flex flex-col gap-3 text-[13px]">
-        <DialogTitle className="font-serif font-medium text-lg">{t('Импорт')}</DialogTitle>
+      <DialogContent className="max-w-[min(1000px,calc(100vw-32px))] sm:max-w-[min(1000px,calc(100vw-32px))] max-h-[calc(100vh-64px)] overflow-auto flex flex-col gap-3 text-sm">
+        <DialogTitle className="font-serif font-medium text-lg">{t('Добавить людей из файла')}</DialogTitle>
         <input ref={input} type="file" hidden accept=".ged,.gedcom,.csv,.tsv,.xlsx,.json,.txt,.md,text/plain" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void read(f) }} />
 
         {!loaded && (
@@ -95,7 +95,7 @@ export function ImportDialog({ open, file, onOpenChange }: { open: boolean; file
           >
             <Upload size={22} className="text-ink-soft" />
             <span className="font-medium">{t('Перетащите файл сюда или выберите его')}</span>
-            <span className="text-ink-soft">GEDCOM, Excel, CSV, JSON, {t('текст')}</span>
+            <span className="text-ink-soft">{t('Файл программы для родословных, таблица или текст')}</span>
           </button>
         )}
 

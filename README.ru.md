@@ -24,6 +24,8 @@ cd folkbranch && ./install.sh
 
 Скрипт напечатает ссылку. Откройте её, назовите семью, и вы владелец. На сервере: `./install.sh --domain family.example.com`, сертификат HTTPS получится сам. Подробности, резервные копии и обновления: [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md).
 
+Хостинг на Railway: см. [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md#railway).
+
 ## Подключить агента
 
 ```bash

@@ -5,7 +5,6 @@ import { assistantActor } from '../lib/agent/agent'
 import { saveAttachment } from '../lib/agent/attachments'
 import { getDb, schema } from '../lib/db'
 import type { Actor } from '../lib/ops/core'
-import { setSetting } from '../lib/ops/settings'
 import { TOOLS } from '../lib/ops/tools'
 import { loadFamily, owner } from './fixture-family'
 

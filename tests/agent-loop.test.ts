@@ -1,12 +1,12 @@
 // The whole conversation with a scripted model: nothing here calls a real one.
 import { readUIMessageStream, type UIMessage, type UIMessageChunk } from 'ai'
 import { MockLanguageModelV4, simulateReadableStream } from 'ai/test'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { assistantRefusal } from '../lib/agent/agent'
 import { assistantResponse } from '../lib/agent/respond'
 import { getDb, schema } from '../lib/db'
 import { getGraph } from '../lib/ops/people'
-import { getSetting, setSetting } from '../lib/ops/settings'
+import { setSetting } from '../lib/ops/settings'
 import { editor, loadFamily, owner, reader, SECRETS } from './fixture-family'
 
 let f: Awaited<ReturnType<typeof loadFamily>>

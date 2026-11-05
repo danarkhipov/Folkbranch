@@ -7,8 +7,12 @@ export async function register() {
   sweepOrphanFiles().then((n) => { if (n) console.log(`Removed ${n} files left by an interrupted upload.`) }).catch(console.error)
   const { sweepAttachments } = await import('./lib/agent/attachments')
   sweepAttachments().catch(console.error)
+  const { tidyDatabase } = await import('./lib/db')
+  setInterval(tidyDatabase, 6 * 60 * 60 * 1000).unref()
   if (hasUsers()) return
   const code = setupCode()
-  const base = process.env.BETTER_AUTH_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : `http://localhost:${process.env.PORT || 3417}`)
+  const { publicOrigins, publicUrl } = await import('./lib/public-url')
+  const base = publicUrl()
+  if (process.env.RAILWAY_PROJECT_ID && !publicOrigins().length) console.log('This service has no public address yet. In Railway: Settings → Networking → Generate Domain, then redeploy.')
   console.log(`\nFolkbranch is empty. Claim it here:\n  ${base}/setup${code ? `?code=${code}` : ''}\n`)
 }

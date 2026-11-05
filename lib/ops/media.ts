@@ -62,9 +62,10 @@ export function getMedia(actor: Actor, id: string): Media {
 
 // A big photo takes hundreds of megabytes to decode, so a batch on a small server waits its turn.
 sharp.cache(false)
+sharp.concurrency(1)
 let decoding: Promise<unknown>[] = []
 async function inTurn<T>(job: () => Promise<T>): Promise<T> {
-  while (decoding.length >= 2) await Promise.race(decoding).catch(() => {})
+  while (decoding.length >= 1) await Promise.race(decoding).catch(() => {})
   const run = job()
   const done = run.finally(() => { decoding = decoding.filter((d) => d !== done) })
   decoding.push(done)
@@ -75,8 +76,8 @@ async function inTurn<T>(job: () => Promise<T>): Promise<T> {
 async function makeCopies(id: string, buf: Buffer) {
   try {
     const rotated = sharp(buf, { failOn: 'none' }).rotate()
-    const info = await rotated.clone().webp({ quality: 82 }).resize({ width: SIZES.medium, height: SIZES.medium, fit: 'inside', withoutEnlargement: true }).toFile(path.join(MEDIA_DIR, `${id}.medium.webp`))
-    await rotated.clone().webp({ quality: 76 }).resize({ width: SIZES.thumb, height: SIZES.thumb, fit: 'inside', withoutEnlargement: true }).toFile(path.join(MEDIA_DIR, `${id}.thumb.webp`))
+    const info = await rotated.clone().webp({ quality: 82 }).resize({ width: SIZES.medium, height: SIZES.medium, fit: 'inside', withoutEnlargement: true }).toFile(path.join(/*turbopackIgnore: true*/ MEDIA_DIR, `${id}.medium.webp`))
+    await rotated.clone().webp({ quality: 76 }).resize({ width: SIZES.thumb, height: SIZES.thumb, fit: 'inside', withoutEnlargement: true }).toFile(path.join(/*turbopackIgnore: true*/ MEDIA_DIR, `${id}.thumb.webp`))
     return info
   } catch {
     await discardUpload(id)
@@ -96,7 +97,7 @@ export async function storeUpload(buf: Buffer, originalName: string, uploadedBy:
   const ext = path.extname(originalName).toLowerCase().replace(/[^.a-z0-9]/g, '').slice(0, 8)
   const filename = copies ? `${id}.orig${ext || '.' + meta!.format}` : `${id}.file${ext}`
   try {
-    await fs.writeFile(path.join(MEDIA_DIR, filename), buf)
+    await fs.writeFile(path.join(/*turbopackIgnore: true*/ MEDIA_DIR, filename), buf)
   } catch (e) {
     await discardUpload(id)
     throw e
@@ -144,9 +145,9 @@ export async function sweepOrphanFiles(now = Date.now()) {
   }
   let removed = 0
   for (const [id, files] of orphans) {
-    const stats = await Promise.all(files.map((f) => fs.stat(path.join(MEDIA_DIR, f))))
+    const stats = await Promise.all(files.map((f) => fs.stat(path.join(/*turbopackIgnore: true*/ MEDIA_DIR, f))))
     if (stats.some((s) => now - s.mtimeMs < OLD_ENOUGH) || mentioned(id)) continue
-    await Promise.all(files.map((f) => fs.unlink(path.join(MEDIA_DIR, f))))
+    await Promise.all(files.map((f) => fs.unlink(path.join(/*turbopackIgnore: true*/ MEDIA_DIR, f))))
     removed += files.length
   }
   return removed
@@ -155,7 +156,7 @@ export async function sweepOrphanFiles(now = Date.now()) {
 /** Removes the files of an upload that was never accepted. */
 export async function discardUpload(id: string) {
   const files = await fs.readdir(MEDIA_DIR)
-  await Promise.all(files.filter((f) => f.startsWith(`${id}.`)).map((f) => fs.unlink(path.join(MEDIA_DIR, f)).catch(() => null)))
+  await Promise.all(files.filter((f) => f.startsWith(`${id}.`)).map((f) => fs.unlink(path.join(/*turbopackIgnore: true*/ MEDIA_DIR, f)).catch(() => null)))
 }
 
 export function listAllMedia(actor: Actor, limit = 200): Media[] {
@@ -209,7 +210,7 @@ export async function readMediaFile(actor: Actor, id: string, size: MediaSize) {
   const file = r.kind === 'image' && size !== 'orig' ? `${id}.${size}.webp` : r.filename
   return {
     // The camera's record of where a picture was taken stays with those who may edit the archive.
-    data: await fs.readFile(path.join(MEDIA_DIR, file)).then((b) => (r.kind === 'image' && file === r.filename && seesOnlyPublic(actor) ? sharp(b, { failOn: 'none' }).rotate().jpeg({ quality: 92 }).toBuffer() : b)).catch(() => { throw new OpError(404, 'the file is missing') }),
+    data: await fs.readFile(path.join(/*turbopackIgnore: true*/ MEDIA_DIR, file)).then((b) => (r.kind === 'image' && file === r.filename && seesOnlyPublic(actor) ? sharp(b, { failOn: 'none' }).rotate().jpeg({ quality: 92 }).toBuffer() : b)).catch(() => { throw new OpError(404, 'the file is missing') }),
     mime: file.endsWith('.webp') ? 'image/webp' : r.kind === 'image' && seesOnlyPublic(actor) ? 'image/jpeg' : r.mime,
     name: r.originalName,
     download: r.kind !== 'image',
@@ -229,10 +230,10 @@ function cropBox(crop: string | null): Box {
 export async function readAvatar(mediaId: string, crop: string | null) {
   const c = cropBox(crop)
   const key = [c.x, c.y, c.w, c.h].map((n) => Math.round(n * 1000)).join('_')
-  const cached = path.join(MEDIA_DIR, `${mediaId}.avatar.${key}.webp`)
+  const cached = path.join(/*turbopackIgnore: true*/ MEDIA_DIR, `${mediaId}.avatar.${key}.webp`)
   const hit = await fs.readFile(cached).catch(() => null)
   if (hit) return hit
-  const src = path.join(MEDIA_DIR, `${mediaId}.medium.webp`)
+  const src = path.join(/*turbopackIgnore: true*/ MEDIA_DIR, `${mediaId}.medium.webp`)
   const m = await sharp(src).metadata().catch(() => { throw new OpError(404, 'the file is missing') })
   const W = m.width!, H = m.height!
   const left = Math.min(W - 1, Math.round(c.x * W)), top = Math.min(H - 1, Math.round(c.y * H))

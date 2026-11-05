@@ -9,3 +9,6 @@ data
 !.env.example
 *.ged
 docs
+tests
+START_PROMPT.md
+.railway

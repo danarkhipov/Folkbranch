@@ -27,7 +27,7 @@ export function HowRelated({ onPath, onClose }: { onPath: (ids: string[] | null)
     const p = id ? byId.get(id) : null
     return (
       <PersonPopover onPick={set}>
-        <button className="flex items-center gap-2 h-9 px-2 rounded-lg border border-input bg-white w-full text-left text-[13px]">
+        <button className="flex items-center gap-2 h-9 px-2 rounded-lg border border-input bg-white w-full text-left text-sm">
           {p ? <><Mini person={p} /> <span className="truncate">{personName(p)}</span></> : <span className="text-ink-faint">{t(placeholder)}</span>}
         </button>
       </PersonPopover>
@@ -35,13 +35,14 @@ export function HowRelated({ onPath, onClose }: { onPath: (ids: string[] | null)
   }
   return (
     <div className="float side-sheet fixed left-3 top-[60px] w-80 p-3 z-10 flex flex-col gap-2">
-      <div className="flex items-center justify-between"><h3 className="font-serif font-medium text-[15px]">{t('Кем приходится?')}</h3><button className="text-ink-faint hover:text-ink" aria-label={t('Закрыть')} title={t('Закрыть')} onClick={onClose}><X size={15} /></button></div>
-      {slot(a, setA, 'Первый человек')}
-      {slot(b, setB, 'Второй человек')}
-      {a && b && a !== b && !kin && <p className="text-[13px] text-ink-soft">{t('Кровного родства и связи через брак не найдено')}</p>}
+      <div className="flex items-center justify-between"><h3 className="font-serif font-medium text-lg">{t('Кем приходится?')}</h3><button className="text-ink-faint hover:text-ink" aria-label={t('Закрыть')} title={t('Закрыть')} onClick={onClose}><X size={15} /></button></div>
+      <p className="text-sm text-ink-soft">{t('Выберите двух людей, и мы покажем, кем они приходятся друг другу.')}</p>
+      {slot(a, setA, 'Выбрать первого')}
+      {slot(b, setB, 'Выбрать второго')}
+      {a && b && a !== b && !kin && <p className="text-sm text-ink-soft">{t('Кровного родства и связи через брак не найдено')}</p>}
       {kin && (
         <div className="pt-1">
-          <p className="font-serif text-[17px] leading-snug"><span className="text-rust">{kin.label}</span></p>
+          <p className="font-serif text-lg leading-snug"><span className="text-rust">{kin.label}</span></p>
           <p className="text-xs text-ink-soft">{personName(byId.get(b!)!)} — {lang === 'en' ? 'to' : 'для'} {personName(byId.get(a!)!)}</p>
           <div className="mt-2 flex flex-wrap items-center gap-1 text-xs text-ink-soft">
             {kin.path.map((id, i) => (
@@ -66,13 +67,13 @@ export function HistoryPanel({ onClose }: { onClose: () => void }) {
   const fmt = new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
   return (
     <div className="float side-sheet fixed left-3 top-[60px] bottom-3 w-80 flex flex-col z-10">
-      <div className="flex items-center justify-between px-3 pt-3 pb-2"><h3 className="font-serif font-medium text-[15px]">{t('Что нового')}</h3><button className="text-ink-faint hover:text-ink" aria-label={t('Закрыть')} title={t('Закрыть')} onClick={onClose}><X size={15} /></button></div>
+      <div className="flex items-center justify-between px-3 pt-3 pb-2"><h3 className="font-serif font-medium text-lg">{t('История')}</h3><button className="text-ink-faint hover:text-ink" aria-label={t('Закрыть')} title={t('Закрыть')} onClick={onClose}><X size={15} /></button></div>
       <div className="flex-1 overflow-auto px-1.5 pb-2">
-        {!rows.length && <p className="px-2 text-[13px] text-ink-faint">{t('Пока ничего не менялось')}</p>}
+        {!rows.length && <p className="px-2 text-sm text-ink-faint">{t('Пока ничего не менялось')}</p>}
         {rows.map((r) => (
           <div key={r.id} className={cn('group rounded-md px-2 py-1.5 hover:bg-muted', r.undoneAt && 'opacity-50')}>
-            <button className="text-left text-[13px] leading-snug" onClick={() => r.personIds[0] && byId.has(r.personIds[0]) && focus(r.personIds[0], { center: true })}>{r.summary}</button>
-            <div className="flex items-center text-[11px] text-ink-faint mt-0.5">
+            <button className="text-left text-sm leading-snug" onClick={() => r.personIds[0] && byId.has(r.personIds[0]) && focus(r.personIds[0], { center: true })}>{r.summary}</button>
+            <div className="flex items-center text-xs text-ink-faint mt-0.5">
               <span>{r.actorName} · {fmt.format(r.at)}</span>
               {r.undoneAt && <span className="ml-2">{t('Отменено')}</span>}
               {canEdit && !r.undoneAt && !r.undoOf && (
@@ -94,8 +95,9 @@ export function SettingsDialog({ open, onOpenChange, familyName, providers, onTe
   const [section, setSection] = useState<Section>('account')
   const items: [Section, string, LucideIcon][] = [
     ['account', 'Мой аккаунт', UserRound],
-    ...(isOwner ? [['people', 'Люди и доступ', Users], ['archive', 'Архив', Archive_], ['assistant', 'Ассистент', AssistantIcon], ['agents', 'Внешние агенты', KeyRound]] as [Section, string, LucideIcon][] : []),
-    ['data', 'Импорт и экспорт', ArrowLeftRight],
+    ...(isOwner ? [['people', 'Люди и доступ', Users], ['archive', 'Архив', Archive_], ['assistant', 'Ассистент', AssistantIcon]] as [Section, string, LucideIcon][] : []),
+    ['data', 'Файлы', ArrowLeftRight],
+    ...(isOwner ? [['agents', 'Для разработчиков', KeyRound]] as [Section, string, LucideIcon][] : []),
   ]
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -104,7 +106,7 @@ export function SettingsDialog({ open, onOpenChange, familyName, providers, onTe
         <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
           <nav aria-label={t('Настройки')} className="flex shrink-0 gap-0.5 overflow-x-auto border-b border-border p-2 sm:w-52 sm:flex-col sm:overflow-visible sm:border-b-0 sm:border-r">
             {items.map(([id, label, Icon]) => (
-              <button key={id} className={`flex shrink-0 items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] ${section === id ? 'bg-muted font-medium text-ink' : 'text-ink-soft hover:bg-muted/60'}`} aria-current={section === id ? 'page' : undefined} onClick={() => setSection(id)}><Icon size={15} /> {t(label)}</button>
+              <button key={id} className={`flex shrink-0 items-center gap-2 rounded-lg px-2.5 min-h-9 text-left text-sm ${section === id ? 'bg-muted font-medium text-ink' : 'text-ink-soft hover:bg-muted/60'}`} aria-current={section === id ? 'page' : undefined} onClick={() => setSection(id)}><Icon size={15} /> {t(label)}</button>
             ))}
           </nav>
           <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-5 py-4">
@@ -134,18 +136,18 @@ function Account({ providers }: { providers: { google: boolean; yandex: boolean 
     }
   }
   return (
-    <div className="flex flex-col gap-5 text-[13px]">
+    <div className="flex flex-col gap-5 text-sm">
       <section className="flex flex-col gap-1">
-        <h3 className="font-medium">{me.name}</h3>
+        <h3 className="text-base font-medium">{me.name}</h3>
         <p className="text-xs text-ink-soft">{t(roleHelp[me.role])}</p>
       </section>
       {me.role !== 'reader' && (
         <section className="flex flex-col gap-1.5">
-          <h3 className="font-medium">{t('Моя карточка на схеме')}</h3>
-          <p className="text-xs text-ink-soft">{t('Тогда схема покажет, кем вам приходится каждый человек. Выбрать можно только живого.')}</p>
+          <h3 className="text-base font-medium">{t('Моя карточка на схеме')}</h3>
+          <p className="text-xs text-ink-soft">{t('Выберите себя, и схема покажет, кем вам приходится каждый человек. Подойдёт только живой человек.')}</p>
           <div className="flex items-center gap-2">
             <PersonPopover onPick={claim} exclude={[...byId.values()].filter((p) => !p.living || p.deathDate).map((p) => p.id)}>
-              <button type="button" className="h-9 max-w-64 truncate rounded-lg border border-input bg-white px-3">{mine ? personName(mine) : t('Выбрать')}</button>
+              <button type="button" className="h-9 max-w-64 truncate rounded-lg border border-input bg-white px-3">{mine ? personName(mine) : t('Выбрать свою карточку')}</button>
             </PersonPopover>
             {mine && <button type="button" className="text-xs text-ink-soft underline" onClick={() => claim(null)}>{t('Убрать')}</button>}
           </div>
@@ -153,7 +155,7 @@ function Account({ providers }: { providers: { google: boolean; yandex: boolean 
       )}
       {(providers.google || providers.yandex) && (
         <section className="flex flex-col gap-1.5">
-          <h3 className="font-medium">{t('Вход без ссылки')}</h3>
+          <h3 className="text-base font-medium">{t('Вход без ссылки')}</h3>
           <p className="text-xs text-ink-soft">{t('Привяжите аккаунт, чтобы входить снова без новой ссылки.')}</p>
           <div className="flex flex-wrap gap-2">
             {providers.google && <button className="bar-btn border border-border" onClick={() => linkAccount('/api/auth/link-social', { provider: 'google', callbackURL: '/' })}>{t('Привязать Google')}</button>}
@@ -162,14 +164,14 @@ function Account({ providers }: { providers: { google: boolean; yandex: boolean 
         </section>
       )}
       <section className="flex flex-col gap-1.5">
-        <h3 className="font-medium">{t('Устройства')}</h3>
-        <p className="text-xs text-ink-soft">{t('Если потеряли телефон или входили на чужом компьютере.')}</p>
+        <h3 className="text-base font-medium">{t('Устройства')}</h3>
+        <p className="text-xs text-ink-soft">{t('Если потеряли телефон или входили на чужом компьютере. Выйдут все устройства, кроме этого.')}</p>
         <button type="button" className="bar-btn self-start border border-border" onClick={async () => { await fetch('/api/auth/revoke-other-sessions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); notify(t('Другие устройства отключены')) }}>{t('Выйти на других устройствах')}</button>
       </section>
       <section className="flex flex-col gap-1.5">
-        <h3 className="font-medium">{t('Выход')}</h3>
-        <p className="text-xs text-ink-soft">{t('После выхода войти снова можно будет только по новой ссылке или через привязанный Google и Яндекс ID.')}</p>
-        <button type="button" className="bar-btn self-start border border-border" onClick={async () => { await fetch('/api/auth/sign-out', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); location.href = '/login' }}><LogOut size={14} /> {t('Выйти')}</button>
+        <h3 className="text-base font-medium">{t('Выход')}</h3>
+        <p className="text-xs text-ink-soft">{t('Войти снова можно будет по новой ссылке или через Google и Яндекс, если вы их подключили.')}</p>
+        <button type="button" className="bar-btn self-start border border-border" onClick={async () => { await fetch('/api/auth/sign-out', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); location.href = '/login' }}><LogOut size={14} /> {t('Выйти с этого устройства')}</button>
       </section>
     </div>
   )
@@ -185,8 +187,8 @@ const ROLES: Role[] = ['editor', 'reader', 'owner']
 const INVITE_ROLES: Role[] = ['editor', 'reader']
 const roleName: Record<Role, string> = { owner: 'владелец', editor: 'редактор', reader: 'читатель' }
 const roleHelp: Record<Role, string> = {
-  owner: 'Владелец: всё, включая настройки и доступ других людей.',
-  editor: 'Редактор: видит всех и может менять схему и страницы.',
+  owner: 'Вы владелец: можете менять всё, включая настройки и доступ других людей.',
+  editor: 'Редактор: видит всех и может менять схему и биографии.',
   reader: 'Читатель: смотрит схему, живые родственники скрыты.',
 }
 
@@ -210,20 +212,27 @@ function Access() {
   }
   const person = personId ? byId.get(personId) : null
   return (
-    <div className="flex flex-col gap-5 text-[13px]">
+    <div className="flex flex-col gap-5 text-sm">
       <form className="flex flex-col gap-2" onSubmit={async (e) => { e.preventDefault(); if (name.trim()) { await makeLink({ name: name.trim(), role, personId }); setName(''); setPersonId(null) } }}>
-        <h3 className="font-medium">{t('Пригласить человека')}</h3>
-        <input className="h-9 min-w-0 rounded-lg border border-input bg-white px-3" required placeholder={t('Как зовут')} aria-label={t('Как зовут')} value={name} onChange={(e) => setName(e.target.value)} />
-        <div className="flex flex-wrap gap-2">
-          <select aria-label={t('Роль')} className="h-9 rounded-lg border border-input bg-white px-2" value={role} onChange={(e) => setRole(e.target.value as Role)}>
-            {INVITE_ROLES.map((r) => <option key={r} value={r}>{t(roleName[r])}</option>)}
-          </select>
-          <PersonPopover onPick={setPersonId} exclude={[...byId.values()].filter((p) => !p.living || p.deathDate).map((p) => p.id)}>
-            <button type="button" className="h-9 max-w-56 truncate rounded-lg border border-input bg-white px-3 text-ink-soft">{person ? personName(person) : t('Его карточка на схеме')}</button>
-          </PersonPopover>
-          <button className="h-9 rounded-lg bg-ink px-3 whitespace-nowrap text-white">{t('Создать ссылку')}</button>
+        <h3 className="text-base font-medium">{t('Пригласить человека')}</h3>
+        <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Имя')}
+          <input className="h-9 min-w-0 rounded-lg border border-input bg-white px-3 text-sm text-ink" required value={name} onChange={(e) => setName(e.target.value)} />
+        </label>
+        <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
+          <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Что сможет делать')}
+            <select className="h-9 rounded-lg border border-input bg-white px-2 text-sm text-ink" value={role} onChange={(e) => setRole(e.target.value as Role)}>
+              {INVITE_ROLES.map((r) => <option key={r} value={r}>{t(roleName[r])}</option>)}
+            </select>
+          </label>
+          <div className="flex flex-col gap-1 text-xs text-ink-soft">{t('Карточка на схеме (необязательно)')}
+            <PersonPopover onPick={setPersonId} exclude={[...byId.values()].filter((p) => !p.living || p.deathDate).map((p) => p.id)}>
+              <button type="button" className="h-9 min-w-0 truncate rounded-lg border border-input bg-white px-3 text-sm text-ink">{person ? personName(person) : t('Выбрать карточку')}</button>
+            </PersonPopover>
+          </div>
         </div>
-        <p className="text-xs text-ink-soft">{t(roleHelp[role])} {t('Ссылка одноразовая и действует 30 дней.')}</p>
+        <p className="text-xs text-ink-soft">{t('Редактор видит всех и может менять схему и биографии. Читатель только смотрит и не видит живых родственников.')}</p>
+        <button className="h-9 self-start rounded-lg bg-ink px-3 whitespace-nowrap text-white">{t('Создать приглашение')}</button>
+        <p className="text-xs text-ink-soft">{t('Ссылка одноразовая и действует 30 дней.')}</p>
         {link && (
           <div className="flex items-center gap-2 rounded-lg bg-muted px-2 py-1.5">
             <code className="truncate text-xs flex-1">{link}</code>
@@ -232,7 +241,7 @@ function Access() {
         )}
       </form>
       <section>
-        <h4 className="text-xs text-ink-faint mb-1">{t('Люди с доступом')}</h4>
+        <h4 className="text-base font-medium mb-1">{t('Люди с доступом')}</h4>
         {users.map((u) => (
           <div key={u.id} className="flex items-center gap-2 py-1">
             <span className="truncate flex-1">{u.name}</span>
@@ -250,12 +259,12 @@ function Access() {
       </section>
       {invites.length > 0 && (
         <section>
-          <h4 className="text-xs text-ink-faint mb-1">{t('Приглашения, которыми ещё не воспользовались')}</h4>
+          <h4 className="text-base font-medium mb-1">{t('Приглашены, но ещё не вошли')}</h4>
           {invites.map((i) => (
             <div key={i.id} className="flex items-center gap-2 py-1">
               <span className="truncate flex-1">{i.name}</span>
               <span className="text-xs text-ink-faint">{t(roleName[i.role])}</span>
-              <button className="text-xs text-ink-soft hover:text-destructive" onClick={async () => { await api(`invites/${i.id}`, { method: 'DELETE' }); refresh() }}>{t('Отозвать')}</button>
+              <button className="bar-btn border border-border" onClick={async () => { await api(`invites/${i.id}`, { method: 'DELETE' }); refresh() }}>{t('Отменить приглашение')}</button>
             </div>
           ))}
         </section>
@@ -269,7 +278,7 @@ function Archive({ familyName, lang }: { familyName: string; lang: Lang }) {
   const [name, setName] = useState(familyName)
   const save = (json: unknown) => api('settings', { method: 'PATCH', json }).then(() => location.reload())
   return (
-    <div className="flex max-w-sm flex-col gap-3 text-[13px]">
+    <div className="flex max-w-sm flex-col gap-3 text-sm">
       <label className="flex flex-col gap-1 text-ink-soft">{t('Название семьи')}
         <input className="h-9 rounded-lg border border-input bg-white px-3 text-ink" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name !== familyName && name && save({ familyName: name })} />
       </label>
@@ -287,25 +296,25 @@ function DataTab({ onText }: { onText: () => void }) {
   const [hide, setHide] = useState(true)
   const [importing, setImporting] = useState(false)
   return (
-    <div className="flex flex-col gap-5 text-[13px]">
+    <div className="flex flex-col gap-5 text-sm">
       {canEdit && (
         <section className="flex flex-col gap-1.5">
-          <h3 className="font-medium">{t('Добавить людей из файла')}</h3>
-          <p className="text-xs text-ink-soft">{t('GEDCOM из других программ, таблица Excel или CSV, JSON. Перед добавлением покажем, что изменится. Файл можно просто перетащить на схему.')}</p>
+          <h3 className="text-base font-medium">{t('Добавить людей из файла')}</h3>
+          <p className="text-xs text-ink-soft">{t('Подойдёт таблица или файл .ged из программы для родословных. Перед добавлением покажем, что изменится. Файл можно просто перетащить на схему.')}</p>
           <button className="bar-btn self-start border border-border" onClick={() => setImporting(true)}><Upload size={14} /> {t('Выбрать файл')}</button>
           <ImportDialog open={importing} onOpenChange={setImporting} />
         </section>
       )}
       <section className="flex flex-col gap-1.5">
-        <h3 className="font-medium">{t('Скачать схему')}</h3>
-        <p className="text-xs text-ink-soft">{t('GEDCOM открывается в других программах для родословных. В файл входят люди и связи, но не страницы и фотографии.')}</p>
-        <a className="bar-btn self-start border border-border" href={`/api/v1/gedcom/export?living=${hide ? 'hide' : 'show'}`}><Download size={14} /> {t('Скачать GEDCOM')}</a>
-        {me.role !== 'reader' && <label className="flex items-center gap-2 text-ink-soft"><input type="checkbox" checked={hide} onChange={(e) => setHide(e.target.checked)} /> {t('Не включать живых родственников')}</label>}
+        <h3 className="text-base font-medium">{t('Скачать файл для других программ')}</h3>
+        <p className="text-xs text-ink-soft">{t('Файл .ged открывается в программах для родословных. В него входят люди и связи, но не биографии и фотографии.')}</p>
+        {me.role !== 'reader' && <label className="flex items-center gap-2 text-ink"><input type="checkbox" checked={hide} onChange={(e) => setHide(e.target.checked)} /> {t('Не включать живых родственников в файл')}</label>}
+        <a className="bar-btn self-start border border-border" href={`/api/v1/gedcom/export?living=${hide ? 'hide' : 'show'}`}><Download size={14} /> {t('Скачать файл')}</a>
       </section>
       <section className="flex flex-col gap-1.5">
-        <h3 className="font-medium">{t('Схема текстом')}</h3>
+        <h3 className="text-base font-medium">{t('Схема текстом')}</h3>
         <p className="text-xs text-ink-soft">{t('Вся схема как простой текст: удобно посмотреть, скопировать или дописать сразу много людей.')}</p>
-        <button className="bar-btn self-start border border-border" onClick={onText}><FileText size={14} /> {t('Открыть')}</button>
+        <button className="bar-btn self-start border border-border" onClick={onText}><FileText size={14} /> {t('Открыть текст')}</button>
       </section>
     </div>
   )

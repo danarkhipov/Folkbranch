@@ -1,21 +1,12 @@
-import { translate } from '../i18n'
 import { createHash, randomBytes } from 'node:crypto'
 import { desc, eq, isNull } from 'drizzle-orm'
 import { getDb, schema } from '../db'
 import type { HistoryEntry, Role } from '../types'
 import { Actor, newId, OpError, requireRole, seesOnlyPublic } from './core'
+import { say } from './app-config'
 import { getGraph } from './people'
 
-/** A label in the archive's language, for summaries written on the server. */
-export const say = (key: string) => translate(getSetting('language') === 'en' ? 'en' : 'ru', key)
-
-export function getSetting(key: string): string | null {
-  return getDb().select().from(schema.settings).where(eq(schema.settings.key, key)).get()?.value ?? null
-}
-
-export function setSetting(key: string, value: string) {
-  getDb().insert(schema.settings).values({ key, value }).onConflictDoUpdate({ target: schema.settings.key, set: { value } }).run()
-}
+export { getSetting, say, setSetting } from './app-config'
 
 export const hasUsers = () => !!getDb().select({ id: schema.user.id }).from(schema.user).limit(1).get()
 
@@ -108,7 +99,9 @@ export function setMyPerson(actor: Actor, personId: string | null) {
 
 export function listHistory(actor: Actor, limit = 100): HistoryEntry[] {
   const db = getDb()
-  const rows = db.select().from(schema.history).orderBy(desc(schema.history.at)).limit(limit).all()
+  // Without `changes`: it can hold whole page texts, and this list only shows who did what.
+  const h = schema.history
+  const rows = db.select({ id: h.id, at: h.at, actorName: h.actorName, summary: h.summary, personIds: h.personIds, undoOf: h.undoOf, undoneAt: h.undoneAt }).from(h).orderBy(desc(h.at)).limit(limit).all()
   const hidden = seesOnlyPublic(actor) ? new Set(getGraph(actor).persons.filter((p) => p.hidden).map((p) => p.id)) : new Set<string>()
   return rows
     .map((r) => ({ id: r.id, at: r.at, actorName: r.actorName, summary: r.summary, personIds: JSON.parse(r.personIds) as string[], undoOf: r.undoOf, undoneAt: r.undoneAt }))

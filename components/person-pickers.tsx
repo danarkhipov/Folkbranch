@@ -27,9 +27,9 @@ function PeopleList({ onPick, exclude }: { onPick: (id: string) => void; exclude
   const people = useVisible(exclude)
   return (
     <Command>
-      <CommandInput placeholder={t('Поиск по имени…')} />
+      <CommandInput placeholder={t('Поиск по имени…')} aria-label={t('Поиск по имени…')} />
       <CommandList>
-        <CommandEmpty>{t('Никого не нашли')}</CommandEmpty>
+        <CommandEmpty>{t('Никого не нашли. Проверьте написание или введите только фамилию')}</CommandEmpty>
         {people.map((p) => (
           <CommandItem key={p.id} value={`${personName(p)} ${p.maidenName} ${p.birthYear ?? ''} ${p.tags.join(' ')} ${p.id}`} onSelect={() => onPick(p.id)}>
             <Mini person={p} />
@@ -69,13 +69,14 @@ export function PersonPopover({ children, onPick, exclude, open, onOpenChange }:
   )
 }
 
-export function ConfirmDialog({ state, onClose }: { state: { text: string; action: string; resolve: (v: boolean) => void } | null; onClose: () => void }) {
+export function ConfirmDialog({ state, onClose }: { state: { text: string; action: string; note?: string; resolve: (v: boolean) => void } | null; onClose: () => void }) {
   const { t } = useApp()
   const done = (v: boolean) => { state?.resolve(v); onClose() }
   return (
     <Dialog open={!!state} onOpenChange={(o) => !o && done(false)}>
       <DialogContent className="max-w-sm" showCloseButton={false}>
-        <DialogTitle className="font-serif font-medium text-base leading-snug">{state?.text}</DialogTitle>
+        <DialogTitle className="font-serif font-medium text-lg">{state?.text}</DialogTitle>
+        {state?.note && <p className="text-sm text-ink-soft">{state.note}</p>}
         <div className="flex justify-end gap-2 mt-2">
           <button className="bar-btn" onClick={() => done(false)}>{t('Отмена')}</button>
           <button className="bar-btn on !bg-destructive" autoFocus onClick={() => done(true)}>{state?.action}</button>

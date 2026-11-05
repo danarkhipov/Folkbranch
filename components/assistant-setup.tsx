@@ -1,11 +1,12 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ExternalLink, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { PRESETS, type PresetId } from '@/lib/agent/presets'
 import { api, useApp } from '@/lib/client'
 import type { AssistantState } from '@/lib/types'
+import { PanelEdge } from './panel-size'
 
 export interface ProviderStatus { connected: boolean; provider: PresetId | 'local' | null; label: string | null; model: string | null; source: 'server' | 'app' | null; keyEnding: string | null }
 export const useProviderStatus = () => useQuery({ queryKey: ['provider'], queryFn: () => api<ProviderStatus>('assistant/provider') })
@@ -21,58 +22,15 @@ export function ModelSelect({ presetId, value, onChange }: { presetId: PresetId;
   const current = models.find((m) => m.id === (value || models[0].id))
   return (
     <label className="flex flex-col gap-1 text-xs text-ink-soft">
-      {t('Модель')}
-      <select aria-label={t('Модель')} className="h-9 w-full rounded-lg border border-input bg-white px-2 text-[13px] text-ink" value={custom ? CUSTOM : value || models[0].id} onChange={(e) => { const c = e.target.value === CUSTOM; setCustom(c); onChange(c ? '' : e.target.value) }}>
+      {t('Нейросеть')}
+      <select aria-label={t('Нейросеть')} className="h-9 w-full rounded-lg border border-input bg-white px-2 text-sm text-ink" value={custom ? CUSTOM : value || models[0].id} onChange={(e) => { const c = e.target.value === CUSTOM; setCustom(c); onChange(c ? '' : e.target.value) }}>
         {models.map((m) => <option key={m.id} value={m.id}>{m.label}, {m.price}</option>)}
-        <option value={CUSTOM}>{t('Другая модель…')}</option>
+        <option value={CUSTOM}>{t('Другая нейросеть…')}</option>
       </select>
-      {custom && <input aria-label={t('Название модели')} placeholder={t('Название модели')} className="h-9 w-full rounded-lg border border-input bg-white px-2 font-mono text-ink" value={value} onChange={(e) => onChange(e.target.value)} />}
+      {custom && <input aria-label={t('Название нейросети')} placeholder={t('Название нейросети')} className="h-9 w-full rounded-lg border border-input bg-white px-2 font-mono text-ink" value={value} onChange={(e) => onChange(e.target.value)} />}
       {!custom && current?.note && <span>{t(current.note)}</span>}
-      <span className="text-ink-faint">{t('Цена за миллион токенов: ввод / вывод')}</span>
+      <span className="text-ink-faint">{t('Цена примерно за тысячу страниц текста: ваш вопрос / ответ нейросети')}</span>
     </label>
-  )
-}
-
-/** A size the person dragged to, remembered in this browser. */
-export function useStoredSize(key: string, initial: number, clamp: (n: number) => number) {
-  const [size, setSize] = useState(initial)
-  useEffect(() => {
-    try {
-      const saved = Number(localStorage.getItem(key))
-      if (saved) setSize(clamp(saved))
-    } catch {}
-  }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
-  const change = (n: number) => {
-    const next = clamp(n)
-    setSize(next)
-    try { localStorage.setItem(key, String(next)) } catch {}
-  }
-  return [size, change] as const
-}
-
-export const useAssistantWidth = () => useStoredSize('assistant-width', 420, (w) => Math.round(Math.max(340, Math.min(w, Math.min(900, window.innerWidth - 80)))))
-
-/** The handle on a panel's edge: drag it, or use the arrow keys when it has focus. A double click goes back to `home`. */
-export function PanelEdge({ width, onWidth, home = 420, edge = 'right', label = 'Ширина чата', className }: { width: number; onWidth: (w: number) => void; home?: number; edge?: 'right' | 'left' | 'top'; label?: string; className?: string }) {
-  const { t } = useApp()
-  const start = useRef<{ at: number; width: number } | null>(null)
-  const place = (e: { clientX: number; clientY: number }) => (edge === 'top' ? e.clientY : e.clientX)
-  const sign = edge === 'right' ? 1 : -1
-  return (
-    <div
-      role="separator" aria-orientation={edge === 'top' ? 'horizontal' : 'vertical'} aria-label={t(label)} aria-valuenow={width} tabIndex={0}
-      className={`panel-edge panel-edge-${edge} ${className ?? 'max-sm:hidden'}`}
-      onPointerDown={(e) => { start.current = { at: place(e), width }; e.currentTarget.setPointerCapture(e.pointerId); document.body.style.userSelect = 'none' }}
-      onPointerMove={(e) => { if (start.current) onWidth(start.current.width + sign * (place(e) - start.current.at)) }}
-      onPointerUp={() => { start.current = null; document.body.style.userSelect = '' }}
-      onDoubleClick={() => onWidth(home)}
-      onKeyDown={(e) => {
-        const grow = edge === 'top' ? 'ArrowUp' : edge === 'left' ? 'ArrowLeft' : 'ArrowRight'
-        const shrink = edge === 'top' ? 'ArrowDown' : edge === 'left' ? 'ArrowRight' : 'ArrowLeft'
-        if (e.key === grow) onWidth(width + 24)
-        if (e.key === shrink) onWidth(width - 24)
-      }}
-    />
   )
 }
 
@@ -105,13 +63,13 @@ export function ProviderForm({ onDone }: { onDone?: () => void }) {
     }
   }
   return (
-    <form className="flex flex-col gap-3 text-[13px]" onSubmit={connect}>
+    <form className="flex flex-col gap-3 text-sm" onSubmit={connect}>
       <fieldset className="flex flex-col gap-1.5">
-        <legend className="mb-1 text-xs text-ink-soft">{t('Выберите провайдера')}</legend>
+        <legend className="mb-1 text-xs text-ink-soft">{t('Выберите сервис')}</legend>
         {PRESETS.map((p) => (
           <label key={p.id} className={`flex cursor-pointer items-start gap-2 rounded-lg border px-2.5 py-2 ${p.id === id ? 'border-ink bg-white' : 'border-border'}`}>
             <input type="radio" name="provider" className="mt-0.5 accent-[var(--ink)]" checked={p.id === id} onChange={() => { setId(p.id); setError(''); setModel('') }} />
-            <span className="min-w-0"><span className="block font-medium">{p.label}</span><span className="block text-xs text-ink-soft">{t(p.pitch)}</span></span>
+            <span className="min-w-0"><span className="block font-medium">{p.label}</span>{p.pitch && <span className="block text-xs text-ink-soft">{t(p.pitch)}</span>}</span>
           </label>
         ))}
       </fieldset>
@@ -119,10 +77,13 @@ export function ProviderForm({ onDone }: { onDone?: () => void }) {
         <li><span className="text-ink-soft">1.</span> <a className="inline-flex items-center gap-1 underline" href={preset.keysUrl} target="_blank" rel="noreferrer noopener">{t('Откройте страницу ключей')} {preset.label} <ExternalLink size={12} /></a></li>
         <li><span className="text-ink-soft">2.</span> {t(preset.howTo)}</li>
         <li className="flex flex-col gap-1.5"><span><span className="text-ink-soft">3.</span> {t('Скопируйте ключ и вставьте его сюда')}</span>
-          <input type="password" autoComplete="off" spellCheck={false} aria-label={t('Ключ провайдера')} placeholder={t('Ключ провайдера')} className="h-9 w-full rounded-lg border border-input bg-white px-3 font-mono text-xs" value={key} onChange={(e) => { setKey(e.target.value); setError('') }} />
+          <input type="password" autoComplete="off" spellCheck={false} aria-label={t('Ключ')} placeholder={t('Ключ')} className="h-9 w-full rounded-lg border border-input bg-white px-3 font-mono text-xs" value={key} onChange={(e) => { setKey(e.target.value); setError('') }} />
         </li>
       </ol>
-      <ModelSelect presetId={id} value={model} onChange={setModel} />
+      <details>
+        <summary className="cursor-pointer text-ink-soft">{t('Выбрать другую нейросеть')}</summary>
+        <div className="mt-2"><ModelSelect presetId={id} value={model} onChange={setModel} /></div>
+      </details>
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
       <button className="h-9 rounded-lg bg-ink px-3 text-white disabled:opacity-50" disabled={busy || key.trim().length < 10}>{t(busy ? 'Проверяю ключ…' : 'Проверить и подключить')}</button>
     </form>
@@ -139,10 +100,10 @@ export default function AssistantSetup({ state, open, onClose, width, onWidth }:
     router.refresh()
   }
   return (
-    <aside hidden={!open} aria-label={t('Ассистент')} style={{ width: `min(${width}px, calc(100vw - 24px))` }} className="assistant side-sheet float fixed left-3 top-[60px] bottom-3 z-10 flex flex-col !bg-[#fffdf8] text-[13.5px] [&[hidden]]:hidden">
+    <aside hidden={!open} aria-label={t('Ассистент')} style={{ width: `min(${width}px, calc(100vw - 24px))` }} className="assistant side-sheet float fixed left-3 top-[60px] bottom-3 z-10 flex flex-col !bg-[#fffdf8] text-sm [&[hidden]]:hidden">
       <PanelEdge width={width} onWidth={onWidth} />
       <header className="flex items-center gap-1 border-b border-border py-1 pl-3 pr-1">
-        <h2 className="flex-1 font-serif text-[15px] font-medium">{t('Ассистент')}</h2>
+        <h2 className="flex-1 font-serif text-lg font-medium">{t('Ассистент')}</h2>
         <button className="bar-btn" title={t('Закрыть')} aria-label={t('Закрыть')} onClick={onClose}><X size={15} /></button>
       </header>
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
@@ -151,15 +112,15 @@ export default function AssistantSetup({ state, open, onClose, width, onWidth }:
         {reason === 'off' && !state.canFix && <p>{t('Владелец архива выключил ассистента.')}</p>}
         {reason === 'off' && state.canFix && (
           <>
-            <p>{t('Ассистент выключен. Ключ провайдера уже есть.')}</p>
+            <p>{t('Ассистент выключен. Включите его, чтобы задавать вопросы о семье.')}</p>
             <button className="h-9 rounded-lg bg-ink px-3 text-white" onClick={enable}>{t('Включить ассистента')}</button>
           </>
         )}
         {reason === 'no-key' && state.canFix && (
           <>
             <div>
-              <h3 className="font-serif text-[15px] font-medium">{t('Подключите ассистента')}</h3>
-              <p className="text-xs text-ink-soft">{t('Ему нужен ключ провайдера нейросети. Это займёт пару минут, а сделать это нужно один раз.')}</p>
+              <h3 className="text-base font-medium mb-1">{t('Подключите ассистента')}</h3>
+              <p className="text-xs text-ink-soft">{t('Ассистенту нужен ключ от сервиса нейросетей. Настройка займёт пару минут, делать её нужно один раз.')}</p>
             </div>
             <ProviderForm />
           </>

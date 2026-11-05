@@ -11,7 +11,7 @@ import { DATA_DIR } from './db'
 export function setupCode(): string | null {
   if (process.env.SETUP_TOKEN) return process.env.SETUP_TOKEN
   if (process.env.NODE_ENV !== 'production') return null
-  const file = path.join(DATA_DIR, 'setup-code')
+  const file = path.join(/*turbopackIgnore: true*/ DATA_DIR, 'setup-code')
   if (!fs.existsSync(file)) {
     fs.mkdirSync(DATA_DIR, { recursive: true })
     fs.writeFileSync(file, randomBytes(18).toString('base64url'), { mode: 0o600 })

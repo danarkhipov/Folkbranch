@@ -1,9 +1,10 @@
 import { and, eq, or } from 'drizzle-orm'
-import { getDb, schema } from '../db'
+import { dataStamp, getDb, schema } from '../db'
 import type { Certainty, Claim, Fact, Graph, ParentKind, Person, Sex, Source, UnionKind } from '../types'
 import { personName, yearOf } from '../types'
 import { Actor, Changes, can, mutate, newId, OpError, requireRole, seesOnlyPublic } from './core'
-import { say } from './settings'
+import { say } from './app-config'
+import { reconcile } from './merge'
 
 const label = (p: { givenName: string; surname: string } | undefined) => (p && personName(p)) || say('Без названия')
 
@@ -16,19 +17,57 @@ export function hiddenFor(actor: Actor, p: { id: string; living: boolean }) {
   return seesOnlyPublic(actor) && p.living && p.id !== actor.personId
 }
 
-export function getGraph(actor: Actor): Graph {
+const HIDE = (p: any) => ({ ...p, givenName: '', surname: '', maidenName: '', patronymic: '', otherNames: '', birthDate: '', birthYear: null, birthPlace: '', deathDate: '', deathPlace: '', sex: 'U' as Sex, avatarMediaId: null, avatarCrop: null, tags: [], facts: [], sources: [], claims: [], hidden: true })
+
+const PERSON_JSON = (r: any) => ({ ...r, tags: JSON.parse(r.tags ?? '[]') as string[], facts: JSON.parse(r.facts ?? '[]') as Fact[], sources: JSON.parse(r.sources ?? '[]') as Source[], claims: JSON.parse(r.claims ?? '[]') })
+
+const BOOT = Date.now().toString(36)
+interface GraphEntry { stamp: string; graph: Graph; json?: string; hidden?: Map<string, Graph['persons'][number]> }
+const shared = globalThis as unknown as { __folkbranch?: GraphEntry }
+
+/** Everyone and all links as they stand, parsed once per change. Shared by all callers: read it, never change it. */
+function wholeGraph() {
+  const stamp = dataStamp()
+  if (stamp && shared.__folkbranch?.stamp === stamp) return shared.__folkbranch
   const db = getDb()
-  const rows = db.select().from(schema.persons).all() as unknown as (Omit<Person, 'tags' | 'facts' | 'sources' | 'claims'> & { tags: string; facts: string; sources: string; claims: string })[]
-  return {
-    persons: rows.map((r) => {
-      const p = { ...r, tags: JSON.parse(r.tags ?? '[]') as string[], facts: JSON.parse(r.facts ?? '[]') as Fact[], sources: JSON.parse(r.sources ?? '[]') as Source[], claims: JSON.parse(r.claims ?? '[]') as Claim[] }
-      return hiddenFor(actor, p)
-        ? { ...p, givenName: '', surname: '', maidenName: '', patronymic: '', otherNames: '', birthDate: '', birthYear: null, birthPlace: '', deathDate: '', deathPlace: '', sex: 'U' as Sex, avatarMediaId: null, avatarCrop: null, tags: [], facts: [], sources: [], claims: [], hidden: true }
-        : p
-    }),
-    parentChild: db.select().from(schema.parentChild).all() as Graph['parentChild'],
-    unions: db.select().from(schema.unions).all() as Graph['unions'],
-  }
+  const graph = {
+    persons: db.select().from(schema.persons).all().map(PERSON_JSON),
+    parentChild: db.select().from(schema.parentChild).all(),
+    unions: db.select().from(schema.unions).all(),
+  } as unknown as Graph
+  const entry: GraphEntry = { stamp: stamp ?? '', graph }
+  if (process.env.VITEST) deepFreeze(graph)
+  if (stamp) shared.__folkbranch = entry
+  return entry
+}
+
+function deepFreeze(o: unknown) {
+  if (!o || typeof o !== 'object' || Object.isFrozen(o)) return
+  Object.freeze(o)
+  Object.values(o).forEach(deepFreeze)
+}
+
+export function getGraph(actor: Actor): Graph {
+  const entry = wholeGraph()
+  const { graph } = entry
+  if (!seesOnlyPublic(actor)) return graph
+  const hidden = (entry.hidden ??= new Map(graph.persons.filter((p) => p.living).map((p) => [p.id, HIDE(p)])))
+  return { ...graph, persons: graph.persons.map((p) => (hiddenFor(actor, p) ? hidden.get(p.id)! : p)) }
+}
+
+/** Whether this person may know that someone has a card open. Asked often, so it builds no graph. */
+export function canSeePerson(actor: Actor, id: string) {
+  if (!seesOnlyPublic(actor)) return true
+  const entry = wholeGraph()
+  return !(entry.hidden ??= new Map(entry.graph.persons.filter((p) => p.living).map((p) => [p.id, HIDE(p)]))).has(id) || id === actor.personId
+}
+
+/** The graph as sent to a page, with a tag that lets an unchanged one travel as a short "not modified". */
+export function graphForPage(actor: Actor): { etag: string | null; body: () => string } {
+  const entry = wholeGraph()
+  const stamp = dataStamp()
+  const etag = stamp ? `"${BOOT}.${stamp}.${seesOnlyPublic(actor) ? `r${actor.personId}` : 'all'}"` : null
+  return { etag, body: () => (seesOnlyPublic(actor) ? JSON.stringify(getGraph(actor)) : (entry.json ??= JSON.stringify(entry.graph))) }
 }
 
 export function getPersonRow(id: string) {
@@ -123,17 +162,9 @@ function link(c: Changes, type: QuickRelation, to: string, other: string, otherP
 }
 
 function isAncestor(candidate: string, of: string) {
-  const db = getDb()
-  const seen = new Set<string>()
-  const stack = [of]
-  while (stack.length) {
-    const cur = stack.pop()!
-    if (cur === candidate) return true
-    if (seen.has(cur)) continue
-    seen.add(cur)
-    db.select().from(schema.parentChild).where(eq(schema.parentChild.childId, cur)).all().forEach((r) => stack.push(r.parentId))
-  }
-  return false
+  return !!getDb().$client.prepare(`
+    with recursive up(id) as (select ? union select p.parent_id from parent_child p join up on p.child_id = up.id)
+    select 1 from up where id = ? limit 1`).get(of, candidate)
 }
 
 export function addParent(c: Changes, parentId: string, childId: string, kind: ParentKind = 'birth', certainty: Certainty = 'family') {
@@ -156,15 +187,16 @@ export function addUnion(c: Changes, aId: string, bId: string, kind: UnionKind =
 }
 
 const FIELD: Record<string, string> = {
-  givenName: 'Имя', surname: 'Фамилия', maidenName: 'Девичья фамилия', patronymic: 'Отчество', otherNames: 'Другие имена', tags: 'Группа или метка', facts: 'Факты', sources: 'Источники', claims: 'Версии', sex: 'Пол', birthDate: 'Рождение', birthPlace: 'Место рождения',
+  givenName: 'Имя', surname: 'Фамилия', maidenName: 'Девичья фамилия', patronymic: 'Отчество', otherNames: 'Другие имена', tags: 'Название группы', facts: 'Факты', sources: 'Источники', claims: 'Версии', sex: 'Пол', birthDate: 'Рождение', birthPlace: 'Место рождения',
   deathDate: 'Смерть', deathPlace: 'Место смерти', living: 'Жив', certainty: 'Уверенность',
 }
 
-export function updatePerson(actor: Actor, id: string, input: PersonInput) {
+export function updatePerson(actor: Actor, id: string, input: PersonInput, seen?: Record<string, unknown>) {
   requireRole(actor, 'editor')
   const p = getPersonRow(id)
   return mutate(actor, { summary: `${label(p)}: ${Object.keys(input).map((k) => say(FIELD[k] ?? k)).join(', ')}`, personIds: [id], key: `person:${id}` }, (c) => {
-    const row = normalize(input)
+    // Read here, inside the write: nothing can slip in between the comparison and the change.
+    const row = normalize(seen ? reconcile(getPersonRow(id), input as Record<string, unknown>, seen) as PersonInput : input)
     if (input.deathDate && input.living === undefined) row.living = false
     return c.update('persons', id, row)
   }) as Person

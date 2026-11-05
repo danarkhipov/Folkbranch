@@ -7,7 +7,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import Database from 'better-sqlite3'
 
-const DATA_DIR = path.resolve(process.env.DATA_DIR || './data')
+// A platform's shell opens as root, and a file made by root would lock the running app out of it.
+if (process.getuid?.() === 0) { process.setgid('node'); process.setuid('node') }
+const DATA_DIR = path.resolve(process.env.RAILWAY_VOLUME_MOUNT_PATH || process.env.DATA_DIR || './data')
 const dbFile = path.join(DATA_DIR, 'family.db')
 const hash = (t) => createHash('sha256').update(t).digest('hex')
 const newId = () => randomBytes(9).toString('base64url')

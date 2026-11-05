@@ -2,7 +2,7 @@
 import { z } from 'zod'
 import { MockLanguageModelV4, simulateReadableStream } from 'ai/test'
 import { readUIMessageStream, type ModelMessage, type UIMessage, type UIMessageChunk } from 'ai'
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { activeToolNames, assistantActor, buildAgent, lean, mustFinish, trimHistory } from '../lib/agent/agent'
 import { saveAttachment } from '../lib/agent/attachments'
 import { assistantResponse } from '../lib/agent/respond'
@@ -44,10 +44,6 @@ async function send(messages: UIMessage[], m: MockLanguageModelV4, extra: Record
   const stream = new ReadableStream<UIMessageChunk>({ start(c) { chunks.forEach((x) => c.enqueue(x)); c.close() } })
   for await (const x of readUIMessageStream({ stream, message: messages.at(-1)?.role === 'assistant' ? messages.at(-1) : undefined })) message = x
   return { message: message!, parts: message!.parts as any[], chunks }
-}
-const approve = (r: { parts: any[]; message: UIMessage }) => {
-  for (const p of r.parts.filter((x) => x.state === 'approval-requested')) { p.state = 'approval-responded'; p.approval = { ...p.approval, approved: true } }
-  return r.message
 }
 
 describe('whose card is mine', () => {

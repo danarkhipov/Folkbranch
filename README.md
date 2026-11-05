@@ -24,6 +24,8 @@ cd folkbranch && ./install.sh
 
 The script prints a link. Open it, name your family, and you are the owner. Use `./install.sh --domain family.example.com` on a server: it obtains an HTTPS certificate by itself. More options, backups and updates: [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md).
 
+Hosting on Railway instead: see [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md#railway).
+
 ## Connect an agent
 
 ```bash

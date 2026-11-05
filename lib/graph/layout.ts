@@ -1,23 +1,35 @@
 // Family layout, following pedigree-chart conventions: partners side by side with the man on
 // the left, a straight line between them, children hanging from one shared bar, eldest on the
 // left, and every line made of horizontal and vertical segments.
-// dagre only decides the generations and a first order; the rest is computed here.
+// dagre only decides the generations and a first order. `order.ts` then chooses who stands where
+// to cross least, and `tracks.ts` the heights of the bars; both are named after the methods they use.
 import dagre from '@dagrejs/dagre'
-import type { Graph, ParentLink, Union } from '../types'
+import { lifeYears, type Graph, type ParentLink, type Person, type Union } from '../types'
+import { orderRows, type OrderEdge, type OrderNode } from './order'
+import { assignTracks, type Net } from './tracks'
+import { boxOf, type Box } from './visible'
 
 export const CARD_W = 156
 export const CARD_H = 118
 export const AVATAR_CY = 34
 const AVATAR_R = 30
+/** Partners stand further apart than a caption is wide, so the line down from their dot is never under a name. */
+export const PITCH = 178
 const RANK_SEP = 76
-const NODE_SEP = 44
+const NODE_SEP = 22
+/** A line passing through a row takes this little room, and stays clear of captions on both sides. */
+const PASS_W = 12
 const LANE = 10
+/** Between a bar and the rows above and below it. */
+const GAP_EDGE = 26
 const CORNER = 8
 
 export type LineStyle = 'solid' | 'adopted' | 'assumed'
 export interface CardPos { id: string; x: number; y: number }
-export interface UnionPos { id: string; union: Union; x: number; y: number; path: string; x1: number; x2: number }
-export interface EdgePos { id: string; childId: string; parentIds: string[]; path: string; style: LineStyle; links: ParentLink[]; familyKey: string; /** The stretch that belongs to this child alone, from its bar down to it. */ own: string
+export interface UnionPos { id: string; union: Union; x: number; y: number; path: string; x1: number; x2: number; box: Box }
+export interface EdgePos { id: string; childId: string; parentIds: string[]; path: string; style: LineStyle; links: ParentLink[]; familyKey: string
+  /** Around the whole bar with its trunk and all the siblings, so the shared part is never cut. */ box: Box
+  /** The stretch that belongs to this child alone, from its bar down to it. */ own: string
   /** The part shared with siblings: from the parents down to the bar, and the bar itself. */ shared: string
   /** Siblings hanging from one bar share a group. */ group: string
   barAt: [number, number]
@@ -29,7 +41,10 @@ export interface Layout {
   bounds: { x: number; y: number; w: number; h: number }
 }
 
-interface Block { key: string; members: string[]; rank: number; x: number; width: number }
+/** Past the card's text, however it wraps, and past its plus buttons. */
+export const cardBox = (c: CardPos): Box => [c.x - CARD_W / 2, c.y - 30, c.x + CARD_W / 2, c.y + 260]
+
+interface Block extends OrderNode { rank: number; x: number; width: number }
 
 /** Groups spouses into blocks, refusing a merge that would put a parent and child side by side. */
 function buildBlocks(g: Graph) {
@@ -123,288 +138,281 @@ export function orthogonal(points: [number, number][]) {
 
 /** Lines end here, behind the caption's opaque background, which cuts them off at the text. */
 const UNDER_CAPTION = AVATAR_CY + AVATAR_R + 12
-const NAME_CHARS = 17
-const NAME_LINE = 17
+const NAME_CHARS = 14
+const YEAR_CHARS = 17
+// All at the largest size captions reach when the chart is zoomed out.
+const TEXT_LINE = 24
+const YEAR_LINE = 24
+const LABEL_LINE = 30
 
-/** How tall a card's caption gets: names wrap by words, and a relation label may sit under the years. */
-function cardHeight(name: string) {
+/** How many lines a text takes when it wraps by words. */
+function wrappedLines(text: string, width: number) {
   let lines = 1, used = 0
-  for (const word of name.split(/\s+/).filter(Boolean)) {
-    if (used && used + 1 + word.length > NAME_CHARS) { lines++; used = word.length }
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    if (used && used + 1 + word.length > width) { lines++; used = word.length }
     else used += (used ? 1 : 0) + word.length
+    // A word wider than the caption is broken across lines.
+    while (used > width) { lines++; used -= width }
   }
-  return AVATAR_CY + AVATAR_R + 13 + lines * NAME_LINE + 15 + 20
+  return lines
+}
+/** How tall a card's caption gets: names and long dates wrap, and a relation label may sit under the years. */
+function cardHeight(p: Person | undefined) {
+  const years = p ? lifeYears(p) : ''
+  return AVATAR_CY + AVATAR_R + 13 + wrappedLines(p ? `${p.givenName ?? ''} ${p.surname ?? ''}` : '', NAME_CHARS) * TEXT_LINE + wrappedLines(years, YEAR_CHARS) * YEAR_LINE + LABEL_LINE
 }
 const mean = (xs: number[]) => xs.reduce((a, c) => a + c, 0) / xs.length
 
-/** dagre takes most of the time on a large family, and only the shape of the tree matters to it, so editing a name or a date reuses its answer. */
-let lastPlacing: { key: string; placed: Map<string, { x: number; y: number }> } | null = null
-function placeBlocks(d: InstanceType<typeof dagre.graphlib.Graph>, members: Map<string, Set<string>>) {
-  const key = JSON.stringify([[...members].map(([k, m]) => [k, m.size]), d.edges().map((e: { v: string; w: string }) => [e.v, e.w])])
-  if (lastPlacing?.key === key) return lastPlacing.placed
-  dagre.layout(d)
-  const placed = new Map([...members.keys()].map((k) => { const n = d.node(k) as { x: number; y: number }; return [k, { x: n.x, y: n.y }] as const }))
-  lastPlacing = { key, placed }
-  return placed
+interface Family { key: string; parents: string[]; children: string[]; links: ParentLink[] }
+
+/** Dagre and the search for the best order take most of the time on a large family, and depend only on its shape, so editing a name reuses their answer. */
+let lastOrder: { key: string; rows: { key: string; slots: string[]; rank: number; x: number; width: number; birth: number }[][]; edges: OrderEdge[] } | null = null
+
+/** A line passing through a row on its way to children further down holds a place in that row. */
+function passKey(f: string, childRank: number, rank: number) {
+  return `pass:${f}@${childRank}:${rank}`
 }
 
-/** `rootsBelow` draws the tree as it grows: elders at the bottom, the youngest at the top. */
-export function layoutFamily(g: Graph, { rootsBelow = false }: { rootsBelow?: boolean } = {}): Layout {
-  const { members, blockOf, adjacency, parentsOf } = buildBlocks(g)
-  const byId = new Map(g.persons.map((p) => [p.id, p]))
+function arrangeRows(g: Graph, members: Map<string, Set<string>>, blockOf: Map<string, string>, adjacency: Map<string, string[]>, parentsOf: Map<string, string[]>, byFamily: Map<string, Family>, byId: Map<string, Person>) {
+  const key = JSON.stringify([
+    [...members].map(([k, m]) => [k, [...m]]),
+    g.parentChild.map((l) => [l.parentId, l.childId]),
+    g.unions.map((u) => [u.aId, u.bId]),
+    g.persons.map((p) => [p.sex, p.birthYear]),
+  ])
+  if (lastOrder?.key === key) return lastOrder
+
   const d = new dagre.graphlib.Graph().setGraph({ rankdir: 'TB', ranksep: RANK_SEP, nodesep: NODE_SEP }).setDefaultEdgeLabel(() => ({}))
-  for (const [k, m] of members) d.setNode(k, { width: m.size * CARD_W, height: CARD_H })
+  for (const [k, m] of members) d.setNode(k, { width: m.size * PITCH, height: CARD_H })
   for (const l of g.parentChild) {
     const a = blockOf.get(l.parentId), b = blockOf.get(l.childId)
     if (a !== undefined && b !== undefined && a !== b) d.setEdge(a, b)
   }
-  const placed = placeBlocks(d, members)
+  dagre.layout(d)
+  const ys = [...new Set([...members.keys()].map((k) => (d.node(k) as { y: number }).y))].sort((a, b) => a - b)
 
-  const ys = [...new Set([...placed.values()].map((n) => n.y))].sort((a, b) => a - b)
-  // The tallest caption sets the row, so that bars in the gaps never run through text.
-  const heightOf = (id: string) => { const p = byId.get(id); return Math.max(CARD_H, cardHeight(p ? `${p.givenName ?? ''} ${p.surname ?? ''}` : '')) }
-  const tallest = Math.max(CARD_H, ...g.persons.map((p) => heightOf(p.id)))
-  const ROW = tallest + RANK_SEP
-  const rowY = (rank: number) => (rootsBelow ? ys.length - 1 - rank : rank) * ROW
-  const blocks = new Map<string, Block>()
-  for (const [k, m] of members) {
-    const n = placed.get(k)!
-    blocks.set(k, { key: k, members: [...m], rank: ys.indexOf(n.y), x: n.x, width: m.size * CARD_W })
-  }
+  const birth = (ids: string[]) => Math.min(9999, ...ids.filter((m) => parentsOf.has(m)).map((m) => byId.get(m)?.birthYear ?? 9999))
   const rows: Block[][] = ys.map(() => [])
-  for (const b of blocks.values()) rows[b.rank].push(b)
-
-  /** Where each person sits relative to the centre of their block. */
-  const offsetOf = new Map<string, number>()
-  const blockFor = (id: string) => blocks.get(blockOf.get(id) ?? '')
-  const arrange = (b: Block) => {
-    const order = chainOrder(b.members, adjacency)
-    const parentX = (id: string) => {
-      const p = parentsOf.get(id)?.[0]
-      const bl = p ? blockFor(p) : undefined
-      return bl && bl.key !== b.key ? bl.x : undefined
-    }
-    if (order.length === 2) {
-      const [a, c] = order
-      const ax = parentX(a), cx = parentX(c)
-      // When both have parents here, whoever's parents stand further left goes left, or lines
-      // would cross. Otherwise the convention holds: the man on the left.
-      const flip = ax !== undefined && cx !== undefined ? ax > cx : byId.get(a)?.sex === 'F' || byId.get(c)?.sex === 'M'
-      if (flip) order.reverse()
-    }
-    order.forEach((id, i) => offsetOf.set(id, (i + 0.5) * CARD_W - b.width / 2))
-    b.members = order
-  }
-  const familyX = (parents: string[]) => {
-    const xs = parents.flatMap((p) => {
-      const bl = blockFor(p)
-      return bl && offsetOf.has(p) ? [bl.x + offsetOf.get(p)!] : []
-    })
-    return xs.length ? mean(xs) : undefined
-  }
-  const childrenOf = new Map<string, string[]>()
-  for (const [c, ps] of parentsOf) for (const p of ps) childrenOf.set(p, [...(childrenOf.get(p) ?? []), c])
-  const birth = (b: Block) => Math.min(9999, ...b.members.filter((m) => parentsOf.has(m)).map((m) => byId.get(m)?.birthYear ?? 9999))
-
-  // Top down: each row follows its parents, and siblings stand eldest first.
-  for (const row of rows) {
-    row.forEach(arrange)
-    const key = new Map(row.map((b) => {
-      const xs = b.members.flatMap((m) => {
-        const x = parentsOf.has(m) ? familyX(parentsOf.get(m)!) : undefined
-        return x === undefined ? [] : [x - offsetOf.get(m)!]
-      })
-      return [b.key, xs.length ? mean(xs) : b.x]
-    }))
-    // Compare by the family's position, so that siblings group together and birth order decides inside.
-    const familyPos = new Map(row.map((b) => {
-      const kid = b.members.find((m) => parentsOf.has(m))
-      return [b.key, kid ? familyX(parentsOf.get(kid)!) ?? b.x : b.x]
-    }))
-    row.sort((p, q) => {
-      const diff = familyPos.get(p.key)! - familyPos.get(q.key)!
-      return Math.abs(diff) > 1 ? diff : birth(p) - birth(q)
-    })
-    placeInOrder(row, row.map((b) => key.get(b.key)!))
+  const rankOf = new Map<string, number>()
+  for (const [k, m] of members) {
+    const n = d.node(k) as { x: number; y: number }
+    const rank = ys.indexOf(n.y)
+    let slots = chainOrder([...m], adjacency)
+    // The convention, until crossings say otherwise: the man on the left.
+    if (slots.length === 2 && (byId.get(slots[0])?.sex === 'F' || byId.get(slots[1])?.sex === 'M')) slots = slots.toReversed()
+    rows[rank].push({ key: k, slots, birth: birth(slots), rank, x: n.x, width: m.size * PITCH })
+    for (const id of m) rankOf.set(id, rank)
   }
 
-  // Alternate up and down so parents settle above the middle of their children.
-  const sweep = (row: Block[], up: boolean) => {
-    const want = row.map((b) => {
-      const targets: number[] = []
-      for (const m of b.members) {
-        const off = offsetOf.get(m)!
-        if (up) {
-          for (const c of childrenOf.get(m) ?? []) {
-            const bl = blockFor(c)
-            if (bl && offsetOf.has(c)) targets.push(bl.x + offsetOf.get(c)! - off)
-          }
-        } else if (parentsOf.has(m)) {
-          const x = familyX(parentsOf.get(m)!)
-          if (x !== undefined) targets.push(x - off)
-        }
+  const edges: OrderEdge[] = []
+  for (const f of byFamily.values()) {
+    const placed = f.parents.filter((p) => rankOf.has(p))
+    if (!placed.length) continue
+    const nearest = Math.max(...placed.map((p) => rankOf.get(p)!))
+    const sources = placed.filter((p) => rankOf.get(p) === nearest)
+    const sourceX = mean(sources.map((p) => (d.node(blockOf.get(p)!) as { x: number }).x))
+    for (const [rank, kids] of Map.groupBy(f.children.filter((c) => rankOf.has(c)), (c) => rankOf.get(c)!)) {
+      if (rank <= nearest) continue // A link that goes up the chart cannot be helped by the order.
+      let up = sources
+      for (let r = nearest + 1; r < rank; r++) {
+        const pass = passKey(f.key, rank, r)
+        rows[r].push({ key: pass, slots: [pass], birth: 9999, rank: r, x: sourceX, width: PASS_W })
+        edges.push({ up, down: pass, rank: r })
+        up = [pass]
       }
-      return targets.length ? mean(targets) : b.x
-    })
-    placeInOrder(row, want)
-  }
-  for (let i = 0; i < 6; i++) {
-    for (let r = rows.length - 2; r >= 0; r--) sweep(rows[r], true)
-    for (let r = 1; r < rows.length; r++) sweep(rows[r], false)
-  }
-
-  const cards = new Map<string, CardPos>()
-  for (const b of blocks.values()) for (const id of b.members) cards.set(id, { id, x: b.x + offsetOf.get(id)!, y: rowY(b.rank) })
-
-  /** A clear vertical corridor in a row, near x, for lines passing through a generation. */
-  const corridor = (rank: number, x: number) => {
-    const row = rows[rank] ?? []
-    let best = x, bestDist = Infinity
-    const consider = (c: number) => {
-      if (row.some((b) => c > b.x - b.width / 2 - 8 && c < b.x + b.width / 2 + 8)) return
-      if (Math.abs(c - x) < bestDist) {
-        best = c
-        bestDist = Math.abs(c - x)
-      }
+      for (const c of kids) edges.push({ up, down: c, rank })
     }
-    consider(x)
-    for (const b of row) {
-      consider(b.x - b.width / 2 - NODE_SEP / 2)
-      consider(b.x + b.width / 2 + NODE_SEP / 2)
-    }
-    return best
   }
+  for (const row of rows) row.sort((a, b) => a.x - b.x)
+  orderRows(rows, edges)
+  lastOrder = { key, rows: rows.map((row) => row.map(({ key, slots, rank, x, width, birth }) => ({ key, slots, rank, x, width, birth }))), edges }
+  return lastOrder
+}
 
-  const unions: UnionPos[] = g.unions.flatMap((u) => {
-    const a = cards.get(u.aId), b = cards.get(u.bId)
-    if (!a || !b) return []
-    const [l, r] = a.x < b.x ? [a, b] : [b, a]
-    const y1 = l.y + AVATAR_CY, y2 = r.y + AVATAR_CY
-    const edge = AVATAR_R + 5
-    if (l.y === r.y && r.x - l.x <= CARD_W + 1) return [{ id: u.id, union: u, x: (l.x + r.x) / 2, y: y1, path: `M${l.x + edge} ${y1}H${r.x - edge}`, x1: l.x, x2: r.x }]
-    if (l.y === r.y) {
-      // A partner further along the row: a bracket over the cards in between.
-      const top = l.y - 14
-      return [{ id: u.id, union: u, x: (l.x + r.x) / 2, y: top, path: orthogonal([[l.x, y1 - edge], [l.x, top], [r.x, top], [r.x, y2 - edge]]), x1: l.x, x2: r.x }]
-    }
-    // Across generations: leave sideways, go down a corridor, come in from the side.
-    const [hi, lo] = l.y < r.y ? [l, r] : [r, l]
-    const dir = lo.x >= hi.x ? 1 : -1
-    const x = hi.x + dir * (CARD_W / 2)
-    const midY = hi.y + tallest + 14
-    return [{ id: u.id, union: u, x, y: midY, path: orthogonal([[hi.x + dir * edge, hi.y + AVATAR_CY], [x, hi.y + AVATAR_CY], [x, midY], [lo.x - dir * edge, midY], [lo.x - dir * edge, lo.y + AVATAR_CY]]), x1: l.x, x2: r.x }]
-  })
+/** `rootsBelow` draws the tree as it grows: elders at the bottom, the youngest at the top. */
+export function layoutFamily(g: Graph, { rootsBelow = false }: { rootsBelow?: boolean } = {}): Layout {
+  if (!g.persons.length) return { cards: new Map(), unions: [], edges: [], bounds: { x: 0, y: 0, w: 0, h: 0 } }
+  const { members, blockOf, adjacency, parentsOf } = buildBlocks(g)
+  const byId = new Map(g.persons.map((p) => [p.id, p]))
 
   // Children grouped by their set of parents: one family, one shared bar.
   const linksOf = Map.groupBy(g.parentChild, (l) => l.childId)
-  const byFamily = new Map<string, { key: string; parents: string[]; children: string[]; links: ParentLink[] }>()
+  const byFamily = new Map<string, Family>()
   for (const [child, parents] of parentsOf) {
-    if (!cards.has(child)) continue
+    if (!byId.has(child)) continue
     const key = [...parents].sort().join('|')
     const fam = byFamily.get(key) ?? { key, parents, children: [], links: [] }
     fam.children.push(child)
     fam.links.push(...(linksOf.get(child) ?? []))
     byFamily.set(key, fam)
   }
-  const unionOfPair = new Map<string, UnionPos>()
-  for (const u of unions) {
-    const pair = [u.union.aId, u.union.bId].sort().join('|')
-    if (!unionOfPair.has(pair)) unionOfPair.set(pair, u)
-  }
-  const dotOf = (parents: string[]) => (parents.length === 2 ? unionOfPair.get([...parents].sort().join('|')) : undefined)
-  const families = [...byFamily.values()].map((f) => {
-    const dot = dotOf(f.parents)
-    const ps = f.parents.map((p) => cards.get(p)).filter(Boolean) as CardPos[]
-    return { ...f, dot, ps, x: dot ? dot.x : ps.length ? mean(ps.map((c) => c.x)) : 0 }
-  }).filter((f) => f.ps.length).sort((a, b) => a.x - b.x)
 
-  const rankOf = (y: number) => (rootsBelow ? ys.length - 1 - Math.round(y / ROW) : Math.round(y / ROW))
-  /** A bar's height in the gap before its children's row: lane 0 sits next to the children, higher lanes move towards the parents. */
-  const laneY = (rank: number, lane: number) => (rootsBelow ? rowY(rank) + tallest + RANK_SEP / 2 - 14 + lane * LANE : rowY(rank) - RANK_SEP / 2 + 14 - lane * LANE)
-  /** The middle of the gap a trunk crosses on its way through a generation. */
-  const gapY = (rank: number) => (rootsBelow ? rowY(rank) + tallest + RANK_SEP / 2 : rowY(rank) - RANK_SEP / 2)
+  const arranged = arrangeRows(g, members, blockOf, adjacency, parentsOf, byFamily, byId)
+  const rows: Block[][] = arranged.rows.map((row) => row.map((b) => ({ ...b })))
+
+  /** Where each person, or passing line, stands relative to the centre of its block. */
+  const offsetOf = new Map<string, number>()
+  const blockFor = new Map<string, Block>()
+  for (const row of rows) for (const b of row) b.slots.forEach((id, i) => {
+    offsetOf.set(id, (i + 0.5) * (b.width / b.slots.length) - b.width / 2)
+    blockFor.set(id, b)
+  })
+  const xOf = (slot: string) => blockFor.get(slot)!.x + offsetOf.get(slot)!
+  const edgeTop = (e: OrderEdge) => mean(e.up.map(xOf))
+  const entering = Map.groupBy(arranged.edges, (e) => blockFor.get(e.down)!.key)
+  const leaving = new Map<string, OrderEdge[]>()
+  for (const e of arranged.edges) for (const k of new Set(e.up.map((s) => blockFor.get(s)!.key))) leaving.set(k, [...(leaving.get(k) ?? []), e])
+
+  // Alternate up and down so parents settle above the middle of their children.
+  const settle = (row: Block[], up: boolean) => {
+    const want = row.map((b) => {
+      const targets: number[] = []
+      if (up) {
+        for (const e of leaving.get(b.key) ?? []) for (const s of e.up) if (blockFor.get(s) === b) targets.push(xOf(e.down) - offsetOf.get(s)!)
+      } else {
+        for (const e of entering.get(b.key) ?? []) targets.push(edgeTop(e) - offsetOf.get(e.down)!)
+      }
+      return targets.length ? mean(targets) : b.x
+    })
+    placeInOrder(row, want)
+  }
+  for (const row of rows) settle(row, false)
+  for (let i = 0; i < 6; i++) {
+    for (let r = rows.length - 2; r >= 0; r--) settle(rows[r], true)
+    for (let r = 1; r < rows.length; r++) settle(rows[r], false)
+  }
+
+  /** The rows as they stand on the page, top first. */
+  const lastRank = rows.length - 1
+  const visual = (rank: number) => (rootsBelow ? lastRank - rank : rank)
+  const rankOfPerson = (id: string) => blockFor.get(id)?.rank
+  /** The gap on the parents' side of a row, as the page's rows it lies between: gap v is under page row v. */
+  const gapBefore = (rank: number) => (rootsBelow ? visual(rank) : visual(rank) - 1)
+
+  const heightOf = (id: string) => Math.max(CARD_H, cardHeight(byId.get(id)))
+  const rowHeight: number[] = []
+  for (const row of rows) rowHeight[visual(row[0]?.rank ?? 0)] = Math.max(CARD_H, ...row.flatMap((b) => b.slots.filter((s) => byId.has(s)).map(heightOf)))
+
+  /** A clear vertical corridor in a row, near x, for a bar that must leave from between other people. */
+  const corridor = (rank: number, x: number, lo: number, hi: number) => {
+    const row = rows[rank] ?? []
+    const blocked = (c: number) => row.some((b) => c > b.x - b.width / 2 - 8 && c < b.x + b.width / 2 + 8)
+    if (!blocked(x)) return x
+    const options = row.flatMap((b) => [b.x - b.width / 2 - NODE_SEP / 2, b.x + b.width / 2 + NODE_SEP / 2]).filter((c) => !blocked(c) && c > lo && c < hi)
+    return options.length ? options.reduce((a, c) => (Math.abs(c - x) < Math.abs(a - x) ? c : a)) : x
+  }
+
+  // First the positions along the row: everything horizontal is known before any height is chosen.
+  type Bridge = { u: Union; a: string; b: string; l: string; r: string; kind: 'side' | 'over' | 'across'; x: number; net?: Net; gap?: number; hi?: string; lo?: string; dir?: number; side?: number }
+  const edge = AVATAR_R + 5
+  const netsByGap = new Map<number, Net[]>()
+  const addNet = (gap: number, above: number[], below: number[]) => {
+    const net: Net = { above, below, track: 0 }
+    netsByGap.set(gap, [...(netsByGap.get(gap) ?? []), net])
+    return net
+  }
+  const bridges: Bridge[] = g.unions.flatMap((u): Bridge[] => {
+    if (!blockFor.has(u.aId) || !blockFor.has(u.bId)) return []
+    const [l, r] = xOf(u.aId) < xOf(u.bId) ? [u.aId, u.bId] : [u.bId, u.aId]
+    const lx = xOf(l), rx = xOf(r)
+    const base = { u, a: u.aId, b: u.bId, l, r }
+    if (rankOfPerson(l) === rankOfPerson(r)) {
+      if (rx - lx <= PITCH + 1) return [{ ...base, kind: 'side', x: (lx + rx) / 2 }]
+      return [{ ...base, kind: 'over', x: corridor(rankOfPerson(l)!, (lx + rx) / 2, lx, rx) }]
+    }
+    // Across generations: leave sideways, go along a gap, come in from the side.
+    const [hi, lo] = visual(rankOfPerson(l)!) < visual(rankOfPerson(r)!) ? [l, r] : [r, l]
+    const dir = xOf(lo) >= xOf(hi) ? 1 : -1
+    const x = xOf(hi) + dir * (PITCH / 2)
+    const side = xOf(lo) - dir * edge
+    const gap = visual(rankOfPerson(hi)!)
+    return [{ ...base, kind: 'across', x, hi, lo, dir, side, gap, net: addNet(gap, [x], [side]) }]
+  })
+  const bridgeOfPair = new Map<string, Bridge>()
+  for (const b of bridges) {
+    const pair = [b.a, b.b].sort().join('|')
+    if (!bridgeOfPair.has(pair)) bridgeOfPair.set(pair, b)
+  }
+
+  type Group = { f: Family; rank: number; kids: string[]; dot?: Bridge; sources: string[]; x: number; legs: { gap: number; net?: Net; to: number }[]; bar: Net; lo: number; hi: number; trunkX: number }
+  const groups: Group[] = []
+  for (const f of [...byFamily.values()]) {
+    const ps = f.parents.filter((p) => blockFor.has(p))
+    if (!ps.length) continue
+    const dot = f.parents.length === 2 ? bridgeOfPair.get([...f.parents].sort().join('|')) : undefined
+    const x = dot ? dot.x : mean(ps.map(xOf))
+    const nearest = Math.max(...ps.map((p) => rankOfPerson(p)!))
+    for (const [rank, kids] of Map.groupBy(f.children.filter((c) => blockFor.has(c)), (c) => rankOfPerson(c)!)) {
+      const legs: Group['legs'] = []
+      let at = x
+      for (let r = nearest + 1; r < rank; r++) {
+        const to = xOf(passKey(f.key, rank, r))
+        const gap = gapBefore(r)
+        legs.push({ gap, to, net: to === at ? undefined : addNet(gap, rootsBelow ? [to] : [at], rootsBelow ? [at] : [to]) })
+        at = to
+      }
+      const xs = kids.map(xOf)
+      const gap = gapBefore(rank)
+      const bar = addNet(gap, rootsBelow ? xs : [at], rootsBelow ? [at] : xs)
+      groups.push({ f, rank, kids, dot, sources: ps, x, legs, bar, lo: Math.min(...xs, at), hi: Math.max(...xs, at), trunkX: at })
+    }
+  }
+
+  // Now the heights: each gap is as tall as its bars need.
+  const tracksOf = new Map<number, number>()
+  for (const [gap, nets] of netsByGap) tracksOf.set(gap, assignTracks(nets))
+  const gapHeight = (gap: number) => Math.max(RANK_SEP, 2 * GAP_EDGE + ((tracksOf.get(gap) ?? 1) - 1) * LANE)
+  const rowTop: number[] = []
+  let y = 0
+  for (let v = 0; v <= lastRank; v++) {
+    rowTop[v] = y
+    y += rowHeight[v] + gapHeight(v)
+  }
+  const gapTop = (gap: number) => (gap < 0 ? -gapHeight(gap) : rowTop[gap] + rowHeight[gap])
+  const netY = (gap: number, net: Net) => gapTop(gap) + (gapHeight(gap) - ((tracksOf.get(gap) ?? 1) - 1) * LANE) / 2 + net.track * LANE
+
+  const cards = new Map<string, CardPos>()
+  for (const row of rows) for (const b of row) for (const id of b.slots) if (byId.has(id)) cards.set(id, { id, x: xOf(id), y: rowTop[visual(b.rank)] })
+
+  const unions: UnionPos[] = bridges.map((br) => {
+    const l = cards.get(br.l)!, r = cards.get(br.r)!
+    const y1 = l.y + AVATAR_CY, y2 = r.y + AVATAR_CY
+    const common = { id: br.u.id, union: br.u, x1: l.x, x2: r.x }
+    if (br.kind === 'side') return { ...common, x: br.x, y: y1, path: `M${l.x + edge} ${y1}H${r.x - edge}`, box: boxOf([[l.x, y1], [r.x, y1]]) }
+    if (br.kind === 'over') {
+      const top = l.y - 14
+      const points: [number, number][] = [[l.x, y1 - edge], [l.x, top], [r.x, top], [r.x, y2 - edge]]
+      return { ...common, x: br.x, y: top, path: orthogonal(points), box: boxOf(points) }
+    }
+    const hi = cards.get(br.hi!)!, lo = cards.get(br.lo!)!
+    const midY = netY(br.gap!, br.net!)
+    const points: [number, number][] = [[hi.x + br.dir! * edge, hi.y + AVATAR_CY], [br.x, hi.y + AVATAR_CY], [br.x, midY], [br.side!, midY], [br.side!, lo.y + AVATAR_CY]]
+    return { ...common, x: br.x, y: midY, path: orthogonal(points), box: boxOf(points) }
+  })
+  const unionById = new Map(unions.map((u) => [u.id, u]))
+
   /** The card is a portrait over a caption, so a line comes into the portrait from above or under the caption from below. */
   const entryY = (c: CardPos) => (rootsBelow ? c.y + UNDER_CAPTION : c.y + AVATAR_CY - AVATAR_R - 4)
   /** The clickable part of a line stays outside the caption, so a click on a name is a click on the card. */
   const hitEndY = (c: CardPos) => (rootsBelow ? c.y + heightOf(c.id) : entryY(c))
-  const startOf = (f: (typeof families)[number]) => (f.dot ? f.dot.y : rootsBelow ? Math.min(...f.ps.map((p) => p.y)) + AVATAR_CY - AVATAR_R - 4 : Math.max(...f.ps.map((p) => p.y)) + UNDER_CAPTION)
-
-  type Group = { f: (typeof families)[number]; rank: number; kids: string[]; trunkX: number; lo: number; hi: number; path: [number, number][]; barY: number; start: number }
-  const groupsList: Group[] = []
-  for (const f of families) {
-    const nearest = (rootsBelow ? Math.min : Math.max)(...f.ps.map((p) => p.y))
-    const start = startOf(f)
-    const groups = new Map<number, string[]>()
-    for (const c of f.children) {
-      const rank = rankOf(cards.get(c)!.y)
-      groups.set(rank, [...(groups.get(rank) ?? []), c])
-    }
-    for (const [rank, kids] of groups) {
-      // The trunk drops through any generations in between along a clear corridor.
-      const path: [number, number][] = [[f.x, start]]
-      let x = f.x
-      for (let r = rankOf(nearest) + 1; r < rank; r++) {
-        const c = corridor(r, x)
-        const y = gapY(r)
-        path.push([x, y], [c, y])
-        x = c
-      }
-      const xs = [...kids.map((c) => cards.get(c)!.x), x]
-      groupsList.push({ f, rank, kids, trunkX: x, lo: Math.min(...xs), hi: Math.max(...xs), path, barY: laneY(rank, 0), start })
-    }
-  }
-
-  /** The vertical pieces a bar at height y adds: its trunk, and one drop to each child. */
-  const verticals = (g: Group, y: number): [number, number, number][] => [
-    [g.trunkX, g.start, y],
-    ...g.kids.map((c): [number, number, number] => [cards.get(c)!.x, y, entryY(cards.get(c)!)]),
-  ]
-  /** Only families that share both a stretch of height and of width can cross, so the others are not looked at. */
-  const neighbours = (() => {
-    const near = new Map<Group, Set<Group>>(groupsList.map((g) => [g, new Set()]))
-    const rows = new Map<number, Group[]>()
-    for (const g of groupsList) {
-      const heights = [g.start, ...Array.from({ length: 6 }, (_, lane) => laneY(g.rank, lane)), ...g.kids.map((c) => entryY(cards.get(c)!))]
-      for (let r = Math.floor(Math.min(...heights) / ROW); r <= Math.floor(Math.max(...heights) / ROW); r++) {
-        const row = rows.get(r) ?? []
-        for (const h of row) if (h !== g && h.lo <= g.hi && h.hi >= g.lo) { near.get(g)!.add(h); near.get(h)!.add(g) }
-        row.push(g)
-        rows.set(r, row)
-      }
-    }
-    return near
-  })()
-  /** Crossings a bar at height y would make with every other family, plus a large penalty for two bars on one line. */
-  const cost = (g: Group, y: number) => {
-    let c = 0
-    const mine = verticals(g, y)
-    for (const h of neighbours.get(g)!) {
-      if (h.rank === g.rank && Math.abs(h.barY - y) < 1 && h.lo < g.hi && h.hi > g.lo) c += 1000
-      for (const [vx, v1, v2] of verticals(h, h.barY)) if (vx > g.lo && vx < g.hi && y > Math.min(v1, v2) && y < Math.max(v1, v2)) c += 1
-      for (const [vx, v1, v2] of mine) if (vx > h.lo && vx < h.hi && h.barY > Math.min(v1, v2) && h.barY < Math.max(v1, v2)) c += 1
-    }
-    return c
-  }
-  // Move each bar to the lane that crosses the fewest other lines; a few rounds settle it.
-  for (let round = 0; round < 3; round++) {
-    for (const g of groupsList) {
-      let best = g.barY, bestCost = Infinity
-      for (let lane = 0; lane < 6; lane++) {
-        const y = laneY(g.rank, lane)
-        const c = cost(g, y) + lane * 0.01
-        if (c < bestCost) {
-          bestCost = c
-          best = y
-        }
-      }
-      g.barY = best
-    }
-  }
 
   const edges: EdgePos[] = []
-  for (const g of groupsList) {
-    const { f, kids, trunkX: x, lo, hi, path, barY } = g
+  for (const g2 of groups) {
+    const { f, kids, trunkX: x, lo, hi, legs, bar } = g2
+    const parentCards = g2.sources.map((p) => cards.get(p)!)
+    const start = g2.dot ? unionById.get(g2.dot.u.id)!.y : rootsBelow ? Math.min(...parentCards.map((p) => p.y)) + AVATAR_CY - AVATAR_R - 4 : Math.max(...parentCards.map((p) => p.y)) + UNDER_CAPTION
+    const path: [number, number][] = [[g2.x, start]]
+    let at = g2.x
+    for (const leg of legs) {
+      if (leg.net) {
+        const y = netY(leg.gap, leg.net)
+        path.push([at, y], [leg.to, y])
+      }
+      at = leg.to
+    }
+    const barY = netY(gapBefore(g2.rank), bar)
     const shared = `${orthogonal([...path, [x, barY]])} M${lo} ${barY}H${hi}`
+    const box = boxOf([...path, [x, barY], [lo, barY], [hi, barY], ...kids.flatMap((c): [number, number][] => [[cards.get(c)!.x, entryY(cards.get(c)!)], [cards.get(c)!.x, hitEndY(cards.get(c)!)]])])
     for (const child of kids) {
       const t = cards.get(child)!
       const links = f.links.filter((l) => l.childId === child)
@@ -416,9 +424,10 @@ export function layoutFamily(g: Graph, { rootsBelow = false }: { rootsBelow?: bo
         path: orthogonal([...path, [x, barY], [t.x, barY], [t.x, entryY(t)]]),
         style: links.some((l) => l.kind !== 'birth') ? 'adopted' : links.some((l) => l.certainty === 'assumed') ? 'assumed' : 'solid',
         links,
+        box,
         own: `M${t.x} ${barY}V${hitEndY(t)}`,
         shared,
-        group: `${f.key}@${g.rank}`,
+        group: `${f.key}@${g2.rank}`,
         barAt: [t.x, barY],
         groupAt: [(lo + hi) / 2, barY],
       })
@@ -427,6 +436,6 @@ export function layoutFamily(g: Graph, { rootsBelow = false }: { rootsBelow?: bo
 
   const all = [...cards.values()]
   const minX = Math.min(...all.map((c) => c.x)) - CARD_W / 2, maxX = Math.max(...all.map((c) => c.x)) + CARD_W / 2
-  const minY = Math.min(...all.map((c) => c.y)), maxY = Math.max(...all.map((c) => c.y)) + tallest
-  return { cards, unions, edges, bounds: all.length ? { x: minX, y: minY, w: maxX - minX, h: maxY - minY } : { x: 0, y: 0, w: 0, h: 0 } }
+  const minY = Math.min(...all.map((c) => c.y)), maxY = Math.max(...all.map((c) => c.y + heightOf(c.id)))
+  return { cards, unions, edges, bounds: { x: minX, y: minY, w: maxX - minX, h: maxY - minY } }
 }
