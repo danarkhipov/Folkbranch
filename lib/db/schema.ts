@@ -192,11 +192,13 @@ export const apiTokens = sqliteTable('api_tokens', {
   expiresAt: integer('expires_at'),
 })
 
-// One open draft per token collects its operations until a person accepts or rejects it.
+// One open draft per author collects its operations until a person accepts or rejects it. The author is an API token
+// or a reader suggesting a correction.
 export const proposals = sqliteTable('proposals', {
   id: text('id').primaryKey(),
-  tokenId: text('token_id').notNull(),
-  tokenName: text('token_name').notNull(),
+  authorId: text('author_id').notNull(),
+  authorKind: text('author_kind').notNull().default('token'),
+  authorName: text('author_name').notNull(),
   status: text('status').notNull().default('pending'),
   ops: text('ops').notNull().default('[]'),
   idMap: text('id_map').notNull().default('{}'),
@@ -219,4 +221,42 @@ export const views = sqliteTable('views', {
   createdBy: text('created_by').notNull().default(''),
   updatedAt: integer('updated_at').notNull().default(0),
 })
+
+// A link to look at the family without an account. Sees what a reader sees, and with a view, only the people in it.
+export const shareLinks = sqliteTable('share_links', {
+  id: text('id').primaryKey(),
+  tokenHash: text('token_hash').notNull().unique(),
+  name: text('name').notNull(),
+  viewId: text('view_id'),
+  passwordHash: text('password_hash'),
+  createdBy: text('created_by').notNull(),
+  createdAt: integer('created_at').notNull(),
+  // Null means it lasts until closed.
+  expiresAt: integer('expires_at'),
+  revokedAt: integer('revoked_at'),
+  opens: integer('opens').notNull().default(0),
+})
+
+// What someone told, in their words, with or without their voice. Never a fact: a fact can cite a story as its source.
+export const stories = sqliteTable('stories', {
+  id: text('id').primaryKey(),
+  title: text('title').notNull().default(''),
+  body: text('body').notNull().default(''),
+  // Who told it, when they have no card or lost it. With a card, `story_people` says who.
+  tellerName: text('teller_name').notNull().default(''),
+  toldOn: text('told_on').notNull().default(''),
+  mediaId: text('media_id'),
+  durationSec: integer('duration_sec'),
+  createdBy: text('created_by').notNull().default(''),
+  createdAt: integer('created_at').notNull().default(0),
+  updatedAt: integer('updated_at').notNull().default(0),
+})
+
+// `about`: whom the story is about, at least one. `teller`: who told it, at most one.
+export const storyPeople = sqliteTable('story_people', {
+  id: text('id').primaryKey(),
+  storyId: text('story_id').notNull(),
+  personId: text('person_id').notNull(),
+  role: text('role').notNull().default('about'),
+}, (t) => [index('story_people_story').on(t.storyId), index('story_people_person').on(t.personId)])
 

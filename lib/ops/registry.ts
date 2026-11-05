@@ -10,6 +10,7 @@ import { newId, OpError, undo } from './core'
 import { importGedcom } from './gedcom'
 import * as media from './media'
 import * as pages from './pages'
+import * as stories from './stories'
 import * as people from './people'
 import { say } from './settings'
 import { certainty, personInput, claimField, sourceInput, relationType, agentCreate, agentPatch, relationInput, box, blocks, markdown, type Def, def, personFor, isAgent, isTemp, assertLink, assertPlanSound, assertSpouses, checkNewPerson, checkPatch, withVersions, assertVersion, pageContent, FIELD, REL, nameOfReal, pageName } from './op-defs'
@@ -134,7 +135,7 @@ export const OPS: Record<string, Def> = {
     creates: true,
     prepare: pageContent,
     apply: (a, x) => pages.createPage(a, { personId: x.personId, title: x.title, parentPageId: x.parentPageId, icon: x.icon, content: x.content }),
-    describe: (x, c) => ({ text: `${c.name(x.personId)}: ${say('Новая страница')} «${x.title ?? ''}»`, details: x.content ? [`${x.content.length} ${say('блоков')}`] : [] }),
+    describe: (x, c) => ({ text: `${c.name(x.personId)}: ${say('Новая страница')} «${x.title ?? ''}»` }),
   }),
   update_page: def({
     risk: 'write',
@@ -173,6 +174,18 @@ export const OPS: Record<string, Def> = {
     },
     apply: (a, x) => media.commitUpload(a, x.row, x.personId),
     describe: (x, c) => ({ text: `${say('Загрузить фото')}: ${x.row.originalName}`, details: x.personId ? [c.name(x.personId)] : [] }),
+  }),
+  create_story: def({
+    internal: true,
+    risk: 'write',
+    description: "A reader's story, waiting for review.",
+    input: z.object({}).passthrough(),
+    creates: true,
+    apply: (a, x) => stories.createStory(a, x),
+    describe: (x, c) => ({
+      text: `${x.about.map((id: string) => c.name(id)).join(', ')}: ${say('Рассказ')}${x.title ? ` «${x.title}»` : ''}`,
+      details: [x.tellerId ? `${say('Со слов')}: ${c.name(x.tellerId)}` : x.tellerName && `${say('Со слов')}: ${x.tellerName}`, x.toldOn, x.audio && say('С записью голоса'), x.body].filter(Boolean),
+    }),
   }),
   update_photo: def({
     risk: 'write',

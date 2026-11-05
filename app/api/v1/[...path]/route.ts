@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { z } from 'zod'
 import { fromOurPages } from '@/lib/same-origin'
-import { getActor, hasBearer } from '@/lib/api-auth'
+import { getActor, guestActor, hasBearer } from '@/lib/api-auth'
 import { match, openApi } from '@/lib/api/router'
 import { accessRoutes } from '@/lib/api/routes/access'
 import { contentRoutes } from '@/lib/api/routes/content'
@@ -29,8 +29,9 @@ async function handle(req: Request, ctx: { params: Promise<{ path: string[] }> }
     const h = await headers()
     // Cookies travel on their own, so writes with a cookie must come from our own pages.
     if (!hasBearer(h) && req.method !== 'GET' && !fromOurPages(h)) return Response.json({ error: 'bad origin' }, { status: 403 })
-    const actor = await getActor(h)
+    const actor = (await getActor(h)) ?? guestActor(h)
     if (!actor) return Response.json({ error: 'unauthorized' }, { status: 401 })
+    if (actor.guest && !found.route.guest) return Response.json({ error: 'not available with a link' }, { status: 403 })
     if (actor.tokenId && found.route.human) return Response.json({ error: 'not available to tokens' }, { status: 403 })
     const result = await found.route.handler({ actor, params: found.params, req, query: new URL(req.url).searchParams, body: () => req.json() })
     if (result instanceof Response) return result

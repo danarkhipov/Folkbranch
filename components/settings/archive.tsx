@@ -1,11 +1,14 @@
 'use client'
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { api, useApp } from '@/lib/client'
 import { type Lang } from '@/lib/types'
 
 export function Archive({ familyName, lang }: { familyName: string; lang: Lang }) {
   const { t } = useApp()
   const [name, setName] = useState(familyName)
+  const { data: voices } = useQuery({ queryKey: ['stories', 'usage'], queryFn: () => api<{ used: number; limit: number }>('stories/usage') })
+  const mb = (n: number) => Math.ceil(n / 1024 / 1024)
   const save = (json: unknown) => api('settings', { method: 'PATCH', json }).then(() => location.reload())
   return (
     <div className="flex max-w-sm flex-col gap-3 text-sm">
@@ -17,6 +20,7 @@ export function Archive({ familyName, lang }: { familyName: string; lang: Lang }
           <option value="ru">Русский</option><option value="en">English</option>
         </select>
       </label>
+      {voices && <p className="text-xs text-ink-soft">{t('Записи голоса занимают')} {mb(voices.used)} {t('МБ из')} {mb(voices.limit)}.</p>}
     </div>
   )
 }

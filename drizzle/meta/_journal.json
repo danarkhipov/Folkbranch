@@ -71,6 +71,20 @@
       "when": 1793870612100,
       "tag": "0009_yielding_green_goblin",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1793957012100,
+      "tag": "0010_share_and_suggest",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1793875682932,
+      "tag": "0011_stories",
+      "breakpoints": true
     }
   ]
 }

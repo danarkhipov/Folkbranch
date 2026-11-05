@@ -13,7 +13,7 @@ import { Legend } from './graph-parts'
 
 export type Side = 'related' | 'history' | 'review' | 'assistant' | null
 
-export function MainBar({ familyName, present, mode, navRef, side, draftOps, onSearch, onSide, onAssistant, onSettings }: { familyName: string; present: Present[]; mode: 'full' | 'no-name' | 'compact'; navRef: RefObject<HTMLElement | null>; side: Side; draftOps: number; onSearch: () => void; onSide: (next: Side) => void; onAssistant: () => void; onSettings: () => void }) {
+export function MainBar({ guest, familyName, present, mode, navRef, side, draftOps, onSearch, onSide, onAssistant, onSettings }: { guest: boolean; familyName: string; present: Present[]; mode: 'full' | 'no-name' | 'compact'; navRef: RefObject<HTMLElement | null>; side: Side; draftOps: number; onSearch: () => void; onSide: (next: Side) => void; onAssistant: () => void; onSettings: () => void }) {
   const { t } = useApp()
   /** Only where the label itself is hidden: a compact bar with room for hovering. */
   const hint = (text: string) => (mode === 'compact' && window.innerWidth > 640 ? text : undefined)
@@ -24,9 +24,10 @@ export function MainBar({ familyName, present, mode, navRef, side, draftOps, onS
         <span className="sep w-px h-5 bg-border mx-0.5" />
         <button className="bar-btn" title={t('Поиск людей')} aria-label={t('Поиск людей')} onClick={onSearch}><Search size={16} /> <span className="nav-label">{t('Поиск')}</span></button>
         <button className={side === 'related' ? 'bar-btn on' : 'bar-btn'} title={hint(t('Родство'))} aria-label={t('Кем приходится?')} onClick={() => onSide(side === 'related' ? null : 'related')}><Users size={16} /> <span className="nav-label">{t('Родство')}</span></button>
-        <button className={side === 'assistant' ? 'bar-btn on' : 'bar-btn'} title={hint(t('Ассистент'))} aria-label={t('Ассистент')} onClick={onAssistant}><AssistantIcon /> <span className="nav-label">{t('Ассистент')}</span></button>
-        <button className={side === 'history' || side === 'review' ? 'bar-btn on relative' : 'bar-btn relative'} title={draftOps > 0 ? `${t('История')}: ${t('Правки ассистента')} ${draftOps}` : hint(t('История'))} aria-label={t('История')} onClick={() => onSide(side === 'review' ? 'history' : side === 'history' ? null : draftOps > 0 ? 'review' : 'history')}><Clock size={16} /> <span className="nav-label">{t('История')}</span>{draftOps > 0 && <span className="absolute right-1 top-1 min-w-4 rounded-full bg-rust px-1 text-center text-xs leading-4 text-white">{draftOps}</span>}</button>
-        <button className="bar-btn" title={hint(t('Настройки'))} aria-label={t('Настройки')} onClick={onSettings}><Settings size={16} /> <span className="nav-label">{t('Настройки')}</span></button>
+        {!guest && <button className={side === 'assistant' ? 'bar-btn on' : 'bar-btn'} title={hint(t('Ассистент'))} aria-label={t('Ассистент')} onClick={onAssistant}><AssistantIcon /> <span className="nav-label">{t('Ассистент')}</span></button>}
+        {!guest && <button className={side === 'history' || side === 'review' ? 'bar-btn on relative' : 'bar-btn relative'} title={draftOps > 0 ? `${t('История')}: ${t('Правки на проверку')} ${draftOps}` : hint(t('История'))} aria-label={t('История')} onClick={() => onSide(side === 'review' ? 'history' : side === 'history' ? null : draftOps > 0 ? 'review' : 'history')}><Clock size={16} /> <span className="nav-label">{t('История')}</span>{draftOps > 0 && <span className="absolute right-1 top-1 min-w-4 rounded-full bg-rust px-1 text-center text-xs leading-4 text-white">{draftOps}</span>}</button>}
+        {!guest && <button className="bar-btn" title={hint(t('Настройки'))} aria-label={t('Настройки')} onClick={onSettings}><Settings size={16} /> <span className="nav-label">{t('Настройки')}</span></button>}
+        {guest && <span className="nav-label px-2 text-xs text-ink-soft whitespace-nowrap">{t('Просмотр по ссылке')}</span>}
       </nav>
   )
 }

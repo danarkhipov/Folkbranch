@@ -6,7 +6,7 @@ import { api } from './client'
 export interface Present { id: string; name: string; focusId: string | null }
 
 /** What a change elsewhere can touch. An open page's text stays out: its editor settles that by itself. */
-const FRESH = ['graph', 'history', 'gaps', 'pages', 'media', 'proposals', 'views']
+const FRESH = ['graph', 'history', 'gaps', 'pages', 'media', 'proposals', 'views', 'stories']
 const RETRY_MS = 2000
 const MAX_RETRY_MS = 60_000
 const SPREAD_MS = 3000
@@ -15,13 +15,14 @@ const SILENCE_MS = 70_000
 const CHECK_MS = 15_000
 
 /** Keeps this page in step with the others, and closes the line while the tab is hidden. */
-export function useLive(focusId: string | null) {
+export function useLive(focusId: string | null, enabled = true) {
   const qc = useQueryClient()
   const [present, setPresent] = useState<Present[]>([])
   const client = useRef<string | null>(null)
   const focus = useRef(focusId)
 
   useEffect(() => {
+    if (!enabled) return
     let source: EventSource | null = null
     let again: ReturnType<typeof setTimeout> | undefined
     let wait = RETRY_MS
@@ -79,7 +80,7 @@ export function useLive(focusId: string | null) {
       document.removeEventListener('visibilitychange', onVisibility)
       close()
     }
-  }, [qc])
+  }, [qc, enabled])
 
   useEffect(() => {
     focus.current = focusId

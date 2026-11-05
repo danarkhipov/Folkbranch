@@ -64,7 +64,7 @@ describe('review queue', () => {
     const page = await reg.dispatch(bot, 'create_page', { personId: dad.tempId, title: 'Биография', markdown: `# Жизнь\nОтец [@Сын](person:${son.tempId})` })
     expect(people.getGraph(owner).persons.length).toBe(before)
 
-    const [draft] = reg.listProposals(owner).filter((p) => p.tokenName === 'bot-editor-true')
+    const [draft] = reg.listProposals(owner).filter((p) => p.authorName === 'bot-editor-true')
     expect(draft.ops.map((o) => o.op)).toEqual(['create_person', 'create_person', 'create_page'])
     expect(draft.ops[1].details?.join()).toContain('Отец Очередной')
 
@@ -82,7 +82,7 @@ describe('review queue', () => {
     // After acceptance the model's old temporary id still points at the right person.
     const later = await reg.dispatch(bot, 'update_person', { id: dad.tempId, patch: { birthPlace: 'Кострома' } })
     expect(later.status).toBe('pending_review')
-    const next = reg.listProposals(owner).find((d) => d.tokenName === 'bot-editor-true')!
+    const next = reg.listProposals(owner).find((d) => d.authorName === 'bot-editor-true')!
     expect(next.ops[0].text).toContain('Отец Очередной')
     await reg.rejectProposal(owner, next.id)
     expect(people.getPersonRow(realDad.id).birthPlace).toBe('')

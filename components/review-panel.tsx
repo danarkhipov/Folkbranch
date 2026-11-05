@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Check, X } from 'lucide-react'
 import { api, useApp, useProposals } from '@/lib/client'
 
-/** The drafts a token has written: every line in words, accepted or rejected by a person. */
+/** What a token or a reader has suggested: every line in words, accepted or rejected by a person. */
 export function ReviewPanel({ onClose }: { onClose: () => void }) {
   const { t } = useApp()
   const qc = useQueryClient()
@@ -20,19 +20,20 @@ export function ReviewPanel({ onClose }: { onClose: () => void }) {
   }
   return (
     <div className="float side-sheet fixed left-3 top-[60px] bottom-3 w-96 max-w-[calc(100vw-24px)] flex flex-col z-10">
-      <div className="flex items-center justify-between px-3 pt-3 pb-2"><h3 className="font-serif font-medium text-lg">{t('Правки ассистента')}</h3><button className="text-ink-faint hover:text-ink" aria-label={t('Закрыть')} title={t('Закрыть')} onClick={onClose}><X size={15} /></button></div>
+      <div className="flex items-center justify-between px-3 pt-3 pb-2"><h3 className="font-serif font-medium text-lg">{t('Правки на проверку')}</h3><button className="text-ink-faint hover:text-ink" aria-label={t('Закрыть')} title={t('Закрыть')} onClick={onClose}><X size={15} /></button></div>
       <div className="flex-1 overflow-auto px-3 pb-3 flex flex-col gap-4">
         {!drafts.length && <p className="text-sm text-ink-faint">{t('Правок на проверку нет')}</p>}
         {drafts.map((d) => (
           <section key={d.id} className="flex flex-col gap-1.5">
-            <div className="flex items-baseline justify-between text-xs text-ink-soft"><b className="font-medium text-ink">{d.tokenName}</b><span>{d.ops.length} {t('правок')}</span></div>
+            <div className="flex items-baseline justify-between text-xs text-ink-soft"><b className="font-medium text-ink">{d.authorName}</b><span>{t('Правок')}: {d.ops.length}</span></div>
             {d.error && <p className="text-xs text-destructive flex gap-1"><AlertTriangle size={13} className="flex-none mt-px" /> {d.error}</p>}
             <div className="flex flex-col rounded-lg border border-border divide-y divide-border max-h-[50vh] overflow-auto bg-white/60">
               {d.ops.map((o, i) => (
                 <div key={i} className="group flex gap-2 px-2 py-1.5 text-sm">
                   <div className="min-w-0 flex-1">
                     <div className="leading-snug break-words">{o.text}</div>
-                    {o.details?.map((line, j) => <div key={j} className="text-xs text-ink-soft break-words">{line}</div>)}
+                    {o.details?.map((line, j) => <div key={j} className="text-xs text-ink-soft break-words whitespace-pre-wrap">{line}</div>)}
+                    {o.audio && <audio controls preload="none" className="mt-1 h-8 w-full" src={`/api/v1/proposals/${d.id}/ops/${i}/audio`} />}
                   </div>
                   <button title={t('Удалить')} disabled={busy} className="hidden group-hover:block text-ink-faint hover:text-destructive flex-none self-start" onClick={() => act(() => api(`proposals/${d.id}/ops/${i}`, { method: 'DELETE' }))}><X size={13} /></button>
                 </div>

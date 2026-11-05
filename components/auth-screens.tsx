@@ -98,3 +98,41 @@ export function InviteScreen({ token, lang, familyName, name, valid }: { token: 
     </main>
   )
 }
+
+/** A link for viewing: a button first, so a preview in a messenger opens nothing and learns nothing. */
+export function ShareScreen({ token, valid, needsPassword, lang }: { token: string; valid: boolean; needsPassword: boolean; lang: Lang }) {
+  const t = (k: string) => translate(lang, k)
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  return (
+    <main className={shell}>
+      {valid ? (
+        <form className={card} onSubmit={async (e) => {
+          e.preventDefault()
+          setBusy(true)
+          setError('')
+          const r = await post('/api/share', { token, ...(needsPassword ? { password } : {}) })
+          if (r.ok) return location.replace('/')
+          setBusy(false)
+          setError((await r.json().catch(() => null))?.error ?? 'error')
+        }}>
+          <h1 className="font-serif text-xl font-medium">{t('Вам открыли семейный архив для просмотра')}</h1>
+          <p className="text-ink-soft text-sm">{t('Регистрация не нужна. Живые родственники скрыты.')}</p>
+          {needsPassword && (
+            <label className="flex flex-col gap-1 text-sm text-ink-soft">{t('Пароль')}
+              <input className={field} type="password" autoComplete="off" required value={password} onChange={(e) => setPassword(e.target.value)} />
+            </label>
+          )}
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          <button className={primary} disabled={busy}>{t('Открыть архив')}</button>
+        </form>
+      ) : (
+        <div className={card}>
+          <h1 className="font-serif text-xl font-medium">{t('Ссылка недействительна')}</h1>
+          <p className="text-ink-soft text-sm">{t('Срок ссылки истёк, или её закрыли. Попросите новую.')}</p>
+        </div>
+      )}
+    </main>
+  )
+}

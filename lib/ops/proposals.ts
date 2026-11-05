@@ -19,11 +19,12 @@ export interface QueuedOp { op: string; args: any; tempId?: string; text: string
 
 export interface Proposal {
   id: string
-  tokenName: string
+  authorName: string
+  authorKind: string
   status: string
   error: string | null
   createdAt: number
-  ops: { op: string; text: string; details?: string[] }[]
+  ops: { op: string; text: string; details?: string[]; audio?: boolean }[]
 }
 
 const TABLES = { persons: schema.persons, pages: schema.pages, media: schema.media, mediaTags: schema.mediaTags, history: schema.history }
@@ -87,7 +88,7 @@ function readback(actor: Actor, ops: PlannedOp[], map: Record<string, string>) {
 function withKnownIds(actor: Actor, args: unknown) {
   if (!actor.tokenId) return args
   const db = getDb()
-  const rows = db.select({ idMap: schema.proposals.idMap }).from(schema.proposals).where(and(eq(schema.proposals.tokenId, actor.tokenId), eq(schema.proposals.status, 'applied'))).all()
+  const rows = db.select({ idMap: schema.proposals.idMap }).from(schema.proposals).where(and(eq(schema.proposals.authorId, actor.tokenId), eq(schema.proposals.status, 'applied'))).all()
   return swapIds(args, Object.assign({}, ...rows.map((r) => JSON.parse(r.idMap))))
 }
 
@@ -98,20 +99,28 @@ function swapIds<T>(args: T, map: Record<string, string>): T {
   return JSON.parse(json.replace(/tmp_[a-z0-9]+/g, (m) => map[m] ?? m))
 }
 
-function draftOf(tokenId: string) {
+function draftOf(authorId: string) {
   const p = schema.proposals
-  return getDb().select().from(p).where(and(eq(p.tokenId, tokenId), eq(p.status, 'pending'))).orderBy(desc(p.createdAt)).get()
+  return getDb().select().from(p).where(and(eq(p.authorId, authorId), eq(p.status, 'pending'))).orderBy(desc(p.createdAt)).get()
 }
 
-function enqueue(actor: Actor, ops: PlannedOp[]) {
+const authorId = (actor: Actor) => actor.tokenId ?? actor.userId
+
+/** How many lines are waiting from this author. */
+/** How many of the waiting lines are voice recordings. */
+export const pendingVoices = (actor: Actor) => (JSON.parse(draftOf(authorId(actor))?.ops ?? '[]') as QueuedOp[]).filter((o) => o.op === 'create_story' && o.args.audio).length
+
+export const pendingOps = (actor: Actor) => (JSON.parse(draftOf(authorId(actor))?.ops ?? '[]') as unknown[]).length
+
+export function enqueue(actor: Actor, ops: (PlannedOp & { details?: string[] })[]) {
   const db = getDb()
   return db.transaction(() => {
-    const token = db.select().from(schema.apiTokens).where(eq(schema.apiTokens.id, actor.tokenId!)).get()!
-    let draft = draftOf(actor.tokenId!)
+    const author = authorId(actor)
+    let draft = draftOf(author)
     if (!draft) {
       const id = newId()
-      db.insert(schema.proposals).values({ id, tokenId: token.id, tokenName: token.name, createdAt: Date.now() }).run()
-      draft = draftOf(token.id)!
+      db.insert(schema.proposals).values({ id, authorId: author, authorKind: actor.tokenId ? 'token' : 'person', authorName: actor.name, createdAt: Date.now() }).run()
+      draft = draftOf(author)!
     }
     const queued: QueuedOp[] = JSON.parse(draft.ops)
     if (queued.length + ops.length > MAX_DRAFT_OPS) throw new OpError(413, 'draft is full, wait for review')
@@ -129,7 +138,8 @@ function enqueue(actor: Actor, ops: PlannedOp[]) {
       }
       const args = swapIds(o.args, renames)
       checkRefs(d, args, known)
-      queued.push({ op: o.op, args, tempId, ...d.describe(args, { name: (id) => nameInDraft(String(id), queued) }) })
+      const said = d.describe(args, { name: (id) => nameInDraft(String(id), queued) })
+      queued.push({ op: o.op, args, tempId, text: said.text, details: [...(said.details ?? []), ...(o.details ?? [])] })
     }
     announceChange()
     db.update(schema.proposals).set({ ops: JSON.stringify(queued), error: null }).where(eq(schema.proposals.id, draft.id)).run()
@@ -180,8 +190,8 @@ const humanOnly = (actor: Actor) => {
 }
 
 const toPublic = (r: typeof schema.proposals.$inferSelect): Proposal => ({
-  id: r.id, tokenName: r.tokenName, status: r.status, error: r.error, createdAt: r.createdAt,
-  ops: (JSON.parse(r.ops) as QueuedOp[]).map(({ op, text, details }) => ({ op, text, details })),
+  id: r.id, authorName: r.authorName, authorKind: r.authorKind, status: r.status, error: r.error, createdAt: r.createdAt,
+  ops: (JSON.parse(r.ops) as QueuedOp[]).map(({ op, text, details, args }) => ({ op, text, details, ...(op === 'create_story' && args.audio ? { audio: true } : {}) })),
 })
 
 export function listProposals(actor: Actor): Proposal[] {
@@ -191,9 +201,9 @@ export function listProposals(actor: Actor): Proposal[] {
 }
 
 export function myProposals(actor: Actor): Proposal[] {
-  if (!actor.tokenId) throw new OpError(400, 'for tokens')
+  if (!actor.tokenId && actor.role !== 'reader') throw new OpError(400, 'for tokens and readers')
   const p = schema.proposals
-  return getDb().select().from(p).where(eq(p.tokenId, actor.tokenId)).orderBy(desc(p.createdAt)).limit(20).all().map(toPublic)
+  return getDb().select().from(p).where(eq(p.authorId, authorId(actor))).orderBy(desc(p.createdAt)).limit(20).all().map(toPublic)
 }
 
 function pending(id: string) {
@@ -203,14 +213,23 @@ function pending(id: string) {
   return r
 }
 
+/** A voice waiting for review, so whoever accepts it has heard it. */
+export function queuedAudio(actor: Actor, id: string, index: number) {
+  humanOnly(actor)
+  const op = (JSON.parse(pending(id).ops) as QueuedOp[])[index]
+  if (op?.op !== 'create_story' || !op.args.audio) throw new OpError(404, 'not found')
+  return op.args.audio as { filename: string; mime: string }
+}
+
 export function acceptProposal(actor: Actor, id: string) {
   humanOnly(actor)
   const db = getDb()
   const r = pending(id)
   const ops = JSON.parse(r.ops) as QueuedOp[]
-  const author: Actor = { ...actor, name: `${r.tokenName} → ${actor.name}`, tokenId: r.tokenId }
+  // A reader's correction goes in like a model's edit: a changed value keeps its versions and sources.
+  const author: Actor = { ...actor, name: `${r.authorName} → ${actor.name}`, ...(r.authorKind === 'token' ? { tokenId: r.authorId } : { assistant: true }) }
   try {
-    const { historyId, map } = applyOps(author, ops, {}, `${r.tokenName}: ${ops.length} ${say('правок')}`)
+    const { historyId, map } = applyOps(author, ops, {}, `${r.authorName}: ${ops.length} ${say('правок')}`)
     db.update(schema.proposals).set({ status: 'applied', idMap: JSON.stringify(map), resolvedAt: Date.now(), resolvedBy: actor.name, historyId, error: null }).where(eq(schema.proposals.id, id)).run()
     return { applied: ops.length, historyId }
   } catch (e) {
@@ -239,5 +258,8 @@ export async function removeProposalOp(actor: Actor, id: string, index: number) 
 }
 
 async function discardFiles(ops: QueuedOp[]) {
-  await Promise.all(ops.filter((o) => o.op === 'upload_photo').map((o) => media.discardUpload(o.args.row.id)))
+  await Promise.all([
+    ...ops.filter((o) => o.op === 'upload_photo').map((o) => media.discardUpload(o.args.row.id)),
+    ...ops.filter((o) => o.op === 'create_story' && o.args.audio).map((o) => media.discardUpload(o.args.audio.id)),
+  ])
 }

@@ -6,13 +6,15 @@ import { OPS } from '@/lib/ops/registry'
 
 export type Ctx = { actor: Actor; params: Record<string, string>; req: Request; query: URLSearchParams; body: () => Promise<any> }
 export type Handler = (c: Ctx) => unknown | Promise<unknown>
-export interface Route { method: string; path: string; handler: Handler; summary: string; op?: string; human?: boolean }
+export interface Route { method: string; path: string; handler: Handler; summary: string; op?: string; human?: boolean; guest?: boolean }
 
 export const role = z.enum(['owner', 'editor', 'reader'])
 
 export const get = (path: string, summary: string, handler: Handler): Route => ({ method: 'GET', path, summary, handler })
 /** A write for signed-in people only; tokens are refused before it runs. */
 export const human = (method: string, path: string, summary: string, handler: Handler): Route => ({ method, path, summary, handler, human: true })
+/** A read that someone with a viewing link may make. Every other route refuses them. */
+export const open = (path: string, summary: string, handler: Handler): Route => ({ ...get(path, summary, handler), guest: true })
 /** A write through the operation registry, so a token's call lands in the review queue. */
 export const op = (method: string, path: string, name: string, toArgs: (c: Ctx, body: any) => unknown = (_, b) => b): Route => ({
   method, path, op: name, summary: OPS[name].description,

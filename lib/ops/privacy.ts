@@ -4,6 +4,7 @@ import type { Graph, Person, Sex } from '../types'
 import { type Actor, seesOnlyPublic } from './core'
 
 export function hiddenFor(actor: Actor, p: { id: string; living: boolean }) {
+  if (actor.guest?.only && !actor.guest.only.has(p.id)) return true
   return seesOnlyPublic(actor) && p.living && p.id !== actor.personId
 }
 

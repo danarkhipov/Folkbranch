@@ -15,6 +15,8 @@ export interface Actor {
   review?: boolean
   /** The app's built-in assistant, acting for this person. */
   assistant?: boolean
+  /** Came through a link and has no account. `only`: the people of the view that link shows, or null for everyone. */
+  guest?: { viewId: string | null; only: Set<string> | null }
   /** When the assistant last read the archive: anything newer from someone else makes it look again. */
   since?: number
 }
@@ -41,6 +43,8 @@ export const TRACKED = {
   pages: schema.pages,
   media: schema.media,
   mediaTags: schema.mediaTags,
+  stories: schema.stories,
+  storyPeople: schema.storyPeople,
 } as const
 export type Tracked = keyof typeof TRACKED
 
@@ -217,7 +221,20 @@ export const REFERENCES: { table: Tracked; column: string; to: 'persons' | 'medi
   { table: 'pages', column: 'personId', to: 'persons' },
   { table: 'mediaTags', column: 'personId', to: 'persons' },
   { table: 'mediaTags', column: 'mediaId', to: 'media' },
+  { table: 'storyPeople', column: 'personId', to: 'persons' },
 ]
+
+/** A story is reached through the people it is about. With none left it could never be read or removed. */
+export function dropStoriesAboutNobody(c: Changes) {
+  const db = getDb()
+  const about = new Set(db.select({ id: schema.storyPeople.storyId }).from(schema.storyPeople).where(eq(schema.storyPeople.role, 'about')).all().map((r) => r.id))
+  for (const s of db.select({ id: schema.stories.id, mediaId: schema.stories.mediaId }).from(schema.stories).all()) {
+    if (about.has(s.id)) continue
+    for (const r of db.select({ id: schema.storyPeople.id }).from(schema.storyPeople).where(eq(schema.storyPeople.storyId, s.id)).all()) c.remove('storyPeople', r.id)
+    if (s.mediaId) c.remove('media', s.mediaId)
+    c.remove('stories', s.id)
+  }
+}
 
 /** Removes rows that point at deleted people or photos. */
 export function purgeOrphans(c: Changes) {
@@ -233,6 +250,7 @@ export function purgeOrphans(c: Changes) {
     const rows = db.select(columns).from(TRACKED[table] as typeof schema.persons).all() as unknown as Record<string, string>[]
     for (const r of rows) if (refs.some((ref) => r[ref.column] !== null && !known[ref.to].has(r[ref.column]))) c.remove(table, r.id)
   }
+  dropStoriesAboutNobody(c)
   // A missing portrait clears the field; the person stays.
   for (const r of db.select({ id: schema.persons.id, avatarMediaId: schema.persons.avatarMediaId }).from(schema.persons).all())
     if (r.avatarMediaId && !known.media.has(r.avatarMediaId)) c.update('persons', r.id, { avatarMediaId: null, avatarCrop: null })

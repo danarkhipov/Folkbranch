@@ -45,7 +45,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
   const { data: graph } = useQuery({ queryKey: ['graph'], queryFn: () => api<Graph>('graph') })
   const canvas = useRef<CanvasHandle>(null)
   const [focusId, setFocusId] = useState<string | null>(() => (typeof location !== 'undefined' ? new URLSearchParams(location.search).get('p') : null))
-  const present = useLive(focusId)
+  const present = useLive(focusId, !me.guest)
   const [search, setSearch] = useState(false)
   const [side, setSide] = useState<Side>(null)
   // Mounted on first use and kept, so the conversation survives closing the panel.
@@ -112,7 +112,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
         e.preventDefault()
         setSearch((s) => !s)
       }
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j' && !me.guest) {
         e.preventDefault()
         toggleAssistant()
       }
@@ -220,7 +220,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       <ConnectionNotice t={t} />
       <GraphCanvas ref={canvas} scope={scope} pathIds={path} groupIds={groupIds} panelOpen={panelOpen} leftInset={side === 'assistant' ? assistantWidth + 12 : 0}/>
 
-      <MainBar familyName={familyName} present={present} mode={barMode} navRef={nav} side={side} draftOps={draftOps} onSearch={() => setSearch(true)} onSide={(next) => { setSide(next); setPath(null) }} onAssistant={toggleAssistant} onSettings={() => setSettings(true)} />
+      <MainBar guest={!!me.guest} familyName={familyName} present={present} mode={barMode} navRef={nav} side={side} draftOps={draftOps} onSearch={() => setSearch(true)} onSide={(next) => { setSide(next); setPath(null) }} onAssistant={toggleAssistant} onSettings={() => setSettings(true)} />
       <ViewBar onPrint={() => setPrinting(true)} scope={scope} canvas={canvas} rootsBelow={rootsBelow} onFlip={flipChart} groups={groups} onGroups={setGroups} allGroups={allGroups} left={side === 'assistant' ? assistantWidth + 24 : side === 'history' ? 344 : side === 'review' ? 408 : 12} crowded={panelOpen || !!side} />
 
       {!ctx.graph.persons.length && ctx.canEdit && (
