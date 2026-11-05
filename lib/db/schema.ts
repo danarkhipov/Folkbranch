@@ -153,7 +153,9 @@ export const media = sqliteTable('media', {
 export const mediaTags = sqliteTable('media_tags', {
   id: text('id').primaryKey(),
   mediaId: text('media_id').notNull(),
-  personId: text('person_id').notNull(),
+  // Empty when someone on the photo has no card: a colleague, a neighbour. Then only `label` says who.
+  personId: text('person_id'),
+  label: text('label'),
   x: real('x'),
   y: real('y'),
   w: real('w'),

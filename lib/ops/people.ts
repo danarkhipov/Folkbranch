@@ -5,6 +5,9 @@ import { personName, yearOf } from '../types'
 import { Actor, Changes, can, mutate, newId, OpError, requireRole, seesOnlyPublic } from './core'
 import { say } from './app-config'
 import { reconcile } from './merge'
+import { hiddenFor, hiddenIn, maskPerson } from './privacy'
+
+export { hiddenFor }
 
 const label = (p: { givenName: string; surname: string } | undefined) => (p && personName(p)) || say('Без названия')
 
@@ -12,12 +15,6 @@ function isLikelyLiving(birthYear: number | null, deathDate: string, deathYear: 
   if (deathDate || deathYear) return false
   return !(birthYear && birthYear < new Date().getFullYear() - 110)
 }
-
-export function hiddenFor(actor: Actor, p: { id: string; living: boolean }) {
-  return seesOnlyPublic(actor) && p.living && p.id !== actor.personId
-}
-
-const HIDE = (p: any) => ({ ...p, givenName: '', surname: '', maidenName: '', patronymic: '', otherNames: '', birthDate: '', birthYear: null, birthPlace: '', deathDate: '', deathPlace: '', sex: 'U' as Sex, avatarMediaId: null, avatarCrop: null, tags: [], facts: [], sources: [], claims: [], hidden: true })
 
 const PERSON_JSON = (r: any) => ({ ...r, tags: JSON.parse(r.tags ?? '[]') as string[], facts: JSON.parse(r.facts ?? '[]') as Fact[], sources: JSON.parse(r.sources ?? '[]') as Source[], claims: JSON.parse(r.claims ?? '[]') })
 
@@ -47,19 +44,25 @@ function deepFreeze(o: unknown) {
   Object.values(o).forEach(deepFreeze)
 }
 
+/** One masked copy of each living person per change, however many readers ask. */
+const maskedOf = (entry: GraphEntry) => (entry.hidden ??= new Map(entry.graph.persons.filter((p) => p.living).map((p) => [p.id, maskPerson(p)])))
+
 export function getGraph(actor: Actor): Graph {
   const entry = wholeGraph()
   const { graph } = entry
   if (!seesOnlyPublic(actor)) return graph
-  const hidden = (entry.hidden ??= new Map(graph.persons.filter((p) => p.living).map((p) => [p.id, HIDE(p)])))
+  const hidden = maskedOf(entry)
   return { ...graph, persons: graph.persons.map((p) => (hiddenFor(actor, p) ? hidden.get(p.id)! : p)) }
 }
+
+/** Everyone masked for this person. */
+export const hiddenPeople = (actor: Actor) => hiddenIn(actor, getGraph(actor))
 
 /** Whether this person may know that someone has a card open. Asked often, so it builds no graph. */
 export function canSeePerson(actor: Actor, id: string) {
   if (!seesOnlyPublic(actor)) return true
   const entry = wholeGraph()
-  return !(entry.hidden ??= new Map(entry.graph.persons.filter((p) => p.living).map((p) => [p.id, HIDE(p)]))).has(id) || id === actor.personId
+  return !maskedOf(entry).has(id) || id === actor.personId
 }
 
 /** The graph as sent to a page, with a tag that lets an unchanged one travel as a short "not modified". */

@@ -34,7 +34,7 @@ export function requireRole(a: Actor, role: Role) {
   if (!can(a, role)) throw new OpError(403, 'forbidden')
 }
 
-const TRACKED = {
+export const TRACKED = {
   persons: schema.persons,
   parentChild: schema.parentChild,
   unions: schema.unions,
@@ -205,22 +205,37 @@ function recordHistory(actor: Actor, meta: Meta, changes: Change[], undoOf?: str
   return id
 }
 
+/**
+ * What points at what. The tracked tables have no foreign keys, on purpose: undo re-creates rows in any order.
+ * A new table that refers to someone must be listed here; a test fails if it is not.
+ */
+export const REFERENCES: { table: Tracked; column: string; to: 'persons' | 'media' }[] = [
+  { table: 'parentChild', column: 'parentId', to: 'persons' },
+  { table: 'parentChild', column: 'childId', to: 'persons' },
+  { table: 'unions', column: 'aId', to: 'persons' },
+  { table: 'unions', column: 'bId', to: 'persons' },
+  { table: 'pages', column: 'personId', to: 'persons' },
+  { table: 'mediaTags', column: 'personId', to: 'persons' },
+  { table: 'mediaTags', column: 'mediaId', to: 'media' },
+]
+
 /** Removes rows that point at deleted people or photos. */
 export function purgeOrphans(c: Changes) {
   const db = getDb()
-  const people = new Set(db.select({ id: schema.persons.id }).from(schema.persons).all().map((r) => r.id))
-  const photos = new Set(db.select({ id: schema.media.id }).from(schema.media).all().map((r) => r.id))
-  // Only the columns compared: this runs on every undo, and pages hold whole texts.
-  for (const r of db.select({ id: schema.parentChild.id, parentId: schema.parentChild.parentId, childId: schema.parentChild.childId }).from(schema.parentChild).all())
-    if (!people.has(r.parentId) || !people.has(r.childId)) c.remove('parentChild', r.id)
-  for (const r of db.select({ id: schema.unions.id, aId: schema.unions.aId, bId: schema.unions.bId }).from(schema.unions).all())
-    if (!people.has(r.aId) || !people.has(r.bId)) c.remove('unions', r.id)
-  for (const r of db.select({ id: schema.pages.id, personId: schema.pages.personId }).from(schema.pages).all())
-    if (!people.has(r.personId)) c.remove('pages', r.id)
-  for (const r of db.select({ id: schema.mediaTags.id, personId: schema.mediaTags.personId, mediaId: schema.mediaTags.mediaId }).from(schema.mediaTags).all())
-    if (!people.has(r.personId) || !photos.has(r.mediaId)) c.remove('mediaTags', r.id)
+  const known = {
+    persons: new Set(db.select({ id: schema.persons.id }).from(schema.persons).all().map((r) => r.id)),
+    media: new Set(db.select({ id: schema.media.id }).from(schema.media).all().map((r) => r.id)),
+  }
+  for (const [table, refs] of Map.groupBy(REFERENCES, (r) => r.table)) {
+    const t = TRACKED[table] as unknown as Record<string, never>
+    // Only the columns compared: this runs on every undo, and pages hold whole texts.
+    const columns = Object.fromEntries(['id', ...refs.map((r) => r.column)].map((k) => [k, t[k]]))
+    const rows = db.select(columns).from(TRACKED[table] as typeof schema.persons).all() as unknown as Record<string, string>[]
+    for (const r of rows) if (refs.some((ref) => r[ref.column] !== null && !known[ref.to].has(r[ref.column]))) c.remove(table, r.id)
+  }
+  // A missing portrait clears the field; the person stays.
   for (const r of db.select({ id: schema.persons.id, avatarMediaId: schema.persons.avatarMediaId }).from(schema.persons).all())
-    if (r.avatarMediaId && !photos.has(r.avatarMediaId)) c.update('persons', r.id, { avatarMediaId: null, avatarCrop: null })
+    if (r.avatarMediaId && !known.media.has(r.avatarMediaId)) c.update('persons', r.id, { avatarMediaId: null, avatarCrop: null })
 }
 
 export function undo(actor: Actor, historyId: string, summary: string) {

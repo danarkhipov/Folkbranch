@@ -4,17 +4,13 @@
 // dagre only decides the generations and a first order. `order.ts` then chooses who stands where
 // to cross least, and `tracks.ts` the heights of the bars; both are named after the methods they use.
 import dagre from '@dagrejs/dagre'
-import { lifeYears, type Graph, type ParentLink, type Person, type Union } from '../types'
+import type { Graph, ParentLink, Person, Union } from '../types'
+import { AVATAR_CY, AVATAR_R, CARD_H, CARD_W, cardHeight, PITCH, UNDER_CAPTION } from './metrics'
 import { orderRows, type OrderEdge, type OrderNode } from './order'
 import { assignTracks, type Net } from './tracks'
 import { boxOf, type Box } from './visible'
 
-export const CARD_W = 156
-export const CARD_H = 118
-export const AVATAR_CY = 34
-const AVATAR_R = 30
-/** Partners stand further apart than a caption is wide, so the line down from their dot is never under a name. */
-export const PITCH = 178
+export { AVATAR_CY, CARD_H, CARD_W, PITCH } from './metrics'
 const RANK_SEP = 76
 const NODE_SEP = 22
 /** A line passing through a row takes this little room, and stays clear of captions on both sides. */
@@ -136,31 +132,6 @@ export function orthogonal(points: [number, number][]) {
   return d
 }
 
-/** Lines end here, behind the caption's opaque background, which cuts them off at the text. */
-const UNDER_CAPTION = AVATAR_CY + AVATAR_R + 12
-const NAME_CHARS = 14
-const YEAR_CHARS = 17
-// All at the largest size captions reach when the chart is zoomed out.
-const TEXT_LINE = 24
-const YEAR_LINE = 24
-const LABEL_LINE = 30
-
-/** How many lines a text takes when it wraps by words. */
-function wrappedLines(text: string, width: number) {
-  let lines = 1, used = 0
-  for (const word of text.split(/\s+/).filter(Boolean)) {
-    if (used && used + 1 + word.length > width) { lines++; used = word.length }
-    else used += (used ? 1 : 0) + word.length
-    // A word wider than the caption is broken across lines.
-    while (used > width) { lines++; used -= width }
-  }
-  return lines
-}
-/** How tall a card's caption gets: names and long dates wrap, and a relation label may sit under the years. */
-function cardHeight(p: Person | undefined) {
-  const years = p ? lifeYears(p) : ''
-  return AVATAR_CY + AVATAR_R + 13 + wrappedLines(p ? `${p.givenName ?? ''} ${p.surname ?? ''}` : '', NAME_CHARS) * TEXT_LINE + wrappedLines(years, YEAR_CHARS) * YEAR_LINE + LABEL_LINE
-}
 const mean = (xs: number[]) => xs.reduce((a, c) => a + c, 0) / xs.length
 
 interface Family { key: string; parents: string[]; children: string[]; links: ParentLink[] }

@@ -6,10 +6,11 @@ import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
 import sharp from 'sharp'
 import { desc, eq, inArray, sql } from 'drizzle-orm'
-import { getDb, MEDIA_DIR, schema } from '../db'
+import { getDb, schema } from '../db'
+import { listMediaFiles, mediaFile, removeMediaFiles, writeAtomic } from '../storage'
 import type { Box, Media } from '../types'
 import { Actor, Changes, mutate, newId, OpError, requireRole, seesOnlyPublic } from './core'
-import { getGraph } from './people'
+import { hiddenPeople } from './people'
 import { say } from './settings'
 
 const MAX_SIZE = 40 * 1024 * 1024
@@ -23,41 +24,38 @@ function row(id: string) {
 }
 
 /** Readers lose access to any photo that shows a relative hidden from them. */
-function hiddenIds(actor: Actor) {
-  return seesOnlyPublic(actor) ? new Set(getGraph(actor).persons.filter((p) => p.hidden).map((p) => p.id)) : new Set<string>()
-}
-
 export function canSeeMedia(actor: Actor, mediaId: string) {
-  const hidden = hiddenIds(actor)
+  const hidden = hiddenPeople(actor)
   if (!hidden.size) return true
-  return !getDb().select().from(schema.mediaTags).where(eq(schema.mediaTags.mediaId, mediaId)).all().some((t) => hidden.has(t.personId))
+  return !getDb().select().from(schema.mediaTags).where(eq(schema.mediaTags.mediaId, mediaId)).all().some((t) => t.personId && hidden.has(t.personId))
 }
 
-function withTags(rows: (typeof schema.media.$inferSelect)[]): Media[] {
+function withTags(rows: (typeof schema.media.$inferSelect)[], actor: Actor): Media[] {
   if (!rows.length) return []
   const tags = Map.groupBy(getDb().select().from(schema.mediaTags).where(inArray(schema.mediaTags.mediaId, rows.map((r) => r.id))).all(), (t) => t.mediaId)
   return rows.map((r) => ({
     id: r.id, kind: r.kind as Media['kind'], originalName: r.originalName, mime: r.mime, width: r.width, height: r.height,
     caption: r.caption, date: r.date, place: r.place, createdAt: r.createdAt,
-    tags: tags.get(r.id) ?? [],
+    // A caption can name a living person, and a reader has no way to be told apart from one.
+    tags: (tags.get(r.id) ?? []).map((t) => (!seesOnlyPublic(actor) ? t : { ...t, label: t.label && '' })),
   }))
 }
 
 function visible(actor: Actor, list: Media[]) {
-  const hidden = hiddenIds(actor)
-  return hidden.size ? list.filter((m) => !m.tags.some((t) => hidden.has(t.personId))) : list
+  const hidden = hiddenPeople(actor)
+  return hidden.size ? list.filter((m) => !m.tags.some((t) => t.personId && hidden.has(t.personId))) : list
 }
 
 export function listPersonMedia(actor: Actor, personId: string): Media[] {
   const db = getDb()
   const ids = db.select({ id: schema.mediaTags.mediaId }).from(schema.mediaTags).where(eq(schema.mediaTags.personId, personId)).all().map((r) => r.id)
   if (!ids.length) return []
-  return visible(actor, withTags(db.select().from(schema.media).where(inArray(schema.media.id, ids)).all()))
+  return visible(actor, withTags(db.select().from(schema.media).where(inArray(schema.media.id, ids)).all(), actor))
 }
 
 export function getMedia(actor: Actor, id: string): Media {
   if (!canSeeMedia(actor, id)) throw new OpError(404, 'not found')
-  return withTags([row(id)])[0]
+  return withTags([row(id)], actor)[0]
 }
 
 // A big photo takes hundreds of megabytes to decode, so a batch on a small server waits its turn.
@@ -76,8 +74,8 @@ async function inTurn<T>(job: () => Promise<T>): Promise<T> {
 async function makeCopies(id: string, buf: Buffer) {
   try {
     const rotated = sharp(buf, { failOn: 'none' }).rotate()
-    const info = await rotated.clone().webp({ quality: 82 }).resize({ width: SIZES.medium, height: SIZES.medium, fit: 'inside', withoutEnlargement: true }).toFile(path.join(/*turbopackIgnore: true*/ MEDIA_DIR, `${id}.medium.webp`))
-    await rotated.clone().webp({ quality: 76 }).resize({ width: SIZES.thumb, height: SIZES.thumb, fit: 'inside', withoutEnlargement: true }).toFile(path.join(/*turbopackIgnore: true*/ MEDIA_DIR, `${id}.thumb.webp`))
+    const info = await rotated.clone().webp({ quality: 82 }).resize({ width: SIZES.medium, height: SIZES.medium, fit: 'inside', withoutEnlargement: true }).toFile(mediaFile(`${id}.medium.webp`))
+    await rotated.clone().webp({ quality: 76 }).resize({ width: SIZES.thumb, height: SIZES.thumb, fit: 'inside', withoutEnlargement: true }).toFile(mediaFile(`${id}.thumb.webp`))
     return info
   } catch {
     await discardUpload(id)
@@ -97,7 +95,7 @@ export async function storeUpload(buf: Buffer, originalName: string, uploadedBy:
   const ext = path.extname(originalName).toLowerCase().replace(/[^.a-z0-9]/g, '').slice(0, 8)
   const filename = copies ? `${id}.orig${ext || '.' + meta!.format}` : `${id}.file${ext}`
   try {
-    await fs.writeFile(path.join(/*turbopackIgnore: true*/ MEDIA_DIR, filename), buf)
+    await writeAtomic(mediaFile(filename), buf)
   } catch (e) {
     await discardUpload(id)
     throw e
@@ -139,28 +137,25 @@ export async function sweepOrphanFiles(now = Date.now()) {
       || !!db.select({ id: schema.proposals.id }).from(schema.proposals).where(like(schema.proposals.ops)).limit(1).get()
   }
   const orphans = new Map<string, string[]>()
-  for (const f of await fs.readdir(MEDIA_DIR)) {
+  for (const f of await listMediaFiles()) {
     const id = f.slice(0, f.indexOf('.'))
     if (id && !known.has(id)) orphans.set(id, [...(orphans.get(id) ?? []), f])
   }
   let removed = 0
   for (const [id, files] of orphans) {
-    const stats = await Promise.all(files.map((f) => fs.stat(path.join(/*turbopackIgnore: true*/ MEDIA_DIR, f))))
+    const stats = await Promise.all(files.map((f) => fs.stat(mediaFile(f))))
     if (stats.some((s) => now - s.mtimeMs < OLD_ENOUGH) || mentioned(id)) continue
-    await Promise.all(files.map((f) => fs.unlink(path.join(/*turbopackIgnore: true*/ MEDIA_DIR, f))))
+    await Promise.all(files.map((f) => fs.unlink(mediaFile(f))))
     removed += files.length
   }
   return removed
 }
 
 /** Removes the files of an upload that was never accepted. */
-export async function discardUpload(id: string) {
-  const files = await fs.readdir(MEDIA_DIR)
-  await Promise.all(files.filter((f) => f.startsWith(`${id}.`)).map((f) => fs.unlink(path.join(/*turbopackIgnore: true*/ MEDIA_DIR, f)).catch(() => null)))
-}
+export const discardUpload = removeMediaFiles
 
 export function listAllMedia(actor: Actor, limit = 200): Media[] {
-  return visible(actor, withTags(getDb().select().from(schema.media).orderBy(desc(schema.media.createdAt)).limit(limit).all()))
+  return visible(actor, withTags(getDb().select().from(schema.media).orderBy(desc(schema.media.createdAt)).limit(limit).all(), actor))
 }
 
 /** Fetches a photo for an upload-by-link, refusing addresses inside our own network. */
@@ -210,7 +205,7 @@ export async function readMediaFile(actor: Actor, id: string, size: MediaSize) {
   const file = r.kind === 'image' && size !== 'orig' ? `${id}.${size}.webp` : r.filename
   return {
     // The camera's record of where a picture was taken stays with those who may edit the archive.
-    data: await fs.readFile(path.join(/*turbopackIgnore: true*/ MEDIA_DIR, file)).then((b) => (r.kind === 'image' && file === r.filename && seesOnlyPublic(actor) ? sharp(b, { failOn: 'none' }).rotate().jpeg({ quality: 92 }).toBuffer() : b)).catch(() => { throw new OpError(404, 'the file is missing') }),
+    data: await fs.readFile(mediaFile(file)).then((b) => (r.kind === 'image' && file === r.filename && seesOnlyPublic(actor) ? sharp(b, { failOn: 'none' }).rotate().jpeg({ quality: 92 }).toBuffer() : b)).catch(() => { throw new OpError(404, 'the file is missing') }),
     mime: file.endsWith('.webp') ? 'image/webp' : r.kind === 'image' && seesOnlyPublic(actor) ? 'image/jpeg' : r.mime,
     name: r.originalName,
     download: r.kind !== 'image',
@@ -230,19 +225,16 @@ function cropBox(crop: string | null): Box {
 export async function readAvatar(mediaId: string, crop: string | null) {
   const c = cropBox(crop)
   const key = [c.x, c.y, c.w, c.h].map((n) => Math.round(n * 1000)).join('_')
-  const cached = path.join(/*turbopackIgnore: true*/ MEDIA_DIR, `${mediaId}.avatar.${key}.webp`)
+  const cached = mediaFile(`${mediaId}.avatar.${key}.webp`)
   const hit = await fs.readFile(cached).catch(() => null)
   if (hit) return hit
-  const src = path.join(/*turbopackIgnore: true*/ MEDIA_DIR, `${mediaId}.medium.webp`)
+  const src = mediaFile(`${mediaId}.medium.webp`)
   const m = await sharp(src).metadata().catch(() => { throw new OpError(404, 'the file is missing') })
   const W = m.width!, H = m.height!
   const left = Math.min(W - 1, Math.round(c.x * W)), top = Math.min(H - 1, Math.round(c.y * H))
   const width = Math.max(1, Math.min(W - left, Math.round(c.w * W))), height = Math.max(1, Math.min(H - top, Math.round(c.h * H)))
   const out = await sharp(src).extract({ left, top, width, height }).resize(192, 192, { fit: 'cover' }).webp({ quality: 82 }).toBuffer()
-  // By rename, so a crash cannot leave half a picture that later reads take for the cache.
-  const part = `${cached}.${newId()}.part`
-  await fs.writeFile(part, out)
-  await fs.rename(part, cached)
+  await writeAtomic(cached, out)
   return out
 }
 
@@ -258,22 +250,26 @@ export function deleteMedia(actor: Actor, id: string) {
   const r = row(id)
   // Files stay on disk so the deletion can be rolled back.
   const tags = db.select().from(schema.mediaTags).where(eq(schema.mediaTags.mediaId, id)).all()
-  mutate(actor, { summary: `${say('Удалить')}: ${r.originalName}`, personIds: tags.map((t) => t.personId) }, (c: Changes) => {
+  mutate(actor, { summary: `${say('Удалить')}: ${r.originalName}`, personIds: tags.flatMap((t) => t.personId ?? []) }, (c: Changes) => {
     tags.forEach((t) => c.remove('mediaTags', t.id))
     db.select().from(schema.persons).where(eq(schema.persons.avatarMediaId, id)).all().forEach((p) => c.update('persons', p.id, { avatarMediaId: null, avatarCrop: null }))
     c.remove('media', id)
   })
 }
 
-export function addTag(actor: Actor, mediaId: string, personId: string, box: Box | null) {
+/** Marks someone on a photo: a person with a card, or anyone else by a caption alone. */
+export function addTag(actor: Actor, mediaId: string, who: { personId?: string | null; label?: string | null }, box: Box | null) {
   requireRole(actor, 'editor')
   const r = row(mediaId)
+  const personId = who.personId || null
+  const label = who.label?.trim() || null
+  if (!personId && !label) throw new OpError(400, 'who is on the photo?')
   const db = getDb()
-  return mutate(actor, { summary: `${say('Фото')}: ${r.originalName}`, personIds: [personId] }, (c) => {
+  return mutate(actor, { summary: `${say('Фото')}: ${r.originalName}`, personIds: personId ? [personId] : [] }, (c) => {
     // Replace the frameless tag from upload rather than listing the person twice.
-    const loose = db.select().from(schema.mediaTags).where(eq(schema.mediaTags.mediaId, mediaId)).all().find((t) => t.personId === personId && t.x === null)
+    const loose = personId ? db.select().from(schema.mediaTags).where(eq(schema.mediaTags.mediaId, mediaId)).all().find((t) => t.personId === personId && t.x === null) : undefined
     if (loose && box) return c.update('mediaTags', loose.id, { ...box })
-    return c.insert('mediaTags', { id: newId(), mediaId, personId, ...(box ?? {}) })
+    return c.insert('mediaTags', { id: newId(), mediaId, personId, label: personId ? null : label, ...(box ?? {}) })
   })
 }
 
@@ -281,5 +277,5 @@ export function removeTag(actor: Actor, id: string) {
   requireRole(actor, 'editor')
   const t = getDb().select().from(schema.mediaTags).where(eq(schema.mediaTags.id, id)).get()
   if (!t) throw new OpError(404, 'not found')
-  mutate(actor, { summary: `${say('Удалить')}: ${say('Фото')}`, personIds: [t.personId] }, (c) => c.remove('mediaTags', id))
+  mutate(actor, { summary: `${say('Удалить')}: ${say('Фото')}`, personIds: t.personId ? [t.personId] : [] }, (c) => c.remove('mediaTags', id))
 }

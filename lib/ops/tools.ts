@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { blocksToMarkdown } from '../markdown'
 import { Family } from '../kinship'
 import { parseFamilyText, planFamilyText, serializeFamilyText } from '../textformat'
-import { CLAIM_FIELDS, hasConflict, NAME_FIELDS, summary } from '../claims'
+import { summary } from '../claims'
 import { guessMapping, parseCsv, rowsToText, type Mapping } from '../import-formats'
 import { lifeYears, personName, type Lang, type Person, type Role } from '../types'
 import { Actor, can, OpError } from './core'
@@ -12,6 +12,7 @@ import { attachmentBytes, findAttachment, readAttachmentText } from '../agent/at
 import { exportGedcom, importGedcom, previewGedcom } from './gedcom'
 import { listAllMedia, listPersonMedia, updateMedia, uploadMedia } from './media'
 import { getPage, listPages } from './pages'
+import { findGaps } from './gaps'
 import { getGraph } from './people'
 import { OUTPUTS } from './outputs'
 import { describeOp, dispatch, myProposals } from './proposals'
@@ -75,16 +76,7 @@ const READS: Record<string, { description: string; input: z.ZodObject; run: (a: 
   find_gaps: {
     description: 'What is unfinished, person by person: missing dates and places, no parents, values without a source, conflicting versions. People with conflicts come first. Good as a work queue.',
     input: z.object({ limit: z.number().int().min(1).max(200).default(30), onlyConflicts: z.boolean().default(false) }),
-    run: (a, x) => {
-      const g = getGraph(a)
-      const parents = new Set(g.parentChild.map((l) => l.childId))
-      return g.persons.filter((p) => !p.hidden).map((p) => {
-        const missing = [!p.birthDate && 'birthDate', !p.birthPlace && 'birthPlace', !p.living && !p.deathDate && 'deathDate', !p.living && !p.deathPlace && 'deathPlace', !parents.has(p.id) && 'parents', p.sex === 'U' && 'sex'].filter(Boolean)
-        const s = summary(p)
-        return { ...brief(p), missing, unsourced: s.unsourced, conflicts: CLAIM_FIELDS.concat(NAME_FIELDS).filter((f) => hasConflict(p, f)) }
-      }).filter((r) => (x.onlyConflicts ? r.conflicts.length : r.missing.length || r.unsourced || r.conflicts.length))
-        .sort((p, q) => q.conflicts.length - p.conflicts.length || q.missing.length - p.missing.length).slice(0, x.limit)
-    },
+    run: (a, x) => findGaps(a, x).map(({ person, ...r }) => ({ ...brief(person), ...r })),
   },
   parse_table: {
     description: 'Turn a CSV table into the text format, ready for preview_text and import_text. Columns are guessed from the headers (Russian or English: name, surname, born, died, father, mother, spouse...). Pass `columns` to override, one field per column: id, name, given, patronymic, surname, maiden, sex, birthDate, birthPlace, deathDate, deathPlace, father, mother, spouse, or empty to skip.',

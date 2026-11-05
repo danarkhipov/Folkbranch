@@ -39,7 +39,8 @@ function Photo({ id, list, index, setIndex, onClose }: { id: string; list?: stri
   const [full, setFull] = useState(false)
   const [hot, setHot] = useState<string | null>(null)
 
-  const addTag = useWrite(({ personId, box }: { personId: string; box: Box | null }) => api(`media/${id}/tags`, { json: { personId, box } }), refresh)
+  const [caption, setCaption] = useState('')
+  const addTag = useWrite(({ personId, label, box }: { personId?: string; label?: string; box: Box | null }) => api(`media/${id}/tags`, { json: { personId, label, box } }), refresh)
   const delTag = useWrite((tagId: string) => api(`tags/${tagId}`, { method: 'DELETE' }), refresh)
   const avatar = useWrite(({ personId, crop }: { personId: string; crop: Box }) => api(`persons/${personId}/avatar`, { method: 'PUT', json: { mediaId: id, crop } }))
   const meta = useWrite((p: Partial<Media>) => api(`media/${id}`, { method: 'PATCH', json: p }), refresh)
@@ -90,10 +91,10 @@ function Photo({ id, list, index, setIndex, onClose }: { id: string; list?: stri
         >
           <img ref={img} src={mediaUrl(id)} alt={m.caption} draggable={false} className="max-h-[calc(100vh-96px)] max-w-full block rounded-sm" />
           {boxes.map((tag) => {
-            const p = byId.get(tag.personId)
+            const p = tag.personId ? byId.get(tag.personId) : undefined
             return (
-              <div key={tag.id} className={cn('tagbox', hot === tag.id && 'show')} style={pos(tag as Box)} onClick={() => { onClose(); focus(tag.personId, { center: true }) }}>
-                <span className="tagname">{p ? personName(p) || t('Скрыто') : ''}</span>
+              <div key={tag.id} className={cn('tagbox', hot === tag.id && 'show')} style={pos(tag as Box)} onClick={() => { if (p) { onClose(); focus(p.id, { center: true }) } }}>
+                <span className="tagname">{p ? personName(p) || t('Скрыто') : tag.label || t('Без подписи')}</span>
               </div>
             )
           })}
@@ -126,14 +127,16 @@ function Photo({ id, list, index, setIndex, onClose }: { id: string; list?: stri
 
         <div className="flex flex-col gap-1">
           {m.tags.map((tag) => {
-            const p = byId.get(tag.personId)
-            if (!p) return null
+            const p = tag.personId ? byId.get(tag.personId) : undefined
+            if (tag.personId && !p) return null
             return (
               <div key={tag.id} onMouseEnter={() => setHot(tag.id)} onMouseLeave={() => setHot(null)} className="group flex items-center gap-2 rounded-md hover:bg-muted px-1 py-0.5">
-                <button className="flex items-center gap-2 min-w-0 flex-1 text-left" onClick={() => { onClose(); focus(p.id, { center: true }) }}>
-                  <Mini person={p} /> <span className="truncate">{personName(p) || t('Скрыто')}</span>
-                </button>
-                {canEdit && tag.x !== null && <button title={t('Сделать аватаркой')} className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity text-ink-faint hover:text-ink" onClick={() => avatar.mutate({ personId: p.id, crop: squareCrop(tag as Box, m.width, m.height) })}><UserRound size={14} /></button>}
+                {p ? (
+                  <button className="flex items-center gap-2 min-w-0 flex-1 text-left" onClick={() => { onClose(); focus(p.id, { center: true }) }}>
+                    <Mini person={p} /> <span className="truncate">{personName(p) || t('Скрыто')}</span>
+                  </button>
+                ) : <span className="min-w-0 flex-1 truncate">{tag.label || t('Без подписи')}</span>}
+                {canEdit && p && tag.x !== null && <button title={t('Сделать аватаркой')} className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity text-ink-faint hover:text-ink" onClick={() => avatar.mutate({ personId: p.id, crop: squareCrop(tag as Box, m.width, m.height) })}><UserRound size={14} /></button>}
                 {canEdit && <button title={t('Удалить')} className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity text-ink-faint hover:text-destructive" onClick={() => delTag.mutate(tag.id)}><X size={14} /></button>}
               </div>
             )
@@ -145,7 +148,7 @@ function Photo({ id, list, index, setIndex, onClose }: { id: string; list?: stri
             <PersonPopover
               open={!!pick}
               onOpenChange={(o) => { if (!o) { setPick(null); setDraft(null) } }}
-              exclude={m.tags.filter((tag) => tag.x !== null).map((tag) => tag.personId)}
+              exclude={m.tags.filter((tag) => tag.x !== null).flatMap((tag) => tag.personId ?? [])}
               onPick={(personId) => {
                 addTag.mutate({ personId, box: pick })
                 setFaces((f) => f.filter((x) => x !== pick))
@@ -155,6 +158,21 @@ function Photo({ id, list, index, setIndex, onClose }: { id: string; list?: stri
             >
               <span className="text-xs text-ink-faint">{t('Обведите лицо на фото, чтобы отметить человека')}</span>
             </PersonPopover>
+            {pick && (
+              <form className="flex gap-1.5" onSubmit={(e) => {
+                e.preventDefault()
+                const label = caption.trim()
+                if (!label) return
+                addTag.mutate({ label, box: pick })
+                setFaces((f) => f.filter((x) => x !== pick))
+                setDraft(null)
+                setPick(null)
+                setCaption('')
+              }}>
+                <input aria-label={t('Подпись без карточки')} placeholder={t('Подпись без карточки')} className="h-9 min-w-0 flex-1 rounded-lg border border-input bg-white px-2 text-sm" value={caption} onChange={(e) => setCaption(e.target.value)} />
+                <button className="bar-btn border border-border" disabled={!caption.trim()}>{t('Подписать')}</button>
+              </form>
+            )}
             <button className="bar-btn border border-border self-start" disabled={scan === 'busy'} onClick={scanFaces}><ScanFace size={14} /> {t('Найти лица')}{scan === 'busy' && '…'}</button>
             {scan === 'none' && <p className="text-xs text-ink-faint">{t('Лиц не найдено')}</p>}
             {scan === 'error' && <p className="text-xs text-destructive">{t('Не удалось загрузить модель распознавания')}</p>}

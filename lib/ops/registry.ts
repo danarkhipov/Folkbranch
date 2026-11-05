@@ -192,11 +192,11 @@ export const OPS: Record<string, Def> = {
   }),
   tag_photo: def({
     risk: 'write',
-    description: 'Mark a person on a photo. The box is in fractions of the photo size; without a box the person is simply linked.',
-    input: z.object({ mediaId: z.string(), personId: z.string(), box: box.nullish() }),
+    description: 'Mark someone on a photo: personId for a person in the archive, or label alone for anyone else. Never create a person just to name them on a photo. The box is in fractions of the photo size; without a box the person is simply linked.',
+    input: z.object({ mediaId: z.string(), personId: z.string().nullish(), label: z.string().max(200).nullish(), box: box.nullish() }).refine((x) => x.personId || x.label?.trim(), 'personId or label is required'),
     refs: { mediaId: 'media', personId: 'persons' },
-    apply: (a, x) => media.addTag(a, x.mediaId, x.personId, x.box ?? null),
-    describe: (x, c) => ({ text: `${say('Фото')}: ${c.name(x.personId)}` }),
+    apply: (a, x) => media.addTag(a, x.mediaId, x, x.box ?? null),
+    describe: (x, c) => ({ text: `${say('Фото')}: ${x.personId ? c.name(x.personId) : x.label}` }),
   }),
   untag_photo: def({
     risk: 'danger',

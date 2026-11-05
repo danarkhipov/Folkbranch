@@ -3,7 +3,7 @@ import { getDb, schema } from '../db'
 import type { Page, PageMeta } from '../types'
 import { personName } from '../types'
 import { Actor, Changes, mutate, newId, OpError, requireRole, seesOnlyPublic } from './core'
-import { getGraph, getPersonRow, hiddenFor } from './people'
+import { getPersonRow, hiddenFor, hiddenPeople } from './people'
 import { say } from './settings'
 
 
@@ -31,7 +31,6 @@ export function getPage(actor: Actor, id: string): Page {
 }
 
 /** A mention stores the person's name; whoever may not see a relative must not learn it. */
-const hiddenPeople = (actor: Actor) => new Set(getGraph(actor).persons.filter((p) => p.hidden).map((p) => p.id))
 
 function scrubMentions(hidden: Set<string>, content: string) {
   const walk = (node: unknown): unknown => {

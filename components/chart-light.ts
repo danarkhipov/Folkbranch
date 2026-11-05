@@ -2,6 +2,7 @@
 import { useMemo, useRef, useState } from 'react'
 import type { Layout } from '@/lib/graph/layout'
 import { useApp } from '@/lib/client'
+import { nearFamily } from '@/lib/graph/select'
 import { pairKey, type LightMode } from './graph-parts'
 
 /** Who and which lines stand out: the open card's family, a path, a group, or whatever the cursor is on. */
@@ -19,10 +20,7 @@ export function useChartLight(layout: Layout, pathIds: string[] | null, groupIds
   }
   const hoverKin = useMemo(() => {
     if (!hoverId || focusId || pathIds || !byId.has(hoverId)) return null
-    const parents = family.parents.get(hoverId) ?? []
-    const siblings = parents.flatMap((p) => family.children.get(p) ?? []).filter((c) => c !== hoverId)
-    const grand = parents.flatMap((p) => family.parents.get(p) ?? [])
-    const near = [...new Set([...parents, ...(family.spouses.get(hoverId) ?? []), ...(family.children.get(hoverId) ?? []), ...siblings, ...grand])]
+    const near = nearFamily(family, hoverId)
     return new Map(near.flatMap((id) => {
       const k = family.relation(hoverId, id, lang)
       return k ? [[id, k.label] as const] : []

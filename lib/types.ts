@@ -118,7 +118,9 @@ export interface Page extends PageMeta {
 export interface MediaTag {
   id: string
   mediaId: string
-  personId: string
+  /** Empty for someone without a card; `label` then says who. */
+  personId: string | null
+  label: string | null
   x: number | null
   y: number | null
   w: number | null

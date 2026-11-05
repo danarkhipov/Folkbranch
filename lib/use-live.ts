@@ -6,7 +6,7 @@ import { api } from './client'
 export interface Present { id: string; name: string; focusId: string | null }
 
 /** What a change elsewhere can touch. An open page's text stays out: its editor settles that by itself. */
-const FRESH = ['graph', 'history', 'pages', 'media', 'proposals']
+const FRESH = ['graph', 'history', 'gaps', 'pages', 'media', 'proposals']
 const RETRY_MS = 2000
 const MAX_RETRY_MS = 60_000
 const SPREAD_MS = 3000
