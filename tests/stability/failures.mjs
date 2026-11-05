@@ -132,4 +132,4 @@ await scenario('input', async () => {
   ok('a parent loop is refused', loop.status >= 400 && loop.status < 500, String(loop.status))
   ok('healthy after all that', (await fetch(B + '/api/health')).ok)
 })
-sh('docker rm -f fg-stab')
+sh('docker rm -fv fg-stab')

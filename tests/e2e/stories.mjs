@@ -9,7 +9,7 @@ import { IMAGE, sh, sleep, waitUp } from './lib.mjs'
 const ok = (n, c, x = '') => { console.log(`${c ? 'PASS' : 'FAIL'} ${n}${x ? ' · ' + x : ''}`); if (!c) process.exitCode = 1 }
 const O = 'http://localhost:3446'
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'family-stories-'))
-try { sh('docker rm -f fg-stories') } catch {}
+try { sh('docker rm -fv fg-stories') } catch {}
 sh(`docker run -d --name fg-stories -p 127.0.0.1:3446:3000 -e BETTER_AUTH_URL=${O} -e SETUP_TOKEN=x ${IMAGE}`)
 await waitUp(O)
 const r = await fetch(O + '/api/auth/family/setup', { method: 'POST', headers: { 'content-type': 'application/json', origin: O }, body: JSON.stringify({ name: 'Анна', familyName: 'Лесные', language: 'ru', demo: true, code: 'x' }) })
@@ -191,6 +191,6 @@ ok('the voices are in the downloaded copy', /\.voice\.webm/.test(names) && /\.vo
 const usage = await (await call('GET', 'stories/usage')).json()
 ok('the owner can see the room they take', usage.used > 0 && usage.limit > usage.used, JSON.stringify(usage))
 ok('no page errors', errs.length === 0, errs.join(' | '))
-await br.close(); sh('docker rm -f fg-stories')
+await br.close(); sh('docker rm -fv fg-stories')
 fs.rmSync(work, { recursive: true, force: true })
 process.exit(process.exitCode ?? 0)

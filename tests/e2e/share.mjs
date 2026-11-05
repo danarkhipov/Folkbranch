@@ -4,7 +4,7 @@ import { IMAGE, sh, sleep, waitUp } from './lib.mjs'
 
 const ok = (n, c, x = '') => { console.log(`${c ? 'PASS' : 'FAIL'} ${n}${x ? ' · ' + x : ''}`); if (!c) process.exitCode = 1 }
 const O = 'http://localhost:3445'
-try { sh('docker rm -f fg-share') } catch {}
+try { sh('docker rm -fv fg-share') } catch {}
 sh(`docker run -d --name fg-share -p 127.0.0.1:3445:3000 -e BETTER_AUTH_URL=${O} -e SETUP_TOKEN=x ${IMAGE}`)
 await waitUp(O)
 const r = await fetch(O + '/api/auth/family/setup', { method: 'POST', headers: { 'content-type': 'application/json', origin: O }, body: JSON.stringify({ name: 'Анна', familyName: 'Лесные', language: 'ru', demo: true, code: 'x' }) })
@@ -169,5 +169,5 @@ ok('a reader still cannot write directly', (await call('PATCH', `persons/${subje
 ok('a reader cannot accept their own suggestion', (await call('POST', 'proposals/x/accept', {}, rc)).status === 403)
 
 ok('no page errors', errs.length === 0, errs.join(' | '))
-await br.close(); sh('docker rm -f fg-share')
+await br.close(); sh('docker rm -fv fg-share')
 process.exit(process.exitCode ?? 0)

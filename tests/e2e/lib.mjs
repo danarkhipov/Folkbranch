@@ -8,7 +8,7 @@ export const cookiesOf = (cookie) => cookie.split('; ').map((c) => ({ name: c.sp
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 /** A throwaway container with the fictional family. Returns its address and a signed-in owner's cookie. */
 export async function boot(name, port, img, { args = '', people = 1000, volume = true, pub } = {}) {
-  try { sh(`docker rm -f ${name}`) } catch {}
+  try { sh(`docker rm -fv ${name}`) } catch {}
   try { sh(`docker volume rm ${name}-data`) } catch {}
   const B = pub ?? `http://localhost:${port}`
   sh(`docker run -d --name ${name} -p 127.0.0.1:${port}:3000 ${volume ? `-v ${name}-data:/data` : ''} -e BETTER_AUTH_URL=${B} -e SETUP_TOKEN=audit ${args} ${img}`)

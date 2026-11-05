@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Mic, Pencil, ScrollText, Trash2 } from 'lucide-react'
 import { api, useApp } from '@/lib/client'
 import { personName, type Person, type Story } from '@/lib/types'
+import { ReadText } from './person-fields'
 
 const StoryDialog = dynamic(() => import('./story-dialog').then((m) => m.StoryDialog), { ssr: false })
 const StoryFactDialog = dynamic(() => import('./story-dialog').then((m) => m.StoryFactDialog), { ssr: false })
@@ -45,24 +46,24 @@ export function StoriesTab({ person }: { person: Person }) {
     qc.invalidateQueries({ queryKey: ['history'] })
   }
   return (
-    <div className="px-6 py-4 flex flex-col gap-3">
-      {!me.guest && <button className="bar-btn border border-border self-start" onClick={() => setEditing('new')}><Mic size={14} /> {t('Записать рассказ')}</button>}
-      {stories.length > 0 && <p className="text-xs text-ink-soft">{t('Рассказы хранятся отдельно от сведений: это чьи-то слова, а не проверенные факты.')}</p>}
-      {!stories.length && me.guest && <p className="text-sm text-ink-faint">{t('Рассказов пока нет')}</p>}
+    <div className="px-4 py-4 flex flex-col gap-3">
+      {!me.guest && <button className="add-btn self-start" onClick={() => setEditing('new')}><Mic size={14} /> {t('Записать рассказ')}</button>}
+      {<p className="text-xs text-ink-soft">{t('Рассказы хранятся отдельно от сведений: это чьи-то слова, а не проверенные факты.')}</p>}
+      {!stories.length && <p className="text-sm text-ink-faint">{t('Рассказов пока нет')}</p>}
       {stories.map((s) => {
         const who = teller(s)
         const line = [who && `${t('Со слов')}: ${who}`, s.toldOn, s.createdBy && `${t('Добавлено')}: ${s.createdBy}`].filter(Boolean).join(' · ')
         return (
-          <article key={s.id} className="rounded-lg border border-border bg-white/60 px-3 py-2">
-            {s.title && <h4 className="font-serif text-base font-medium leading-snug">{s.title}</h4>}
-            {line && <p className="text-xs text-ink-soft">{line}</p>}
+          <article key={s.id} className="min-w-0 rounded-lg border border-border bg-white/60 px-3 py-2">
+            {s.title && <h4 className="font-serif text-base font-medium leading-snug break-anywhere">{s.title}</h4>}
+            {line && <p className="text-xs text-ink-soft break-anywhere">{line}</p>}
             {s.hasAudio && <Voice id={s.id} />}
-            {s.body && <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap break-words">{s.body}</p>}
+            {s.body && <p className="mt-1.5 text-sm leading-relaxed"><ReadText value={s.body} /></p>}
             {canEdit && (
               <div className="mt-1.5 flex flex-wrap gap-3 text-xs text-ink-soft">
                 <button className="flex items-center gap-1 hover:text-ink" onClick={() => setFact(s)}><ScrollText size={12} /> {t('Сделать фактом')}</button>
-                <button className="flex items-center gap-1 hover:text-ink" onClick={() => setEditing(s)}><Pencil size={12} /> {t('Изменить рассказ')}</button>
-                <button className="flex items-center gap-1 hover:text-destructive" onClick={() => remove(s)}><Trash2 size={12} /> {t('Удалить рассказ')}</button>
+                <button aria-label={t('Изменить рассказ')} className="flex items-center gap-1 hover:text-ink" onClick={() => setEditing(s)}><Pencil size={12} /> {t('Изменить')}</button>
+                <button aria-label={t('Удалить рассказ')} className="ml-auto flex items-center gap-1 hover:text-destructive" onClick={() => remove(s)}><Trash2 size={12} /> {t('Удалить')}</button>
               </div>
             )}
           </article>

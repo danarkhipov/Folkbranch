@@ -107,3 +107,28 @@ export function cardCertainty(p: Subject): Certainty {
   if (guess) return 'assumed'
   return s.documented && !s.told && !s.unsourced && !s.conflict ? 'documented' : 'family'
 }
+
+/**
+ * Two cards become one. Every version either held stays. Where the cards disagreed, the value picked is the accepted
+ * one and the other stays as a possible version, so nothing anyone wrote is lost.
+ */
+export function mergeClaims(keep: Claim[], drop: Claim[], fields: { field: ClaimField; keep: string; drop: string; chosen: string }[], id: () => string): Claim[] {
+  const ids = new Set(keep.map((c) => c.id))
+  const out = [...keep, ...drop.map((c) => (ids.has(c.id) ? { ...c, id: id() } : c))]
+  const same = (c: Claim, field: ClaimField, value: string) => c.field === field && c.value === value
+  for (const { field, keep: a, drop: b, chosen } of fields) {
+    if (!(a && b && a !== b) && !out.some((c) => c.field === field)) continue
+    for (const value of [a, b]) {
+      if (value && !out.some((c) => same(c, field, value))) out.push({ id: id(), field, value, sourceId: null, status: 'possible', reason: '', at: Date.now() })
+    }
+    for (const c of out) {
+      if (c.field !== field || c.status === 'rejected') continue
+      c.status = c.value === chosen ? 'accepted' : 'possible'
+    }
+    // The same value noted on both cards is one version, not two.
+    const first = out.find((c) => same(c, field, chosen) && c.status === 'accepted')
+    for (let i = out.length - 1; i >= 0; i--) if (out[i] !== first && same(out[i], field, chosen) && out[i].status === 'accepted') out.splice(i, 1)
+  }
+  return out.map((c) => ({ ...c }))
+}
+

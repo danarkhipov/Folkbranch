@@ -11,7 +11,7 @@ fs.rmSync(OUT, { recursive: true, force: true }); fs.mkdirSync(OUT, { recursive:
 const stub = spawn('node', [fileURLToPath(new URL('model-stub.mjs', import.meta.url))], { stdio: 'ignore' })
 
 async function demo(name, port, env = '') {
-  try { sh(`docker rm -f ${name}`) } catch {}
+  try { sh(`docker rm -fv ${name}`) } catch {}
   const B = `http://localhost:${port}`
   sh(`docker run -d --name ${name} -p 127.0.0.1:${port}:3000 -e BETTER_AUTH_URL=${B} -e SETUP_TOKEN=demo-code ${env} ${img}`)
   await waitUp(B)
@@ -133,7 +133,7 @@ const ck2 = await signUp(N)
   await surface(q, 'h01-assistant-setup', () => q.locator('nav button[aria-label="Ассистент"]').click())
 }
 await br.close(); stub.kill()
-try { sh('docker rm -f fg-typ fg-typ2') } catch {}
+try { sh('docker rm -fv fg-typ fg-typ2') } catch {}
 
 // ---- Measures.
 const BAD_WORDS = /(^|[^а-яёa-z])(токен\w*|MCP|REST|API|провайдер\w*|JSON|CSV|SSE|OAuth|URL|эндпоинт\w*|промпт\w*|Parameters|Result|Submit|Close)($|[^а-яёa-z])|(?<!файл |\()GEDCOM/i
