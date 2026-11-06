@@ -25,4 +25,10 @@ describe('the brand', () => {
     expect(existsSync('folkbranch')).toBe(true)
     for (const file of texts) expect(readFileSync(file, 'utf8'), file).not.toMatch(/\.\/family\b/)
   })
+
+  it('keeps the installer working through curl | sh, where the script is on stdin', () => {
+    const execs = readFileSync('install.sh', 'utf8').split('\n').filter((l) => l.includes('compose exec'))
+    expect(execs.length).toBeGreaterThan(0)
+    for (const line of execs) expect(line).toContain('</dev/null')
+  })
 })

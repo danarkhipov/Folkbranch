@@ -33,7 +33,8 @@ const seen = path.join(dir, 'agents.log')
 for (const a of ['claude', 'codex']) fs.writeFileSync(path.join(bin, a), `#!/bin/sh\necho "${a} $*" >> "${seen}"\n`, { mode: 0o755 })
 const env = { ...process.env, FOLKBRANCH_IMAGE: IMAGE, COMPOSE_PROJECT_NAME: 'fg-install', PATH: `${bin}:${process.env.PATH}` }
 const run = (cmd, cwd = dir) => spawnSync('sh', ['-c', cmd], { cwd, env, encoding: 'utf8', timeout: 240000 })
-const first = run(`sh "${repo}/install.sh" --dir "${dir}" --port 3453`)
+// Piped, as in the README: a command that reads stdin would swallow the rest of the script.
+const first = run(`cat "${repo}/install.sh" | sh -s -- --dir "${dir}" --port 3453`)
 const link = first.stdout.match(/http:\/\/localhost:3453\/setup\?code=\S+/)?.[0]
 ok('one command starts it and prints the link', !!link, first.stderr.slice(-160))
 ok('with no build', !/building here/i.test(first.stdout))

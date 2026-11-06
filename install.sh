@@ -77,7 +77,8 @@ fi
 
 printf "Waiting for the app"
 i=0
-until docker compose exec -T folkbranch node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1; do
+# Through curl this script arrives on stdin, so exec must not read it: </dev/null keeps the rest of the script.
+until docker compose exec -T folkbranch node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" </dev/null >/dev/null 2>&1; do
   i=$((i + 1))
   [ "$i" -gt 60 ] && { echo; echo "It did not start. See: cd $DIR && docker compose logs folkbranch"; exit 1; }
   printf "."
@@ -86,7 +87,7 @@ done
 echo
 
 URL=$(value BETTER_AUTH_URL)
-if docker compose exec -T folkbranch node folkbranch.mjs doctor 2>/dev/null | grep -q '^Users:   0'; then
+if docker compose exec -T folkbranch node folkbranch.mjs doctor </dev/null 2>/dev/null | grep -q '^Users:   0'; then
   echo
   echo "Ready. Open this address and create your family:"
   echo

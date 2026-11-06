@@ -2,6 +2,11 @@
 
 All notable changes are listed here, newest first. Versions follow [Semantic Versioning](https://semver.org). Each version is a Git tag, and ready images are at `ghcr.io/danarkhipov/folkbranch`.
 
+## Unreleased
+
+### Fixed
+- The install command run through `curl | sh` stopped before printing the setup link.
+
 ## 1.1.0 - 2026-11-06
 
 ### Added
