@@ -22,7 +22,7 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ghcr.io/danarkhipov/folkbranch
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
