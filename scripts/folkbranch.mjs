@@ -46,7 +46,7 @@ function tokenCreate(o) {
   if (!['reader', 'editor'].includes(role)) fail('--role must be reader or editor')
   const days = o.days === undefined ? null : Number(o.days)
   if (days !== null && !(days > 0)) fail('--days must be a positive number')
-  const token = `fg_${randomBytes(32).toString('base64url')}`
+  const token = `fb_${randomBytes(32).toString('base64url')}`
   const db = open()
   const now = Date.now()
   db.prepare('insert into api_tokens (id, name, token_hash, role, review, created_by, created_at, expires_at) values (?, ?, ?, ?, ?, ?, ?, ?)')
@@ -56,12 +56,12 @@ function tokenCreate(o) {
   console.log(`Token for "${name}" (${role}${role === 'editor' ? (o.direct ? ', writes apply at once' : ', writes wait for your review') : ''}). Shown once, keep it safe.\n`)
   console.log(`  ${token}\n`)
   console.log('Claude Code:\n')
-  console.log(`  claude mcp add --transport http family ${url} --header "Authorization: Bearer ${token}"\n`)
+  console.log(`  claude mcp add --transport http folkbranch ${url} --header "Authorization: Bearer ${token}"\n`)
   console.log('Cursor, Windsurf and any other MCP client:\n')
-  console.log(JSON.stringify({ mcpServers: { family: { type: 'http', url, headers: { Authorization: `Bearer ${token}` } } } }, null, 2).replace(/^/gm, '  '))
+  console.log(JSON.stringify({ mcpServers: { folkbranch: { type: 'http', url, headers: { Authorization: `Bearer ${token}` } } } }, null, 2).replace(/^/gm, '  '))
   console.log('\nCodex:\n')
   console.log(`  export FOLKBRANCH_TOKEN=${token}`)
-  console.log(`  codex mcp add family --url ${url} --bearer-token-env-var FOLKBRANCH_TOKEN`)
+  console.log(`  codex mcp add folkbranch --url ${url} --bearer-token-env-var FOLKBRANCH_TOKEN`)
 }
 
 function tokenList() {
@@ -96,7 +96,7 @@ function loginLink() {
 async function backup(o) {
   const dir = path.resolve(o._[0] || path.join(DATA_DIR, 'backups'))
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-  const target = path.join(dir, `family-${stamp}`)
+  const target = path.join(dir, `folkbranch-${stamp}`)
   fs.mkdirSync(target, { recursive: true })
   // A consistent copy, safe while the app is running.
   await open(true).backup(path.join(target, 'family.db'))

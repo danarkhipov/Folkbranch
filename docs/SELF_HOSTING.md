@@ -26,12 +26,12 @@ The repository is ready for Railway: `.railway/railway.ts` describes one service
 
 ```bash
 railway login
-railway init --name family-archive
+railway init --name folkbranch
 railway config apply
-railway variable set --service family "BETTER_AUTH_SECRET=$(openssl rand -hex 32)"
-railway domain --service family
-railway up --service family
-railway logs --service family
+railway variable set --service folkbranch "BETTER_AUTH_SECRET=$(openssl rand -hex 32)"
+railway domain --service folkbranch
+railway up --service folkbranch
+railway logs --service folkbranch
 ```
 
 The logs print the link that claims the empty archive. Open it and create the owner. The link's code stops working after that.
@@ -42,7 +42,7 @@ The logs print the link that claims the empty archive. Open it and create the ow
 
 **Your own domain.** Add it in Railway, then set `BETTER_AUTH_URL=https://your.domain` and redeploy. The old Railway address keeps working. Google or Yandex sign-in also need `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `YANDEX_CLIENT_ID`, `YANDEX_CLIENT_SECRET`, with the callbacks `/api/auth/callback/google` and `/api/auth/oauth2/callback/yandex` at your address.
 
-**Locked out or need a copy.** `railway ssh --service family`, then `node family.mjs login-link` or `node family.mjs backup`. Backups land in `/data/backups`, on the same volume, so also take one off the server or turn on volume backups in Railway.
+**Locked out or need a copy.** `railway ssh --service folkbranch`, then `node folkbranch.mjs login-link` or `node folkbranch.mjs backup`. Backups land in `/data/backups`, on the same volume, so also take one off the server or turn on volume backups in Railway.
 
 **Memory.** With a family of 1000 and 20 people looking at it, the app stays near 130 MB, and 256 MB is enough for a family of this size including uploads and an import. It holds one parsed copy of the family, rebuilt only after a change. The image limits the JavaScript heap to 256 MB through `NODE_OPTIONS`; an archive with very many people or very large uploads may need more.
 
@@ -52,27 +52,27 @@ Any platform that runs a Dockerfile and gives you a persistent `/data` works the
 
 ## The first person
 
-An empty instance can be claimed only with a code, so a stranger who finds it first cannot take it. `install.sh` prints a link with the code. Otherwise it is in the logs (`docker compose logs family`) and in `setup-code` in the data folder. After the first person signs up, the code stops mattering.
+An empty instance can be claimed only with a code, so a stranger who finds it first cannot take it. `install.sh` prints a link with the code. Otherwise it is in the logs (`docker compose logs folkbranch`) and in `setup-code` in the data folder. After the first person signs up, the code stops mattering.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `./family token create --name NAME` | Connect an agent, see [AGENTS.md](AGENTS.md) |
-| `./family token list`, `./family token revoke ID` | See and cut off tokens |
-| `./family login-link` | One-time sign-in link for the owner, for when you are locked out |
-| `./family backup` | Consistent copy of the database and photos, safe while running |
-| `./family doctor` | Where the data is and what is in it |
+| `./folkbranch token create --name NAME` | Connect an agent, see [AGENTS.md](AGENTS.md) |
+| `./folkbranch token list`, `./folkbranch token revoke ID` | See and cut off tokens |
+| `./folkbranch login-link` | One-time sign-in link for the owner, for when you are locked out |
+| `./folkbranch backup` | Consistent copy of the database and photos, safe while running |
+| `./folkbranch doctor` | Where the data is and what is in it |
 
 ## Backups
 
-**From the app.** Settings → Files → Download a full copy: one file with the database, photos and files, and a checksum for each. It leaves out sign-in sessions and can be restored on a clean install from the setup screen, or over an archive from the same place in settings. The previous archive stays in `backups/before-restore` on the volume. An assistant key set in the app has to be entered again unless the server keeps the same secret.
+**From the app.** Settings → Import and export → Download a full copy: one file with the database, photos and files, and a checksum for each. It leaves out sign-in sessions and can be restored on a clean install from the setup screen, or over an archive from the same place in settings. The previous archive stays in `backups/before-restore` on the volume. An assistant key set in the app has to be entered again unless the server keeps the same secret.
 
 Restoring restarts the process, so something must start it again: Docker Compose and Railway do. Under plain `pnpm dev` start it by hand.
 
 **From the command line.**
 
-`./family backup` writes to `backups/` inside the data volume. To take a copy off the server:
+`./folkbranch backup` writes to `backups/` inside the data volume. To take a copy off the server:
 
 ```bash
 docker compose cp family:/data/backups ./backups
@@ -106,9 +106,8 @@ Without internet the app and its data need none, only face detection in photos d
 
 All of them are optional and explained in [.env.example](../.env.example). Change `.env`, then run `docker compose up -d`.
 
-## Копия перед обновлением
+## The copy before an update
 
-Обновление само меняет базу при старте, если в новой версии есть миграции. Перед этим сервер кладёт копию базы в `backups/before-migration-<номер>/family.db` внутри папки данных и хранит пять последних. Фото в неё не входят: миграции их не трогают. Если копию сделать не удалось, например кончилось место на диске, база остаётся как есть, а сервер не запускается и пишет причину в журнал.
+An update changes the database by itself at start if the new version has migrations. Before that, the server puts a copy of the database in `backups/before-migration-<number>/family.db` inside the data folder and keeps the last five. Photos are not included: migrations do not touch them. If the copy cannot be made, for example because the disk is full, the database stays as it is, and the server does not start and writes the reason to its log.
 
-Как вернуться к копии: остановите сервер, замените `family.db` файлом из копии, удалите `family.db-wal` и `family.db-shm`, запустите прежнюю версию приложения. С новой версией миграция просто применится снова. Изменения, сделанные после обновления, при этом пропадут.
-
+To go back to the copy: stop the server, replace `family.db` with the file from the copy, delete `family.db-wal` and `family.db-shm`, and start the previous version of the app. With the new version the migration simply applies again. Changes made after the update are lost.

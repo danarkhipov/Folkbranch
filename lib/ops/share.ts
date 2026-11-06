@@ -11,7 +11,7 @@ import { Actor, newId, OpError, requireRole } from './core'
 import { getGraph } from './people'
 import { say } from './app-config'
 
-export const SHARE_COOKIE = 'fg_view'
+export const SHARE_COOKIE = 'fb_view'
 const DAY = 24 * 3600 * 1000
 const COOKIE_DAYS = 30
 const MAX_TRIES = 8

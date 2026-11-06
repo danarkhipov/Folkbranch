@@ -29,7 +29,7 @@ for (const p of ['/api/agent', '/api/agent/files']) { const r = await anon(p, { 
 { const r = await anon('/api/health', { anon: true }); note('/api/health виден всем', (await r.text())) }
 { const r = await anon('/api/v1/openapi.json', { anon: true }); note('/api/v1/openapi.json без входа', r.status) }
 { const r = await anon('/api/mcp', { anon: true, json: { jsonrpc: '2.0', id: 1, method: 'tools/list' } }); say(r.status === 401, 'MCP без токена', r.status) }
-{ const r = await anon('/api/mcp', { anon: true, headers: { authorization: 'Bearer fg_fake' }, json: { jsonrpc: '2.0', id: 1, method: 'tools/list' } }); say(r.status === 401, 'MCP с поддельным токеном', r.status) }
+{ const r = await anon('/api/mcp', { anon: true, headers: { authorization: 'Bearer fb_fake' }, json: { jsonrpc: '2.0', id: 1, method: 'tools/list' } }); say(r.status === 401, 'MCP с поддельным токеном', r.status) }
 
 // ---- Sign-in
 for (const [p, json] of [['/api/auth/sign-up/email', { email: 'x@evil.test', password: 'Passw0rd!Passw0rd', name: 'x' }], ['/api/auth/sign-in/email', { email: 'x@evil.test', password: 'Passw0rd!Passw0rd' }], ['/api/auth/family/setup', { name: 'x', familyName: 'x', language: 'ru', demo: true, code: 'demo-code' }], ['/api/auth/family/setup', { name: 'x', familyName: 'x', language: 'ru', demo: true }], ['/api/auth/family/accept', { token: 'nope' }]]) {

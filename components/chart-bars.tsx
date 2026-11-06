@@ -10,6 +10,7 @@ import type { CanvasHandle } from './graph-canvas'
 import type { ChartScope } from './chart-scope'
 import { ViewMenu } from './chart-view-menu'
 import { Legend } from './graph-parts'
+import { Logo } from './logo'
 
 export type Side = 'related' | 'history' | 'review' | 'assistant' | null
 
@@ -19,6 +20,7 @@ export function MainBar({ guest, familyName, present, mode, navRef, side, draftO
   const hint = (text: string) => (mode === 'compact' && window.innerWidth > 640 ? text : undefined)
   return (
       <nav aria-label={t('Главное меню')} ref={navRef} className={cn('float main-bar fixed left-3 top-3 z-10 flex items-center gap-0.5 p-1', mode !== 'full' && mode)}>
+        <Logo size={22} className="bar-logo ml-1.5 flex-none" />
         <span className="family-name font-serif font-medium text-base px-2.5 max-w-[220px] truncate">{familyName}</span>
         {present.length > 0 && <span className="presence" title={`${t('Сейчас в архиве')}: ${present.map((o) => o.name).join(', ')}`} aria-label={`${t('Сейчас в архиве')}: ${present.map((o) => o.name).join(', ')}`} role="img">{present.slice(0, 3).map((o) => <span key={o.id}>{o.name.slice(0, 1).toUpperCase()}</span>)}{present.length > 3 && <span>+{present.length - 3}</span>}</span>}
         <span className="sep w-px h-5 bg-border mx-0.5" />

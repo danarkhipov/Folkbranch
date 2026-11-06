@@ -33,7 +33,7 @@ function issue(role: 'reader' | 'editor', review = true) {
 describe('tokens', () => {
   it('are stored hashed, stop working when revoked, and never become owners', () => {
     const { id, token } = tokens.createToken(owner, { name: 'x', role: 'editor', review: true })
-    expect(token.startsWith('fg_')).toBe(true)
+    expect(token.startsWith('fb_')).toBe(true)
     expect(JSON.stringify(db.getDb().select().from(db.schema.apiTokens).all())).not.toContain(token)
     const actor = tokens.actorFromToken(token)!
     expect(actor.role).toBe('editor')
@@ -41,7 +41,7 @@ describe('tokens', () => {
     expect(() => tokens.createToken(actor, { name: 'z', role: 'editor', review: false })).toThrow('forbidden')
     tokens.revokeToken(owner, id)
     expect(tokens.actorFromToken(token)).toBeNull()
-    expect(tokens.actorFromToken('fg_wrong')).toBeNull()
+    expect(tokens.actorFromToken('fb_wrong')).toBeNull()
   })
 
   it('read-only ones cannot write and do not see the living', async () => {
@@ -247,7 +247,7 @@ describe('tokens', () => {
     expect(tokens.actorFromToken(past.token)).toBeNull()
     tokens.revokeToken(owner, live.id)
     expect(tokens.actorFromToken(live.token)).toBeNull()
-    expect(tokens.actorFromToken('fg_made_up')).toBeNull()
+    expect(tokens.actorFromToken('fb_made_up')).toBeNull()
   })
 })
 

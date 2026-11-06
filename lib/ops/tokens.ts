@@ -9,7 +9,7 @@ const TOUCH_MS = 60_000
 
 export function createToken(actor: Actor, input: { name: string; role: 'reader' | 'editor'; review: boolean; expiresInDays?: number | null }) {
   requireRole(actor, 'owner')
-  const token = `fg_${randomBytes(32).toString('base64url')}`
+  const token = `fb_${randomBytes(32).toString('base64url')}`
   const id = newId()
   getDb().insert(schema.apiTokens).values({ id, name: input.name, tokenHash: hash(token), role: input.role, review: input.review, expiresAt: input.expiresInDays ? Date.now() + input.expiresInDays * 86_400_000 : null, createdBy: actor.userId, createdAt: Date.now() }).run()
   // Shown once: only the hash is kept.
@@ -28,7 +28,7 @@ export function revokeToken(actor: Actor, id: string) {
   if (!r.changes) throw new OpError(404, 'not found')
 }
 
-/** Turns "Authorization: Bearer fg_..." into an actor; null means the token is unknown or revoked. */
+/** Turns "Authorization: Bearer fb_..." into an actor; null means the token is unknown or revoked. */
 export function actorFromToken(token: string): Actor | null {
   const db = getDb()
   const row = db.select().from(schema.apiTokens).where(eq(schema.apiTokens.tokenHash, hash(token))).get()

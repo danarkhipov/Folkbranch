@@ -111,7 +111,7 @@ function SameList() {
         <div key={`${d.a}.${d.b}`} className="rounded-md px-2 py-1.5 text-sm flex flex-col gap-0.5">
           <span className="font-medium break-anywhere">{person(d.a)}</span>
           <span className="font-medium break-anywhere">{person(d.b)}</span>
-          {d.why.length > 0 && <span className="text-xs text-ink-soft">{t('Совпадает')}: {d.why.join(', ')}</span>}
+          {d.why.length > 0 && <span className="text-xs text-ink-soft">{t('Совпадает')}: {d.why.map(t).join(', ')}</span>}
           <span className="mt-0.5 flex flex-wrap gap-1.5">
             <button className="bar-btn border border-border !h-7" onClick={() => setPair(fuller(d.a, d.b))}>{t('Сравнить')}</button>
             <button className="bar-btn !h-7 text-ink-soft" onClick={async () => { await api('duplicates/dismiss', { json: { a: d.a, b: d.b } }); qc.invalidateQueries({ queryKey: ['duplicates'] }) }}>{t('Это разные люди')}</button>

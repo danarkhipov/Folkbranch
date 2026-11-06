@@ -3,13 +3,13 @@ import { defineRailway, project, service, volume } from 'railway/iac'
 
 export default defineRailway(() => {
   // Everything the archive holds lives here. Removing this volume deletes the archive.
-  const data = volume('family-data')
-  const family = service('family', {
+  const data = volume('folkbranch-data')
+  const folkbranch = service('folkbranch', {
     healthcheck: '/api/health',
     healthcheckTimeout: 120,
     // SQLite and uploaded photos live on one volume, so one copy is the only correct number.
     replicas: 1,
     volumeMounts: { '/data': data },
   })
-  return project('family-archive', { resources: [family, data] })
+  return project('folkbranch', { resources: [folkbranch, data] })
 })

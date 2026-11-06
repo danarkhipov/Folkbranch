@@ -1,7 +1,6 @@
 import { ShareScreen } from '@/components/auth-screens'
-import { getSetting } from '@/lib/ops/settings'
+import { archiveLang } from '@/lib/ops/settings'
 import { shareInfo } from '@/lib/ops/share'
-import type { Lang } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,5 +8,5 @@ export const dynamic = 'force-dynamic'
 export default async function Share({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
   const info = shareInfo(token)
-  return <ShareScreen token={token} valid={!!info} needsPassword={!!info?.needsPassword} lang={(getSetting('language') as Lang) ?? 'ru'} />
+  return <ShareScreen token={token} valid={!!info} needsPassword={!!info?.needsPassword} lang={archiveLang()} />
 }

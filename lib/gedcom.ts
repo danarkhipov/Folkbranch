@@ -208,7 +208,7 @@ function factLines(f: Fact) {
   return lines
 }
 
-export function writeGedcom(graph: Graph, opts: { hideLiving: boolean; source: string }): string {
+export function writeGedcom(graph: Graph, opts: { hideLiving: boolean; source: string; pageWord?: string }): string {
   const out = ['0 HEAD', `1 SOUR ${opts.source}`, '1 GEDC', '2 VERS 5.5.1', '2 FORM LINEAGE-LINKED', '1 CHAR UTF-8']
   const hide = (p: Person) => opts.hideLiving && p.living
   const xref = new Map(graph.persons.map((p, i) => [p.id, `@I${i + 1}@`]))
@@ -250,7 +250,7 @@ export function writeGedcom(graph: Graph, opts: { hideLiving: boolean; source: s
       for (const f of p.facts) out.push(...factLines(f))
       for (const s of p.sources) {
         out.push(`1 SOUR ${s.title}`)
-        const page = [s.ref, s.page && `л. ${s.page}`].filter(Boolean).join(', ')
+        const page = [s.ref, s.page && `${opts.pageWord ?? 'л.'} ${s.page}`].filter(Boolean).join(', ')
         if (page) out.push(`2 PAGE ${page}`)
         if (s.url) out.push(`2 NOTE ${s.url}`)
       }

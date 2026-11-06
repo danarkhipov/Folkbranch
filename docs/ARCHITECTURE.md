@@ -1,187 +1,179 @@
-# Архитектура
+# Architecture
 
-Принцип: максимально просто и дёшево. Один контейнер, одна папка с данными. Никаких обязательных внешних сервисов.
+The principle: as simple and cheap as possible. One container, one data folder, no required outside services.
 
-## Схема
+## Overview
 
 ```
-Docker-контейнер (Next.js: интерфейс + API + MCP)
-└─ /data  (постоянный диск: Railway Volume или папка на сервере)
-   ├─ family.db   — SQLite: люди, связи, страницы, отметки на фото, пользователи
-   └─ media/      — оригиналы фото и уменьшенные копии
+Docker container (Next.js: app + API + MCP)
+└─ /data  (persistent disk: a Railway volume or a folder on a server)
+   ├─ family.db   SQLite: people, links, pages, photo tags, users
+   └─ media/      original photos and smaller copies
 ```
 
-Бэкап и перенос — копия одной папки.
+Backing up and moving means copying one folder.
 
-## Стек
+## Stack
 
-| Задача | Выбор | Зачем |
+| Job | Choice | Why |
 |---|---|---|
-| Приложение | Next.js (App Router), TypeScript | Интерфейс и API в одном сервисе |
-| Интерфейс | Tailwind, shadcn/ui | Чистые компоненты в духе Notion, Cmd+K |
-| Граф | `@dagrejs/dagre` + свой рендер (HTML-карточки, SVG-линии, `d3-zoom`) | Вся семья сразу: `dagre` определяет поколения и первый порядок, а положения и линии под прямым углом считаем сами. Координаты не хранятся. См. «Почему не family-chart» |
-| Страницы | BlockNote (только ядро) | Редактор блоков как в Notion на базе Tiptap |
-| Вход | Better Auth | Приглашения, ссылка на почту, Google, Яндекс ID, роли; таблицы в той же SQLite |
-| База | SQLite в режиме WAL, Drizzle ORM | Без отдельного сервера; поиск через FTS5 |
-| Фото | `sharp` на сервере, `react-easy-crop` для аватарки, MediaPipe в браузере для лиц, `yet-another-react-lightbox` | Уменьшенные копии, кадрирование, подсказка лиц, просмотр |
-| Данные в браузере | TanStack Query | Правки видны сразу, обновление при возврате на вкладку |
-| ИИ | официальный MCP TypeScript SDK | Встроенный MCP-сервер |
+| App | Next.js (App Router), TypeScript | The interface and API in one service |
+| Interface | Tailwind, shadcn/ui | Clean components, Cmd+K |
+| Chart | `@dagrejs/dagre` + our own rendering (HTML cards, SVG lines, `d3-zoom`) | The whole family at once: `dagre` decides generations and the first order, and we compute positions and right-angled lines. Coordinates are not stored. See "Why not family-chart" |
+| Pages | BlockNote (core only) | A block editor on top of Tiptap |
+| Sign-in | Better Auth | Invitations, Google, Yandex ID, roles; its tables live in the same SQLite |
+| Database | SQLite in WAL mode, Drizzle ORM | No separate server; search through FTS5 |
+| Photos | `sharp` on the server, `react-easy-crop` for avatars, MediaPipe in the browser for faces, `yet-another-react-lightbox` | Smaller copies, cropping, face hints, viewing |
+| Browser data | TanStack Query | Edits show at once, refresh on returning to the tab |
+| AI | the official MCP TypeScript SDK | The built-in MCP server |
 
-Перед установкой проверить актуальные API и версии через context7, а лицензии всех зависимостей — в первую очередь. У BlockNote дополнительные пакеты (ИИ, экспорт в PDF и Word) под GPL или платной лицензией: их не брать.
+Check the license of any new dependency first. BlockNote's extra packages (AI, PDF and Word export) are under GPL or a paid license: do not use them.
 
-## Почему так
+## Why it is built this way
 
-- **SQLite, а не Postgres.** 2–3 пользователя в месяц, мало данных. Режим WAL спокойно выдерживает одновременную правку несколькими людьми. Один файл упрощает бэкап и open-source-установку.
-- **Фото рядом с базой, а не внутри.** В самой SQLite база быстро разрастается до гигабайтов, и бэкапы тяжелеют. В базе хранится только путь к файлу.
-- **Хранилище за простым интерфейсом.** По умолчанию папка на диске; S3 (Railway Bucket, R2) можно подключить одной переменной, если понадобится.
-- **Отдельная графовая база не нужна.** Граф — это таблицы связей, родство вычисляется обходом в коде.
-- **Без онлайн-синхронизации.** Правки одновременно почти не пересекаются; последняя побеждает, всё лежит в истории.
-- **Без Supabase.** Бесплатный проект засыпает после недели без заходов, платный тариф 25 $ в месяц, плюс второй поставщик и правила RLS.
-- **Без React Flow и elkjs.** Свободный холст заставил бы хранить координаты, а у elkjs лицензия EPL.
-- **Почему не family-chart.** Прототип 04.11.2026: библиотека строит вид только вокруг одного человека. От Алексея в демо-семье видно 13 человек из 27: нет дядь, тёть и двоюродных. Поэтому невозможны «показать всех» и подсветка двоюродных из PRODUCT.md. У `dagre` те же 27 человек видны сразу, 1000 человек раскладываются за 87 мс.
+- **SQLite, not Postgres.** A family has few users and little data. WAL mode easily handles several people editing at once. One file makes backups and open-source installs simple.
+- **Photos next to the database, not inside.** Inside SQLite the database quickly grows to gigabytes and backups get heavy. The database stores only a path.
+- **No separate graph database.** The graph is link tables, and kinship is computed by walking them in code.
+- **No real-time text merging.** Edits rarely overlap; conflicts are caught field by field, and everything is in history.
+- **No Supabase.** A free project sleeps after a week without visits, the paid plan costs $25 a month, and it adds a second provider and RLS rules.
+- **No React Flow or elkjs.** A free canvas would force us to store coordinates, and elkjs is under EPL.
+- **Why not family-chart.** A prototype on 4 November 2026 showed that the library builds a view around one person only. From one person in the demo family it showed 13 of 27 people: no uncles, aunts or cousins. So "show everyone" and highlighting cousins were impossible. `dagre` shows the same 27 people at once and lays out 1000 people in 87 ms.
 
-## Слой операций
+## The operations layer
 
-Все записи описаны один раз в `lib/ops/registry.ts`: входные данные, текст для проверки, применение. Интерфейс, REST и MCP вызывают `dispatch()`. Для токена запись уходит в черновик, для человека применяется сразу. Новый маршрут записи по умолчанию закрыт для токенов.
+All writes are described once in `lib/ops/registry.ts`: input, review text, how to apply. The app, REST and MCP call `dispatch()`. For a token a write goes to a draft, for a person it applies at once. A new write route is closed to tokens by default.
 
-## Модель данных
-
-```
-persons       ФИО, девичья фамилия, пол, рождение и смерть (дата текстом + год для сортировки),
-              места, «жив», avatar_media_id, статус уверенности
-parent_child  родитель → ребёнок; вид: родной / приёмный / отчим-мачеха; «предположительно»
-unions        супруги; вид: брак / гражданский; даты начала и конца
-pages         person_id, parent_page_id, название, иконка, порядок, содержимое (BlockNote JSON)
-media         файл, размеры, подпись, дата, место, кто загрузил
-media_tags    фото ↔ человек + рамка (x, y, w, h в долях)
-history       кто, когда, что изменил (было/стало по строкам); для отката
-invites       хеш одноразовой ссылки, имя, роль, карточка, срок
-settings      название семьи, язык
-api_tokens    токены нейросети: хеш, роль, нужна ли проверка, отзыв
-proposals     черновики правок от токенов: операции и результат проверки
-user, session, account, verification — таблицы Better Auth
-
-Позже, по мере необходимости:
-events        рождение, брак, переезд, служба, смерть: дата, место, источник
-sources       откуда факт: документ, рассказ, ссылка; уровень уверенности
-comments      обсуждения на странице человека
+## Data model
 
 ```
+persons       name, maiden name, sex, birth and death (date as text + year for sorting),
+              places, living, avatar_media_id, certainty
+parent_child  parent → child; kind: birth / adopted / step; assumed or not
+unions        spouses; kind: marriage / civil; start and end dates
+pages         person_id, parent_page_id, title, icon, order, content (BlockNote JSON)
+media         file, size, caption, date, place, who uploaded
+media_tags    photo ↔ person + frame (x, y, w, h as fractions)
+history       who, when, what changed (before/after by row); for undo
+invites       hash of a one-time link, name, role, card, expiry
+settings      family name, language
+api_tokens    agent tokens: hash, role, whether review is needed, revocation
+proposals     drafts of edits from tokens: operations and the review result
+user, session, account, verification — Better Auth tables
+```
 
-«Сын», «дочь», «отец», «мать» в базе **не хранятся**. Они вычисляются из `parent_child` и пола, поэтому противоречий быть не может.
+"Son", "daughter", "father" and "mother" are **not stored**. They are computed from `parent_child` and sex, so they cannot contradict each other.
 
-Даты неточные: «~1876», «1883 или 1886». Поэтому дата хранится текстом, рядом отдельно год для сортировки.
+Dates are inexact: "~1876", "1883 or 1886". So a date is stored as text, with a year beside it for sorting.
 
-## Развёртывание
+## Deployment
 
-1. **Railway.** Кнопка шаблона: сервис и Volume. Тариф Hobby, около 5 $ в месяц. Сон приложения включён: без заходов почти ничего не тратится, первый заход будит за несколько секунд.
-2. **Свой сервер.** `docker run -p 3000:3000 -v ./data:/data <image>` или `docker compose up`.
-3. **Мастер первого запуска.** Первый вошедший становится владельцем, выбирает язык (русский или английский) и название семьи.
+1. **Your own computer or server.** `install.sh` writes settings and starts the ready image from `docker-compose.yml`.
+2. **Railway.** One service with one volume, built from the `Dockerfile`.
+3. **First run.** The first person becomes the owner and chooses the language (English or Russian) and the family name.
 
-Вся настройка через переменные окружения (см. `.env.example`). Необязательные: OAuth Google и Яндекса, `SETUP_TOKEN` (защита пустого экземпляра), `RECOVERY_TOKEN` (возврат владельца). Почта и S3 пока не подключены.
+All settings are environment variables (see `.env.example`). Optional ones: Google and Yandex OAuth, `SETUP_TOKEN` (protects an empty instance), `RECOVERY_TOKEN` (gets the owner back in). Email and S3 are not connected.
 
-## Что учесть на Railway
+## Railway notes
 
-- С Volume работает только одна копия приложения, при обновлении сайт недоступен несколько секунд. Для семьи это неважно.
-- На тарифах Free и Hobby исходящий SMTP закрыт. Письма только через HTTP API (Resend). Поэтому базовый вход сделан через ссылки-приглашения, без почты.
-- Полезные функции Railway: автоматические патчи безопасности, инфраструктура как код (`.railway/railway.ts`), бэкапы Volume. Проверить по актуальной документации (docs.railway.com, Railway MCP подключён).
+- With a volume only one copy of the app can run, and the site is unavailable for a few seconds during an update. For a family this does not matter.
+- Outgoing SMTP is closed on the Free and Hobby plans. That is why the basic sign-in uses invitation links and no email.
 
-## Риски
+## Risks
 
-1. **Неточные даты и спорные родства.** Текстовые даты, пометка уверенности у фактов и связей.
-2. **Одновременные правки.** Последняя побеждает, откат в один клик.
-3. **Приватность.** Живые скрыты от читателей, фото только после входа, сайт закрыт от поисковиков, закрытая регистрация.
-4. **Вход для родни.** Пожилым удобнее ссылка, чем пароль. Google есть не у всех в России, поэтому нужен Яндекс ID. Письма на mail.ru могут попадать в спам: нужен свой домен и настройка DNS для Resend.
-5. **Две версии данных.** Сайт стартует импортом GEDCOM, дальше главным становится сайт. Двусторонней синхронизации с каноном исследования нет.
-6. **Потеря данных.** Ежедневная копия базы, по желанию отправка в S3 или Litestream. Экспорт полного архива.
-7. **Своя раскладка.** Браки между поколениями и родственные браки дают длинные линии: граф остаётся верным, но менее аккуратным. Проверено тестами на устойчивость, красоту на большой настоящей семье ещё предстоит оценить.
-8. **Модель лиц.** Файл модели MediaPipe браузер скачивает с серверов Google при нажатии «Найти лица». Сами фото никуда не уходят. Без сети работает только ручная отметка.
+1. **Inexact dates and disputed kinship.** Text dates and a certainty mark on facts and links.
+2. **Privacy.** Living people are hidden from readers, photos need a sign-in, the site is closed to search engines, registration is closed.
+3. **Signing in for relatives.** Older people find a link easier than a password. Google is not available to everyone, so Yandex ID is supported too.
+4. **Data loss.** An automatic copy of the database before each migration, plus a full archive export.
+5. **Our own layout.** Marriages across generations and between relatives produce long lines: the chart stays correct but less tidy.
+6. **The face model.** The browser downloads the MediaPipe model file from Google's servers when you press "Find faces". The photos themselves go nowhere. Without a network, only manual tagging works.
 
-## Несколько пользователей одновременно
+## Several people at once
 
-Один процесс и синхронный SQLite: записи идут строго по очереди, транзакции не пересекаются. Поэтому защищаться нужно не от порчи базы, а от потери правок.
+One process and synchronous SQLite: writes go strictly in turn and transactions do not overlap. So the thing to protect against is not database corruption but losing edits.
 
-- **Поле.** Редактор посылает `seen`: что он видел. Если значение успели изменить на другое, сервер отвечает 409, ничего не перезаписывая (`lib/ops/merge.ts`). Без `seen` работает как раньше: последняя запись побеждает.
-- **Списки (факты, источники, метки, версии).** Сливаются: добавленное обоими остаётся, удалённое одним не возвращается.
-- **Текст страницы.** Сравнение по версии, как и было (`baseUpdatedAt`).
-- **Ассистент.** Читает архив на момент своего ответа (`actor.since`). Если человек изменил карточку позже, запись отклоняется, ассистент перечитывает и решает заново. Одновременно идут не больше четырёх ответов, по одному на человека.
-- **Живые обновления.** `/api/events` (SSE) сообщает только сам факт изменения и кто на месте. Данные страница забирает сама, со своими правами, поэтому читатель ничего лишнего не узнаёт. В скрытой вкладке канал закрыт. Рассчитано на один процесс: при нескольких репликах понадобится общая шина.
-- **Чтение.** Граф разбирается один раз на изменение и общий для всех (`getGraph`, менять его нельзя: в тестах он заморожен). Неизменившийся граф уходит ответом 304.
+- **A field.** The editor sends `seen`: what it saw. If the value has since changed to something else, the server answers 409 and overwrites nothing (`lib/ops/merge.ts`). Without `seen`, the last write wins.
+- **Lists (facts, sources, tags, versions).** These merge: what both added stays, and what one removed does not come back.
+- **Page text.** Compared by version (`baseUpdatedAt`).
+- **The assistant.** It reads the archive as of its answer (`actor.since`). If a person changed the card later, the write is refused, and the assistant rereads and decides again. At most four answers run at once, one per person.
+- **Live updates.** `/api/events` (SSE) reports only the fact of a change and who is present. The page fetches the data itself, with its own permissions, so a reader learns nothing extra. A hidden tab closes the channel. This assumes one process: several replicas would need a shared bus.
+- **Reading.** The graph is parsed once per change and shared by everyone (`getGraph`; it must not be changed, and tests freeze it). An unchanged graph is answered with 304.
 
-## Схема на странице
+## The chart on the page
 
-На странице только то, что видно, плюс запас около 0,4 экрана с каждой стороны (`lib/graph/visible.ts`). При анимированном переходе на странице оба места: откуда и куда. Кнопки «+» появляются только у карточки под курсором или в фокусе. При масштабе меньше 0,25 подписи и зоны клика по линиям скрыты: прочитать их нельзя, а рисовать дорого. Клавиатура: Tab идёт по видимым карточкам и сдвигает схему, остальных людей находит поиск.
+The page holds only what is visible, plus about 0.4 of a screen on each side (`lib/graph/visible.ts`). During an animated move both places are on the page: from and to. The `+` buttons appear only on the card under the pointer or in focus. Below scale 0.25, labels and click zones on lines are hidden: they cannot be read and cost a lot to draw. Keyboard: Tab goes through visible cards and moves the chart, and search finds everyone else.
 
-`components/graph-canvas.tsx` только собирает части:
+`components/graph-canvas.tsx` only puts the parts together:
 
-- `chart-view.ts`: сдвиг, масштаб, что держать на странице;
-- `chart-light.ts`: подсветка родных, пути и групп;
-- `chart-links.ts`: протягивание связи;
-- `chart-selection.ts`: выбор и удаление линии.
+- `chart-view.ts`: pan, zoom, what to keep on the page;
+- `chart-light.ts`: highlighting relatives, paths and groups;
+- `chart-links.ts`: dragging a link;
+- `chart-selection.ts`: selecting and deleting a line.
 
-Редкие панели (настройки, импорт, фото, история, родство, правки ассистента) загружаются при первом открытии.
+Rarely used panels (settings, import, photos, history, kinship, assistant edits) load on first opening.
 
-## Что выдерживает живой канал
+## What the live channel survives
 
-- Сервер шлёт `ping` каждые 25 секунд. Страница, не услышав ничего 70 секунд, открывает канал заново: так она переживает сон ноутбука и смену сети.
-- Ответ с ошибкой, например 502 во время деплоя, браузер считает окончательным, поэтому `use-live` переподключается сам, с растущей паузой и случайным разбросом.
-- Присутствие рассылается не чаще раза в 200 мс и считается один раз на пользователя: после перезапуска возвращаются сразу все страницы.
-- Страницу, которая перестала читать и накопила 100 сообщений, сервер отключает. Страницы сверх лимита в 300 получают 503.
+- The server sends a `ping` every 25 seconds. A page that hears nothing for 70 seconds reopens the channel, so it survives a sleeping laptop and a network change.
+- The browser treats an error response, such as a 502 during a deploy, as final, so `use-live` reconnects by itself with a growing, randomized pause.
+- Presence goes out at most every 200 ms and is computed once per user, so all pages return at once after a restart.
+- A page that stopped reading and piled up 100 messages is disconnected by the server. Pages over the limit of 300 get a 503.
 
-## Как раскладывается схема
+## How the chart is laid out
 
-Метод слоёв (Sugiyama): поколения, порядок в ряду, положение по горизонтали, линии. Пара или цепочка браков стоит одним блоком.
+The layered method (Sugiyama): generations, order within a row, horizontal position, lines. A couple or a chain of marriages stands as one block.
 
-- `lib/graph/layout.ts` собирает всё. Dagre решает только, кто в каком поколении, и даёт первый порядок.
-- `lib/graph/order.ts` ищет порядок людей с наименьшим числом пересечений: проходы по рядам по среднему положению родственников, затем перенос каждого блока на лучшее место (sifting) и разворот пары. Линия к детям через поколение занимает в промежуточном ряду своё место, поэтому не идёт сквозь людей.
-- `lib/graph/tracks.ts` решает, на какой высоте идёт каждая шина в промежутке между рядами (Eschbach, Günther, Becker, *Orthogonal Hypergraph Drawing*, JGAA 2006). Промежуток становится выше, если шин много.
-- Партнёры стоят на расстоянии 178, подпись не шире 162, поэтому линия от их точки вниз никогда не уходит под имя.
-- Порядок зависит только от формы семьи и кэшируется: правка имени никого не сдвигает в сторону.
+- `lib/graph/layout.ts` puts it all together. Dagre decides only who is in which generation and gives the first order.
+- `lib/graph/order.ts` looks for the order with the fewest crossings: sweeps over rows by the average position of relatives, then moving each block to its best place (sifting) and flipping a couple. A line to children across a generation takes its own place in the row between, so it does not run through people.
+- `lib/graph/tracks.ts` decides at what height each bus runs in the gap between rows (Eschbach, Günther, Becker, *Orthogonal Hypergraph Drawing*, JGAA 2006). The gap grows if there are many buses.
+- Partners stand 178 apart and a label is at most 162 wide, so the line down from their dot never goes under a name.
+- The order depends only on the family's shape and is cached: editing a name moves no one sideways.
 
-Качество меряется по готовой геометрии в `tests/layout-quality.ts`: пересечения, наложения, линии сквозь карточки. Найти порядок совсем без пересечений в общем случае нельзя (задача NP-трудная), так что у запутанных семей с браками между родственниками часть пересечений остаётся.
+Quality is measured on the finished geometry in `tests/layout-quality.ts`: crossings, overlaps, lines through cards. Finding an order with no crossings at all is NP-hard in general, so tangled families with marriages between relatives keep some crossings.
 
-## Где что лежит
+## Where things are
 
-- `lib/api/routes/*`: маршруты по разделам, `lib/api/router.ts`: описание маршрута и OpenAPI.
-- `lib/ops/privacy.ts`: что скрыто от читателя. Любой новый выход данных идёт через него.
-- `lib/ops/core.ts`, `REFERENCES`: кто на кого ссылается. Новая таблица со ссылкой на человека или фото добавляется сюда, иначе падает тест.
-- `lib/storage.ts`: файлы на томе, запись только через переименование.
-- `lib/graph/metrics.ts`: размеры на схеме, `lib/graph/select.ts`: кто входит в часть семьи.
-- `components/settings/*`: разделы настроек.
+- `lib/api/routes/*`: routes by section, `lib/api/router.ts`: route descriptions and OpenAPI.
+- `lib/ops/privacy.ts`: what is hidden from a reader. Every new way out for data goes through it.
+- `lib/ops/core.ts`, `REFERENCES`: who refers to whom. A new table that refers to a person or photo is added here, or a test fails.
+- `lib/storage.ts`: files on the volume, written only by renaming.
+- `lib/graph/metrics.ts`: sizes on the chart, `lib/graph/select.ts`: who belongs to a part of the family.
+- `lib/i18n.ts`: the interface's words. The Russian text is the key and English is the lookup.
+- `components/settings/*`: settings sections.
 
-## Проверки
+## Checks
 
-`pnpm check`: типы, тесты, циклы импортов. `pnpm check:full`: браузерные сценарии, метрики текстов, бюджеты скорости и аварийные сценарии в одноразовых контейнерах на вымышленной семье, платные модели не вызываются. `SOAK=10 pnpm check:full` добавляет 10-минутную нагрузку.
+`pnpm check`: types, tests, import cycles. `pnpm check:full`: browser scenarios, text metrics, speed budgets and crash scenarios in throwaway containers with an invented family; no paid models are called. `SOAK=10 pnpm check:full` adds a 10-minute load.
 
-## Виды
+A new word in the interface needs English in `lib/i18n.ts`: `tests/i18n-coverage.test.ts` fails without it. `tests/e2e/english-everywhere.mjs` presses everything as each role and looks for Russian on screens, in system dialogs and in answers. `BUDGET_S=600` makes it a full pass of about half an hour.
 
-Таблица `views` не хранит фактов о семье и не входит в историю: только какую часть показать и где стоят карточки, поставленные вручную. Строка `main` держит положения для схемы без фильтра. Фильтр работает в браузере (`components/chart-scope.ts`, `lib/graph/select.ts`) поверх уже полученного графа, поэтому видимость для читателя решает сервер, а не вид. Закреплённая карточка в раскладке получает большой вес в `placeInOrder`: остальные расступаются.
+## Views
 
-## Печать
+The `views` table holds no facts about the family and is not part of history: only which part to show and where manually placed cards stand. The `main` row keeps positions for the chart with no filter. The filter works in the browser (`components/chart-scope.ts`, `lib/graph/select.ts`) on top of the graph already received, so the server, not the view, decides what a reader sees. A pinned card gets a large weight in `placeInOrder`, and the others make room.
 
-PDF собирается в браузере (`lib/print-chart.ts`, загружается только по кнопке) из той же раскладки в плотном режиме `layoutFamily(g, { print: true })`, а не снимком экрана. Линии и текст векторные, шрифты из `public/fonts` встроены подмножеством. Что читатель не видит, в файл не попадает, потому что браузер этого не получал; живых у владельца скрывает маска до раскладки.
+## Printing
 
-`lib/graph/print-plan.ts` считает масштаб и листы. Склейка режется по полосам поколений: вертикальный разрез должен пройти между людьми всех поколений полосы, поэтому полоса берёт столько поколений, сколько можно разрезать без потерь. Если лист меньше карточки, план сообщает `cutsCard`, и окно предупреждает.
+The PDF is built in the browser (`lib/print-chart.ts`, loaded only on the button) from the same layout in dense mode, `layoutFamily(g, { print: true })`, not from a screenshot. Lines and text are vector, and fonts from `public/fonts` are embedded as a subset. What a reader cannot see is not in the file, because the browser never received it; the owner's living relatives are hidden by a mask before layout.
 
-## Гости и предложения
+`lib/graph/print-plan.ts` computes the scale and sheets. Taping sheets together cuts by generation bands: a vertical cut has to pass between people of every generation in the band, so a band takes as many generations as can be cut without loss. If a sheet is smaller than a card, the plan reports `cutsCard` and the window warns.
 
-Гость приходит по ссылке для просмотра и не имеет учётной записи. `getActor` его не знает, поэтому живой канал, копия, ассистент и MCP отвечают ему 401 сами собой. Спрашивает о нём только `/api/v1` и страница `/`, и маршрут впускает гостя, лишь если объявлен через `open(...)`: это чтение, и список проверяет `tests/share.test.ts`. Для остального гость равен читателю: те же маски, а при ссылке на вид люди вне вида удалены из схемы и закрыты в страницах и фото. Страница `/share/<токен>` ничего не говорит о семье и ничего не выдаёт без нажатия, потому что её могут читать превью мессенджеров. В базе лежит только хеш токена, а кука перестаёт действовать, когда ссылку закрыли, срок вышел или удалён её вид.
+## Guests and suggestions
 
-Читатель пишет только через `POST proposals/suggest` (`lib/ops/suggest.ts`): поля из короткого списка и текст, который становится страницей. Обычные маршруты записи для него закрыты как прежде. Предложение ложится в общую очередь `proposals`, где автор теперь токен или человек. `seen` берётся на сервере в момент предложения, поэтому принятие не затрёт правку, сделанную позже: черновик останется с причиной.
+A guest arrives by a viewing link and has no account. `getActor` does not know them, so the live channel, backups, the assistant and MCP answer 401 by themselves. Only `/api/v1` and the `/` page ask about them, and a route lets a guest in only if declared through `open(...)`: that means reading, and `tests/share.test.ts` checks the list. Otherwise a guest equals a reader: the same masks, and with a link to a view, people outside the view are removed from the chart and closed in pages and photos. The `/share/<token>` page says nothing about the family and gives nothing away without a press, because messenger previews may read it. The database holds only the token's hash, and the cookie stops working when the link is closed, expires, or its view is deleted.
 
-## Рассказы
+A reader writes only through `POST proposals/suggest` (`lib/ops/suggest.ts`): fields from a short list and text that becomes a page. Ordinary write routes stay closed. A suggestion goes into the shared `proposals` queue, whose author is now a token or a person. `seen` is taken on the server at the moment of suggesting, so accepting cannot overwrite a later edit: the draft stays with a reason.
 
-`stories` и `story_people` входят в историю изменений, как страницы. Рассказ не меняет сведения о человеке: факт появляется только отдельным действием и в поле источника называет рассказ. Голос лежит в `media` с `kind = 'audio'` и попадает в копию архива вместе с остальными файлами, но в списках фото его нет, а читать его можно только через `stories/:id/audio`, который отдаёт файл потоком и понимает `Range`. Файл хранится как есть, тип определяется по первым байтам, а не по имени.
+## Stories
 
-Рассказ скрыт от читателя и гостя, если среди его людей или рассказчика есть кто-то скрытый. Голос без рассказчика-карточки и имя без карточки читателю не отдаются: это может быть живой человек. Токены и модели рассказов не получают: `create_story` помечен `internal` и не попадает в инструменты, а чтение им запрещено. Лимит места на голоса задаёт `MAX_AUDIO_MB`, по умолчанию 5000.
+`stories` and `story_people` are part of history, like pages. A story does not change facts about a person: a fact appears only through a separate action and names the story as its source. A voice recording lives in `media` with `kind = 'audio'` and goes into the archive copy with other files, but it is not in photo lists and can be read only through `stories/:id/audio`, which streams the file and understands `Range`. The file is stored as is, and its type comes from the first bytes, not the name.
 
-## Карточка человека
+A story is hidden from a reader and a guest if anyone among its people or its teller is hidden. A voice without a teller's card and a name without a card are not given to a reader: it may be a living person. Tokens and models get no stories: `create_story` is marked `internal` and is not among the tools, and reading is forbidden to them. `MAX_AUDIO_MB` limits the space for voices, 5000 by default.
 
-Значение не обрезается ни при какой длине. Поле для правки это `GrowText`: textarea поверх скрытой копии текста, которая задаёт размер. Для чтения значение выводится текстом через `ReadText`, и адреса в нём можно нажать. Добавление идёт через `AddMenu`, а не через `select`: действие не должно выглядеть полем со значением. Адреса и имена файлов на страницах оформляет `decorateBlocks` из `lib/linkify.ts` при показе, в базу это попадает, только если страницу правят.
+## The person card
 
-`tests/e2e/card.mjs` проверяет карточку на крайних данных: пять случаев, пять вкладок, пять ширин, владелец и читатель. Считает наезды, выход за край, обрезанный текст, горизонтальную прокрутку, мелкие цели, сырые адреса, нехватку места под содержимым. Отдельно проверяет, что правка, сохранение и подсказки работают. Метрики не заменяют взгляд: второй круг просмотра скриншотов нашёл дефекты при 100% по метрикам.
+A value is never cut, at any length. The editing field is `GrowText`: a textarea over a hidden copy of the text that sets the size. For reading, a value is shown as text through `ReadText`, with clickable addresses. Adding goes through `AddMenu`, not `select`: an action should not look like a field with a value. `decorateBlocks` from `lib/linkify.ts` formats addresses and file names on pages when shown, and this reaches the database only if the page is edited.
 
-## Слияние карточек
+`tests/e2e/card.mjs` checks the card on extreme data: five cases, five tabs, five widths, owner and reader. It counts overlaps, overflow, cut text, horizontal scrolling, small targets, raw addresses and lack of room for content. It also checks that editing, saving and hints work. Metrics do not replace looking: a second round of reviewing screenshots found defects at 100% on metrics.
 
-`lib/ops/merge-people.ts`. Всё, что за фактами и связями, идёт через `Changes`, поэтому отмена возвращает базу точно: `tests/merge-people.test.ts` проверяет это на 500 случайных парах. Проверка «можно ли» (`whyNot`) считает родство так, будто карточки уже одна, и повторяется внутри записи вместе со сверкой `updatedAt`. Аккаунты, приглашения, виды и ожидающие черновики не входят в историю: они идут за человеком и после отмены не возвращаются. Новая таблица со ссылкой на человека должна попасть и в `REFERENCES`, и в `movePeopleLinks`/`moveContent`.
+## Merging cards
 
+`lib/ops/merge-people.ts`. Everything beyond facts and links goes through `Changes`, so undo restores the database exactly: `tests/merge-people.test.ts` checks this on 500 random pairs. The check for whether a merge is possible (`whyNot`) computes kinship as if the cards were already one, and repeats inside the write along with comparing `updatedAt`. Accounts, invitations, views and waiting drafts are not part of history: they follow the person and do not come back after undo. A new table that refers to a person has to go into both `REFERENCES` and `movePeopleLinks`/`moveContent`.

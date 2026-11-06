@@ -61,7 +61,7 @@ export function Field({ value, onSave, placeholder, className, readOnly, id, sug
   const typingOver = useRef<string | null>(null)
   // A relative's edit arriving now must not wipe what is being typed; the comparison on save settles it.
   useEffect(() => { if (typingOver.current === null) setV(value) }, [value])
-  if (readOnly) return value ? <ReadText value={value} className={className} /> : null
+  if (readOnly) return value ? <ReadText value={value} className={className} /> : fit ? null : <span />
   const typed = v.trim().toLowerCase()
   const hints = focused && typed && suggestions ? suggestions.filter((s) => s.toLowerCase().includes(typed) && s.toLowerCase() !== typed).slice(0, 5) : []
   return (

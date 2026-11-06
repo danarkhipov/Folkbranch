@@ -1,7 +1,7 @@
 # ./install.sh writes .env and starts this. Add --profile https for automatic certificates.
 services:
-  family:
-    image: ${FAMILY_IMAGE:-ghcr.io/danarkhipov/folkbranch:latest}
+  folkbranch:
+    image: ${FOLKBRANCH_IMAGE:-ghcr.io/danarkhipov/folkbranch:latest}
     build: .
     env_file:
       - path: .env
@@ -9,7 +9,7 @@ services:
     ports:
       - "${BIND:-127.0.0.1}:${PORT:-3000}:3000"
     volumes:
-      - family-data:/data
+      - folkbranch-data:/data
     environment:
       PORT: "3000"
     restart: unless-stopped
@@ -17,7 +17,7 @@ services:
   caddy:
     image: caddy:2
     profiles: [https]
-    depends_on: [family]
+    depends_on: [folkbranch]
     ports:
       - "80:80"
       - "443:443"
@@ -30,5 +30,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  family-data:
+  folkbranch-data:
   caddy-data:

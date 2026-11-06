@@ -18,7 +18,7 @@ COPY --chown=node:node --from=build /app/.next/standalone ./
 COPY --chown=node:node --from=build /app/.next/static ./.next/static
 COPY --chown=node:node --from=build /app/public ./public
 COPY --chown=node:node --from=build /app/drizzle ./drizzle
-COPY --chown=node:node scripts/family.mjs ./family.mjs
+COPY --chown=node:node scripts/folkbranch.mjs ./folkbranch.mjs
 # The standalone build keeps the driver out of sight; the server commands need to find it, and the build fails if they cannot.
 RUN cd node_modules && ln -s .pnpm/better-sqlite3@*/node_modules/better-sqlite3 better-sqlite3 && cd .. && node -e "require('better-sqlite3')"
 # The folder is made here so a new Docker volume inherits it. Railway refuses a VOLUME line, so the volume is declared where the app is run.

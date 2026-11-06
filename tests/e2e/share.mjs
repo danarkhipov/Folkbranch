@@ -73,9 +73,9 @@ await guest.keyboard.press('Escape')
 ok('nothing the guest does runs into a refusal', denied.length === 0, denied.slice(0, 4).join(', '))
 
 // The same cookie, by hand.
-const gc = (await guest.context().cookies()).filter((c) => c.name === 'fg_view')
+const gc = (await guest.context().cookies()).filter((c) => c.name === 'fb_view')
 ok('the cookie cannot be read by scripts', gc[0]?.httpOnly && gc[0]?.sameSite === 'Lax')
-const gcookie = `fg_view=${gc[0].value}`
+const gcookie = `fb_view=${gc[0].value}`
 const graph = await (await call('GET', 'graph', null, gcookie)).json()
 ok('the graph holds no living names', graph.persons.filter((p) => p.hidden).length === living.length && !living.some((p) => p.givenName && JSON.stringify(graph).includes(`"${p.givenName}"`)))
 const refused = [['PATCH', `persons/${dead[0].id}`, { givenName: 'Х' }], ['POST', 'persons', { givenName: 'Х' }], ['DELETE', `persons/${dead[0].id}`], ['POST', 'proposals/suggest', { personId: dead[0].id, text: 'x' }], ['POST', 'presence', { client: 'x', focusId: null }], ['POST', 'views', { name: 'x', scope: 'all', focusId: null, collapsed: [] }], ['POST', 'shares', { name: 'x' }], ['POST', 'invites', { name: 'x', role: 'owner' }], ['POST', 'tokens', { name: 'x', role: 'editor' }], ['PATCH', 'settings', { familyName: 'x' }], ['POST', 'media', {}], ['GET', 'history'], ['GET', 'users'], ['GET', 'settings'], ['GET', 'tokens'], ['GET', 'shares'], ['GET', 'invites'], ['GET', 'proposals'], ['GET', 'proposals/mine'], ['GET', 'media'], ['GET', 'gaps'], ['GET', 'export/gedcom'], ['GET', 'assistant/provider']]

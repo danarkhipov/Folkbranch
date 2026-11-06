@@ -13,3 +13,7 @@ updates:
     directory: /
     schedule: { interval: monthly }
     target-branch: develop
+    ignore:
+      # Node moves only to a long-term release: 25 does not build the native SQLite driver here.
+      - dependency-name: node
+        update-types: ['version-update:semver-major']

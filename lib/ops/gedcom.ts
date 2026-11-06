@@ -5,7 +5,7 @@ import { peopleWords } from '../names'
 import { Actor, mutate, requireRole, seesOnlyPublic } from './core'
 import { addParent, addUnion, getGraph, insertPerson } from './people'
 import { insertPage } from './pages'
-import { getSetting, say } from './settings'
+import { archiveLang, say } from './settings'
 
 
 export function previewGedcom(actor: Actor, text: string) {
@@ -32,8 +32,8 @@ function certaintyOf(quality: number | null): Certainty {
 
 export function importGedcom(actor: Actor, text: string) {
   requireRole(actor, 'editor')
-  const g = parseGedcom(text, getSetting('language') === 'en' ? 'en' : 'ru')
-  return mutate(actor, { summary: `${say('Импорт GEDCOM')}: ${peopleWords(g.persons.length, getSetting('language') === 'en' ? 'en' : 'ru')}` }, (c) => {
+  const g = parseGedcom(text, archiveLang())
+  return mutate(actor, { summary: `${say('Импорт GEDCOM')}: ${peopleWords(g.persons.length, archiveLang())}` }, (c) => {
     const ids = new Map<string, string>()
     for (const p of g.persons) {
       const living = !p.dead && !p.deathDate && !((yearOf(p.birthDate) ?? 9999) < new Date().getFullYear() - 110)
@@ -70,5 +70,5 @@ export function importGedcom(actor: Actor, text: string) {
 export function exportGedcom(actor: Actor, hideLiving: boolean) {
   const graph = getGraph(actor)
   // Readers never get living relatives, whatever the checkbox says.
-  return writeGedcom(graph, { hideLiving: hideLiving || seesOnlyPublic(actor), source: 'Folkbranch' })
+  return writeGedcom(graph, { hideLiving: hideLiving || seesOnlyPublic(actor), source: 'Folkbranch', pageWord: say('л.') })
 }

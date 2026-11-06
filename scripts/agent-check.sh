@@ -3,7 +3,7 @@
 # demo family: no interface, and never your archive. It spends money on the provider's key.
 #
 #   OPENROUTER_API_KEY=... scripts/agent-check.sh            (or put the key in .env.check)
-#   AGENT_MODEL=openai/gpt-6-luna CHECK_ONLY=родство,pdf scripts/agent-check.sh
+#   AGENT_MODEL=openai/gpt-6-luna CHECK_ONLY=pdf scripts/agent-check.sh
 set -eu
 cd "$(dirname "$0")/.."
 [ -f .env.check ] && { set -a; . ./.env.check; set +a; }

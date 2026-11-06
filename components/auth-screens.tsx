@@ -1,8 +1,9 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { translate } from '@/lib/i18n'
 import type { Lang } from '@/lib/types'
 import { Brand } from './brand-icons'
+import { Logo } from './logo'
 import { RestoreForm } from './settings/restore-form'
 
 const shell = 'canvas !overflow-auto !cursor-default grid place-items-center p-4'
@@ -12,8 +13,12 @@ const primary = 'h-10 rounded-lg bg-ink text-white disabled:opacity-40'
 
 const post = (url: string, body: unknown) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
 
-export function SetupScreen({ needsCode, initialCode = '', wrongAddress }: { needsCode: boolean; initialCode?: string; wrongAddress: string | null }) {
-  const [lang, setLang] = useState<Lang>('ru')
+/** The page itself is built before the archive's language is known. */
+const useHtmlLang = (lang: Lang) => useEffect(() => { document.documentElement.lang = lang }, [lang])
+
+export function SetupScreen({ needsCode, initialCode = '', initialLang, wrongAddress }: { needsCode: boolean; initialCode?: string; initialLang: Lang; wrongAddress: string | null }) {
+  const [lang, setLang] = useState<Lang>(initialLang)
+  useHtmlLang(lang)
   const t = (k: string) => translate(lang, k)
   const [name, setName] = useState('')
   const [familyName, setFamilyName] = useState('')
@@ -30,11 +35,12 @@ export function SetupScreen({ needsCode, initialCode = '', wrongAddress }: { nee
         if (r.ok) location.href = '/?welcome=1'
         else { setBusy(false); setError((await r.json().catch(() => null))?.message ?? 'error') }
       }}>
+        <div className="flex items-center gap-2 font-serif text-lg font-medium"><Logo size={32} /> Folkbranch</div>
         <h1 className="font-serif text-2xl font-medium">{t('Семейный архив')}</h1>
         <p className="text-ink-soft -mt-2 text-sm">{t('Вы станете владельцем архива.')}</p>
         {wrongAddress && <p role="alert" className="rounded-lg bg-muted px-3 py-2 text-sm text-destructive break-anywhere">{t('Вы открыли не тот адрес, что указан в настройках, и вход работать не будет. В настройках')}: <b>{wrongAddress}</b>. {t('Откройте этот адрес или поменяйте BETTER_AUTH_URL.')}</p>}
         <div className="flex gap-1">
-          {(['ru', 'en'] as const).map((l) => <button type="button" key={l} onClick={() => setLang(l)} className={lang === l ? 'bar-btn on' : 'bar-btn'}>{l === 'ru' ? 'Русский' : 'English'}</button>)}
+          {(['en', 'ru'] as const).map((l) => <button type="button" key={l} onClick={() => setLang(l)} className={lang === l ? 'bar-btn on' : 'bar-btn'}>{l === 'ru' ? 'Русский' : 'English'}</button>)}
         </div>
         <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Ваше имя')}<input required autoFocus className={field} value={name} onChange={(e) => setName(e.target.value)} /></label>
         <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Название семьи')}<input required className={field} value={familyName} onChange={(e) => setFamilyName(e.target.value)} /></label>
@@ -53,6 +59,7 @@ export function SetupScreen({ needsCode, initialCode = '', wrongAddress }: { nee
 }
 
 export function LoginScreen({ lang, familyName, providers }: { lang: Lang; familyName: string; providers: { google: boolean; yandex: boolean } }) {
+  useHtmlLang(lang)
   const t = (k: string) => translate(lang, k)
   const go = async (url: string, body: unknown) => {
     const j = await (await post(url, body)).json()
@@ -61,6 +68,7 @@ export function LoginScreen({ lang, familyName, providers }: { lang: Lang; famil
   return (
     <main className={shell}>
       <div className={card}>
+        <Logo size={40} />
         <h1 className="font-serif text-2xl font-medium">{familyName || t('Семейный архив')}</h1>
         <p className="font-medium">{t('Вход только по приглашению')}</p>
         <p className="text-ink-soft text-sm -mt-2">{t('Попросите родственника, который уже в архиве, прислать вам ссылку.')}</p>
@@ -72,6 +80,7 @@ export function LoginScreen({ lang, familyName, providers }: { lang: Lang; famil
 }
 
 export function InviteScreen({ token, lang, familyName, name, valid }: { token: string; lang: Lang; familyName: string; name: string; valid: boolean }) {
+  useHtmlLang(lang)
   const t = (k: string) => translate(lang, k)
   const [busy, setBusy] = useState(false)
   return (
@@ -79,6 +88,7 @@ export function InviteScreen({ token, lang, familyName, name, valid }: { token: 
       <div className={card}>
         {valid ? (
           <>
+            <Logo size={40} />
             <p className="text-ink-soft text-base">{t('Вас пригласили в семейный архив')}</p>
             <h1 className="font-serif text-2xl font-medium -mt-2">{familyName}</h1>
             {name && <p>{t('Вы войдёте как')}: {name}. {t('Если это не вы, попросите новую ссылку.')}</p>}
@@ -92,6 +102,7 @@ export function InviteScreen({ token, lang, familyName, name, valid }: { token: 
           </>
         ) : (
           <>
+            <Logo size={40} />
             <h1 className="font-serif text-xl font-medium">{t('Ссылка недействительна')}</h1>
             <p className="text-ink-soft text-sm">{t('Ссылка устарела или уже использована. Попросите новую.')}</p>
           </>
@@ -103,6 +114,7 @@ export function InviteScreen({ token, lang, familyName, name, valid }: { token: 
 
 /** A link for viewing: a button first, so a preview in a messenger opens nothing and learns nothing. */
 export function ShareScreen({ token, valid, needsPassword, lang }: { token: string; valid: boolean; needsPassword: boolean; lang: Lang }) {
+  useHtmlLang(lang)
   const t = (k: string) => translate(lang, k)
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -119,6 +131,7 @@ export function ShareScreen({ token, valid, needsPassword, lang }: { token: stri
           setBusy(false)
           setError((await r.json().catch(() => null))?.error ?? 'error')
         }}>
+          <Logo size={40} />
           <h1 className="font-serif text-xl font-medium">{t('Вам открыли семейный архив для просмотра')}</h1>
           <p className="text-ink-soft text-sm">{t('Регистрация не нужна. Живые родственники скрыты.')}</p>
           {needsPassword && (
@@ -131,6 +144,7 @@ export function ShareScreen({ token, valid, needsPassword, lang }: { token: stri
         </form>
       ) : (
         <div className={card}>
+          <Logo size={40} />
           <h1 className="font-serif text-xl font-medium">{t('Ссылка недействительна')}</h1>
           <p className="text-ink-soft text-sm">{t('Срок ссылки истёк, или её закрыли. Попросите новую.')}</p>
         </div>

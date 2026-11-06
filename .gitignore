@@ -9,3 +9,6 @@ next-env.d.ts
 *.ged
 .claude/
 START_PROMPT.md
+
+# Written by next dev
+/AGENTS.md

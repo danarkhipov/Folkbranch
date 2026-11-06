@@ -59,7 +59,7 @@ export function SetupGuide({ onImport, onFirstPerson }: { onImport?: () => void;
         </div>
       </Step>
       <Step title="Подключить агента по MCP" state={s.agents ? 'done' : 'optional'} logos={['claudecode', 'codex', 'cursor', 'mcp']} open={open === 'mcp'} onToggle={toggle('mcp')}>
-        <p className="text-ink-soft">{t('Агент сможет читать архив и предлагать правки. Создайте ключ и скопируйте команду для своей программы. На компьютере с установленным приложением хватит одной команды:')} <code>./family connect</code></p>
+        <p className="text-ink-soft">{t('Агент сможет читать архив и предлагать правки. Создайте ключ и скопируйте команду для своей программы. На компьютере с установленным приложением хватит одной команды:')} <code>./folkbranch connect</code></p>
         <p><span className="text-ink-soft">{t('Адрес для подключения')}:</span> <code className="break-all">{s.mcpUrl}</code></p>
         <TokensTab />
       </Step>

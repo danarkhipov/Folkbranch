@@ -1,11 +1,28 @@
 {
   "name": "folkbranch",
-  "version": "1.0.0",
-  "description": "A self-hosted family tree with Notion-style pages, shared editing and MCP access for AI agents",
+  "version": "1.1.0",
+  "description": "A self-hosted family tree your whole family can use: shared pages, photos, voice stories, GEDCOM, and AI agents over MCP with review of every edit.",
   "private": true,
   "license": "AGPL-3.0-only",
+  "author": "Daniel Arkhipov",
+  "keywords": [
+    "family-tree",
+    "genealogy",
+    "family-history",
+    "self-hosted",
+    "gedcom",
+    "mcp",
+    "ai-agents",
+    "nextjs",
+    "sqlite",
+    "docker",
+    "privacy"
+  ],
   "homepage": "https://github.com/danarkhipov/folkbranch",
-  "repository": { "type": "git", "url": "https://github.com/danarkhipov/folkbranch.git" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/danarkhipov/folkbranch.git"
+  },
   "bugs": "https://github.com/danarkhipov/folkbranch/issues",
   "scripts": {
     "dev": "next dev -p 3417",
@@ -92,5 +109,8 @@
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
   },
-  "packageManager": "pnpm@9.15.1"
+  "packageManager": "pnpm@9.15.1",
+  "engines": {
+    "node": ">=24"
+  }
 }

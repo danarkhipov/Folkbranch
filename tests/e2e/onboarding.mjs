@@ -18,7 +18,7 @@ sh(`docker run -d --name fg-onb -p 127.0.0.1:3452:3000 -e BETTER_AUTH_URL=https:
 await waitUp('http://localhost:3452')
 const br = await chromium.launch({ channel: 'chrome', headless: true })
 {
-  const p = await br.newPage()
+  const p = await br.newPage({ locale: 'ru-RU' })
   await p.goto('http://localhost:3452/setup?code=x')
   ok('opened on the wrong address, setup says so before anything is typed', (await p.locator('main').innerText()).includes('https://family.example.org'))
   await p.close()
@@ -26,12 +26,12 @@ const br = await chromium.launch({ channel: 'chrome', headless: true })
 }
 
 // One command.
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'family-install-'))
-for (const f of ['docker-compose.yml', 'Caddyfile', 'family']) fs.copyFileSync(path.join(repo, f), path.join(dir, f))
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'folkbranch-install-'))
+for (const f of ['docker-compose.yml', 'Caddyfile', 'folkbranch']) fs.copyFileSync(path.join(repo, f), path.join(dir, f))
 const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'family-bin-'))
 const seen = path.join(dir, 'agents.log')
 for (const a of ['claude', 'codex']) fs.writeFileSync(path.join(bin, a), `#!/bin/sh\necho "${a} $*" >> "${seen}"\n`, { mode: 0o755 })
-const env = { ...process.env, FAMILY_IMAGE: IMAGE, COMPOSE_PROJECT_NAME: 'fg-install', PATH: `${bin}:${process.env.PATH}` }
+const env = { ...process.env, FOLKBRANCH_IMAGE: IMAGE, COMPOSE_PROJECT_NAME: 'fg-install', PATH: `${bin}:${process.env.PATH}` }
 const run = (cmd, cwd = dir) => spawnSync('sh', ['-c', cmd], { cwd, env, encoding: 'utf8', timeout: 240000 })
 const first = run(`sh "${repo}/install.sh" --dir "${dir}" --port 3453`)
 const link = first.stdout.match(/http:\/\/localhost:3453\/setup\?code=\S+/)?.[0]
@@ -44,7 +44,7 @@ ok('running it again keeps the settings', fs.readFileSync(path.join(dir, '.env')
 
 const B = 'http://localhost:3453'
 const errs = []
-const ctx = await br.newContext({ viewport: { width: 1280, height: 860 } })
+const ctx = await br.newContext({ locale: 'ru-RU',  viewport: { width: 1280, height: 860 } })
 const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(e.message.slice(0, 160)))
 await p.goto(link)
 ok('the example family is not ticked by default', !(await p.getByRole('checkbox').first().isChecked()))
@@ -64,8 +64,8 @@ ok('it names the address to connect to', (await dialog.innerText()).includes(`${
 await dialog.getByLabel('Название ключа').fill('Мой агент')
 await dialog.getByRole('button', { name: 'Создать ключ доступа' }).click(); await sleep(500)
 const shown = async (name) => { await dialog.getByRole('radio', { name }).click(); await sleep(150); return dialog.locator('code.break-all').last().innerText() }
-ok('Claude Code gets its command', (await shown('Claude Code')).includes('claude mcp add --transport http family'))
-ok('Codex gets its command', (await shown('Codex')).includes('codex mcp add family --url'))
+ok('Claude Code gets its command', (await shown('Claude Code')).includes('claude mcp add --transport http folkbranch'))
+ok('Codex gets its command', (await shown('Codex')).includes('codex mcp add folkbranch --url'))
 ok('Cursor gets the text, and where to paste it', (await shown('Cursor')).includes('mcpServers') && (await dialog.innerText()).includes('~/.cursor/mcp.json'))
 await scan('MCP open')
 if (SHOTS) await p.screenshot({ path: `${SHOTS}/connect.png` })
@@ -85,10 +85,10 @@ ok('it stays in the settings', await p.getByRole('button', { name: 'Адрес �
 await p.keyboard.press('Escape')
 
 // One command connects the agent programs on this computer.
-const conn = run('./family connect')
+const conn = run('./folkbranch connect')
 const log = fs.readFileSync(seen, 'utf8')
-ok('./family connect finds Claude Code and Codex', conn.status === 0 && conn.stdout.includes('Claude Code Codex') && /claude mcp add --scope user --transport http family http:\/\/localhost:3453\/api\/mcp --header Authorization: Bearer fg_/.test(log) && log.includes('codex mcp add family --url'), conn.stdout.slice(-120))
-const token = log.match(/Bearer (fg_\S+)/)?.[1]
+ok('./folkbranch connect finds Claude Code and Codex', conn.status === 0 && conn.stdout.includes('Claude Code Codex') && /claude mcp add --scope user --transport http folkbranch http:\/\/localhost:3453\/api\/mcp --header Authorization: Bearer fb_/.test(log) && log.includes('codex mcp add folkbranch --url'), conn.stdout.slice(-120))
+const token = log.match(/Bearer (fb_\S+)/)?.[1]
 const mcp = await fetch(`${B}/api/mcp`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) })
 const tools = await mcp.text()
 ok('and that key really opens MCP', mcp.ok && tools.includes('get_overview'), `${mcp.status} ${tools.slice(0, 80)}`)

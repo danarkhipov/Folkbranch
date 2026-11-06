@@ -27,11 +27,11 @@ export function TokensTab() {
   const origin = typeof location === 'undefined' ? '' : location.origin
   const [client, setClient] = useState<Client>('claude')
   const snippet = client === 'claude'
-    ? `claude mcp add --transport http family ${origin}/api/mcp --header "Authorization: Bearer ${made}"`
+    ? `claude mcp add --transport http folkbranch ${origin}/api/mcp --header "Authorization: Bearer ${made}"`
     : client === 'codex'
-      ? `export FOLKBRANCH_TOKEN=${made}\ncodex mcp add family --url ${origin}/api/mcp --bearer-token-env-var FOLKBRANCH_TOKEN`
+      ? `export FOLKBRANCH_TOKEN=${made}\ncodex mcp add folkbranch --url ${origin}/api/mcp --bearer-token-env-var FOLKBRANCH_TOKEN`
     : client !== 'prompt'
-      ? JSON.stringify({ mcpServers: { family: { type: 'http', url: `${origin}/api/mcp`, headers: { Authorization: `Bearer ${made}` } } } }, null, 2)
+      ? JSON.stringify({ mcpServers: { folkbranch: { type: 'http', url: `${origin}/api/mcp`, headers: { Authorization: `Bearer ${made}` } } } }, null, 2)
       : t('Подключись к семейному архиву по MCP. Сначала вызови get_overview, затем find_gaps. Прежде чем создавать человека, ищи его через search_people. Каждое найденное значение записывай через add_version с источником и его достоверностью, а не перезаписывай поля.')
   const fmt = new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short' })
   return (
@@ -90,7 +90,7 @@ export function TokensTab() {
               {r.lastUsedAt ? ` · ${t('последнее использование')} ${fmt.format(r.lastUsedAt)}` : ''}
               {r.expiresAt ? ` · ${t(r.expiresAt < Date.now() ? 'истёк' : 'действует до')} ${fmt.format(r.expiresAt)}` : ''}
             </span>
-            {r.revokedAt ? <span className="text-xs text-ink-faint">{t('Отозван')}</span> : <button className="text-xs text-ink-soft hover:text-destructive" onClick={async () => { await api(`tokens/${r.id}`, { method: 'DELETE' }); refresh() }}>{t('Отменить')}</button>}
+            {r.revokedAt ? <span className="text-xs text-ink-faint">{t('Отозван')}</span> : <button className="text-xs text-ink-soft hover:text-destructive" onClick={async () => { await api(`tokens/${r.id}`, { method: 'DELETE' }); refresh() }}>{t('Отозвать')}</button>}
           </div>
         ))}
       </section>

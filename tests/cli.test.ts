@@ -4,7 +4,7 @@ import { getDb } from '../lib/db'
 import { actorFromToken } from '../lib/ops/tokens'
 
 getDb()
-const family = (...args: string[]) => execFileSync(process.execPath, ['scripts/family.mjs', ...args], { encoding: 'utf8', env: { ...process.env, BETTER_AUTH_URL: 'https://family.test' } })
+const family = (...args: string[]) => execFileSync(process.execPath, ['scripts/folkbranch.mjs', ...args], { encoding: 'utf8', env: { ...process.env, BETTER_AUTH_URL: 'https://family.test' } })
 
 describe('server commands', () => {
   it('make a token the app accepts, and cut it off', () => {
@@ -17,7 +17,7 @@ describe('server commands', () => {
   })
 
   it('print a ready command for Claude Code', () => {
-    expect(family('token', 'create', '--name', 'reader-bot')).toContain('claude mcp add --transport http family https://family.test/api/mcp')
+    expect(family('token', 'create', '--name', 'reader-bot')).toContain('claude mcp add --transport http folkbranch https://family.test/api/mcp')
   })
 
   it('report the archive', () => {

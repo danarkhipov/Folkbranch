@@ -198,7 +198,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
         barFull.current = bar.offsetWidth
         barName.current = (bar.querySelector<HTMLElement>('.family-name')?.offsetWidth ?? 90) + 30 // the name, its divider, tighter buttons
       }
-      const room = card ? window.innerWidth - card.offsetWidth - 32 : Infinity
+      const room = window.innerWidth - (card?.offsetWidth ?? 0) - 32
       setBarMode(room >= barFull.current ? 'full' : room >= barFull.current - barName.current ? 'no-name' : 'compact')
     }
     measure()

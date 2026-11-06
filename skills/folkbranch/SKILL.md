@@ -25,16 +25,16 @@ Ask once: this computer, or a server? For a server you also need its SSH access 
 4. After they have done that, connect this agent:
 
    ```bash
-   cd ~/folkbranch && ./family connect
+   cd ~/folkbranch && ./folkbranch connect
    ```
 
    If you run elsewhere than the server, ask them to create a key in the app under Settings > Agents and MCP.
 5. Check it works: call `get_overview` over MCP. New tools may need a restart of the agent program.
 
-Update: run the install command again. Everything else: `./family help`, and `docs/SELF_HOSTING.md` in the repository.
+Update: run the install command again. Everything else: `./folkbranch help`, and `docs/SELF_HOSTING.md` in the repository.
 
 ## Rules
 
 - This is people's family data. Do not copy it anywhere, and do not read `.env` aloud or into logs.
 - An agent's key makes edits wait for a person's review. Do not ask for a key that writes directly unless they say so.
-- Before anything that can lose data, such as removing the Docker volume, ask first and download a copy: `./family backup`.
+- Before anything that can lose data, such as removing the Docker volume, ask first and download a copy: `./folkbranch backup`.

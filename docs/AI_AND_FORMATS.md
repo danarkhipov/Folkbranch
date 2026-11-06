@@ -1,78 +1,78 @@
-# Нейросеть, API и форматы
+# AI, API and formats
 
-Требование: нейросеть подключается к приложению и может менять все элементы — загружать, удалять, менять связи. Либо можно вставить текст на графовом языке, и он превращается в карточки.
+An AI agent can connect to the app and change everything in it: upload, delete, change links. You can also paste text in the graph format, and it turns into cards.
 
-## Один набор операций, три входа
+## One set of operations, three ways in
 
-Вся логика лежит в одном слое операций. Интерфейс, REST API и MCP вызывают одно и то же, поэтому права и история работают одинаково.
+All the logic lives in one operations layer. The app, the REST API and MCP call the same thing, so permissions and history work the same everywhere.
 
 ## MCP
 
-Встроен в приложение: `/api/mcp` (Streamable HTTP без сессий, официальный TypeScript SDK). Отдельно разворачивать не нужно. Вход только по токену.
+Built into the app at `/api/mcp` (stateless Streamable HTTP, official TypeScript SDK). Nothing separate to deploy. Access is by token only.
 
-Подключение к Claude Code:
+Connecting Claude Code:
 
 ```bash
-claude mcp add --transport http family https://ваш-сайт/api/mcp --header "Authorization: Bearer fg_..."
+claude mcp add --transport http folkbranch https://your.domain/api/mcp --header "Authorization: Bearer fb_..."
 ```
 
-Клиенты, которым нужен вход через OAuth (например, коннекторы claude.ai), пока не поддерживаются: нужен клиент, умеющий передавать заголовок.
+Clients that need OAuth, such as claude.ai connectors, are not supported yet: the client has to be able to send a header.
 
-Чтение: `search_people`, `get_person`, `get_relatives`, `how_related`, `list_pages`, `get_page`, `list_photos`, `export_text`, `preview_text`, `export_gedcom`, `preview_gedcom`, `get_history`, `my_proposals`.
+Reading: `search_people`, `get_person`, `get_relatives`, `how_related`, `list_pages`, `get_page`, `list_photos`, `export_text`, `preview_text`, `export_gedcom`, `preview_gedcom`, `get_history`, `my_proposals`.
 
-Запись (токену «только чтение» не показывается): `create_person`, `update_person`, `delete_person`, `add_relation`, `update_relation`, `remove_relation`, `remove_parent_links`, `create_page`, `update_page`, `move_page`, `delete_page`, `upload_photo`, `update_photo`, `delete_photo`, `tag_photo`, `untag_photo`, `set_avatar`, `import_text`, `import_gedcom`, `undo`.
+Writing (not listed for a read-only token): `create_person`, `update_person`, `delete_person`, `add_relation`, `update_relation`, `remove_relation`, `remove_parent_links`, `create_page`, `update_page`, `move_page`, `delete_page`, `upload_photo`, `update_photo`, `delete_photo`, `tag_photo`, `untag_photo`, `set_avatar`, `import_text`, `import_gedcom`, `undo`.
 
-Страницы нейросеть читает и пишет в Markdown: упоминание `[@Имя](person:ID)`, фото `![подпись](/api/v1/media/ID/file?size=medium)`. Блоки, которых нет в Markdown (таблицы и другие), видны только с `raw: true`, а новый текст заменяет страницу целиком.
+Agents read and write pages in Markdown: a mention is `[@Name](person:ID)`, a photo is `![caption](/api/v1/media/ID/file?size=medium)`. Blocks Markdown cannot express, such as tables, are visible only with `raw: true`, and new text replaces the whole page.
 
 ## REST API
 
-`/api/v1/…`, описание: `/api/v1/openapi.json`. Заголовок `Authorization: Bearer fg_...`. Правка, ушедшая на проверку, возвращает код 202 и `status: pending_review`. Интерфейс сайта работает через этот же API.
+`/api/v1/…`, described at `/api/v1/openapi.json`. Send `Authorization: Bearer fb_...`. An edit sent for review returns 202 and `status: pending_review`. The app itself uses this same API.
 
-## Токены и безопасность
+## Tokens and safety
 
-- Владелец выпускает токен в настройках, вкладка «Нейросеть»: «только чтение» или «редактор». Отзывается в любой момент. В базе лежит только хеш, сам токен показывается один раз.
-- **Живые люди.** Токен «только чтение» видит то же, что читатель: живые скрыты. Токен редактора видит всех, и эти данные уходят поставщику нейросети, поэтому ему нужно доверять.
-- **Проверка правок.** Запись от токена попадает в один черновик на токен. Человек видит каждую строку словами, может убрать лишнюю, принять или отклонить всё. Новым людям выдаётся временный `tmp_…`, который работает в следующих вызовах, и черновик принимается одной транзакцией и одной записью в истории. При ошибке не применяется ничего, причина показывается в черновике.
-- Владелец может снять проверку с токена. Массовые операции (`import_text`, `import_gedcom`) всё равно идут через проверку.
-- История помечает автора: «Claude → Анна». Токен может отменять только свои правки и не может принимать черновики.
-- Токену закрыты пользователи, приглашения, настройки и другие токены: маршрут должен быть явно разрешён.
-- `upload_photo` по ссылке не ходит на внутренние адреса и за перенаправлениями. В страницы токен вставляет только загруженные файлы, чтобы чужая картинка не сообщала о каждом просмотре.
-- Текст страниц написан родными, но модель может принять его за команды. Поэтому проверка правок включена по умолчанию.
+- The owner makes a token under **Settings → Agents and MCP**: read-only or editor. It can be revoked at any time. Only a hash is stored, and the token is shown once.
+- **Living people.** A read-only token sees what a reader sees: living people are hidden. An editor token sees everyone, and that data goes to the model's provider, so you have to trust it.
+- **Reviewing edits.** Writes from a token go into one draft per token. A person sees every line in words, can drop any of them, and accepts or rejects the rest. New people get a temporary `tmp_…` that works in later calls, and the draft is accepted in one transaction and one history entry. If anything fails, nothing is applied and the draft shows why.
+- The owner can turn review off for a token. Bulk operations (`import_text`, `import_gedcom`) are reviewed anyway.
+- History names the author: `Claude → Anna`. A token can undo only its own edits and cannot accept drafts.
+- Users, invitations, settings and other tokens are closed to tokens: a route has to be allowed explicitly.
+- `upload_photo` by URL does not reach internal addresses or follow redirects. In pages a token inserts only uploaded files, so an outside image cannot report every view.
+- Page text is written by relatives, but a model may take it for commands. That is why review is on by default.
 
-## Текстовый формат графа
+## The text graph format
 
-Кнопка с документом в верхней панели: слева текст, справа видно, как он ляжет на граф и что изменится. Люди сопоставляются по `id`, иначе по имени и году рождения, спорные совпадения показываются на выбор. Обратная операция превращает граф в такой же текст, чтобы дать его нейросети и получить обратно с правками.
+The document button in the top bar shows text on the left and, on the right, how it lands on the chart and what changes. People are matched by `id`, otherwise by name and birth year, and doubtful matches are offered as a choice. The reverse operation turns the chart into the same text, so you can give it to a model and get it back with edits.
 
-**Импорт только добавляет и меняет.** Если строки нет в тексте, человек не удаляется, поэтому ответ модели с частью дерева ничего не сотрёт.
+**Import only adds and changes.** A person missing from the text is not deleted, so a model's answer with part of the tree erases nothing.
 
-За основу взят пример формата `family` из Diagrammo (https://diagrammo.app/docs/chart-family). Человек — строка, пара — `Имя + Имя`, дети — строки с отступом под парой. Пример на вымышленных людях:
+It is based on the `family` format example from Diagrammo (https://diagrammo.app/docs/chart-family). A person is a line, a couple is `Name + Name`, children are indented lines under the couple. An example with invented people:
 
 ```text
-family Род Ивановых
-Пётр Иванов b: 1880, d: 1950, sex: m
-Анна Смирнова b: 1885, sex: f
-Пётр Иванов + Анна Смирнова m: 1905
-  Мария Иванова b: 1906, sex: f
-  Сергей Иванов b: ~1910, sex: m
-    Ольга Иванова kind: adopted, c: assumed
+family The Walkers
+Peter Walker b: 1880, d: 1950, sex: m
+Anna Smith b: 1885, sex: f
+Peter Walker + Anna Smith m: 1905
+  Mary Walker b: 1906, sex: f
+  George Walker b: ~1910, sex: m
+    Olive Walker kind: adopted, c: assumed
 ```
 
-Свойства человека: `id`, `b`, `bp` (место рождения), `d`, `dp`, `sex`, `maiden`, `c` (`documented`, `family`, `assumed`). Пары: `m`, `end`, `union: civil`. На строке ребёнка `kind` (`adopted`, `step`) и `c` относятся к связи с родителями. `@id` ссылается на человека с неуникальным именем. Строки `#` и `//` — комментарии.
+Person properties: `id`, `b`, `bp` (birthplace), `d`, `dp`, `sex`, `maiden`, `c` (`documented`, `family`, `assumed`). Couples: `m`, `end`, `union: civil`. On a child's line, `kind` (`adopted`, `step`) and `c` apply to the link with the parents. `@id` refers to a person whose name is not unique. Lines starting with `#` or `//` are comments.
 
-Сверка с оригиналом не закончена: страница Diagrammo при работе над форматом не открылась, поэтому возможны расхождения в деталях. Свойства сверх примера — наше расширение.
+It has not been fully compared with the original: the Diagrammo page did not open while the format was being made, so details may differ. Properties beyond the example are our extension.
 
-Соседний проект для сверки: Genmark (плоский текст, компилируется в GEDCOM 5.5.1), https://github.com/drewherron/genmark.
+A related project to compare with: Genmark (flat text compiled to GEDCOM 5.5.1), https://github.com/drewherron/genmark.
 
 ## GEDCOM
 
-Импорт понимает 5.5.1 и 7.0, экспорт пишет 5.5.1. Заметки, события и источники при импорте становятся страницей «Биография». Экспорт пока не включает страницы и фото. Так можно переехать из MyHeritage, Gramps, FamilySearch и обратно. Импорт разбирается детерминированно, без участия модели, с предпросмотром. Экспорт может скрывать живых.
+Import understands 5.5.1 and 7.0, export writes 5.5.1. Notes, events and sources become a Biography page on import. Export does not include pages and photos yet. This lets you move from and to MyHeritage, Gramps and FamilySearch. Import is deterministic, with no model involved, and has a preview. Export can hide living people.
 
-## Импорт файлов
+## Importing files
 
-Кнопка со стрелкой в верхней панели или просто бросить файл на схему. Excel (`.xlsx`), CSV/TSV и JSON разбираются в браузере и превращаются в текстовый формат, поэтому поиск дубликатов, вопросы о неоднозначных именах и отмена работают одинаково. Столбцы определяются по заголовкам на русском и английском, их можно поправить вручную. Родственника в ячейке можно указать именем или номером строки. GEDCOM идёт своим путём и добавляет всех как новых; окно заранее показывает, сколько имён уже есть.
+Use the arrow button in the top bar, or drop a file on the chart. Excel (`.xlsx`), CSV/TSV and JSON are read in the browser and turned into the text format, so duplicate search, questions about ambiguous names and undo all work the same. Columns are recognized by their headings in English and Russian, and can be corrected by hand. A relative in a cell can be given by name or by row number. GEDCOM goes its own way and adds everyone as new; the window shows beforehand how many names already exist.
 
-Одинаковые имена внутри файла считаются одним человеком, окно об этом предупреждает.
+Identical names inside one file count as one person, and the window warns about it.
 
-## Работа агента
+## How an agent should work
 
-Начинать с `get_overview`, затем `find_gaps`: это очередь работы. Найденное записывать через `add_version` с источником и его достоверностью: прежнее значение остаётся, расхождение видно человеку. `choose_version` и `reject_version` выбирают и отвергают версии. Таблицу агент переводит через `parse_table`, проверяет `preview_text` и отправляет `import_text`. Готовые сценарии MCP: `research_person`, `fill_gaps`, `import_notes`. В настройках, на вкладке «Нейросеть», после создания токена можно скопировать команду для Claude Code, конфигурацию для других клиентов или задание агенту.
+Start with `get_overview`, then `find_gaps`: that is the work queue. Record findings with `add_version` along with a source and its reliability: the old value stays, and a person sees the disagreement. `choose_version` and `reject_version` pick and reject versions. An agent converts a table with `parse_table`, checks it with `preview_text` and sends it with `import_text`. Ready MCP prompts: `research_person`, `fill_gaps`, `import_notes`. After making a token under **Settings → Agents and MCP**, you can copy the command for Claude Code, the config for other clients, or a task for the agent.

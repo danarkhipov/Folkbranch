@@ -3,3 +3,6 @@ contact_links:
   - name: A security problem
     url: https://github.com/danarkhipov/folkbranch/security/advisories/new
     about: Report privately, so families are not exposed before a fix.
+  - name: A question or an idea to talk over
+    url: https://github.com/danarkhipov/folkbranch/discussions
+    about: Ask here before opening an issue.

@@ -14,11 +14,11 @@ import { changesData, isOrdinaryEdit, toolLabel } from '@/lib/agent/labels'
 import { api, undoFailure, useApp } from '@/lib/client'
 
 /** Told to the model after a person takes an answer back, so it does not build on what is gone. */
-const TAKEN_BACK = '[Правки из этого ответа отменены]'
+const TAKEN_BACK = '[The edits from this answer were undone]'
 
 /** The server's words when it has them; never a raw response. */
 function plainError(e: Error, t: (k: string) => string) {
-  try { const said = JSON.parse(e.message)?.error; if (typeof said === 'string' && /[а-яё]/i.test(said)) return said } catch {}
+  try { const said = JSON.parse(e.message); if (said?.plain && typeof said.error === 'string') return said.error } catch {}
   if (!e.message || e.message.startsWith('{') || e.message === 'The assistant could not answer. Try again.') return t('Ассистент не смог ответить.')
   return e.message
 }

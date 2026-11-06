@@ -3,7 +3,7 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh
 #   ... | sh -s -- --domain family.example.com      on a server, with automatic HTTPS
-#   ... | sh -s -- --port 8080 --dir ~/family       another port or folder
+#   ... | sh -s -- --port 8080 --dir ~/archive       another port or folder
 set -eu
 
 REPO=https://raw.githubusercontent.com/danarkhipov/folkbranch/main
@@ -31,10 +31,10 @@ if [ -z "$DIR" ] && [ -f "$HERE/docker-compose.yml" ]; then
 else
   DIR=${DIR:-$HOME/folkbranch}
   mkdir -p "$DIR"
-  for f in docker-compose.yml Caddyfile family; do
+  for f in docker-compose.yml Caddyfile folkbranch; do
     [ -f "$DIR/$f" ] || curl -fsSL "$REPO/$f" -o "$DIR/$f"
   done
-  chmod +x "$DIR/family"
+  chmod +x "$DIR/folkbranch"
 fi
 cd "$DIR"
 
@@ -59,13 +59,13 @@ fi
 value() { sed -n "s/^$1=//p" .env | head -n 1; }
 DOMAIN=$(value DOMAIN)
 PORT=$(value PORT)
-IMAGE=${FAMILY_IMAGE:-ghcr.io/danarkhipov/folkbranch:latest}
-export FAMILY_IMAGE="$IMAGE"
+IMAGE=${FOLKBRANCH_IMAGE:-ghcr.io/danarkhipov/folkbranch:latest}
+export FOLKBRANCH_IMAGE="$IMAGE"
 
 if [ -n "$DOMAIN" ]; then COMPOSE="docker compose --profile https"; else COMPOSE="docker compose"; fi
 echo "Getting the app. The first time takes a minute."
 # A ready image needs no build and no build machine. A clone can still build its own, say for an unreleased change.
-if docker compose pull -q family 2>/dev/null || docker image inspect "$IMAGE" >/dev/null 2>&1; then
+if docker compose pull -q folkbranch 2>/dev/null || docker image inspect "$IMAGE" >/dev/null 2>&1; then
   $COMPOSE up -d --no-build
 elif [ -f Dockerfile ]; then
   echo "No ready image: building here, which takes a few minutes and about 2 GB of memory."
@@ -77,16 +77,16 @@ fi
 
 printf "Waiting for the app"
 i=0
-until docker compose exec -T family node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1; do
+until docker compose exec -T folkbranch node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1; do
   i=$((i + 1))
-  [ "$i" -gt 60 ] && { echo; echo "It did not start. See: cd $DIR && docker compose logs family"; exit 1; }
+  [ "$i" -gt 60 ] && { echo; echo "It did not start. See: cd $DIR && docker compose logs folkbranch"; exit 1; }
   printf "."
   sleep 2
 done
 echo
 
 URL=$(value BETTER_AUTH_URL)
-if docker compose exec -T family node family.mjs doctor 2>/dev/null | grep -q '^Users:   0'; then
+if docker compose exec -T folkbranch node folkbranch.mjs doctor 2>/dev/null | grep -q '^Users:   0'; then
   echo
   echo "Ready. Open this address and create your family:"
   echo
@@ -96,5 +96,5 @@ else
   echo "Running at $URL"
 fi
 echo
-echo "Connect Claude Code or Codex:  cd $DIR && ./family connect"
-echo "All commands:                  ./family help"
+echo "Connect Claude Code or Codex:  cd $DIR && ./folkbranch connect"
+echo "All commands:                  ./folkbranch help"

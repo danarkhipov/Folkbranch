@@ -4,7 +4,7 @@ Agents use the same operations as the app, through MCP at `/api/mcp` or REST at 
 
 ## The assistant inside the app
 
-A chat panel for people signed in to the app. The owner pastes a provider's key right in the panel, where it is checked and kept encrypted in the database, or sets one on the server (see `.env.example`: Anthropic, OpenRouter, OpenAI, Google, or a local model), then the owner turns it on under **Settings → AI**. It is off by default.
+A chat panel for people signed in to the app. The owner pastes a provider's key right in the panel, where it is checked and kept encrypted in the database, or sets one on the server (see `.env.example`: Anthropic, OpenRouter, OpenAI, Google, or a local model), then the owner turns it on under **Settings → Assistant**. It is off by default.
 
 - What it reads in the archive is sent to the model's provider. It works as the person talking to it, with everything they can see, living relatives included. Photos in the archive are not sent.
 - It acts as the person talking to it, with their role. Ordinary edits ask first, or can be allowed for one conversation. Deleting, importing, undoing and settings always ask.
@@ -14,22 +14,22 @@ Files attached in the chat go to the provider too, and stay out of the archive u
 
 ## Get a token
 
-In the app, open the agents panel, or on the server:
+In the app, open **Settings → Agents and MCP**, or on the server:
 
 ```bash
-./family token create --name my-agent --role editor --days 30
+./folkbranch token create --name my-agent --role editor --days 30
 ```
 
 The output includes the ready command for Claude Code:
 
 ```bash
-claude mcp add --transport http family https://your.domain/api/mcp --header "Authorization: Bearer fg_..."
+claude mcp add --transport http folkbranch https://your.domain/api/mcp --header "Authorization: Bearer fb_..."
 ```
 
 Other clients take this config:
 
 ```json
-{ "mcpServers": { "family": { "type": "http", "url": "https://your.domain/api/mcp", "headers": { "Authorization": "Bearer fg_..." } } } }
+{ "mcpServers": { "folkbranch": { "type": "http", "url": "https://your.domain/api/mcp", "headers": { "Authorization": "Bearer fb_..." } } } }
 ```
 
 Clients that accept only OAuth, such as some hosted connectors, cannot connect yet: the server supports bearer tokens.
@@ -42,7 +42,7 @@ Clients that accept only OAuth, such as some hosted connectors, cannot connect y
 | `--role editor` | Everything, including living relatives | Queued as drafts for your review |
 | `--role editor --direct` | Everything | Applied at once and recorded in history. Bulk imports are still reviewed |
 
-Use one token per agent, so its name shows up in history and you can cut it off alone. `--days N` makes it end by itself. `./family token revoke ID` ends it now. Tokens are stored hashed and shown only once.
+Use one token per agent, so its name shows up in history and you can cut it off alone. `--days N` makes it end by itself. `./folkbranch token revoke ID` ends it now. Tokens are stored hashed and shown only once.
 
 ## Good to know
 

@@ -6,7 +6,7 @@ import { Actor, newId, OpError, requireRole, seesOnlyPublic } from './core'
 import { say } from './app-config'
 import { hiddenPeople } from './people'
 
-export { getSetting, say, setSetting } from './app-config'
+export { archiveLang, getSetting, say, setSetting } from './app-config'
 
 export const hasUsers = () => !!getDb().select({ id: schema.user.id }).from(schema.user).limit(1).get()
 

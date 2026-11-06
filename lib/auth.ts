@@ -40,7 +40,7 @@ const familyAccess = () =>
         const u = await createFamilyUser(ctx, ctx.body.name, 'owner', null)
         setSetting('familyName', ctx.body.familyName)
         setSetting('language', ctx.body.language)
-        if (ctx.body.demo) await loadDemo(u.id, ctx.body.name)
+        if (ctx.body.demo) await loadDemo(u.id, ctx.body.name, ctx.body.language)
         return ctx.json({ ok: true })
       }),
       accept: createAuthEndpoint('/family/accept', {

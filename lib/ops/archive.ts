@@ -101,7 +101,7 @@ export async function archiveStream(actor: Actor): Promise<{ stream: Readable; f
     out.on('close', () => { void done() })
     await next()
     const day = new Date().toISOString().slice(0, 10)
-    return { stream: out, filename: `family-archive-${day}.zip` }
+    return { stream: out, filename: `folkbranch-archive-${day}.zip` }
   } catch (e) {
     await done()
     throw e
