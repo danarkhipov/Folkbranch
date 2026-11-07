@@ -31,7 +31,7 @@ beforeAll(() => {
 describe('who a route lets in with a link', () => {
   it('is an explicit short list, and all of it reads', () => {
     const open = ['family', 'content', 'exchange', 'access'].flatMap((f) => [...readFileSync(`lib/api/routes/${f}.ts`, 'utf8').matchAll(/\bopen\('([^']+)'/g)].map((m) => m[1]))
-    expect(open.sort()).toEqual(['graph', 'me', 'media/:id', 'media/:id/file', 'pages/:id', 'persons/:id/avatar', 'persons/:id/media', 'persons/:id/pages', 'persons/:id/stories', 'stories/:id/audio', 'views'])
+    expect(open.sort()).toEqual(['graph', 'me', 'media/:id', 'media/:id/file', 'pages/:id', 'persons/:id/avatar', 'persons/:id/media', 'persons/:id/pages', 'persons/:id/stories', 'search', 'stories/:id/audio', 'views'])
     expect(readFileSync('lib/api/router.ts', 'utf8')).toMatch(/export const open = \(path: string, summary: string, handler: Handler\): Route => \(\{ \.\.\.get\(/)
   })
 })

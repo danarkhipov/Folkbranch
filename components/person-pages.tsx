@@ -10,11 +10,11 @@ import { type PageMeta, type Person } from '@/lib/types'
 
 const PageEditor = dynamic(() => import('./page-editor'), { ssr: false, loading: () => <div className="h-40" /> })
 
-export function Pages({ person, full, onDetails }: { person: Person; full: boolean; onDetails: () => void }) {
+export function Pages({ person, full, startAt, onDetails }: { person: Person; full: boolean; startAt?: string; onDetails: () => void }) {
   const { t, canEdit, confirm } = useApp()
   const key = ['pages', person.id]
   const { data: pages = [] } = useQuery({ queryKey: key, queryFn: () => api<PageMeta[]>(`persons/${person.id}/pages`) })
-  const [openId, setOpenId] = useState<string | null>(null)
+  const [openId, setOpenId] = useState<string | null>(startAt ?? null)
   const selected = pages.find((p) => p.id === openId) ?? pages[0]
   const qc = useQueryClient()
   const refresh = () => { qc.invalidateQueries({ queryKey: key }); qc.invalidateQueries({ queryKey: ['history'] }) }

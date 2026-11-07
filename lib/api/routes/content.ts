@@ -4,6 +4,7 @@ import * as media from '@/lib/ops/media'
 import * as pages from '@/lib/ops/pages'
 import { queuedAudio } from '@/lib/ops/proposals'
 import * as stories from '@/lib/ops/stories'
+import { searchPeople } from '@/lib/ops/people-search'
 import { addStory } from '@/lib/ops/suggest'
 import { audioResponse } from '../audio'
 import { dispatch } from '@/lib/ops/proposals'
@@ -11,6 +12,7 @@ import { OPS } from '@/lib/ops/registry'
 import { get, human, op, open, type Route } from '../router'
 
 export const contentRoutes: Route[] = [
+  open('search', 'People by anything written about them, with where it was found', ({ actor, query }) => searchPeople(actor, (query.get('q') ?? '').slice(0, 200))),
   open('persons/:id/stories', 'Stories told about a person', ({ actor, params }) => stories.listStories(actor, params.id)),
   open('stories/:id/audio', 'The voice of a story, with seeking', ({ actor, params, req }) => audioResponse(stories.storyAudio(actor, params.id), req)),
   human('GET', 'stories/usage', 'Room taken by voices', ({ actor }) => stories.voiceUsage(actor)),

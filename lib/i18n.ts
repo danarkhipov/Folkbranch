@@ -289,6 +289,20 @@ const en: Record<string, string> = {
   'Данные и резервные копии': 'Data and backups',
   'Основные настройки': 'Main settings',
   'ИИ и интеграции': 'AI and integrations',
+  'Имя, дата, место, профессия, «жена Ивана»…': 'Name, date, place, job, "Ivan\'s wife"…',
+  'Никого не нашли. Попробуйте одно слово: фамилию, год или место': 'Nobody found. Try one word: a surname, a year or a place',
+  'Всех слов сразу нет ни у кого. Вот у кого есть часть': 'Nobody has all the words. Here is who has some',
+  'Найдено по запросу': 'Found for',
+  'Убрать подсветку': 'Remove the marks',
+  'Другая версия': 'Another version',
+  'жена': 'wife',
+  'муж': 'husband',
+  'брат': 'brother',
+  'сестра': 'sister',
+  'внучка': 'granddaughter',
+  'внук': 'grandson',
+  'бабушка': 'grandmother',
+  'дедушка': 'grandfather',
 }
 
 export const translate = (lang: Lang, key: string) => (lang === 'en' ? (en[key] ?? key) : key)

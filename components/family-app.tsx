@@ -10,7 +10,7 @@ import { GraphCanvas, type CanvasHandle } from './graph-canvas'
 import { ConnectionNotice, MainBar, ViewBar, type Side } from './chart-bars'
 import { useChartScope } from './chart-scope'
 import { QuickAdd } from './quick-add'
-import { ConfirmDialog, SearchDialog } from './person-pickers'
+import { ConfirmDialog, SearchDialog, type SearchHit } from './person-pickers'
 import type { AssistantState } from '@/lib/types'
 import { useLive } from '@/lib/use-live'
 import { useAssistantWidth } from './panel-size'
@@ -48,6 +48,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
   const [focusId, setFocusId] = useState<string | null>(() => (typeof location !== 'undefined' ? new URLSearchParams(location.search).get('p') : null))
   const present = useLive(focusId, !me.guest)
   const [search, setSearch] = useState(false)
+  const [searchHit, setSearchHit] = useState<SearchHit | null>(null)
   const [side, setSide] = useState<Side>(null)
   // Mounted on first use and kept, so the conversation survives closing the panel.
   const [assistantUsed, setAssistantUsed] = useState(false)
@@ -237,9 +238,9 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       {side === 'review' && <ReviewPanel onClose={() => setSide(null)} />}
       {!assistant.ready && <AssistantSetup state={assistant} open={side === 'assistant'} width={assistantWidth} onWidth={setAssistantWidth} onClose={() => setSide(null)} />}
       {assistant.ready && assistantUsed && <AssistantPanel open={side === 'assistant'} width={assistantWidth} onWidth={setAssistantWidth} onClose={() => setSide(null)} onPath={setPath} onDirection={directChart} />}
-      {panelOpen && <PersonPanel key={focused!.id} person={focused!} onClose={() => focus(null)} onDelete={onDelete} />}
+      {panelOpen && <PersonPanel key={focused!.id} person={focused!} hit={searchHit?.personId === focused!.id ? searchHit : null} onClearHit={() => setSearchHit(null)} onClose={() => focus(null)} onDelete={onDelete} />}
 
-      <SearchDialog open={search} onOpenChange={setSearch} onPick={(id) => focus(id)} />
+      <SearchDialog open={search} onOpenChange={setSearch} onPick={(id, hit) => { setSearchHit(hit ?? null); focus(id) }} />
       <QuickAdd state={quick} onClose={(id) => { setQuick(null); if (id) focus(id) }} />
       {photo && <PhotoDialog state={photo} onClose={() => setPhoto(null)} />}
       {toast && (

@@ -1,17 +1,25 @@
 'use client'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { ExternalLink, Plus } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useApp } from '@/lib/client'
 import { isUrl, splitText } from '@/lib/linkify'
+import { markParts } from '@/lib/search/mark'
 import { cn } from '@/lib/utils'
 import { type Certainty } from '@/lib/types'
 import { Select } from '@/components/ui/select'
 
+/** The words a search found, while the card it led to is open. */
+export const SearchTerms = createContext<string[]>([])
+
 /** Text that wraps and grows with what is typed, so no value is ever cut off, in a line of its own or inside a sentence. */
 export function GrowText({ value, fit, className, ...rest }: { value: string; fit?: boolean; className?: string } & Omit<React.ComponentProps<'textarea'>, 'value'>) {
+  const terms = useContext(SearchTerms)
+  // A text box cannot colour part of its text, so the colour lies under it, letter for letter.
+  const parts = terms.length ? markParts(value, terms) : []
   return (
     <span className={cn('grow-text', fit && 'fit')} data-value={value || rest.placeholder || ' '}>
+      {parts.some((p) => p.mark) && <span className="grow-marks" aria-hidden="true">{parts.map((p, i) => (p.mark ? <mark key={i} className="search-mark">{p.text}</mark> : p.text))}</span>}
       <textarea
         rows={1}
         value={value}

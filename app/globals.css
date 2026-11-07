@@ -192,6 +192,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 kbd { font: 14px var(--font-sans); color: var(--ink-faint); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
 
 [cmdk-input]:focus-visible { outline: none; }
+.search-mark { background: #f6dfa6; color: inherit; border-radius: 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+::highlight(search) { background-color: #f6dfa6; }
+.grow-marks { position: absolute; inset: 0; color: transparent; white-space: pre-wrap; overflow-wrap: anywhere; pointer-events: none; user-select: none; }
 .inline-input { background: transparent; border-radius: 0; padding: 0; width: 100%; outline: none; }
 .break-anywhere { overflow-wrap: anywhere; }
 /* A field as tall and, when asked, as wide as its text: a hidden copy of the text sets the size. */

@@ -7,6 +7,7 @@ import type { Actor } from './core'
 import { listAllMedia } from './media'
 import { readablePages } from './pages'
 import { getGraph } from './people'
+import { searchPeople } from './people-search'
 
 const normal = (s: string) => s.toLowerCase().replace(/ё/g, 'е')
 const fullName = (p: Person) => [p.givenName, p.patronymic, p.surname].filter(Boolean).join(' ')
@@ -50,8 +51,7 @@ export function findPeople(actor: Actor, query: string, limit: number) {
   const people = getGraph(actor).persons.filter((p) => !p.hidden)
   const exact = people.filter((p) => allWords(`${fullName(p)} ${p.maidenName} ${p.otherNames} ${p.birthPlace} ${p.deathPlace} ${p.tags.join(' ')} ${p.facts.map((f) => `${f.kind} ${f.place} ${f.note}`).join(' ')}`, query))
   if (exact.length || !query.trim()) return exact.slice(0, limit)
-  const close = searchArchive(actor, query, limit).results.filter((r) => r.kind === 'person').map((r) => r.id)
-  return close.map((id) => people.find((p) => p.id === id)!)
+  return searchPeople(actor, query, limit).flatMap((r) => people.find((p) => p.id === r.personId) ?? [])
 }
 
 export const queryInput = z.object({

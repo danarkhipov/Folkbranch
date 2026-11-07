@@ -1,18 +1,19 @@
 'use client'
-import { useState, useContext } from 'react'
+import { useContext, useEffect, useRef, useState, type RefObject } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import dynamic from 'next/dynamic'
-import { Maximize2, Minimize2, PencilLine, Trash2, X } from 'lucide-react'
+import { Maximize2, Minimize2, PencilLine, Search, Trash2, X } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { api, Presence, useApp, usePersonSave } from '@/lib/client'
 import { yourTerm } from '@/lib/kinship'
 import { editValue,  } from '@/lib/claims'
 import { patronymicFrom } from '@/lib/names'
+import { normal } from '@/lib/search/words'
 import { cn } from '@/lib/utils'
 import { personName, type ClaimField, type PageMeta, type Person } from '@/lib/types'
 import { PanelEdge, useStoredSize } from './panel-size'
-import { useEsc } from './person-pickers'
-import { Field } from './person-fields'
+import { MatchLine, useEsc, type SearchHit } from './person-pickers'
+import { Field, SearchTerms } from './person-fields'
 import { AvatarButton } from './person-avatar'
 import { Pages } from './person-pages'
 import { FamilyTab } from './person-family'
@@ -20,9 +21,58 @@ import { PhotosTab } from './person-photos'
 import { Details } from './person-details'
 import { StoriesTab } from './person-stories'
 
+const NO_TERMS: string[] = []
+/** Found in the card's own heading: no need to leave the tab the card opens on. */
+const HEADER_KEYS = new Set(['givenName', 'surname', 'patronymic', 'maidenName'])
+
+/**
+ * Colours the found words in whatever the tab shows, a biography included, and brings the first one into view.
+ * Text boxes do theirs themselves: see GrowText.
+ */
+function useSearchMarks(box: RefObject<HTMLElement | null>, terms: string[], tab: string | null) {
+  useEffect(() => {
+    const registry = (globalThis as unknown as { CSS?: { highlights?: Map<string, unknown> } }).CSS?.highlights
+    const Paint = (globalThis as unknown as { Highlight?: new (...r: Range[]) => unknown }).Highlight
+    const root = box.current
+    if (!root || !terms.length) { registry?.delete('search'); return }
+    const wanted = [...new Set(terms.map(normal))].filter(Boolean)
+    let scrolled = false
+    const paint = () => {
+      const ranges: Range[] = []
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        const parent = n.parentElement
+        if (!n.nodeValue || !parent || parent.closest('textarea, input, .grow-marks, mark, [hidden], [data-state=inactive]')) continue
+        const low = normal(n.nodeValue)
+        for (const w of wanted) for (let i = low.indexOf(w); i >= 0; i = low.indexOf(w, i + w.length)) {
+          const r = new Range()
+          r.setStart(n, i)
+          r.setEnd(n, i + w.length)
+          ranges.push(r)
+        }
+      }
+      if (registry && Paint) registry.set('search', new Paint(...ranges))
+      if (scrolled) return
+      const panel = root.querySelector('[role=tabpanel][data-state=active]')
+      const first = panel?.querySelector('.grow-marks mark') ?? ranges.find((r) => panel?.contains(r.startContainer))?.startContainer.parentElement
+      if (first) {
+        scrolled = true
+        first.closest('details')?.setAttribute('open', '')
+        first.scrollIntoView({ block: 'center' })
+      }
+    }
+    paint()
+    // The tab and the biography's editor fill in a moment later.
+    let timer: ReturnType<typeof setTimeout>
+    const watcher = new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(paint, 100) })
+    watcher.observe(root, { childList: true, subtree: true, characterData: true })
+    return () => { watcher.disconnect(); clearTimeout(timer); registry?.delete('search') }
+  }, [box, terms, tab])
+}
+
 const SuggestDialog = dynamic(() => import('./suggest-dialog').then((m) => m.SuggestDialog), { ssr: false })
 
-export function PersonPanel({ person, onClose, onDelete }: { person: Person; onClose: () => void; onDelete: (id: string) => void }) {
+export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { person: Person; hit: SearchHit | null; onClearHit: () => void; onClose: () => void; onDelete: (id: string) => void }) {
   const [width, setWidth] = useStoredSize('person-panel-width', 480, (w) => Math.round(Math.max(360, Math.min(w, window.innerWidth - 80))))
   const [height, setHeight] = useStoredSize('person-panel-height', 560, (h) => Math.round(Math.max(240, Math.min(h, window.innerHeight - 16))))
   const app = useApp()
@@ -42,7 +92,10 @@ export function PersonPanel({ person, onClose, onDelete }: { person: Person; onC
   /** A name with versions keeps them in step: typing corrects the main one. */
   const saveName = (key: ClaimField) => (v: string) => patch.mutate(person.claims.some((c) => c.field === key) ? editValue(person, key, v) : { [key]: v })
   const { data: pageList } = useQuery({ queryKey: ['pages', person.id], queryFn: () => api<PageMeta[]>(`persons/${person.id}/pages`) })
-  const [tab, setTab] = useState<string | null>(null)
+  const [tab, setTab] = useState<string | null>(hit?.matches.find((m) => !HEADER_KEYS.has(m.key))?.tab ?? (hit ? 'details' : null))
+  const [pageId, setPageId] = useState<string | undefined>(hit?.matches.find((m) => m.tab === 'pages')?.refId)
+  const box = useRef<HTMLElement>(null)
+  useSearchMarks(box, hit?.terms ?? [], tab)
   /** Opens a tab and, when given, puts the cursor in that field. */
   const go = (next: string, fieldId?: string) => {
     setTab(next)
@@ -58,7 +111,8 @@ export function PersonPanel({ person, onClose, onDelete }: { person: Person; onC
   const longName = personName(person).length > 28
 
   return (
-    <aside className={cn('panel', full && 'full')} style={{ '--panel-w': `${width}px`, '--panel-h': `${height}px` } as React.CSSProperties}>
+    <SearchTerms.Provider value={hit?.terms ?? NO_TERMS}>
+    <aside ref={box} className={cn('panel', full && 'full')} style={{ '--panel-w': `${width}px`, '--panel-h': `${height}px` } as React.CSSProperties}>
       <PanelEdge edge="left" label="Ширина карточки" width={width} home={480} onWidth={setWidth} className="max-sm:hidden" />
       <PanelEdge edge="top" label="Высота карточки" width={height} home={Math.round((typeof window === 'undefined' ? 800 : window.innerHeight) * 0.7)} onWidth={setHeight} className="sm:hidden" />
       <header className={cn('flex flex-none items-start gap-3 pl-4 pr-2 pt-3 pb-2 max-h-[38%] overflow-y-auto', longName && 'flex-wrap')}>
@@ -86,6 +140,16 @@ export function PersonPanel({ person, onClose, onDelete }: { person: Person; onC
         </div>
       </header>
 
+      {hit && (
+        <div className="mx-3 mb-2 flex flex-none items-start gap-2 rounded-lg bg-muted px-2.5 py-1.5 text-xs max-h-28 overflow-y-auto">
+          <Search size={13} className="mt-0.5 flex-none text-ink-soft" />
+          <div className="min-w-0 flex-1">
+            <div className="text-ink-soft">{t('Найдено по запросу')} «{hit.query}»</div>
+            {hit.matches.slice(0, 5).map((m, i) => <button key={i} className="block w-full text-left hover:underline" onClick={() => { setTab(m.tab); if (m.tab === 'pages') setPageId(m.refId) }}><MatchLine match={m} /></button>)}
+          </div>
+          <button className="flex-none text-ink-faint hover:text-ink" aria-label={t('Убрать подсветку')} title={t('Убрать подсветку')} onClick={onClearHit}><X size={13} /></button>
+        </div>
+      )}
       <Tabs value={tab ?? (pageList && !pageList.length ? (!canEdit ? 'family' : person.birthDate || person.deathDate ? 'details' : 'pages') : 'pages')} onValueChange={setTab} className="flex-1 min-h-0 flex flex-col gap-0">
         <TabsList className="panel-tabs mx-3 w-fit max-w-[calc(100%-1.5rem)] overflow-x-auto justify-start bg-muted">
           <TabsTrigger value="pages" className="text-sm">{t('Биография')}</TabsTrigger>
@@ -94,7 +158,7 @@ export function PersonPanel({ person, onClose, onDelete }: { person: Person; onC
           <TabsTrigger value="photos" className="text-sm">{t('Фото')}</TabsTrigger>
           <TabsTrigger value="stories" className="text-sm">{t('Рассказы')}</TabsTrigger>
         </TabsList>
-        <TabsContent value="pages" className="flex-1 min-h-0 overflow-hidden"><Pages person={person} full={full} onDetails={() => go('details')} /></TabsContent>
+        <TabsContent value="pages" className="flex-1 min-h-0 overflow-hidden"><Pages key={pageId} person={person} full={full} startAt={pageId} onDetails={() => go('details')} /></TabsContent>
         <TabsContent value="details" className="flex-1 min-h-0 overflow-auto pt-3">
           <Details person={person} patch={patch.mutateAsync} />
         </TabsContent>
@@ -104,5 +168,6 @@ export function PersonPanel({ person, onClose, onDelete }: { person: Person; onC
       </Tabs>
       {suggesting && <SuggestDialog person={person} onClose={() => setSuggesting(false)} />}
     </aside>
+    </SearchTerms.Provider>
   )
 }
