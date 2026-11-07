@@ -3,7 +3,7 @@ import { dataStamp, getDb, schema } from '../db'
 import { blocksToMarkdown } from '../markdown'
 import { buildIndex, search, type SearchDoc, type SearchField, type SearchIndex, type SearchResult } from '../search/engine'
 import { normal } from '../search/words'
-import { personName, type Person, type Sex } from '../types'
+import { personName, shownTags, type Person, type Sex } from '../types'
 import { say } from './app-config'
 import { seesOnlyPublic, type Actor } from './core'
 import { listAllMedia } from './media'
@@ -31,7 +31,7 @@ function personFields(p: Person): SearchField[] {
     ...field('birthPlace', 'Место рождения', p.birthPlace, 0.8, 'f-birth-place'),
     ...field('deathDate', 'Смерть', p.deathDate, 0.95, 'f-death-date'),
     ...field('deathPlace', 'Место смерти', p.deathPlace, 0.8, 'f-death-place'),
-    ...field('tags', 'Группы', p.tags.join(', '), 0.75),
+    ...field('tags', 'Группы', shownTags(p.tags).join(', '), 0.75),
     ...p.facts.flatMap((f) => field('fact', 'Факты', [f.kind, f.date, f.place, f.note].filter(Boolean).join(', '), 0.7)),
     ...p.sources.flatMap((s) => field('source', 'Источники', [s.title, s.ref, s.page].filter(Boolean).join(', '), 0.55, 'f-sources')),
     ...p.claims.flatMap((c) => field('claim', 'Другая версия', [shown.has(normal(c.value)) ? '' : c.value, c.reason].filter(Boolean).join(', '), 0.5)),
