@@ -19,11 +19,11 @@ type Section = 'setup' | 'account' | 'general' | 'people' | 'assistant' | 'agent
 const SECTIONS: Record<Section, [string, string, ComponentType<{ size?: number }>]> = {
   setup: ['С чего начать', 'Что уже готово и что ещё можно подключить. Всё необязательное можно пропустить.', ListChecks],
   account: ['Мой аккаунт', 'Как вы связаны с архивом и как входите в него.', UserRound],
-  general: ['Название и язык', 'Как называется семья и на каком языке приложение. Меняется сразу для всех.', SlidersHorizontal],
-  people: ['Люди и доступ', 'Кто входит в архив и что может в нём делать, а кому хватит ссылки для просмотра.', Users],
-  assistant: ['Ассистент', 'Чат внутри приложения: отвечает на вопросы о семье и вносит правки с вашего подтверждения.', AssistantIcon],
-  agents: ['Внешние агенты', 'Подключите Claude, Codex или другую программу: она сможет читать архив и предлагать правки.', KeyRound],
-  data: ['Файлы и копии', 'Добавить людей из файла, скачать данные, сделать копию архива.', ArrowLeftRight],
+  general: ['Общие параметры', 'Название архива и язык приложения. Меняются сразу для всех.', SlidersHorizontal],
+  people: ['Пользователи и доступ', 'Кто входит в архив и что может в нём делать, а кому хватит ссылки для просмотра.', Users],
+  assistant: ['ИИ-ассистент', 'Чат внутри приложения: отвечает на вопросы о семье и вносит правки с вашего подтверждения.', AssistantIcon],
+  agents: ['Агенты и MCP', 'Подключите Claude, Codex или другую программу: она сможет читать архив и предлагать правки.', KeyRound],
+  data: ['Данные и резервные копии', 'Добавить людей из файла, скачать данные, сделать копию архива.', ArrowLeftRight],
 }
 
 export function SettingsDialog({ open, onOpenChange, familyName, providers, onText }: { open: boolean; onOpenChange: (v: boolean) => void; familyName: string; providers: { google: boolean; yandex: boolean }; onText: () => void }) {
@@ -31,7 +31,7 @@ export function SettingsDialog({ open, onOpenChange, familyName, providers, onTe
   const isOwner = me.role === 'owner'
   const [section, setSection] = useState<Section>(isOwner ? 'setup' : 'account')
   const groups: [string, Section[]][] = isOwner
-    ? [['', ['setup', 'account']], ['Семья', ['general', 'people', 'data']], ['ИИ', ['assistant', 'agents']]]
+    ? [['', ['setup', 'account']], ['Основные настройки', ['general', 'people', 'data']], ['ИИ и интеграции', ['assistant', 'agents']]]
     : [['', ['account', 'data']]]
   const [title, description] = SECTIONS[section]
   return (

@@ -30,7 +30,7 @@ await owner.goto(O + '/'); await owner.locator('.pcard').first().waitFor({ timeo
 
 // The owner makes a link in the settings.
 await owner.getByRole('button', { name: 'Настройки' }).click()
-await owner.getByRole('button', { name: 'Люди и доступ' }).click()
+await owner.getByRole('button', { name: 'Пользователи и доступ' }).click()
 await owner.getByLabel('Для кого').fill('Кузен')
 await owner.getByRole('button', { name: 'Создать ссылку' }).click()
 const code = owner.locator('code', { hasText: '/share/' })

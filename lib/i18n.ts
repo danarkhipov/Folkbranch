@@ -282,9 +282,13 @@ const en: Record<string, string> = {
   'Открыть настройки ассистента': 'Open assistant settings',
   'Пригласите родственников по ссылке, чтобы они смотрели архив и дополняли его.': 'Invite relatives by link so they can view the archive and add to it.',
   'Мамина ветка': "Mother's branch",
-  'Внешние агенты': 'External agents',
-  'Как называется семья и на каком языке приложение. Меняется сразу для всех.': 'What the family is called and the language of the app. It changes for everyone at once.',
   'Кто входит в архив и что может в нём делать, а кому хватит ссылки для просмотра.': 'Who can sign in and what they can do, and who only needs a view link.',
+  'Общие параметры': 'General settings',
+  'Название архива и язык приложения. Меняются сразу для всех.': 'The name of the archive and the language of the app. They change for everyone at once.',
+  'Пользователи и доступ': 'Users and access',
+  'Данные и резервные копии': 'Data and backups',
+  'Основные настройки': 'Main settings',
+  'ИИ и интеграции': 'AI and integrations',
 }
 
 export const translate = (lang: Lang, key: string) => (lang === 'en' ? (en[key] ?? key) : key)
