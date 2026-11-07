@@ -13,6 +13,8 @@ pnpm dev
 
 The app opens on http://localhost:3417 with its data in `./data`, which Git ignores. Tick "Load the demo family" on the first screen to get an invented family to work with.
 
+If a page keeps reloading by itself in `pnpm dev`, the development cache is stale. Stop the server, run `rm -rf .next/dev` and start it again. Your data is not in there.
+
 ## Check it
 
 | Command | What it runs |
