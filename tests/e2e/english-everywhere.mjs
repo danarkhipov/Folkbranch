@@ -183,7 +183,7 @@ const walkArchive = async (page, role, hasEdit) => {
     await explore(page, `${role} ${bar}`, async () => { await chart(page); await page.getByRole('button', { name: bar }).first().click({ timeout: 4000 }).catch(() => {}); await sleep(500) })
   }
   await explore(page, `${role} settings`, async () => { await chart(page); await page.getByRole('button', { name: /^Settings/ }).first().click({ timeout: 4000 }).catch(() => {}); await sleep(300) })
-  if (hasEdit) for (const section of ['Setup', 'My account', 'People and access', 'Archive', 'Assistant', 'Import and export', 'Agents and MCP']) {
+  if (hasEdit) for (const section of ['Getting started', 'My account', 'Users and access', 'General settings', 'AI assistant', 'Data and backups', 'Outside programs', 'Faces and voice']) {
     await explore(page, `${role} settings ${section}`, async () => {
       await chart(page)
       await page.getByRole('button', { name: /^Settings/ }).first().click({ timeout: 4000 }).catch(() => {})
@@ -208,7 +208,7 @@ for (const [name, text] of [
 ]) {
   await chart(owner)
   await owner.getByRole('button', { name: /^Settings/ }).first().click()
-  await owner.getByRole('dialog').getByRole('button', { name: 'Import and export', exact: true }).click()
+  await owner.getByRole('dialog').getByRole('button', { name: 'Data and backups', exact: true }).click()
   await sleep(300)
   await owner.getByRole('button', { name: 'Choose a file' }).click()
   await sleep(500)
@@ -251,7 +251,7 @@ if (await editable.isVisible().catch(() => false)) {
 // A file that is not a backup: the server's own words.
 await chart(owner)
 await owner.getByRole('button', { name: /^Settings/ }).first().click().catch(() => {})
-await owner.getByRole('dialog').getByRole('button', { name: 'Import and export', exact: true }).click().catch(() => {})
+await owner.getByRole('dialog').getByRole('button', { name: 'Data and backups', exact: true }).click().catch(() => {})
 await sleep(400)
 const restore = owner.getByRole('dialog').locator('input[type="file"]')
 for (let i = 0; i < await restore.count(); i++) {
@@ -263,7 +263,7 @@ await shot(owner, 'restore-bad')
 // A token just made shows its connection steps for each client.
 await chart(owner)
 await owner.getByRole('button', { name: /^Settings/ }).first().click().catch(() => {})
-await owner.getByRole('dialog').getByRole('button', { name: 'Agents and MCP', exact: true }).click().catch(() => {})
+await owner.getByRole('dialog').getByRole('button', { name: 'Outside programs', exact: true }).click().catch(() => {})
 await owner.getByRole('dialog').getByRole('textbox').first().pressSequentially('agent').catch(() => {})
 await owner.getByRole('button', { name: 'Create token' }).click({ timeout: 3000 }).catch(() => {})
 await sleep(500)
@@ -294,8 +294,7 @@ await reader.locator('.pcard').filter({ hasText: 'Stephen' }).first().click()
 await reader.getByRole('tab', { name: 'Details' }).click()
 await sleep(400)
 ok('a label stays beside its value on a read-only card', await reader.evaluate(() => {
-  const list = document.querySelector('.panel dl')
-  const dt = [...(list?.children ?? [])].find((e) => e.textContent === 'Sex')
+  const dt = [...document.querySelectorAll('.panel div, .panel dt')].find((e) => e.textContent === 'Sex')
   const next = dt?.nextElementSibling
   return !!dt && !!next && Math.abs(dt.getBoundingClientRect().top - next.getBoundingClientRect().top) < 12 && dt.getBoundingClientRect().left < next.getBoundingClientRect().left
 }))

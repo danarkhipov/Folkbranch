@@ -37,7 +37,7 @@ function ProviderSettings() {
     <Section title={t('Сервис и нейросеть')} description={t('Ассистент работает на вашем ключе: вы платите сервису сами, и то, что ассистент читает, уходит туда.')}>
       {data.connected ? (
         <p className="text-xs text-ink-soft">{t('Сервис')}: {data.label}{data.keyEnding ? `, ${t('ключ')} …${data.keyEnding}` : ''}{data.source === 'server' ? `. ${t('Ключ уже настроен')}` : ''}</p>
-      ) : <p className="text-xs text-destructive">{t('Ключ не задан: ассистент не может отвечать')}</p>}
+      ) : <p className="text-xs text-ink-soft">{t('Сначала подключите ключ: без него ассистент не может отвечать.')}</p>}
       {data.source === 'app' && !changing && <ModelSelect key={data.provider} presetId={data.provider as PresetId} value={data.model ?? ''} onChange={changeModel} />}
       {modelError && <p role="alert" className="text-xs text-destructive">{modelError}</p>}
       {data.source !== 'server' && (changing || !data.connected ? <ProviderForm onDone={() => setChanging(false)} /> : (

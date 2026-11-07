@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import { ArrowUpDown, CircleHelp, ClipboardCheck, EyeOff, Clock, Minus, Plus, Printer, Search, Settings, Tags } from 'lucide-react'
+import { ArrowUpDown, CalendarDays, CircleHelp, ClipboardCheck, EyeOff, Clock, Minus, Plus, Printer, Search, Settings, Tags } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useApp } from '@/lib/client'
 import type { Present } from '@/lib/use-live'
@@ -77,12 +77,12 @@ export function MainBar({ folded, onHide, onShow, guest, familyName, present, mo
 }
 
 /** Only about how the chart looks; it steps aside for a panel on the left. */
-export function ViewBar({ folded, onPrint, scope, canvas, rootsBelow, onFlip, groups, onGroups, allGroups, left, crowded }: { folded: boolean; onPrint: () => void; scope: ChartScope; canvas: RefObject<CanvasHandle | null>; rootsBelow: boolean; onFlip: () => void; groups: string[]; onGroups: (next: string[]) => void; allGroups: [string, number][]; left: number; crowded: boolean }) {
+export function ViewBar({ folded, onHide, onOverview, onPrint, scope, canvas, rootsBelow, onFlip, groups, onGroups, allGroups, left, crowded }: { folded: boolean; onHide: () => void; onOverview: () => void; onPrint: () => void; scope: ChartScope; canvas: RefObject<CanvasHandle | null>; rootsBelow: boolean; onFlip: () => void; groups: string[]; onGroups: (next: string[]) => void; allGroups: [string, number][]; left: number; crowded: boolean }) {
   const { t } = useApp()
   return (
       <div aria-label={t('Вид схемы')} role="toolbar" inert={folded} className={cn('float view-bar fixed bottom-3 z-10 flex items-center gap-0.5 p-1', crowded && 'crowded', folded && 'folded')} style={{ left }}>
-        <button className="bar-btn" title={t('Отдалить')} data-hint={t('Показать больше людей на экране.')} aria-label={t('Отдалить')} onClick={() => canvas.current?.zoomBy(0.75)}><Minus size={15} /></button>
-        <button className="bar-btn" title={t('Приблизить')} data-hint={t('Показать людей крупнее.')} aria-label={t('Приблизить')} onClick={() => canvas.current?.zoomBy(1.33)}><Plus size={15} /></button>
+        <button className="bar-btn zoom-btn" title={t('Отдалить')} data-hint={t('Показать больше людей на экране.')} aria-label={t('Отдалить')} onClick={() => canvas.current?.zoomBy(0.75)}><Minus size={15} /></button>
+        <button className="bar-btn zoom-btn" title={t('Приблизить')} data-hint={t('Показать людей крупнее.')} aria-label={t('Приблизить')} onClick={() => canvas.current?.zoomBy(1.33)}><Plus size={15} /></button>
         <button className="bar-btn" title={t(rootsBelow ? 'Сейчас старшие снизу. Показать старших сверху' : 'Сейчас старшие сверху. Показать старших снизу')} aria-label={t('Перевернуть схему')} onClick={onFlip}><ArrowUpDown size={15} /></button>
         <ViewMenu scope={scope} />
         {allGroups.length > 0 && (
@@ -100,11 +100,13 @@ export function ViewBar({ folded, onPrint, scope, canvas, rootsBelow, onFlip, gr
             </PopoverContent>
           </Popover>
         )}
+        <button className="bar-btn" title={t('Даты и цифры')} data-hint={t('Ближайшие памятные дни и семья в цифрах.')} aria-label={t('Даты и цифры')} onClick={onOverview}><CalendarDays size={15} /></button>
         <button className="bar-btn" title={t('Печать схемы')} data-hint={t('На одном листе или склеить из нескольких.')} aria-label={t('Печать схемы')} onClick={onPrint}><Printer size={15} /></button>
         <Popover>
           <PopoverTrigger asChild><button className="bar-btn" title={t('Как читать схему')} data-hint={t('Что значат линии, рамки и цвета.')} aria-label={t('Как читать схему')}><CircleHelp size={15} /></button></PopoverTrigger>
-          <PopoverContent side="top" align="start" className="w-80 text-sm"><Legend /></PopoverContent>
+          <PopoverContent side="top" align="start" collisionPadding={8} className="w-80 max-w-[calc(100vw-16px)] max-h-[min(70dvh,560px)] overflow-y-auto text-sm"><Legend /></PopoverContent>
         </Popover>
+        <button className="bar-btn hide-here" title={t('Скрыть панели')} aria-label={t('Скрыть панели')} onClick={onHide}><EyeOff size={15} /></button>
       </div>
   )
 }

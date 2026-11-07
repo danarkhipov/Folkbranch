@@ -32,7 +32,7 @@ await owner.goto(O + '/'); await owner.locator('.pcard').first().waitFor({ timeo
 await owner.getByRole('button', { name: 'Настройки' }).click()
 await owner.getByRole('button', { name: 'Пользователи и доступ' }).click()
 await owner.getByLabel('Для кого').fill('Кузен')
-await owner.getByRole('button', { name: 'Создать ссылку' }).click()
+await owner.getByRole('button', { name: 'Создать ссылку', exact: true }).click()
 const code = owner.locator('code', { hasText: '/share/' })
 await code.waitFor()
 const link = await code.innerText()
@@ -119,7 +119,7 @@ ok('a closed link stops at once', (await call('GET', 'graph', null, gcookie)).st
 await guest.reload(); await guest.waitForURL(/login/, { timeout: 10000 }).catch(() => {})
 ok('the page sends them away', guest.url().includes('/login'))
 const dead2 = await fetch(link).then((x) => x.text())
-ok('the link says it no longer works', dead2.includes('Ссылка недействительна'))
+ok('the link says it no longer works', dead2.includes('Ссылка больше не работает'))
 
 // A reader suggests in the browser.
 const R = await session('reader')

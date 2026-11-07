@@ -9,8 +9,8 @@ import { personName, shownTags, type Graph, type HistoryEntry, type Lang, type M
 import { GraphCanvas, type CanvasHandle } from './graph-canvas'
 import { ConnectionNotice, MainBar, ViewBar, type Side } from './chart-bars'
 import { useChartScope } from './chart-scope'
-import { QuickAdd } from './quick-add'
-import { ConfirmDialog, SearchDialog, type SearchHit } from './person-pickers'
+import { ConfirmDialog } from './confirm-dialog'
+import type { SearchHit } from './person-pickers'
 import type { AssistantState } from '@/lib/types'
 import { useLive } from '@/lib/use-live'
 import { useAssistantWidth } from './panel-size'
@@ -28,6 +28,9 @@ const AssistantPanel = dynamic(() => import('./assistant-panel'), { ssr: false }
 const AssistantSetup = dynamic(() => import('./assistant-setup'), { ssr: false })
 // Opened now and then, and they bring the photo viewer, the importers and the settings along.
 const PhotoDialog = dynamic(() => import('./photo-dialog').then((m) => m.PhotoDialog), { ssr: false })
+const QuickAdd = dynamic(() => import('./quick-add').then((m) => m.QuickAdd), { ssr: false })
+const SearchDialog = dynamic(() => import('./person-pickers').then((m) => m.SearchDialog), { ssr: false })
+const FamilyOverview = dynamic(() => import('./family-overview').then((m) => m.FamilyOverview), { ssr: false })
 const ImportDialog = dynamic(() => import('./import-dialog').then((m) => m.ImportDialog), { ssr: false })
 const SettingsDialog = dynamic(() => import('./settings/settings-dialog').then((m) => m.SettingsDialog), { ssr: false })
 const HistoryPanel = dynamic(() => import('./side-panels').then((m) => m.HistoryPanel), { ssr: false })
@@ -65,6 +68,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
   const [focusId, setFocusId] = useState<string | null>(() => (typeof location !== 'undefined' ? new URLSearchParams(location.search).get('p') : null))
   const present = useLive(focusId, !me.guest)
   const [search, setSearch] = useState(false)
+  const [overview, setOverview] = useState(false)
   // Nothing of the bars is drawn before the data comes, so reading this here cannot differ from the server's page.
   const [barsHidden, setBarsHidden] = useState(() => { try { return typeof localStorage !== 'undefined' && localStorage.getItem('bars-hidden') === '1' } catch { return false } })
   const hideBars = (hidden: boolean) => {
@@ -193,12 +197,12 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
   useFocusReturn(!!side)
 
   const qc = useQueryClient()
-  const [toast, setToast] = useState<{ text: string; actions: { label: string; run: () => void }[] } | null>(null)
+  const [toast, setToast] = useState<{ text: string; actions: { label: string; run: () => void }[]; stay: boolean } | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  const notify = useCallback((text: string, actions: { label: string; run: () => void }[] = []) => {
+  const notify = useCallback((text: string, actions: { label: string; run: () => void }[] = [], stay = false) => {
     clearTimeout(toastTimer.current)
-    setToast({ text, actions })
-    toastTimer.current = setTimeout(() => setToast(null), TOAST_MS)
+    setToast({ text, actions, stay })
+    if (!stay) toastTimer.current = setTimeout(() => setToast(null), TOAST_MS)
   }, [])
   const undoLast = useCallback(async () => {
     const rows = await api<HistoryEntry[]>('history?limit=20')
@@ -290,7 +294,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       <main id="chart" aria-label={t('Схема семьи')}>
       <GraphCanvas ref={canvas} scope={scope} pathIds={path} groupIds={groupIds} panelOpen={panelOpen} leftInset={side === 'assistant' ? assistantWidth + 12 : 0}/>
 
-      <ViewBar folded={barsHidden} onPrint={() => setPrinting(true)} scope={scope} canvas={canvas} rootsBelow={rootsBelow} onFlip={flipChart} groups={groups} onGroups={setGroups} allGroups={allGroups} left={side === 'assistant' ? assistantWidth + 24 : side === 'history' || side === 'review' ? 408 : 12} crowded={panelOpen || !!side} />
+      <ViewBar folded={barsHidden} onHide={() => hideBars(true)} onOverview={() => setOverview(true)} onPrint={() => setPrinting(true)} scope={scope} canvas={canvas} rootsBelow={rootsBelow} onFlip={flipChart} groups={groups} onGroups={setGroups} allGroups={allGroups} left={side === 'assistant' ? assistantWidth + 24 : side === 'history' || side === 'review' ? 408 : 12} crowded={panelOpen || !!side} />
       </main>
 
       {!ctx.graph.persons.length && ctx.canEdit && (
@@ -305,16 +309,17 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       {assistant.ready && assistantUsed && <AssistantPanel open={side === 'assistant'} width={assistantWidth} onWidth={setAssistantWidth} onClose={() => setSide(null)} onPath={setPath} onDirection={directChart} />}
       {panelOpen && <PersonPanel key={focused!.id} person={focused!} hit={searchHit?.personId === focused!.id ? searchHit : null} onClearHit={() => setSearchHit(null)} onClose={() => focus(null)} onDelete={onDelete} />}
 
-      <SearchDialog open={search} onOpenChange={setSearch} onPick={(id, hit) => { setSearchHit(hit ?? null); focus(id) }} />
-      <QuickAdd state={quick} onClose={(id) => { setQuick(null); if (id) focus(id) }} />
+      {search && <SearchDialog open onOpenChange={setSearch} onPick={(id, hit) => { setSearchHit(hit ?? null); focus(id) }} />}
+      {quick && <QuickAdd state={quick} onClose={(id) => { setQuick(null); if (id) focus(id) }} />}
       {photo && <PhotoDialog state={photo} onClose={() => setPhoto(null)} />}
       {toast && (
-        <div role="status" onMouseEnter={() => clearTimeout(toastTimer.current)} onFocus={() => clearTimeout(toastTimer.current)} onMouseLeave={() => { toastTimer.current = setTimeout(() => setToast(null), TOAST_MS) }} className="float fixed left-1/2 -translate-x-1/2 bottom-3 max-lg:bottom-[68px] z-30 flex items-center gap-1 pl-3 pr-1 py-1 text-sm max-w-[calc(100vw-24px)]">
-          <span className="truncate mr-1">{toast.text}</span>
+        <div role={toast.stay ? 'alert' : 'status'} onMouseEnter={() => clearTimeout(toastTimer.current)} onFocus={() => clearTimeout(toastTimer.current)} onMouseLeave={() => { if (!toast.stay) toastTimer.current = setTimeout(() => setToast(null), TOAST_MS) }} className="float fixed left-1/2 -translate-x-1/2 bottom-3 max-lg:bottom-[68px] z-30 flex items-center gap-1 pl-3 pr-1 py-1 text-sm max-w-[calc(100vw-24px)]">
+          <span className="min-w-0 mr-1 break-anywhere">{toast.text}</span>
           {toast.actions.map((a) => <button key={a.label} className="bar-btn !h-7 whitespace-nowrap" onClick={() => { setToast(null); a.run() }}>{a.label}</button>)}
           <button className="bar-btn !h-7 !min-w-7 !p-0" aria-label={t('Закрыть')} title={t('Закрыть')} onClick={() => setToast(null)}><X size={13} /></button>
         </div>
       )}
+      {overview && <FamilyOverview onClose={() => setOverview(false)} />}
       {textOpen && <TextDialog open onOpenChange={setTextOpen} />}
       {importing && <ImportDialog open file={dropped} onOpenChange={setImporting} />}
       {welcome && <Onboarding onClose={endWelcome} onImport={() => { endWelcome(); setDropped(null); setImporting(true) }} onFirstPerson={() => { endWelcome(); setQuick({ type: null, to: null }) }} />}

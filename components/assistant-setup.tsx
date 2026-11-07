@@ -76,7 +76,7 @@ export function ProviderForm({ onDone }: { onDone?: () => void }) {
       </fieldset>
       <ol className="flex flex-col gap-2">
         <li><span className="text-ink-soft">1.</span> <a className="inline-flex items-center gap-1 underline" href={preset.keysUrl} target="_blank" rel="noreferrer noopener">{t('Откройте страницу ключей')} {preset.label} <ExternalLink size={12} /></a></li>
-        <li><span className="text-ink-soft">2.</span> {t(preset.howTo)}</li>
+        <li><span className="text-ink-soft">2.</span> {t(preset.howTo)}. <span className="text-ink-soft">{t('На сайте сервиса надписи на английском: ищите эти слова.')}</span></li>
         <li className="flex flex-col gap-1.5"><span><span className="text-ink-soft">3.</span> {t('Скопируйте ключ и вставьте его сюда')}</span>
           <input type="password" autoComplete="off" spellCheck={false} aria-label={t('Ключ')} placeholder={t('Ключ')} className={`${inputClass} font-mono`} value={key} onChange={(e) => { setKey(e.target.value); setError('') }} />
         </li>

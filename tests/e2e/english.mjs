@@ -95,6 +95,8 @@ await check(page, 'person')
 const names = await panel.getByRole('tab').allTextContents()
 // Escape also closes the card, so it opens again before each step.
 const openTab = async (name) => {
+  // A dialog that loads on demand can arrive after the Escape meant for it.
+  for (let i = 0; i < 3 && await page.locator('[role=dialog]').count(); i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(200) }
   if (!(await panel.getByRole('tab', { name }).isVisible().catch(() => false))) { await card.click(); await panel.getByRole('tab', { name }).waitFor() }
   await panel.getByRole('tab', { name }).click()
   await page.waitForTimeout(300)
@@ -139,7 +141,8 @@ await page.keyboard.press('Escape')
 // The bars, and every button with a name: each opens a panel, a menu or a list.
 await page.keyboard.press('Escape')
 await page.waitForTimeout(300)
-const bars = await page.locator('button[aria-label]').evaluateAll((all) => [...new Set(all.map((b) => b.getAttribute('aria-label')))])
+// Hiding the bars would leave nothing to press after it.
+const bars = await page.locator('button[aria-label]').evaluateAll((all) => [...new Set(all.map((b) => b.getAttribute('aria-label')).filter((l) => !/(Hide|Show) panels/.test(l)))])
 for (const name of bars) {
   if (/delete|remove|undo|log out|sign out/i.test(name)) continue
   const b = page.locator(`button[aria-label=${JSON.stringify(name)}]`).first()
@@ -168,13 +171,16 @@ if (await settings.isVisible().catch(() => false)) {
   await settings.click()
   const dialog = page.getByRole('dialog').first()
   await dialog.waitFor()
-  for (const name of ['Setup', 'My account', 'People and access', 'Archive', 'Assistant', 'Import and export', 'Agents and MCP']) {
+  for (const name of ['Getting started', 'My account', 'Users and access', 'General settings', 'AI assistant', 'Data and backups', 'Outside programs', 'Faces and voice']) {
+    // On a narrow screen a section takes the whole dialog, and the list is one step back.
+    const back = dialog.getByRole('button', { name: 'Settings', exact: true })
+    if (await back.isVisible().catch(() => false)) { await back.click(); await page.waitForTimeout(100) }
     const b = dialog.getByRole('button', { name, exact: true }).first()
     if (!(await b.isVisible().catch(() => false))) { console.log(`  no settings section "${name}"`); continue }
     await b.click()
     await page.waitForTimeout(200)
     await check(page, `settings-${name}`)
-    for (const inner of await dialog.locator('summary, button[aria-expanded="false"]').all()) {
+    for (const inner of await dialog.locator('summary, button[aria-expanded="false"]:not([role=combobox])').all()) {
       await inner.click({ timeout: 800 }).catch(() => {})
     }
     await check(page, `settings-${name}-open`)
@@ -184,13 +190,16 @@ if (await settings.isVisible().catch(() => false)) {
 
 // The language can change inside the app, both ways, and everything follows.
 const language = async (value, word) => {
+  // Settings stay open after a switch: close them first.
+  for (let i = 0; i < 2 && await page.locator('[role=dialog]').count(); i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(200) }
   await page.getByRole('button', { name: /^(Settings|Настройки)/ }).first().click()
   const d = page.getByRole('dialog').first()
   await d.getByRole('button', { name: /^(General settings|Общие параметры)$/ }).click()
   await d.getByRole('combobox', { name: /^(Language|Язык)$/ }).click()
   await page.getByRole('option', { name: value === 'ru' ? 'Русский' : 'English' }).click()
   await page.waitForLoadState('load')
-  await page.getByRole('button', { name: word }).first().waitFor({ timeout: 15000 })
+  // The bar's button, not the way back inside the open settings, which is named the same.
+  await page.locator(`button[aria-label="${word}"]`).first().waitFor({ timeout: 15000 })
   await page.waitForFunction((l) => document.documentElement.lang === l, value)
   ok(`switches to ${value}`, true)
 }

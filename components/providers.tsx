@@ -17,5 +17,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       document.removeEventListener('gesturestart', stop)
     }
   }, [])
+  // Not while developing: a kept copy of a file that keeps changing only confuses.
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {})
+  }, [])
   return <QueryClientProvider client={client}><TooltipProvider>{children}<Hints /></TooltipProvider></QueryClientProvider>
 }

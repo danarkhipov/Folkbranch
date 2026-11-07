@@ -62,6 +62,9 @@ const round = async () => {
   for (let i = 0; i < 10; i++) { await p.mouse.wheel(0, i < 5 ? 150 : -150); await sleep(15) }
   await p.keyboard.press('Meta+k'); await sleep(150); await p.keyboard.type('Имя1'); await sleep(150); await p.keyboard.press('Escape'); await sleep(150)
   for (const label of ['История', 'Настройки']) { const b = p.locator(`nav button[aria-label="${label}"], nav button[aria-label="${label}?"], nav button[aria-label="Кем приходится?"]`).first(); await p.keyboard.press('Escape'); await sleep(250); if (await p.locator('[role=dialog]').count()) { console.log('Escape left a dialog open:', (await p.locator('[role=dialog]').first().innerText()).slice(0, 80)); errs.push('stuck dialog'); await p.keyboard.press('Escape'); await sleep(250) } await b.click({ timeout: 5000 }).catch(async (e) => { await p.screenshot({ path: '/tmp/page-recovery-fail.png' }); throw e }); await sleep(180); await p.keyboard.press('Escape'); await sleep(100); const open = p.locator('.side-panel button[aria-label="Закрыть"], aside button[aria-label="Закрыть"]').first(); if (await open.count()) await open.click({ timeout: 1000 }).catch(() => {}); await sleep(80) }
+  // Leaves the screen as a round found it, or the next one presses on what is lying over the chart.
+  await p.keyboard.press('Escape'); await sleep(250)
+  for (const close of await p.locator('aside.side-sheet button[aria-label="Закрыть"]').all()) await close.click().catch(() => {})
   for (let i = 0; i < 5; i++) { await rename('Цикл' + i); await sleep(500) }
 }
 const series = [await m()]

@@ -85,13 +85,17 @@ export function TokensTab() {
           {rows.map((r) => <ListRow key={r.id} title={r.name} meta={meta(r)} actions={<Button size="sm" variant="danger" title={`${t('Отозвать')}: ${r.name}`} data-hint={t('Программа с этим ключом сразу потеряет доступ.')} onClick={async () => { if (await ask(`${t('Отозвать ключ')} «${r.name}»?`, t('Отозвать'), t('Программа с этим ключом сразу потеряет доступ. Вернуть ключ нельзя, можно выдать новый.'))) { await api(`tokens/${r.id}`, { method: 'DELETE' }); refresh() } }}><X /> {t('Отозвать')}</Button>} />)}
         </List>
       </Section>
-      <Section title={t('Для разработчиков')} description={t('Адреса для тех, кто подключается к архиву напрямую.')}>
+      <details className="min-w-0">
+        <summary className="cursor-pointer text-base font-medium">{t('Для разработчиков')}</summary>
+        <div className="mt-2 flex min-w-0 flex-col gap-2.5">
+          <p className="text-xs leading-snug text-ink-soft">{t('Адреса для тех, кто подключается к архиву напрямую.')}</p>
         <CopyField label={t('Адрес MCP')} value={`${origin}/api/mcp`} />
         <div className="flex min-w-0 flex-col gap-1">
           <CopyField label={t('Описание API в формате OpenAPI')} value={`${origin}/api/v1/openapi.json`} />
           <Button asChild size="sm" variant="ghost" className="self-start"><a href="/api/v1/openapi.json" target="_blank" rel="noreferrer"><ExternalLink /> {t('Открыть описание')}</a></Button>
         </div>
-      </Section>
+        </div>
+      </details>
     </div>
   )
 }

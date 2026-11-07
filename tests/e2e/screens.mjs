@@ -98,7 +98,7 @@ await surface(p, 'b08-quickadd', async () => { const c = p.locator('.pcard', { h
 await home()
 await surface(p, 'c01-card-biography', async () => { await p.locator('.pcard .nm', { hasText: 'Иван Соколов' }).first().click(); await p.locator('.panel').waitFor(); await sleep(500) })
 for (const [tab, f] of [['Сведения', 'c02-card-details'], ['Семья', 'c03-card-family'], ['Фото', 'c04-card-photos']]) await surface(p, f, () => p.getByRole('tab', { name: tab }).click())
-await surface(p, 'c05-card-delete-confirm', () => p.locator('.panel button[aria-label="Удалить человека"]').first().click()); await esc(p)
+await surface(p, 'c05-card-delete-confirm', async () => { await p.locator('.panel button[aria-label="Ещё"]').first().click(); await p.getByRole('button', { name: 'Удалить человека' }).click() }); await esc(p)
 await home()
 await surface(p, 'd00-assistant-off', () => nav('ИИ-ассистент'))
 await surface(p, 'd01-assistant', async () => { await p.getByRole('button', { name: 'Включить ассистента' }).click({ timeout: 3000 }); await p.locator('.assistant textarea').waitFor({ timeout: 8000 }) })
@@ -111,7 +111,7 @@ const sections = await p.evaluate(() => [...document.querySelectorAll('[role=dia
 for (let i = 0; i < sections.length; i++) await surface(p, `e${i}-settings-${sections[i].replace(/[^a-zа-я0-9]+/gi, '_')}`, () => p.locator('[role=dialog] nav button, [role=dialog] [role=tab]').nth(i).click())
 await esc(p); await home()
 // Photo viewer, on a demo photo if there is one.
-await surface(p, 'f01-import', async () => { await nav('Настройки'); await sleep(300); await p.locator('[role=dialog]').getByText('Файлы').first().click(); await sleep(200); const b = p.locator('[role=dialog] button', { hasText: /Загрузить|Импорт|файл/ }).first(); await b.click({ timeout: 3000 }) })
+await surface(p, 'f01-import', async () => { await nav('Настройки'); await sleep(300); await p.locator('[role=dialog]').getByText('Данные и резервные копии').first().click(); await sleep(200); const b = p.locator('[role=dialog] button', { hasText: /Загрузить|Импорт|файл/ }).first(); await b.click({ timeout: 3000 }) })
 await home()
 // A line selected on the chart.
 await surface(p, 'f02-line-selected', async () => { const box = await p.locator('path.line-hit').nth(2).boundingBox(); await p.locator('path.line-hit').nth(2).click({ force: true, position: { x: box.width / 2, y: box.height / 2 } }) })

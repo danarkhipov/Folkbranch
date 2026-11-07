@@ -58,7 +58,7 @@ export function KinshipCase() {
     }
   }
   return (
-    <Section title={t('Добавить дело из исследования')} description={t('Папка, которую создал скилл ex-ussr-kinship-research. Кандидаты останутся отдельными карточками, а неподтверждённые связи не попадут на схему и останутся заметками.')}>
+    <Section title={t('Добавить дело из исследования')} description={t('Папка с результатами исследования родословной, подготовленная ex-ussr-kinship-research. Возможные родственники останутся отдельными карточками, а неподтверждённые связи не попадут на схему и останутся заметками.')}>
       {/* @ts-expect-error the browser's folder picker has no type in React */}
       <input ref={input} type="file" webkitdirectory="" multiple hidden aria-label={t('Выбрать папку дела')} onChange={(e) => { const list = Array.from(e.target.files ?? []); e.target.value = ''; void pick(list) }} />
       <Button variant="outline" className="self-start" onClick={() => input.current?.click()}><FolderOpen /> {t('Выбрать папку дела')}</Button>

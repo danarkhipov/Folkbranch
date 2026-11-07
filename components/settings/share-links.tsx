@@ -44,7 +44,7 @@ function FamilyFile() {
   }
   return (
     <Section title={t('Файл для родных')} description={t('Один файл со схемой, карточками и фото. Отправьте его в мессенджере: родные откроют его без интернета и регистрации. Живые родственники скрыты, но текст биографий и подписи к фото попадают как написаны: проверьте, нет ли в них имён живых.')}>
-      <Button className="self-start" disabled={busy} onClick={make}><Download /> {busy ? t('Готовим файл…') : t('Скачать файл')}</Button>
+      <Button className="self-start" disabled={busy} onClick={make}><Download /> {busy ? t('Готовим файл…') : t('Скачать файл для родных')}</Button>
       {done && <p role="status" className="text-xs text-ink-soft">{done}</p>}
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
     </Section>

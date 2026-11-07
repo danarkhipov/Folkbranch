@@ -328,9 +328,9 @@ aside.panel:focus { outline: none; }
   .main-bar .bar-rest { flex: 1; min-width: 0; justify-content: space-around; }
   .main-bar.folded { justify-content: flex-start; }
   .bar-peek { top: auto; bottom: 8px; left: 8px; margin: 0 0 5px; }
-  .main-bar .bar-btn { flex: 1; flex-direction: column; gap: 2px; height: 48px; min-width: 0; height: 48px; padding: 0 2px; font-size: 13px; line-height: 1.35; white-space: normal; text-align: center; }
-  .main-bar .bar-btn .nav-label { white-space: normal; }
-  .main-bar .nav-label { display: block; white-space: nowrap; }
+  .main-bar .bar-btn { flex: 1 1 0; flex-direction: column; gap: 2px; height: 48px; min-width: 0; padding: 0 1px; font-size: 13px; line-height: 1.3; text-align: center; }
+  .main-bar .nav-label { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .main-bar .hide-bars { display: none; }
   .view-bar { left: 8px !important; bottom: 72px; }
   .chart-hint { display: none; }
   .panel { bottom: 68px; }
@@ -384,4 +384,13 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
   button:not(:disabled), a[href], summary, select, label:has(> input[type=checkbox]), label:has(> input[type=radio]),
   [role=button], [role=tab], [role=radio], [role=switch], [role=checkbox], [role=menuitem], [role=option], [role=combobox]:not(input), [cmdk-item] { cursor: pointer; }
   button:disabled, [aria-disabled=true], [data-disabled] { cursor: default; }
+}
+
+/* The button to hide the bars moves down here on a phone, to leave the labels room; fingers zoom without buttons. */
+.view-bar .hide-here { display: none; }
+@media (max-width: 640px) { .view-bar .hide-here { display: inline-flex; } }
+@media (max-width: 640px) and (pointer: coarse) { .view-bar .zoom-btn { display: none; } }
+@media (max-width: 360px) {
+  .main-bar .bar-btn { font-size: 10.5px; }
+  .panel-tabs [role=tab] { font-size: 12.5px; }
 }

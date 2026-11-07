@@ -191,15 +191,17 @@ export function Legend() {
       <ul className="mt-2 pt-2 border-t border-border text-sm flex flex-col gap-2">
         <li>{t('Нажмите на человека, чтобы открыть карточку.')}</li>
         <li>{t('Кнопка + рядом с человеком добавляет родственника.')}</li>
-        <li>{t('Перетащите + на другого человека, чтобы связать их.')}</li>
-        <li>{t('Перетащите подпись человека, чтобы сдвинуть его карточку.')}</li>
+        {fine && <li>{t('Перетащите + на другого человека, чтобы связать их.')}</li>}
+        {fine && <li>{t('Перетащите подпись человека, чтобы сдвинуть его карточку.')}</li>}
         {fine && <li>{t('Чтобы удалить связь, нажмите на линию и клавишу Delete.')}</li>}
         {fine && <li>{(/Mac/.test(navigator.platform) ? (k: string) => k : (k: string) => k.replaceAll('⌘', 'Ctrl+'))(t('Клавиши: ⌘K поиск, ⌘J ассистент, ⌘Z отмена.'))}</li>}
       </ul>
+      {fine && <>
       <h3 className="text-base font-medium mt-3 mb-1">{t('С клавиатуры')}</h3>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
         {([['Tab', 'к следующему человеку'], ['← ↑ → ↓', 'по родне: родители, дети, супруг, братья и сёстры'], ['Enter', 'открыть карточку'], ['+ − 0', 'крупнее, мельче, вся схема'], ['⌘K', 'поиск'], ['⌘J', 'ассистент'], ['⌘Z', 'отменить последнее изменение']] as const).map(([k, what]) => <div key={k} className="contents"><dt><kbd>{k}</kbd></dt><dd className="text-ink-soft">{t(what)}</dd></div>)}
       </dl>
+      </>}
     </div>
   )
 }

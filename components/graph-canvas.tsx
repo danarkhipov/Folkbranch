@@ -1,5 +1,5 @@
 'use client'
-import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { useEffect, forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { layoutFamily, CARD_W } from '@/lib/graph/layout'
 import { useApp } from '@/lib/client'
@@ -37,6 +37,9 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
 
     const { moving, startMove } = useCardMove(layout, scope.pins, view.zoom, scope.pin)
 
+    // Said once for a few seconds: it covers people's names, and after that everyone knows.
+    const [hintSeen, setHintSeen] = useState(false)
+    useEffect(() => { if (!clipped) return; const timer = setTimeout(() => setHintSeen(true), 6000); return () => clearTimeout(timer) }, [clipped])
     useImperativeHandle(ref, () => ({ fit: view.refit, center, zoomBy: view.zoomBy }))
 
     const edgeText = (parentIds: string[], childId: string) => {
@@ -129,7 +132,7 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
           )}
         </div>
         {draft && <div className="fixed z-50 pointer-events-none float px-2 py-1 text-xs" style={{ left: draft.cx + 14, top: draft.cy + 14 }}>{t(draft.label)}</div>}
-        {clipped && !panelOpen && !leftInset && <div className="float chart-hint fixed left-1/2 -translate-x-1/2 bottom-[68px] z-10 px-3 py-1.5 text-xs text-ink-soft pointer-events-none whitespace-nowrap">{t('Схема шире экрана: тяните, чтобы сдвинуть')}</div>}
+        {clipped && !hintSeen && !panelOpen && !leftInset && <div className="float chart-hint fixed left-1/2 -translate-x-1/2 bottom-[68px] z-10 px-3 py-1.5 text-xs text-ink-soft pointer-events-none whitespace-nowrap">{t('Схема шире экрана: тяните, чтобы сдвинуть')}</div>}
         {tip && <div className="fixed z-50 pointer-events-none float px-2 py-1 text-xs" style={{ left: tip.x + 12, top: tip.y + 12 }}>{tip.text}</div>}
       </div>
     )

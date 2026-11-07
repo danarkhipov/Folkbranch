@@ -5,6 +5,7 @@ import { X } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useApp } from '@/lib/client'
 import { accept, addVersion, editValue, hasConflict, NAME_FIELDS, reject, RELIABILITY, restore, setSource, sourceOf, summary, versions, type ClaimPatch } from '@/lib/claims'
+import { lifeEvents } from '@/lib/family-dates'
 import { listWriter } from '@/lib/list-writes'
 import { ageWords } from '@/lib/names'
 import { cn } from '@/lib/utils'
@@ -151,6 +152,8 @@ function Versions({ person, field, current, change, attach }: { person: Person; 
   const unclaimedName = NAME_FIELDS.includes(field) && !person.claims.some((c) => c.field === field)
   const sourceWord = '+ источник'
   const otherWord = '+ другой вариант'
+  // Nothing written yet means nothing to source: four empty links in a row said nothing.
+  if (!main && !list.length) return null
   const label = conflict ? `⚠ +${others} ${mainSource?.title ?? t('Указать источник')}` : mainSource ? `${others ? `+${others} ` : ''}${mainSource.title}` : unclaimedName || main ? t(sourceWord) : t(otherWord)
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -199,10 +202,31 @@ function Versions({ person, field, current, change, attach }: { person: Person; 
   )
 }
 
+/** A life in order, read from the card and the family, so nothing has to be written twice. */
+function LifeLine({ person }: { person: Person }) {
+  const { t, graph, focus } = useApp()
+  const events = useMemo(() => lifeEvents(person, graph), [person, graph])
+  if (events.length < 2) return null
+  return (
+    <details className="group">
+      <summary className="cursor-pointer text-base font-medium">{t('Хронология жизни')}</summary>
+      <ol className="mt-1.5 flex flex-col gap-1.5 border-l border-border pl-3 text-sm">
+        {events.map((e, i) => (
+          <li key={i} className="min-w-0">
+            <span className="font-medium">{e.date}</span>{e.age !== null && <span className="text-ink-soft"> · {t('возраст')} {e.age}</span>}
+            <span className="block break-anywhere">{t(e.title)}{e.note && ': '}{e.otherId ? <button className="pick underline underline-offset-2 hover:text-ink" onClick={() => focus(e.otherId, { center: true })}>{e.note}</button> : e.note}</span>
+          </li>
+        ))}
+      </ol>
+    </details>
+  )
+}
+
 export function Details({ person, patch: send }: { person: Person; patch: (p: Partial<Person>) => Promise<unknown> }) {
-  const { t, canEdit, graph, lang, notify } = useApp()
+  const { t, canEdit, graph, lang } = useApp()
   const ro = !canEdit
-  const writer = useRef(listWriter({ facts: person.facts, sources: person.sources, tags: person.tags, claims: person.claims }, send, (e) => { if (![404, 409].includes((e as { status?: number }).status ?? 0)) notify(`${t('Не удалось сохранить')}: ${(e as Error).message}`) })).current
+  // The card itself says when a save fails, with a way to try again.
+  const writer = useRef(listWriter({ facts: person.facts, sources: person.sources, tags: person.tags, claims: person.claims }, send, () => {})).current
   useEffect(() => writer.sync({ facts: person.facts, sources: person.sources, tags: person.tags, claims: person.claims }), [writer, person.facts, person.sources, person.tags, person.claims])
   /** The person as the next change must see it: lists as last written. */
   const current = (): Person => ({ ...person, claims: writer.get('claims'), sources: writer.get('sources') })
@@ -301,6 +325,8 @@ export function Details({ person, patch: send }: { person: Person; patch: (p: Pa
       {badOrder && <p role="alert" className="text-xs text-destructive">{t('Дата смерти раньше даты рождения: проверьте годы')}</p>}
       {tooOld && canEdit && <p className="text-xs text-ink-soft">{t('Больше 110 лет.')} <button className="underline hover:text-ink" onClick={() => patch({ living: false })}>{t('Отметить как умершего')}</button></p>}
 
+      <LifeLine person={person} />
+
       {(person.facts.length > 0 || !ro) && (
         <section className="flex flex-col gap-1.5">
           <h4 className="text-base font-medium">{t('Факты')}</h4>
@@ -355,7 +381,7 @@ export function Details({ person, patch: send }: { person: Person; patch: (p: Pa
 
       {!ro && (
         <PersonPopover onPick={setSameAs} exclude={[person.id]}>
-          <button className="self-start text-xs text-ink-soft underline underline-offset-2 hover:text-ink">{t('Это тот же человек…')}</button>
+          <button className="self-start text-xs text-ink-soft underline underline-offset-2 hover:text-ink">{t('Объединить с другой карточкой…')}</button>
         </PersonPopover>
       )}
       {sameAs && <MergeDialog a={person.id} b={sameAs} onClose={() => setSameAs(null)} />}

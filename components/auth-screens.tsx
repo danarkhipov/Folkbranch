@@ -113,8 +113,8 @@ export function InviteScreen({ token, lang, familyName, name, valid, auto }: { t
         ) : (
           <>
             <Logo size={40} />
-            <h1 className="font-serif text-xl font-medium">{t('Ссылка недействительна')}</h1>
-            <p className="text-ink-soft text-sm">{t('Ссылка устарела или уже использована. Попросите новую.')}</p>
+            <h1 className="font-serif text-xl font-medium">{t('Приглашение больше не работает')}</h1>
+            <p className="text-ink-soft text-sm">{t('Ссылка устарела или уже использована. Попросите того, кто её прислал, отправить новую.')}</p>
           </>
         )}
       </div>
@@ -155,8 +155,8 @@ export function ShareScreen({ token, valid, needsPassword, lang }: { token: stri
       ) : (
         <div className={card}>
           <Logo size={40} />
-          <h1 className="font-serif text-xl font-medium">{t('Ссылка недействительна')}</h1>
-          <p className="text-ink-soft text-sm">{t('Срок ссылки истёк, или её закрыли. Попросите новую.')}</p>
+          <h1 className="font-serif text-xl font-medium">{t('Ссылка больше не работает')}</h1>
+          <p className="text-ink-soft text-sm">{t('Срок ссылки истёк, или её закрыл владелец архива. Попросите того, кто её прислал, отправить новую.')}</p>
         </div>
       )}
     </main>

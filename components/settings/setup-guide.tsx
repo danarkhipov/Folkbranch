@@ -13,7 +13,7 @@ import { TokensTab } from './tokens'
 interface Status { address: string; addressWrong: string | null; insecure: boolean; dataDir: string; freeBytes: number | null; lowDisk: boolean; people: number; users: number; agents: number; assistant: string | null; assistantOn: boolean; google: boolean; yandex: boolean; mcpUrl: string }
 
 type State = 'done' | 'todo' | 'problem' | 'optional'
-const MARK: Record<State, [LucideIcon, string, string]> = { done: [Check, 'text-[#2f7d4f]', 'Готово'], problem: [AlertTriangle, 'text-destructive', 'Нужно исправить'], todo: [Circle, 'text-ink-faint', 'Ещё не сделано'], optional: [Circle, 'text-ink-faint', 'По желанию'] }
+const MARK: Record<State, [LucideIcon, string, string]> = { done: [Check, 'text-[#2f7d4f]', 'Готово'], problem: [AlertTriangle, 'text-destructive', 'Нужно исправить'], todo: [Circle, 'text-ink-faint', 'Ещё не сделано'], optional: [Circle, 'text-ink-faint', ''] }
 
 function Step({ title, state, logos = [], open, onToggle, children }: { title: string; state: State; logos?: BrandName[]; open: boolean; onToggle: () => void; children: React.ReactNode }) {
   const { t } = useApp()
@@ -27,7 +27,7 @@ function Step({ title, state, logos = [], open, onToggle, children }: { title: s
           <ChevronDown size={14} className={`flex-none text-ink-soft transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
         {logos.map((l) => <Brand key={l} name={l} size={15} className="max-sm:hidden text-ink-soft" />)}
-        <span className={`text-xs flex-none ${state === 'problem' ? 'text-destructive' : 'text-ink-soft'}`}>{t(word)}</span>
+        {word && <span className={`text-xs flex-none ${state === 'problem' ? 'text-destructive' : 'text-ink-soft'}`}>{t(word)}</span>}
       </div>
       {open && <div className="flex flex-col gap-2 px-3 pb-3 text-sm">{children}</div>}
     </section>
@@ -48,13 +48,6 @@ export function SetupGuide({ onImport, onFirstPerson, onGo }: { onImport?: () =>
   const gb = s.freeBytes === null ? null : new Intl.NumberFormat(lang, { maximumFractionDigits: 1 }).format(s.freeBytes / 1024 ** 3)
   return (
     <div className="flex min-w-0 flex-col gap-2 text-sm">
-      <Step title="Адрес и хранилище" state={addressState} open={open === 'address' || addressState === 'problem'} onToggle={toggle('address')}>
-        <p><span className="text-ink-soft">{t('Адрес')}:</span> <code className="break-all">{s.address}</code></p>
-        {s.addressWrong && <p role="alert" className="text-destructive break-anywhere">{t('В настройках указан другой адрес, поэтому вход работать не будет')}: <b>{s.addressWrong}</b>. {t('Поменяйте BETTER_AUTH_URL и перезапустите приложение.')}</p>}
-        {s.insecure && <p role="alert" className="text-destructive">{t('Адрес без https: ссылки для входа передаются в открытом виде. На сервере запускайте установку с --domain.')}</p>}
-        <p><span className="text-ink-soft">{t('Данные лежат в')}:</span> <code className="break-all">{s.dataDir}</code>{gb && ` · ${t('свободно')} ${gb} ${t('ГБ')}`}</p>
-        {s.lowDisk && <p role="alert" className="text-destructive">{t('На диске осталось меньше гигабайта. Освободите место, иначе новые файлы не сохранятся.')}</p>}
-      </Step>
       <Step title="Ваша семья" state={s.people ? 'done' : 'todo'} open={open === 'family'} onToggle={toggle('family')}>
         <p className="text-ink-soft">{s.people ? `${t('Людей в архиве')}: ${s.people}.` : t('Добавьте первого человека или загрузите файл GEDCOM, Excel, CSV либо обычный текст.')}</p>
         <div className="flex flex-wrap gap-2">
@@ -62,28 +55,35 @@ export function SetupGuide({ onImport, onFirstPerson, onGo }: { onImport?: () =>
           {onImport && <button type="button" className="add-btn" onClick={onImport}><Upload size={14} /> {t('Загрузить файл')}</button>}
         </div>
       </Step>
-      <Step title="Подключить агента по MCP" state={s.agents ? 'done' : 'optional'} logos={['claudecode', 'codex', 'cursor', 'mcp']} open={open === 'mcp'} onToggle={toggle('mcp')}>
-        <p className="text-ink-soft">{t('Агент сможет читать архив и предлагать правки. Создайте ключ и скопируйте команду для своей программы. На компьютере с установленным приложением хватит одной команды:')} <code>./folkbranch connect</code></p>
-        {onGo ? go('agents', 'Создать ключ') : <><CopyField label={t('Адрес для подключения')} value={s.mcpUrl} /><TokensTab /></>}
-      </Step>
-      <Step title="Встроенный ассистент" state={s.assistant ? (s.assistantOn ? 'done' : 'todo') : 'optional'} logos={['openrouter', 'anthropic', 'openai', 'gemini']} open={open === 'assistant'} onToggle={toggle('assistant')}>
-        {onGo ? <><p className="text-ink-soft">{s.assistant ? `${t('Подключён')}: ${s.assistant}.` : t('Отвечает на вопросы об архиве и вносит правки. Нужен ключ одного из сервисов, платите вы сами этому сервису. Что ассистент читает, уходит туда.')}</p>{go('assistant', 'Открыть настройки ассистента')}</> : s.assistant
-          ? <p className="flex flex-wrap items-center gap-2">{t('Подключён')}: {s.assistant}. {!s.assistantOn && <button type="button" className="bar-btn border border-border" onClick={async () => { await api('settings', { method: 'PATCH', json: { assistantEnabled: '1' } }); qc.invalidateQueries({ queryKey: ['setup'] }) }}>{t('Включить')}</button>}</p>
-          : <><p className="text-ink-soft">{t('Отвечает на вопросы об архиве и вносит правки. Нужен ключ одного из сервисов, платите вы сами этому сервису. Что ассистент читает, уходит туда.')}</p><ProviderForm onDone={async () => { await api('settings', { method: 'PATCH', json: { assistantEnabled: '1' } }); qc.invalidateQueries({ queryKey: ['setup'] }) }} /></>}
-      </Step>
       <Step title="Позвать родственников" state={s.users > 1 ? 'done' : 'optional'} open={open === 'people'} onToggle={toggle('people')}>
         {onGo ? <><p className="text-ink-soft">{t('Пригласите родственников по ссылке, чтобы они смотрели архив и дополняли его.')}</p>{go('people', 'Пригласить человека')}</> : <Access />}
       </Step>
-      <Step title="Вход через Google, Яндекс" state={s.google || s.yandex ? 'done' : 'optional'} logos={['google', 'yandex']} open={open === 'signin'} onToggle={toggle('signin')}>
+      <Step title="Сделать копию" state="optional" open={open === 'copy'} onToggle={toggle('copy')}>
+        <p className="text-ink-soft">{t('Один файл со всем архивом и фотографиями. Из него можно восстановиться на новой установке.')}</p>
+        <Button asChild size="sm" variant="outline" className="self-start"><a href="/api/archive" download><Download /> {t('Скачать полный архив')}</a></Button>
+      </Step>
+      <Step title="Вход: Google, Яндекс" state={s.google || s.yandex ? 'done' : 'optional'} logos={['google', 'yandex']} open={open === 'signin'} onToggle={toggle('signin')}>
         <p className="text-ink-soft">{t('Без этого родственники входят по ссылке-приглашению. Чтобы они могли входить снова сами, создайте доступ у сервиса и добавьте его в настройки приложения.')}</p>
         <ul className="flex flex-col gap-3">
           <li className="flex flex-col gap-1"><span className="flex flex-wrap items-center gap-1.5"><Brand name="google" /> Google: <code>GOOGLE_CLIENT_ID</code>, <code>GOOGLE_CLIENT_SECRET</code></span><CopyField label={t('Адрес возврата')} value={`${s.address}/api/auth/callback/google`} /></li>
           <li className="flex flex-col gap-1"><span className="flex flex-wrap items-center gap-1.5"><Brand name="yandex" className="text-[#fc3f1d]" /> {t('Яндекс')}: <code>YANDEX_CLIENT_ID</code>, <code>YANDEX_CLIENT_SECRET</code></span><CopyField label={t('Адрес возврата')} value={`${s.address}/api/auth/oauth2/callback/yandex`} /></li>
         </ul>
       </Step>
-      <Step title="Сделать копию" state="optional" open={open === 'copy'} onToggle={toggle('copy')}>
-        <p className="text-ink-soft">{t('Один файл со всем архивом и фотографиями. Из него можно восстановиться на новой установке.')}</p>
-        <Button asChild size="sm" variant="outline" className="self-start"><a href="/api/archive" download><Download /> {t('Скачать полный архив')}</a></Button>
+      <Step title="ИИ-ассистент" state={s.assistant ? (s.assistantOn ? 'done' : 'todo') : 'optional'} logos={['openrouter', 'anthropic', 'openai', 'gemini']} open={open === 'assistant'} onToggle={toggle('assistant')}>
+        {onGo ? <><p className="text-ink-soft">{s.assistant ? `${t('Подключён')}: ${s.assistant}.` : t('Отвечает на вопросы об архиве и вносит правки. Нужен ключ одного из сервисов, платите вы сами этому сервису. Что ассистент читает, уходит туда.')}</p>{go('assistant', 'Открыть настройки ассистента')}</> : s.assistant
+          ? <p className="flex flex-wrap items-center gap-2">{t('Подключён')}: {s.assistant}. {!s.assistantOn && <button type="button" className="bar-btn border border-border" onClick={async () => { await api('settings', { method: 'PATCH', json: { assistantEnabled: '1' } }); qc.invalidateQueries({ queryKey: ['setup'] }) }}>{t('Включить')}</button>}</p>
+          : <><p className="text-ink-soft">{t('Отвечает на вопросы об архиве и вносит правки. Нужен ключ одного из сервисов, платите вы сами этому сервису. Что ассистент читает, уходит туда.')}</p><ProviderForm onDone={async () => { await api('settings', { method: 'PATCH', json: { assistantEnabled: '1' } }); qc.invalidateQueries({ queryKey: ['setup'] }) }} /></>}
+      </Step>
+      <Step title="Подключить внешнюю программу" state={s.agents ? 'done' : 'optional'} logos={['claudecode', 'codex', 'cursor', 'mcp']} open={open === 'mcp'} onToggle={toggle('mcp')}>
+        <p className="text-ink-soft">{t('Программа сможет читать архив и предлагать правки. Создайте ключ и скопируйте команду для своей программы. На компьютере с установленным приложением хватит одной команды:')} <code>./folkbranch connect</code></p>
+        {onGo ? go('agents', 'Создать ключ') : <><CopyField label={t('Адрес для подключения')} value={s.mcpUrl} /><TokensTab /></>}
+      </Step>
+      <Step title="Адрес и хранилище" state={addressState} open={open === 'address' || addressState === 'problem'} onToggle={toggle('address')}>
+        <p><span className="text-ink-soft">{t('Адрес')}:</span> <code className="break-all">{s.address}</code></p>
+        {s.addressWrong && <p role="alert" className="text-destructive break-anywhere">{t('В настройках указан другой адрес, поэтому вход работать не будет')}: <b>{s.addressWrong}</b>. {t('Поменяйте BETTER_AUTH_URL и перезапустите приложение.')}</p>}
+        {s.insecure && <p role="alert" className="text-destructive">{t('Адрес без https: ссылки для входа передаются в открытом виде. На сервере запускайте установку с --domain.')}</p>}
+        <p><span className="text-ink-soft">{t('Данные лежат в')}:</span> <code className="break-all">{s.dataDir}</code>{gb && ` · ${t('свободно')} ${gb} ${t('ГБ')}`}</p>
+        {s.lowDisk && <p role="alert" className="text-destructive">{t('На диске осталось меньше гигабайта. Освободите место, иначе новые файлы не сохранятся.')}</p>}
       </Step>
     </div>
   )

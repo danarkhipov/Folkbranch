@@ -2,7 +2,8 @@
 import { useContext, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import dynamic from 'next/dynamic'
-import { History, Maximize2, Minimize2, PencilLine, Search, Trash2, X } from 'lucide-react'
+import { History, Maximize2, Minimize2, MoreHorizontal, PencilLine, Search, Trash2, X } from 'lucide-react'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { api, Presence, useApp, usePersonSave } from '@/lib/client'
 import { yourTerm } from '@/lib/kinship'
@@ -89,7 +90,9 @@ export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { pe
     if (status === 409 || status === 404) {
       notify(t(status === 409 ? 'Это поле только что изменил другой человек. Показано новое значение, проверьте его.' : 'Этого человека только что удалили.'))
       qc.invalidateQueries({ queryKey: ['graph'] })
+      return
     }
+    notify(t('Не сохранилось. Написанное осталось на этом экране. Проверьте интернет и повторите.'), [{ label: t('Повторить'), run: () => patch.mutate(patch.variables as Partial<Person>) }], true)
   })
   /** A name with versions keeps them in step: typing corrects the main one. */
   const saveName = (key: ClaimField) => (v: string) => patch.mutate(person.claims.some((c) => c.field === key) ? editValue(person, key, v) : { [key]: v })
@@ -118,6 +121,7 @@ export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { pe
   const ro = !canEdit
   const [addPatronymic, setAddPatronymic] = useState(false)
   const [suggesting, setSuggesting] = useState(false)
+  const [menu, setMenu] = useState(false)
   // Beside the buttons a long name would break inside its words, so it takes a line of its own.
   const longName = personName(person).length > 28
 
@@ -126,9 +130,9 @@ export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { pe
     <aside ref={box} tabIndex={-1} aria-label={personName(person) || t('Без названия')} className={cn('panel', full && 'full')} style={{ '--panel-w': `${width}px`, '--panel-h': `${height}px` } as React.CSSProperties}>
       <PanelEdge edge="left" label="Ширина карточки" width={width} home={480} onWidth={setWidth} className="max-sm:hidden" />
       <PanelEdge edge="top" label="Высота карточки" width={height} home={Math.round((typeof window === 'undefined' ? 800 : window.innerHeight) * 0.7)} onWidth={setHeight} className="sm:hidden" />
-      <header className={cn('flex flex-none items-start gap-3 pl-4 pr-2 pt-3 pb-2 max-h-[38%] overflow-y-auto', longName && 'flex-wrap')}>
+      <header className={cn('flex flex-none items-start gap-3 pl-4 pr-2 pt-3 pb-2 max-h-[38%] overflow-y-auto max-[360px]:flex-wrap', longName && 'flex-wrap')}>
         <div className="flex-none"><AvatarButton person={person} /></div>
-        <div className={cn('min-w-0 flex-1', longName && 'order-last basis-full')}>
+        <div className={cn('min-w-0 flex-1 max-[360px]:order-last max-[360px]:basis-full', longName && 'order-last basis-full')}>
           <div className="flex flex-wrap items-baseline gap-x-1.5 font-serif text-lg font-medium leading-snug min-w-0">
             <Field fit readOnly={ro} value={person.givenName} placeholder={t('Имя')} onSave={saveName('givenName')} />
             {(person.patronymic || addPatronymic) && <Field id="f-patronymic" fit readOnly={ro} value={person.patronymic} placeholder={t('Отчество')} onSave={saveName('patronymic')} />}
@@ -144,8 +148,16 @@ export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { pe
             {ro && !me.guest && <button className="pick !px-0 flex items-center gap-1 underline underline-offset-2 hover:text-ink" onClick={() => setSuggesting(true)}><PencilLine size={12} /> {t('Предложить правку')}</button>}
           </div>
         </div>
-        <div className="flex flex-none gap-0.5 -mt-1 ml-auto">
-          {canEdit && <button className="bar-btn !p-0 w-7 !h-7 mr-1.5 hover:!text-destructive" aria-label={t('Удалить человека')} title={t('Удалить человека')} onClick={() => onDelete(person.id)}><Trash2 size={14} /></button>}
+        <div className="sticky top-0 z-10 flex flex-none gap-0.5 -mt-1 ml-auto rounded-lg bg-[#fffdf8]">
+          {(canEdit || !me.guest) && (
+            <Popover open={menu} onOpenChange={setMenu}>
+              <PopoverTrigger asChild><button className="bar-btn !p-0 w-7 !h-7" aria-label={t('Ещё')} title={t('Ещё')}><MoreHorizontal size={15} /></button></PopoverTrigger>
+              <PopoverContent align="end" className="flex w-56 flex-col gap-0.5 p-1.5 text-sm">
+                {!me.guest && <button className="flex min-h-9 items-center gap-2 rounded-md px-2 text-left hover:bg-muted" onClick={() => { setMenu(false); setTab('history') }}><History size={15} className="text-ink-soft" /> {t('История изменений')}</button>}
+                {canEdit && <button className="flex min-h-9 items-center gap-2 rounded-md px-2 text-left text-destructive hover:bg-muted" onClick={() => { setMenu(false); onDelete(person.id) }}><Trash2 size={15} /> {t('Удалить человека')}</button>}
+              </PopoverContent>
+            </Popover>
+          )}
           <button className="bar-btn !p-0 w-7 !h-7" aria-label={t(full ? 'Свернуть' : 'Развернуть')} title={t(full ? 'Свернуть' : 'Развернуть')} onClick={() => setFull(!full)}>{full ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</button>
           <button className="bar-btn !p-0 w-7 !h-7" aria-label={t('Закрыть')} title={t('Закрыть')} onClick={onClose}><X size={15} /></button>
         </div>
@@ -169,12 +181,11 @@ export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { pe
       )}
       <Tabs value={tab ?? (pageList && !pageList.length ? (!canEdit ? 'family' : person.birthDate || person.deathDate ? 'details' : 'pages') : 'pages')} onValueChange={setTab} className="flex-1 min-h-0 flex flex-col gap-0">
         <TabsList className="panel-tabs mx-3 w-fit max-w-[calc(100%-1.5rem)] overflow-x-auto justify-start bg-muted">
-          <TabsTrigger value="pages" className="text-sm">{t('Биография')}</TabsTrigger>
           <TabsTrigger value="details" className="text-sm">{t('Сведения')}</TabsTrigger>
+          <TabsTrigger value="pages" className="text-sm">{t('Биография')}</TabsTrigger>
           <TabsTrigger value="family" className="text-sm">{t('Семья')}</TabsTrigger>
           <TabsTrigger value="photos" className="text-sm">{t('Фото')}</TabsTrigger>
           <TabsTrigger value="stories" className="text-sm">{t('Рассказы')}</TabsTrigger>
-          {!me.guest && <TabsTrigger value="history" aria-label={t('История изменений')} title={t('История изменений')} data-hint={t('Кто и что менял в этой карточке. Любое изменение можно откатить.')} className="text-sm"><History size={15} /></TabsTrigger>}
         </TabsList>
         <TabsContent value="pages" className="flex-1 min-h-0 overflow-hidden"><Pages key={pageId} person={person} full={full} startAt={pageId} onDetails={() => go('details')} /></TabsContent>
         <TabsContent value="details" className="flex-1 min-h-0 overflow-auto pt-3">

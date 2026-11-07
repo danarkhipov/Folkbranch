@@ -1,6 +1,7 @@
 'use client'
+import dynamic from 'next/dynamic'
 import { useState } from 'react'
-import { ArrowDownFromLine, ArrowUpFromLine, Check, ChevronsDownUp, ChevronsUpDown, Filter, GitFork, Network, Trash2, UserRound, UsersRound, X, type LucideIcon } from 'lucide-react'
+import { ArrowDownFromLine, ArrowUpFromLine, Check, CircleDot, ChevronsDownUp, ChevronsUpDown, Filter, GitFork, Network, Trash2, UserRound, UsersRound, X, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -8,7 +9,10 @@ import { useApp } from '@/lib/client'
 import type { Scope } from '@/lib/graph/select'
 import { personName } from '@/lib/types'
 import type { ChartScope } from './chart-scope'
-import { Mini, PersonPopover } from './person-pickers'
+import { Mini } from './person-mini'
+
+const PersonPopover = dynamic(() => import('./person-pickers').then((m) => m.PersonPopover), { ssr: false })
+const FanChart = dynamic(() => import('./fan-chart').then((m) => m.FanChart), { ssr: false })
 
 const SCOPES: [Exclude<Scope, 'all'>, string, string, LucideIcon][] = [
   ['ancestors', 'Предки', 'родители, бабушки и дедушки и старше', ArrowUpFromLine],
@@ -21,6 +25,7 @@ export function ViewMenu({ scope }: { scope: ChartScope }) {
   const { t, focusId, me, byId, family, canEdit, notify } = useApp()
   const [name, setName] = useState('')
   const [picked, setPicked] = useState<string | null>(null)
+  const [fan, setFan] = useState<string | null>(null)
   const known = (id: string | null | undefined) => (id && byId.has(id) ? id : null)
   const root = known(picked) ?? known(focusId) ?? known(scope.rootId) ?? known(me.personId)
   const person = root ? byId.get(root)! : null
@@ -57,6 +62,7 @@ export function ViewMenu({ scope }: { scope: ChartScope }) {
             const on = scope.scope === s && scope.rootId === root
             return <button key={s} className={row} disabled={!root} aria-pressed={on} title={root ? undefined : t('Сначала выберите человека')} onClick={() => scope.show({ scope: s, rootId: root })}><Icon size={16} className="flex-none text-ink-soft" />{label(title, line)}{on && <Check size={15} className="flex-none" />}</button>
           })}
+          {root && <button className={row} onClick={() => setFan(root)}><CircleDot size={16} className="flex-none text-ink-soft" />{label('Веер предков', 'все предки на одной картинке')}</button>}
           {canFold && <button className={row} onClick={() => scope.toggleCollapse(root!)}><ChevronsDownUp size={16} className="flex-none text-ink-soft" />{label(scope.collapsed.includes(root!) ? 'Показать потомков' : 'Свернуть потомков', 'только на схеме, данные не меняются')}</button>}
           {scope.views.length > 0 && <h3 className="text-xs text-ink-soft px-2 mt-3">{t('Сохранённые виды')}</h3>}
           {scope.views.map((v) => (
@@ -74,6 +80,7 @@ export function ViewMenu({ scope }: { scope: ChartScope }) {
           {canEdit && Object.keys(scope.pins).length > 0 && <button className={`${row} mt-2`} onClick={() => scope.clearPins().catch(fail)}>{t('Вернуть карточки на их места')}</button>}
         </PopoverContent>
       </Popover>
+      {fan && <FanChart rootId={fan} onClose={() => setFan(null)} />}
       {narrowed && (
         <span className="flex items-center gap-1 pl-1.5 text-sm">
           <span className="max-w-48 truncate">{scope.scope === 'all' ? t('Часть ветвей свёрнута') : `${t(SCOPES.find(([s]) => s === scope.scope)![1])}${shownName ? `: ${shownName}` : ''}`}</span>

@@ -33,7 +33,7 @@ export interface AppCtx {
   openPhoto: (mediaId: string, list?: string[]) => void
   confirm: (text: string, action: string, note?: string) => Promise<boolean>
   quickAdd: (type: QuickType, to: string, otherParent?: string) => void
-  notify: (text: string, actions?: { label: string; run: () => void }[]) => void
+  notify: (text: string, actions?: { label: string; run: () => void }[], stay?: boolean) => void
   /** Rolls back the most recent change that is not already undone. */
   undoLast: () => Promise<void>
 }
@@ -57,9 +57,11 @@ export const useProposals = (enabled: boolean) => useQuery({ queryKey: ['proposa
 
 export function useWrite<V = void, R = unknown>(fn: (v: V) => Promise<R>, also: unknown[][] = [], onError?: (e: Error) => void) {
   const qc = useQueryClient()
+  const app = useContext(App)
   return useMutation({
     mutationFn: fn,
-    onError,
+    // Nothing fails in silence: a person who sees no message believes it worked.
+    onError: onError ?? (() => app?.notify(app.t('Не получилось. Проверьте интернет и попробуйте ещё раз.'), [], true)),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['graph'] })
       qc.invalidateQueries({ queryKey: ['history'] })

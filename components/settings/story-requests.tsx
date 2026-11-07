@@ -49,7 +49,7 @@ export function StoryRequests() {
           <Field label={t('Кого просите')}><Input maxLength={120} placeholder={t('Например, бабушка Нина')} value={tellerName} onChange={(e) => setTellerName(e.target.value)} /></Field>
         </div>
         <Field label={t('Вопрос (необязательно)')}><Input maxLength={400} placeholder={t('Например, как вы познакомились с дедушкой?')} value={question} onChange={(e) => setQuestion(e.target.value)} /></Field>
-        <Button className="self-start" disabled={!personId}><Mic /> {t('Создать ссылку')}</Button>
+        <Button className="self-start" disabled={!personId}><Mic /> {t('Создать ссылку для рассказа')}</Button>
       </form>
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
       {link && <CopyField value={link} primary />}

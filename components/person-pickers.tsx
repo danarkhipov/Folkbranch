@@ -4,20 +4,15 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { api, avatarUrl, useApp } from '@/lib/client'
+import { api, useApp } from '@/lib/client'
 import type { SearchMatch, SearchResult } from '@/lib/search/engine'
 import { markParts } from '@/lib/search/mark'
 import { lifeYears, personName, shownTags, type Person } from '@/lib/types'
+import { Mini } from './person-mini'
 
 export interface SearchHit { personId: string; query: string; matches: SearchMatch[]; terms: string[] }
 
-export function Mini({ person, size = 24 }: { person: Person; size?: number }) {
-  return (
-    <span className="rounded-full overflow-hidden bg-[#e7dfcd] flex-none block" style={{ width: size, height: size }}>
-      <img src={avatarUrl(person)} alt="" className="w-full h-full object-cover" />
-    </span>
-  )
-}
+export { Mini }
 
 const useVisible = (exclude: string[] = []) => {
   const { graph } = useApp()
@@ -106,7 +101,7 @@ export function SearchDialog({ open, onOpenChange, onPick }: { open: boolean; on
   const pick = (r: SearchResult) => { onOpenChange(false); onPick(r.personId, { personId: r.personId, query, matches: r.matches, terms: r.terms }) }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="p-0 overflow-hidden gap-0 max-w-xl sm:max-w-xl" showCloseButton={false}>
+      <DialogContent className="p-0 overflow-hidden gap-0 max-w-xl sm:max-w-xl max-sm:top-3 max-sm:translate-y-0" showCloseButton={false}>
         <DialogTitle className="sr-only">{t('Поиск людей')}</DialogTitle>
         <Command shouldFilter={false} value={active} onValueChange={setActive}>
           <CommandInput value={typed} onValueChange={setTyped} placeholder={t('Имя, дата, место, профессия, «жена Ивана»…')} aria-label={t('Поиск людей')} />
@@ -142,22 +137,6 @@ export function PersonPopover({ children, onPick, exclude, open, onOpenChange }:
   )
 }
 
-export function ConfirmDialog({ state, onClose }: { state: { text: string; action: string; note?: string; resolve: (v: boolean) => void } | null; onClose: () => void }) {
-  const { t } = useApp()
-  const done = (v: boolean) => { state?.resolve(v); onClose() }
-  return (
-    <Dialog open={!!state} onOpenChange={(o) => !o && done(false)}>
-      <DialogContent className="max-w-sm" showCloseButton={false}>
-        <DialogTitle className="font-serif font-medium text-lg">{state?.text}</DialogTitle>
-        {state?.note && <p className="text-sm text-ink-soft">{state.note}</p>}
-        <div className="flex justify-end gap-2 mt-2">
-          <button className="bar-btn" onClick={() => done(false)}>{t('Отмена')}</button>
-          <button className="bar-btn on !bg-destructive" autoFocus onClick={() => done(true)}>{state?.action}</button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
 
 export function useEsc(fn: () => void) {
   const saved = useRef(fn)

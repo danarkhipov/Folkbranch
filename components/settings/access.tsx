@@ -34,7 +34,7 @@ export function Access() {
     <div className="flex min-w-0 flex-col gap-7 text-sm">
       <Section title={t('Пригласить человека')} description={t('Вы получите ссылку и отправите её сами. Она одноразовая и действует 30 дней.')}>
         <form className="flex flex-col gap-3" onSubmit={async (e) => { e.preventDefault(); if (name.trim()) { await makeLink({ name: name.trim(), role, personId }); setName(''); setPersonId(null) } }}>
-          <Field label={t('Имя')}><Input required value={name} onChange={(e) => setName(e.target.value)} /></Field>
+          <Field label={t('Имя')}><Input required placeholder={t('Например, тётя Лена')} value={name} onChange={(e) => setName(e.target.value)} /></Field>
           <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
             <Field label={t('Что сможет делать')} hint={t(roleHelp[role])}><Select aria-label={t('Что сможет делать')} value={role} onChange={(v) => setRole(v as Role)} options={INVITE_ROLES.map((r) => ({ value: r, label: t(roleName[r]) }))} /></Field>
             <div className="flex min-w-0 flex-col gap-1 text-xs text-ink-soft">{t('Карточка на схеме (необязательно)')}
@@ -44,7 +44,7 @@ export function Access() {
               <span className="leading-snug">{t('Схема покажет этому человеку, кем ему приходится каждый.')}</span>
             </div>
           </div>
-          <Button className="self-start" disabled={!name.trim()}><UserPlus /> {t('Создать приглашение')}</Button>
+          <Button className="self-start" disabled={!name.trim()} title={name.trim() ? undefined : t('Сначала введите имя')}><UserPlus /> {t('Создать приглашение')}</Button>
           {link && <CopyField label={t('Отправьте эту ссылку человеку')} value={link} primary />}
         </form>
       </Section>

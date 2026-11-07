@@ -79,7 +79,8 @@ export function useChartView(layout: Layout, panelOpen: boolean, leftInset: numb
 
   const viewport = () => {
     const el = canvas.current!
-    if (!panelOpen) return { w: el.clientWidth, h: el.clientHeight }
+    // On a phone two bars lie over the bottom of the chart, and people belong above them.
+    if (!panelOpen) return { w: el.clientWidth, h: el.clientHeight - (window.innerWidth <= 640 ? 96 : 0) }
     // The editor is a sheet at the bottom on phones, and a side panel elsewhere, as wide or tall as the person dragged it.
     const panel = document.querySelector('.panel')?.getBoundingClientRect()
     if (window.innerWidth <= 640) return { w: el.clientWidth, h: el.clientHeight - (panel?.height ?? el.clientHeight * 0.62) - 8 }

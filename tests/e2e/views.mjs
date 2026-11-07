@@ -43,7 +43,7 @@ ok('the bar says what is shown', await A.getByText('Предки: Иван Со�
 await menu(A); await A.getByRole('button', { name: /^Потомки/ }).click(); await sleep(700); await closeMenu(A)
 ok('descendants bring the partners along', await has(A, 'Анна Соколова') > 0 && await has(A, 'Николай') === 0, `${await cards(A)}`)
 await menu(A)
-await A.getByPlaceholder('Например, мамина ветка').fill('Ветка Ивана')
+await A.getByPlaceholder('Мамина ветка').fill('Ветка Ивана')
 await A.getByRole('button', { name: 'Сохранить', exact: true }).click(); await sleep(500); await closeMenu(A)
 await A.getByRole('button', { name: 'Показать всю семью' }).click(); await sleep(700)
 ok('back to everyone', await cards(A) === total)

@@ -51,8 +51,8 @@ export function GapsList() {
           <button key={r.id} className="block w-full rounded-md px-2 py-1.5 text-left hover:bg-muted" onClick={() => focus(r.id, { center: true })}>
             <span className="block text-sm font-medium">{personName(p) || t('Без названия')}</span>
             {r.conflicts.length > 0 && <span className="block text-xs text-destructive">{t('Версии расходятся')}: {r.conflicts.length}</span>}
-            {r.missing.length > 0 && <span className="block text-xs text-ink-soft">{t('Нет')}: {r.missing.map((k) => t(MISSING[k])).join(', ')}</span>}
-            {r.unsourced > 0 && <span className="block text-xs text-ink-soft">{t('Без источника')}: {r.unsourced}</span>}
+            {r.missing.length > 0 && <span className="block text-xs text-ink-soft">{t('Не указано')}: {r.missing.map((k) => t(MISSING[k])).join(', ')}</span>}
+            {r.unsourced > 0 && <span className="block text-xs text-ink-soft">{t('Нет источников')}: {r.unsourced}</span>}
           </button>
         )
       })}

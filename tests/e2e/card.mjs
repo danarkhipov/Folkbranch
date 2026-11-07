@@ -72,7 +72,7 @@ const scan = (rootSel) => {
   const out = { tabsCut: [], noRoom: [], offPanel: [], cutText: [], cutInput: [], overlap: [], tiny: [], smallTarget: [], rawUrl: [], menuSelect: [], hscroll: [], blank: [] }
   const label = (e) => `${e.tagName.toLowerCase()}${e.getAttribute('aria-label') ? `[${e.getAttribute('aria-label')}]` : ''} "${(e.value ?? e.textContent ?? '').trim().slice(0, 40)}"`
   const seen = (e) => { const s = getComputedStyle(e); if (s.display === 'none' || s.visibility === 'hidden' || e.closest('[hidden]')) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 }
-  const skip = (e) => e.closest('.bn-side-menu, .bn-formatting-toolbar, .panel-edge') || (e.closest('details:not([open])') && !e.closest('summary'))
+  const skip = (e) => e.matches('select[aria-hidden="true"]') || e.closest('.bn-side-menu, .bn-formatting-toolbar, .panel-edge') || (e.closest('details:not([open])') && !e.closest('summary'))
   const all = [...root.querySelectorAll('*')].filter((e) => seen(e) && !skip(e))
   const scroller = (e) => { let p = e.parentElement; while (p && p !== root.parentElement) { const s = getComputedStyle(p); if (/(auto|scroll)/.test(s.overflowX)) return p; p = p.parentElement } return null }
   const mobile = innerWidth < 640
@@ -256,7 +256,7 @@ const ok = (name, good, extra = '') => { works.push({ name, good }); if (!good) 
   await open(cases.longName)
   const name = await panel.getByLabel('Имя').inputValue()
   ok('a long name is all there', name.endsWith('старшего брата'))
-  const [nameBox, bin] = await Promise.all([panel.getByLabel('Имя').boundingBox(), panel.getByRole('button', { name: 'Удалить человека' }).boundingBox()])
+  const [nameBox, bin] = await Promise.all([panel.getByLabel('Имя').boundingBox(), panel.getByRole('button', { name: 'Ещё' }).boundingBox()])
   ok('and clear of the buttons', nameBox.x + nameBox.width <= bin.x || nameBox.y >= bin.y + bin.height)
   await open(cases.heavy, 'Семья')
   ok('a big family shows its first few', await panel.getByRole('button', { name: /Показать всех: 30/ }).count() === 1)

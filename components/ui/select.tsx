@@ -14,7 +14,7 @@ const fromList = (v: string) => (v === EMPTY ? '' : v)
 const LOOK = {
   field: 'h-9 w-full rounded-lg border border-input bg-white pl-3 pr-2.5 text-sm text-ink focus-visible:ring-2 focus-visible:ring-ring/40',
   small: 'h-7 w-full rounded-md border border-input bg-white pl-2 pr-1.5 text-xs text-ink focus-visible:ring-2 focus-visible:ring-ring/40',
-  quiet: 'pick min-h-6 max-w-full flex-none rounded-md pl-1 pr-0.5 text-xs text-ink-soft hover:bg-muted hover:text-ink focus-visible:ring-2 focus-visible:ring-ring/40',
+  quiet: 'pick min-h-6 max-w-full min-w-0 rounded-md pl-1 pr-0.5 text-xs text-ink-soft hover:bg-muted hover:text-ink focus-visible:ring-2 focus-visible:ring-ring/40',
 }
 
 /** The one dropdown of the app: change it here and every list follows. */

@@ -56,7 +56,7 @@ ok('different people are not offered again', await p.getByRole('button', { name:
 // From the card, and what cannot be.
 await p.goto(`${B}/?p=${b}`); await p.locator('aside.panel').waitFor(); await sleep(300)
 await p.getByRole('tab', { name: 'Сведения' }).click(); await sleep(250)
-await p.getByRole('button', { name: 'Это тот же человек…' }).click(); await sleep(250)
+await p.getByRole('button', { name: 'Объединить с другой карточкой…' }).click(); await sleep(250)
 await p.getByRole('option', { name: /Ребёнок/ }).first().click(); await p.getByRole('dialog').waitFor(); await sleep(400)
 const refusal = await p.getByRole('dialog').getByRole('alert').innerText()
 ok('a parent and child cannot be one, and it says why', refusal.includes('предок'), refusal.slice(0, 80))
