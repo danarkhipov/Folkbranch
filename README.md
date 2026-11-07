@@ -65,6 +65,7 @@ Backups, updates and hosting on Railway are in the [self-hosting guide](docs/SEL
 **For the whole family**
 - Invite relatives with a link: no password to remember.
 - Bring in a research case from the [ex-USSR kinship skill](https://github.com/DenisSergeevitch/ex-ussr-kinship-research): what was proved goes on the chart, the rest stays a note.
+- Ask a grandmother for a story with a link: one big button, no account. Her voice waits for your review.
 - Send relatives one file with the chart, cards and photos. It opens with no server or account, and the living stay hidden.
 - Owner, editor and reader roles. Readers can suggest corrections for you to accept.
 - Share a view-only link, with an optional password and an expiry date.

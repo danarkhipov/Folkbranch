@@ -6,6 +6,7 @@ import { queuedAudio } from '@/lib/ops/proposals'
 import * as stories from '@/lib/ops/stories'
 import { searchPeople } from '@/lib/ops/people-search'
 import { addStory } from '@/lib/ops/suggest'
+import * as requests from '@/lib/ops/story-requests'
 import { audioResponse } from '../audio'
 import { dispatch } from '@/lib/ops/proposals'
 import { OPS } from '@/lib/ops/registry'
@@ -21,6 +22,9 @@ export const contentRoutes: Route[] = [
     const file = form.get('audio')
     return addStory(actor, JSON.parse(String(form.get('story') ?? '{}')), file instanceof File ? { buf: Buffer.from(await file.arrayBuffer()), name: file.name } : null)
   }),
+  human('GET', 'story-requests', 'Links asking someone to tell a story', ({ actor }) => requests.listRequests(actor)),
+  human('POST', 'story-requests', 'Ask someone to tell a story, by a link', async ({ actor, body }) => requests.createRequest(actor, await body())),
+  human('DELETE', 'story-requests/:id', 'Close such a link', ({ actor, params }) => requests.closeRequest(actor, params.id)),
   human('PATCH', 'stories/:id', 'Change a story', async ({ actor, params, body }) => stories.updateStory(actor, params.id, await body())),
   human('DELETE', 'stories/:id', 'Delete a story', ({ actor, params }) => stories.deleteStory(actor, params.id)),
   human('GET', 'proposals/:id/ops/:index/audio', 'Hear a story before accepting it', ({ actor, params, req }) => audioResponse(queuedAudio(actor, params.id, Number(params.index)), req)),

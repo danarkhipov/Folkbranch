@@ -237,6 +237,20 @@ export const shareLinks = sqliteTable('share_links', {
   opens: integer('opens').notNull().default(0),
 })
 
+// A link that asks one person to tell about someone: no account, no looking at the archive, only recording.
+export const storyRequests = sqliteTable('story_requests', {
+  id: text('id').primaryKey(),
+  tokenHash: text('token_hash').notNull().unique(),
+  personId: text('person_id').notNull(),
+  tellerName: text('teller_name').notNull().default(''),
+  question: text('question').notNull().default(''),
+  createdBy: text('created_by').notNull(),
+  createdAt: integer('created_at').notNull(),
+  expiresAt: integer('expires_at'),
+  revokedAt: integer('revoked_at'),
+  received: integer('received').notNull().default(0),
+})
+
 // What someone told, in their words, with or without their voice. Never a fact: a fact can cite a story as its source.
 export const stories = sqliteTable('stories', {
   id: text('id').primaryKey(),

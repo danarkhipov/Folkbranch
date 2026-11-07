@@ -72,6 +72,10 @@ Any platform that runs a Dockerfile and gives you a persistent `/data` works the
 
 An empty instance can be claimed only with a code, so a stranger who finds it first cannot take it. `install.sh` prints a link with the code. Otherwise it is in the logs (`docker compose logs folkbranch`) and in `setup-code` in the data folder. After the first person signs up, the code stops mattering.
 
+## Asking for a story
+
+**Settings → Users and access → Ask for a story** makes a link for one person. Whoever has it can only record: they see no one else in the family, and what they send waits for your review. Recording in the browser needs HTTPS, so on a plain address the page offers to pick a sound file instead, such as a voice memo from the phone.
+
 ## Commands
 
 | Command | What it does |

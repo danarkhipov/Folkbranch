@@ -10,6 +10,7 @@ import { List, ListRow, Section } from '@/components/ui/section'
 import { Select } from '@/components/ui/select'
 import { api, useApp } from '@/lib/client'
 import type { ChartView } from '@/lib/ops/views'
+import { StoryRequests } from './story-requests'
 
 interface Share { id: string; name: string; viewId: string | null; hasPassword: boolean; expiresAt: number | null; opens: number }
 
@@ -68,6 +69,7 @@ export function ShareLinks() {
   return (
     <div className="flex min-w-0 flex-col gap-7 text-sm">
       <FamilyFile />
+      <StoryRequests />
       <Section title={t('Ссылка для просмотра')} description={t('Для тех, кому не нужен вход: только смотреть, без регистрации. Живые родственники скрыты, как у читателя.')}>
         <form className="flex flex-col gap-3" onSubmit={async (e) => {
           e.preventDefault()
