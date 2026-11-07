@@ -78,11 +78,16 @@ An empty instance can be claimed only with a code, so a stranger who finds it fi
 
 **Settings → Users and access → Ask for a story** makes a link for one person. Whoever has it can only record: they see no one else in the family, and what they send waits for your review. Recording in the browser needs HTTPS, so on a plain address the page offers to pick a sound file instead, such as a voice memo from the phone.
 
+## A link from your own computer
+
+A link made at home opens only at home. `./folkbranch share` gives the app an address on the internet through a [Cloudflare quick tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/), with no account, and links you make after that lead there, over HTTPS, so recording in the browser works too. It asks first, because it opens a way in from the whole internet: the archive stays behind its sign-in, but Cloudflare carries the traffic. The address changes each time and stops working with `./folkbranch share stop` or when the computer sleeps. For something lasting, use a server.
+
 ## Commands
 
 | Command | What it does |
 |---|---|
 | `./folkbranch open` | Open the app in the browser, signed in as the owner, starting it first if needed |
+| `./folkbranch share`, `share stop` | Give the app an address on the internet for a while, so a relative's link opens |
 | `./folkbranch start`, `stop`, `restart`, `status`, `logs` | Without Docker: run the app and read its log |
 | `./folkbranch connect` | Connect Claude Code or Codex over MCP |
 | `./folkbranch token create --name NAME` | Connect an agent, see [AGENTS.md](AGENTS.md) |

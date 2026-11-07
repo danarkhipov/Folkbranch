@@ -8,13 +8,14 @@ import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { List, ListRow, Section } from '@/components/ui/section'
 import { Select } from '@/components/ui/select'
-import { api, useApp } from '@/lib/client'
+import { api, useApp, useLinkOrigin } from '@/lib/client'
 import { personName, type Role } from '@/lib/types'
 import { PersonPopover } from '../person-pickers'
 import { INVITE_ROLES, ROLES, roleHelp, roleName } from './roles'
 
 export function Access() {
   const { t, me, byId, confirm: ask } = useApp()
+  const origin = useLinkOrigin()
   const qc = useQueryClient()
   const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => api<{ id: string; name: string; role: Role; personId: string | null }[]>('users') })
   const { data: invites = [] } = useQuery({ queryKey: ['invites'], queryFn: () => api<{ id: string; name: string; role: Role }[]>('invites') })
@@ -25,7 +26,7 @@ export function Access() {
   const refresh = () => { qc.invalidateQueries({ queryKey: ['users'] }); qc.invalidateQueries({ queryKey: ['invites'] }) }
   const makeLink = async (json: unknown) => {
     const { token } = await api<{ token: string }>('invites', { json })
-    setLink(`${location.origin}/invite/${token}`)
+    setLink(`${origin}/invite/${token}`)
     refresh()
   }
   const person = personId ? byId.get(personId) : null

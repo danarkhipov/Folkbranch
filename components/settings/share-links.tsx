@@ -8,7 +8,7 @@ import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { List, ListRow, Section } from '@/components/ui/section'
 import { Select } from '@/components/ui/select'
-import { api, useApp } from '@/lib/client'
+import { api, useApp, useLinkOrigin } from '@/lib/client'
 import type { ChartView } from '@/lib/ops/views'
 import { StoryRequests } from './story-requests'
 
@@ -64,6 +64,7 @@ export function ShareLinks() {
   const [password, setPassword] = useState('')
   const [link, setLink] = useState('')
   const [error, setError] = useState('')
+  const origin = useLinkOrigin()
   const refresh = () => qc.invalidateQueries({ queryKey: ['shares'] })
   const date = new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short', year: 'numeric' })
   return (
@@ -76,7 +77,7 @@ export function ShareLinks() {
           setError('')
           try {
             const { token } = await api<{ token: string }>('shares', { json: { name: name.trim(), viewId: viewId || null, expiresInDays: days ? Number(days) : null, ...(password ? { password } : {}) } })
-            setLink(`${location.origin}/share/${token}`)
+            setLink(`${origin}/share/${token}`)
             setName('')
             setPassword('')
             refresh()

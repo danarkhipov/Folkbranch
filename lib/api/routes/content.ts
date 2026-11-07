@@ -5,6 +5,7 @@ import * as pages from '@/lib/ops/pages'
 import { queuedAudio } from '@/lib/ops/proposals'
 import * as stories from '@/lib/ops/stories'
 import { searchPeople } from '@/lib/ops/people-search'
+import { sharedAddress } from '@/lib/public-url'
 import { addStory } from '@/lib/ops/suggest'
 import * as requests from '@/lib/ops/story-requests'
 import { audioResponse } from '../audio'
@@ -22,6 +23,7 @@ export const contentRoutes: Route[] = [
     const file = form.get('audio')
     return addStory(actor, JSON.parse(String(form.get('story') ?? '{}')), file instanceof File ? { buf: Buffer.from(await file.arrayBuffer()), name: file.name } : null)
   }),
+  human('GET', 'link-address', 'The address links should lead to', () => ({ address: sharedAddress() })),
   human('GET', 'story-requests', 'Links asking someone to tell a story', ({ actor }) => requests.listRequests(actor)),
   human('POST', 'story-requests', 'Ask someone to tell a story, by a link', async ({ actor, body }) => requests.createRequest(actor, await body())),
   human('DELETE', 'story-requests/:id', 'Close such a link', ({ actor, params }) => requests.closeRequest(actor, params.id)),

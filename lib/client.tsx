@@ -94,3 +94,9 @@ export const undoFailure = (e: unknown, t: (key: string) => string) =>
 /** The person's photo, or a drawn portrait when there is none. */
 export const avatarUrl = (p: Person) => (p.avatarMediaId ? `/api/v1/persons/${p.id}/avatar?v=${p.updatedAt}` : drawnAvatar(p))
 export const mediaUrl = (id: string, size: 'thumb' | 'medium' | 'orig' = 'medium') => `/api/v1/media/${id}/file?size=${size}`
+
+/** Where a link made now should lead: the outside address while ./folkbranch share is on, or this page's own. */
+export function useLinkOrigin() {
+  const { data } = useQuery({ queryKey: ['link-address'], queryFn: () => api<{ address: string | null }>('link-address') })
+  return data?.address ?? (typeof location === 'undefined' ? '' : location.origin)
+}

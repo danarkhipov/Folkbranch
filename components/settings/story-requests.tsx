@@ -7,7 +7,7 @@ import { CopyField } from '@/components/ui/copy'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { List, ListRow, Section } from '@/components/ui/section'
-import { api, useApp } from '@/lib/client'
+import { api, useApp, useLinkOrigin } from '@/lib/client'
 import { personName } from '@/lib/types'
 import { PersonPopover } from '../person-pickers'
 
@@ -25,7 +25,8 @@ export function StoryRequests() {
   const [error, setError] = useState('')
   const person = graph.persons.find((p) => p.id === personId)
   const refresh = () => qc.invalidateQueries({ queryKey: ['story-requests'] })
-  const hereOnly = typeof location !== 'undefined' && /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
+  const origin = useLinkOrigin()
+  const hereOnly = /^https?:\/\/(localhost|127\.0\.0\.1)(:|$)/.test(origin)
   return (
     <Section title={t('Попросить рассказать')} description={t('Ссылка для одного человека: открыть на телефоне, нажать большую кнопку и говорить. Аккаунт не нужен, архив по ссылке не виден, а запись ждёт вашей проверки.')}>
       <form className="flex flex-col gap-3" onSubmit={async (e) => {
@@ -33,7 +34,7 @@ export function StoryRequests() {
         setError('')
         try {
           const { token } = await api<{ token: string }>('story-requests', { json: { personId, tellerName: tellerName.trim(), question: question.trim() } })
-          setLink(`${location.origin}/tell/${token}`)
+          setLink(`${origin}/tell/${token}`)
           setTellerName('')
           setQuestion('')
           refresh()

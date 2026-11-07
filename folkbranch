@@ -2,7 +2,7 @@
 # Runs a server command inside the running app, for example: ./folkbranch token create --name my-agent
 # ./folkbranch connect   makes a key and connects the agent programs found on this computer over MCP.
 # ./folkbranch open      opens the app in the browser, signed in, starting it first if needed.
-# An install without Docker also has start, stop, restart, status and logs.
+# An install without Docker also has start, stop, restart, status, logs and share.
 cd "$(dirname "$0")" || exit 1
 
 if [ -f .local ]; then
@@ -77,7 +77,75 @@ start() {
   echo "Running at $BETTER_AUTH_URL"
 }
 
+# Is the tunnel ours and alive? As with the app: a number in a file alone proves nothing.
+sharing() {
+  [ -f share.pid ] || return 1
+  spid=$(cat share.pid)
+  [ -n "$spid" ] && ps -p "$spid" -o command= 2>/dev/null | grep -q 'tunnel'
+}
+
+unshare() {
+  if sharing; then kill "$spid" 2>/dev/null; fi
+  rm -f share.pid data/public-address
+}
+
+cloudflared_path() {
+  if [ -n "${FOLKBRANCH_CLOUDFLARED:-}" ]; then printf '%s' "$FOLKBRANCH_CLOUDFLARED"; return; fi
+  if [ -x runtime/cloudflared ]; then printf '%s' "$PWD/runtime/cloudflared"; return; fi
+  case "$(uname -s)-$(uname -m)" in
+    Darwin-arm64) f=cloudflared-darwin-arm64.tgz ;;
+    Darwin-x86_64) f=cloudflared-darwin-amd64.tgz ;;
+    Linux-x86_64) f=cloudflared-linux-amd64 ;;
+    Linux-aarch64|Linux-arm64) f=cloudflared-linux-arm64 ;;
+    *) echo "No tunnel program for this computer." >&2; return 1 ;;
+  esac
+  echo "Getting cloudflared, about 20 MB, kept inside this folder." >&2
+  mkdir -p runtime
+  curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/$f" -o runtime/cloudflared.download || { echo "Could not download it." >&2; return 1; }
+  case "$f" in
+    *.tgz) tar -xzf runtime/cloudflared.download -C runtime cloudflared; rm -f runtime/cloudflared.download ;;
+    *) mv runtime/cloudflared.download runtime/cloudflared ;;
+  esac
+  chmod +x runtime/cloudflared
+  printf '%s' "$PWD/runtime/cloudflared"
+}
+
+# Lets a relative's phone reach this computer, while it stays on. Nothing here decides for the person: the archive
+# gets one more way in from the whole internet, so they say yes to that, in words, every time.
+share() {
+  case "${1:-}" in
+    stop) unshare; echo "The outside address is closed."; return 0 ;;
+    status) if sharing; then cat data/public-address; echo; else echo "Not shared."; return 1; fi; return 0 ;;
+  esac
+  if sharing; then echo "Already shared at: $(cat data/public-address)"; return 0; fi
+  echo "This gives the app an address on the internet, through Cloudflare, until you run ./folkbranch share stop."
+  echo "The archive stays behind its sign-in, but Cloudflare carries the traffic, and anyone with a link you made can use it."
+  if [ "${1:-}" != --yes ]; then
+    if [ ! -t 0 ]; then echo "Say yes first: ./folkbranch share --yes"; return 1; fi
+    printf "Open it? Type yes: "
+    read -r answer
+    [ "$answer" = yes ] || { echo "Nothing was opened."; return 1; }
+  fi
+  start >/dev/null || { echo "The app did not start: ./folkbranch start"; return 1; }
+  tool=$(cloudflared_path) || return 1
+  mkdir -p logs
+  : > logs/share.log
+  nohup "$tool" tunnel --no-autoupdate --url "http://$host:$PORT" </dev/null >> logs/share.log 2>&1 &
+  echo $! > share.pid
+  i=0
+  until addr=$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' logs/share.log | head -n 1) && [ -n "$addr" ]; do
+    i=$((i + 1))
+    if ! sharing || [ "$i" -gt 40 ]; then echo "The tunnel did not open. The end of logs/share.log:"; tail -n 8 logs/share.log; unshare; return 1; fi
+    sleep 1
+  done
+  printf '%s' "$addr" > data/public-address
+  echo
+  echo "Outside address: $addr"
+  echo "Links you make in the app now lead there. It changes each time. To close it: ./folkbranch share stop"
+}
+
 stop() {
+  unshare
   if ! running; then rm -f folkbranch.pid; echo "Not running."; return 0; fi
   kill "$pid"
   i=0
@@ -177,11 +245,13 @@ if [ -f .local ]; then
     restart) stop && start; exit $? ;;
     status) status; exit $? ;;
     logs) logs; exit $? ;;
+    share) share "${2:-}"; exit $? ;;
     ''|help|--help)
       echo "Folkbranch, this computer"
       echo
       echo "  open               Open the app in the browser, signed in"
       echo "  start, stop, restart, status, logs"
+      echo "  share              Give the app an address on the internet, so a relative's link opens"
       echo "  connect            Connect Claude Code or Codex over MCP"
       echo
       ;;
