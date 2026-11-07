@@ -25,7 +25,7 @@ Run one command. On a Mac or Linux it needs nothing else: no Docker, and no Node
 curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh
 ```
 
-It downloads the app (15 MB, or about 40 MB with Node, and about 80 or 200 MB on disk), starts it and prints a link. Open it, name your family, and load the demo family if you want to look around first. The app then shows what is set up and what is optional.
+It downloads the app (23 MB, or about 48 MB with Node, and about 90 or 210 MB on disk), starts it and prints a link. Open it, name your family, and load the demo family if you want to look around first. The app then shows what is set up and what is optional.
 
 On a server with a domain, with Docker and automatic HTTPS (a 115 MB image):
 
@@ -140,7 +140,7 @@ Only people you invite. The site is closed to search engines, photos need a sign
 Not by itself. Connecting an AI provider sends what the assistant reads to that provider, and the app warns you first. Smart features can download models to the browser the first time you use them: speech from jsDelivr and Hugging Face, face finding from Google. Face recognition comes from your own server. Your photos and recordings are not sent anywhere.
 
 **What does it need to run?**
-A Mac or Linux computer and about 200 MB of memory; nothing to install first. Docker is an option, and on Windows the only way for now. It runs on a home computer, a small server or Railway.
+A Mac or Linux computer and about 200 MB of memory; nothing to install first. Docker is an option, and the proven way on Windows. It runs on a home computer, a small server or Railway.
 
 **How do I back it up?**
 Download a full copy under **Settings → Import and export**, or run `./folkbranch backup`. The server also copies the database before each update that changes it.

@@ -39,7 +39,9 @@ describe('the brand', () => {
     const pinned = Number(readFileSync('install.sh', 'utf8').match(/^NODE_VERSION=(\d+)\./m)?.[1])
     expect(pinned).toBeGreaterThanOrEqual(Number(JSON.parse(readFileSync('package.json', 'utf8')).engines.node.replace('>=', '')))
     const release = readFileSync('.github/workflows/release.yml', 'utf8')
-    for (const runner of ['macos-latest', 'macos-15-intel', 'ubuntu-latest', 'ubuntu-24.04-arm']) expect(release).toContain(runner)
+    for (const runner of ['macos-latest', 'macos-15-intel', 'ubuntu-latest', 'ubuntu-24.04-arm', 'windows-latest']) expect(release).toContain(runner)
+    const windows = readFileSync('install.ps1', 'utf8').match(/\$NodeVersion = '(.*)'/)?.[1]
+    expect(windows).toBe(readFileSync('install.sh', 'utf8').match(/^NODE_VERSION=(.*)$/m)?.[1])
   })
 
   it('keeps the two kinds of install apart, so an update never leaves the data behind', () => {

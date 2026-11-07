@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 
 const args = process.argv.slice(2)
 if (process.platform === 'win32') {
-  console.log('On Windows, install with PowerShell or Docker: https://github.com/danarkhipov/Folkbranch#install')
+  console.log('On Windows, run this in PowerShell: irm https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.ps1 | iex')
   process.exit(1)
 }
 

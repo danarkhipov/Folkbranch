@@ -10,8 +10,8 @@ It needs nothing installed first, on macOS or Linux. The command picks the light
 
 | What the computer has | What it does | Download | On disk |
 |---|---|---|---|
-| Node 24 or newer | Uses that Node | 15 MB | about 80 MB |
-| No suitable Node | Brings its own, checked against Node's published checksums and kept inside the folder | about 40 MB | about 200 MB |
+| Node 24 or newer | Uses that Node | 23 MB | about 90 MB |
+| No suitable Node | Brings its own, checked against Node's published checksums and kept inside the folder | about 48 MB | about 210 MB |
 | Anything, with `--docker` | Runs the Docker image, as on a server | 115 MB | more, with Docker itself |
 
 With Node at hand, `npx folkbranch` runs the same installer, and later `npx folkbranch` opens the app and `npx folkbranch stop` stops it.
@@ -26,7 +26,9 @@ cd ~/folkbranch && ./folkbranch open
 
 To remove it, `./folkbranch stop`, then delete the folder. That deletes the archive too, so download a copy first.
 
-A folder stays the kind of install it is, so an update cannot leave your data behind. To move between them, download a full copy in the app, install into another folder and restore it there. Native Windows, Alpine Linux and other systems with no ready build use `--docker`.
+A folder stays the kind of install it is, so an update cannot leave your data behind. To move between them, download a full copy in the app, install into another folder and restore it there. Alpine Linux and other systems with no ready build use `--docker`.
+
+**Windows, not proven yet.** In PowerShell: `irm https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.ps1 | iex`. It works the same way, with `.\\folkbranch` for the commands, except `share`. It is checked on a Windows machine only when a release is built, and has not been through one yet. Docker Desktop is the proven way on Windows.
 
 ## On a server with a domain
 

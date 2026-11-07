@@ -15,12 +15,14 @@ fs.rmSync(stage, { recursive: true, force: true })
 fs.mkdirSync(dist, { recursive: true })
 
 // Links inside node_modules stay links, or the archive doubles and the driver stops resolving.
-const copy = (from, to) => fs.cpSync(from, path.join(stage, to), { recursive: true, verbatimSymlinks: true, force: true })
+// Windows may not allow links, and a zip keeps none: there each is a real copy.
+const windows = process.platform === 'win32'
+const copy = (from, to) => fs.cpSync(from, path.join(stage, to), { recursive: true, force: true, ...(windows ? { dereference: true } : { verbatimSymlinks: true }) })
 copy(standalone, '.')
 copy('.next/static', '.next/static')
 copy('public', 'public')
 copy('drizzle', 'drizzle')
-for (const f of ['folkbranch', 'LICENSE']) copy(f, f)
+for (const f of ['folkbranch', 'folkbranch.ps1', 'folkbranch.cmd', 'LICENSE']) copy(f, f)
 copy('scripts/folkbranch.mjs', 'folkbranch.mjs')
 
 // Left over from the build. The speech runtime's large file comes from its CDN when someone turns speech on (lib/smart/speech.ts),
@@ -35,7 +37,8 @@ const pnpmDir = path.join(stage, 'node_modules/.pnpm')
 const driver = fs.readdirSync(pnpmDir).find((d) => d.startsWith('better-sqlite3@'))
 if (!driver) { console.error('The database driver is not in the build.'); process.exit(1) }
 fs.rmSync(path.join(stage, 'node_modules/better-sqlite3'), { recursive: true, force: true })
-fs.symlinkSync(`.pnpm/${driver}/node_modules/better-sqlite3`, path.join(stage, 'node_modules/better-sqlite3'))
+if (windows) copy(path.join(standalone, 'node_modules/.pnpm', driver, 'node_modules/better-sqlite3'), 'node_modules/better-sqlite3')
+else fs.symlinkSync(`.pnpm/${driver}/node_modules/better-sqlite3`, path.join(stage, 'node_modules/better-sqlite3'))
 execFileSync(process.execPath, ['-e', "require('better-sqlite3'); require('sharp')"], { cwd: stage, stdio: 'inherit' })
 
 // This archive is public. A family's files must never reach it, whatever the build picked up.
@@ -50,12 +53,15 @@ const scan = (dir) => {
 scan(stage)
 
 const pack = (ext, flag) => {
-  const file = path.join(dist, `${name}.tar.${ext}`)
-  execFileSync('tar', [flag, file, '-C', dist, name], { env: { ...process.env, COPYFILE_DISABLE: '1', XZ_OPT: '-6' } })
+  const file = path.join(dist, ext === 'zip' ? `${name}.zip` : `${name}.tar.${ext}`)
+  execFileSync('tar', [...flag.split(' '), file, '-C', dist, name], { env: { ...process.env, COPYFILE_DISABLE: '1', XZ_OPT: '-6' } })
   const sum = createHash('sha256').update(fs.readFileSync(file)).digest('hex')
   fs.writeFileSync(`${file}.sha256`, `${sum}  ${path.basename(file)}\n`)
   console.log(`${file}  ${(fs.statSync(file).size / 1048576).toFixed(1)} MB`)
 }
-pack('xz', '-cJf')
-pack('gz', '-czf')
+if (windows) pack('zip', '-a -cf')
+else {
+  pack('xz', '-cJf')
+  pack('gz', '-czf')
+}
 fs.rmSync(stage, { recursive: true, force: true })

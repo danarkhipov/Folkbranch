@@ -34,6 +34,10 @@ Open it later, signed in and started if it was stopped: `cd ~/folkbranch && ./fo
 
 Update: run the install command again. Everything else: `./folkbranch help`, and `docs/SELF_HOSTING.md` in the repository.
 
+## The first minutes
+
+Once they have named the family and this agent is connected, ask what they already know: names, years, who is whose. Add it with `import_text` so they watch the chart grow in the browser, and it waits for their review. Do not guess what they did not say.
+
 ## A research case
 
 If the ex-ussr-kinship-research skill made a case folder, bring it in with the `import_kinship_case` tool: pass `case_id` from `case-intake.yaml` as `caseId` and the text of `person-register.csv`, `relationship-register.csv`, `claims-register.csv` and `artifact-register.csv`, nothing else from the folder. The person can also pick the folder under Settings > Files. Candidates stay separate cards, unproved relations stay notes, and edits wait for review. Importing again adds only what is new. Do not merge a new card with an old one by name: that is the person's decision.

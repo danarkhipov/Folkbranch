@@ -51,7 +51,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-latest, macos-15-intel, ubuntu-latest, ubuntu-24.04-arm]
+        runner: [macos-latest, macos-15-intel, ubuntu-latest, ubuntu-24.04-arm, windows-latest]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7
@@ -64,11 +64,22 @@ jobs:
       - run: pnpm build
       - run: node scripts/make-bundle.mjs
       - name: The archive installs and answers
+        if: runner.os != 'Windows'
         run: |
           FOLKBRANCH_BUNDLE="file://$(ls "$PWD"/dist/folkbranch-*.tar.gz)" sh install.sh --local --dir "$RUNNER_TEMP/folkbranch" --port 3000
           curl -fs http://127.0.0.1:3000/api/health
           "$RUNNER_TEMP/folkbranch/folkbranch" stop
+      - name: The Windows archive installs and answers
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $env:FOLKBRANCH_BUNDLE = (Get-ChildItem dist\\folkbranch-*.zip | Select-Object -First 1).FullName
+          $env:FOLKBRANCH_DIR = Join-Path $env:RUNNER_TEMP 'folkbranch'
+          .\\install.ps1
+          Invoke-WebRequest http://127.0.0.1:3000/api/health -UseBasicParsing
+          & (Join-Path $env:FOLKBRANCH_DIR 'folkbranch.cmd') stop
       - name: Attach to the release
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$GITHUB_REF_NAME" dist/folkbranch-* --clobber
