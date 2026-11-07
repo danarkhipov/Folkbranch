@@ -5,6 +5,7 @@ import { api, useApp, useWrite } from '@/lib/client'
 import { lifeYears, personName, type Certainty, type Person, type Union } from '@/lib/types'
 import { Mini } from './person-pickers'
 import { Field, CERTAINTY, DateField, Segmented } from './person-fields'
+import { Select } from '@/components/ui/select'
 
 /** A big family shows its first few; the rest are one press away. */
 const SHOWN = 8
@@ -36,14 +37,10 @@ export function FamilyTab({ person }: { person: Person }) {
     )
   }
   const kindToggle = (l: { id: string; kind: string; certainty: string }, female: boolean, stepWord = 'отчим или мачеха') => canEdit && (
-    <select title={t('Родство')} aria-label={t('Родство')} value={`${l.kind}:${l.certainty}`} className="pick bg-transparent text-xs max-sm:text-sm text-ink-soft min-w-0 max-w-full rounded hover:bg-background" onChange={(e) => {
-      const [kind, certainty] = e.target.value.split(':')
+    <Select look="quiet" title={t('Родство')} aria-label={t('Родство')} value={`${l.kind}:${l.certainty}`} onChange={(v) => {
+      const [kind, certainty] = v.split(':')
       setCertainty.mutate({ type: 'parent', id: l.id, kind, certainty })
-    }}>
-      {(['birth', 'adopted', 'step'] as const).flatMap((k) => (Object.keys(CERTAINTY) as Certainty[]).map((c) => (
-        <option key={`${k}:${c}`} value={`${k}:${c}`}>{t(k === 'birth' ? (female ? 'родная' : 'родной') : k === 'adopted' ? (female ? 'приёмная' : 'приёмный') : stepWord)} · {t(CERTAINTY[c])}</option>
-      )))}
-    </select>
+    }} options={(['birth', 'adopted', 'step'] as const).flatMap((k) => (Object.keys(CERTAINTY) as Certainty[]).map((c) => ({ value: `${k}:${c}`, label: `${t(k === 'birth' ? (female ? 'родная' : 'родной') : k === 'adopted' ? (female ? 'приёмная' : 'приёмный') : stepWord)} · ${t(CERTAINTY[c])}` })))} />
   )
   const group = (title: string, items: React.ReactNode[], add?: [string, string]) => (!canEdit && !items.length ? null : (
     <section className="mb-4">

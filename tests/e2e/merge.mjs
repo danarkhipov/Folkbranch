@@ -18,7 +18,7 @@ const errs = []
 const ctx = await br.newContext({ viewport: { width: 1440, height: 900 } }); await ctx.addCookies(cookiesOf(cookie))
 const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(e.message.slice(0, 160)))
 await p.goto(B + '/'); await p.locator('.pcard').first().waitFor({ timeout: 20000 }); await sleep(500)
-await p.locator('nav[aria-label="Главное меню"]').getByRole('button', { name: /История/ }).click(); await sleep(300)
+await p.locator('nav[aria-label="Главное меню"]').getByRole('button', { name: /Проверка/ }).click(); await sleep(300)
 await p.getByRole('radio', { name: 'Похожие' }).click(); await sleep(500)
 ok('the pair is found', await p.getByRole('button', { name: 'Сравнить' }).count() === 1)
 ok('with the reason', await p.getByText('Совпадает').first().innerText().then((x) => x.includes('год рождения')))
@@ -48,7 +48,7 @@ ok('one press brings both back', back.persons.length === 3 && back.persons.find(
 
 // Told they are different people, it stops asking.
 await p.reload(); await p.locator('.pcard').first().waitFor(); await sleep(400)
-await p.locator('nav[aria-label="Главное меню"]').getByRole('button', { name: /История/ }).click(); await sleep(300)
+await p.locator('nav[aria-label="Главное меню"]').getByRole('button', { name: /Проверка/ }).click(); await sleep(300)
 await p.getByRole('radio', { name: 'Похожие' }).click(); await sleep(500)
 await p.getByRole('button', { name: 'Это разные люди' }).click(); await sleep(500)
 ok('different people are not offered again', await p.getByRole('button', { name: 'Сравнить' }).count() === 0 && await p.getByText('Похожих людей не нашлось').count() === 1)

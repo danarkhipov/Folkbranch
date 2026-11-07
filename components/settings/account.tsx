@@ -1,10 +1,12 @@
 'use client'
-import { LogOut } from 'lucide-react'
+import { ChevronsUpDown, LogOut, MonitorX, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Section } from '@/components/ui/section'
 import { api, useApp } from '@/lib/client'
 import { personName } from '@/lib/types'
 import { Brand } from '../brand-icons'
 import { PersonPopover } from '../person-pickers'
-import { roleHelp } from './roles'
+import { roleHelp, roleName } from './roles'
 
 /** Who I am here: my card on the chart, how I get back in, where I am signed in. */
 export function Account({ providers }: { providers: { google: boolean; yandex: boolean } }) {
@@ -19,43 +21,32 @@ export function Account({ providers }: { providers: { google: boolean; yandex: b
     }
   }
   return (
-    <div className="flex flex-col gap-5 text-sm">
-      <section className="flex flex-col gap-1">
-        <h3 className="text-base font-medium">{me.name}</h3>
-        <p className="text-xs text-ink-soft">{t(roleHelp[me.role])}</p>
-      </section>
+    <div className="flex min-w-0 flex-col gap-7 text-sm">
+      <Section title={`${me.name} · ${t(roleName[me.role])}`} description={t(roleHelp[me.role])} />
       {me.role !== 'reader' && (
-        <section className="flex flex-col gap-1.5">
-          <h3 className="text-base font-medium">{t('Моя карточка на схеме')}</h3>
-          <p className="text-xs text-ink-soft">{t('Выберите себя, и схема покажет, кем вам приходится каждый человек. Подойдёт только живой человек.')}</p>
-          <div className="flex items-center gap-2">
+        <Section title={t('Моя карточка на схеме')} description={t('Выберите себя, и схема покажет, кем вам приходится каждый человек. Подойдёт только живой человек.')}>
+          <div className="flex flex-wrap items-center gap-2">
             <PersonPopover onPick={claim} exclude={[...byId.values()].filter((p) => !p.living || p.deathDate).map((p) => p.id)}>
-              <button type="button" className="h-9 max-w-64 truncate rounded-lg border border-input bg-white px-3">{mine ? personName(mine) : t('Выбрать свою карточку')}</button>
+              <button type="button" className="flex h-9 min-w-48 max-w-64 items-center justify-between gap-1.5 rounded-lg border border-input bg-white pl-3 pr-2.5 text-left"><span className="truncate">{mine ? personName(mine) : t('Выбрать свою карточку')}</span><ChevronsUpDown size={14} className="flex-none text-ink-soft" /></button>
             </PersonPopover>
-            {mine && <button type="button" className="text-xs text-ink-soft underline" onClick={() => claim(null)}>{t('Убрать')}</button>}
+            {mine && <Button type="button" size="sm" variant="ghost" onClick={() => claim(null)}><X /> {t('Убрать')}</Button>}
           </div>
-        </section>
+        </Section>
       )}
       {(providers.google || providers.yandex) && (
-        <section className="flex flex-col gap-1.5">
-          <h3 className="text-base font-medium">{t('Вход без ссылки')}</h3>
-          <p className="text-xs text-ink-soft">{t('Привяжите аккаунт, чтобы входить снова без новой ссылки.')}</p>
+        <Section title={t('Вход без ссылки')} description={t('Привяжите аккаунт, чтобы входить снова без новой ссылки.')}>
           <div className="flex flex-wrap gap-2">
-            {providers.google && <button className="bar-btn border border-border" onClick={() => linkAccount('/api/auth/link-social', { provider: 'google', callbackURL: '/' })}><Brand name="google" /> {t('Привязать Google')}</button>}
-            {providers.yandex && <button className="bar-btn border border-border" onClick={() => linkAccount('/api/auth/oauth2/link', { providerId: 'yandex', callbackURL: '/' })}><Brand name="yandex" className="text-[#fc3f1d]" /> {t('Привязать Яндекс ID')}</button>}
+            {providers.google && <Button variant="outline" onClick={() => linkAccount('/api/auth/link-social', { provider: 'google', callbackURL: '/' })}><Brand name="google" /> {t('Привязать Google')}</Button>}
+            {providers.yandex && <Button variant="outline" onClick={() => linkAccount('/api/auth/oauth2/link', { providerId: 'yandex', callbackURL: '/' })}><Brand name="yandex" className="text-[#fc3f1d]" /> {t('Привязать Яндекс ID')}</Button>}
           </div>
-        </section>
+        </Section>
       )}
-      <section className="flex flex-col gap-1.5">
-        <h3 className="text-base font-medium">{t('Устройства')}</h3>
-        <p className="text-xs text-ink-soft">{t('Если потеряли телефон или входили на чужом компьютере. Выйдут все устройства, кроме этого.')}</p>
-        <button type="button" className="bar-btn self-start border border-border" onClick={async () => { await fetch('/api/auth/revoke-other-sessions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); notify(t('Другие устройства отключены')) }}>{t('Выйти на других устройствах')}</button>
-      </section>
-      <section className="flex flex-col gap-1.5">
-        <h3 className="text-base font-medium">{t('Выход')}</h3>
-        <p className="text-xs text-ink-soft">{t('Войти снова можно будет по новой ссылке или через Google и Яндекс, если вы их подключили.')}</p>
-        <button type="button" className="bar-btn self-start border border-border" onClick={async () => { await fetch('/api/auth/sign-out', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); location.href = '/login' }}><LogOut size={14} /> {t('Выйти с этого устройства')}</button>
-      </section>
+      <Section title={t('Устройства')} description={t('Если потеряли телефон или входили на чужом компьютере, выйдите на других устройствах. Вернуться можно по новой ссылке или через привязанный аккаунт.')}>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={async () => { await fetch('/api/auth/revoke-other-sessions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); notify(t('Другие устройства отключены')) }}><MonitorX /> {t('Выйти на других устройствах')}</Button>
+          <Button type="button" variant="outline" onClick={async () => { await fetch('/api/auth/sign-out', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); location.href = '/login' }}><LogOut /> {t('Выйти с этого устройства')}</Button>
+        </div>
+      </Section>
     </div>
   )
 }

@@ -1,7 +1,9 @@
 'use client'
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, Check, ChevronDown, Circle, Download, Upload, UserPlus, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Check, ChevronDown, Circle, Download, Upload, UserPlus, type LucideIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { CopyField } from '@/components/ui/copy'
 import { api, useApp } from '@/lib/client'
 import { ProviderForm } from '../assistant-setup'
 import { Brand, type BrandName } from '../brand-icons'
@@ -33,13 +35,15 @@ function Step({ title, state, logos = [], open, onToggle, children }: { title: s
 }
 
 /** Everything the app needs, one step each, with what is missing saying so. Each step can be skipped and come back to. */
-export function SetupGuide({ onImport, onFirstPerson }: { onImport?: () => void; onFirstPerson?: () => void }) {
+export function SetupGuide({ onImport, onFirstPerson, onGo }: { onImport?: () => void; onFirstPerson?: () => void; onGo?: (section: 'people' | 'assistant' | 'agents' | 'data') => void }) {
   const { t, lang } = useApp()
   const qc = useQueryClient()
   const { data: s } = useQuery({ queryKey: ['setup'], queryFn: () => api<Status>('setup/status') })
   const [open, setOpen] = useState<string | null>(null)
   if (!s) return <div className="h-40" />
   const toggle = (id: string) => () => setOpen(open === id ? null : id)
+  // In the settings a step leads to its own screen; the same form is not repeated here.
+  const go = (section: 'people' | 'assistant' | 'agents' | 'data', label: string) => <Button type="button" size="sm" variant="outline" className="self-start" onClick={() => onGo!(section)}>{t(label)} <ArrowRight /></Button>
   const addressState: State = s.addressWrong || s.insecure || s.lowDisk ? 'problem' : 'done'
   const gb = s.freeBytes === null ? null : new Intl.NumberFormat(lang, { maximumFractionDigits: 1 }).format(s.freeBytes / 1024 ** 3)
   return (
@@ -60,27 +64,26 @@ export function SetupGuide({ onImport, onFirstPerson }: { onImport?: () => void;
       </Step>
       <Step title="Подключить агента по MCP" state={s.agents ? 'done' : 'optional'} logos={['claudecode', 'codex', 'cursor', 'mcp']} open={open === 'mcp'} onToggle={toggle('mcp')}>
         <p className="text-ink-soft">{t('Агент сможет читать архив и предлагать правки. Создайте ключ и скопируйте команду для своей программы. На компьютере с установленным приложением хватит одной команды:')} <code>./folkbranch connect</code></p>
-        <p><span className="text-ink-soft">{t('Адрес для подключения')}:</span> <code className="break-all">{s.mcpUrl}</code></p>
-        <TokensTab />
+        {onGo ? go('agents', 'Создать ключ') : <><CopyField label={t('Адрес для подключения')} value={s.mcpUrl} /><TokensTab /></>}
       </Step>
       <Step title="Встроенный ассистент" state={s.assistant ? (s.assistantOn ? 'done' : 'todo') : 'optional'} logos={['openrouter', 'anthropic', 'openai', 'gemini']} open={open === 'assistant'} onToggle={toggle('assistant')}>
-        {s.assistant
+        {onGo ? <><p className="text-ink-soft">{s.assistant ? `${t('Подключён')}: ${s.assistant}.` : t('Отвечает на вопросы об архиве и вносит правки. Нужен ключ одного из сервисов, платите вы сами этому сервису. Что ассистент читает, уходит туда.')}</p>{go('assistant', 'Открыть настройки ассистента')}</> : s.assistant
           ? <p className="flex flex-wrap items-center gap-2">{t('Подключён')}: {s.assistant}. {!s.assistantOn && <button type="button" className="bar-btn border border-border" onClick={async () => { await api('settings', { method: 'PATCH', json: { assistantEnabled: '1' } }); qc.invalidateQueries({ queryKey: ['setup'] }) }}>{t('Включить')}</button>}</p>
           : <><p className="text-ink-soft">{t('Отвечает на вопросы об архиве и вносит правки. Нужен ключ одного из сервисов, платите вы сами этому сервису. Что ассистент читает, уходит туда.')}</p><ProviderForm onDone={async () => { await api('settings', { method: 'PATCH', json: { assistantEnabled: '1' } }); qc.invalidateQueries({ queryKey: ['setup'] }) }} /></>}
       </Step>
       <Step title="Позвать родственников" state={s.users > 1 ? 'done' : 'optional'} open={open === 'people'} onToggle={toggle('people')}>
-        <Access />
+        {onGo ? <><p className="text-ink-soft">{t('Пригласите родственников по ссылке, чтобы они смотрели архив и дополняли его.')}</p>{go('people', 'Пригласить человека')}</> : <Access />}
       </Step>
       <Step title="Вход через Google, Яндекс" state={s.google || s.yandex ? 'done' : 'optional'} logos={['google', 'yandex']} open={open === 'signin'} onToggle={toggle('signin')}>
         <p className="text-ink-soft">{t('Без этого родственники входят по ссылке-приглашению. Чтобы они могли входить снова сами, создайте доступ у сервиса и добавьте его в настройки приложения.')}</p>
-        <ul className="flex flex-col gap-1.5">
-          <li className="flex flex-wrap items-center gap-1.5"><Brand name="google" /> Google: <code>GOOGLE_CLIENT_ID</code>, <code>GOOGLE_CLIENT_SECRET</code>. {t('Адрес возврата')}: <code className="break-all">{s.address}/api/auth/callback/google</code></li>
-          <li className="flex flex-wrap items-center gap-1.5"><Brand name="yandex" className="text-[#fc3f1d]" /> {t('Яндекс')}: <code>YANDEX_CLIENT_ID</code>, <code>YANDEX_CLIENT_SECRET</code>. {t('Адрес возврата')}: <code className="break-all">{s.address}/api/auth/oauth2/callback/yandex</code></li>
+        <ul className="flex flex-col gap-3">
+          <li className="flex flex-col gap-1"><span className="flex flex-wrap items-center gap-1.5"><Brand name="google" /> Google: <code>GOOGLE_CLIENT_ID</code>, <code>GOOGLE_CLIENT_SECRET</code></span><CopyField label={t('Адрес возврата')} value={`${s.address}/api/auth/callback/google`} /></li>
+          <li className="flex flex-col gap-1"><span className="flex flex-wrap items-center gap-1.5"><Brand name="yandex" className="text-[#fc3f1d]" /> {t('Яндекс')}: <code>YANDEX_CLIENT_ID</code>, <code>YANDEX_CLIENT_SECRET</code></span><CopyField label={t('Адрес возврата')} value={`${s.address}/api/auth/oauth2/callback/yandex`} /></li>
         </ul>
       </Step>
       <Step title="Сделать копию" state="optional" open={open === 'copy'} onToggle={toggle('copy')}>
         <p className="text-ink-soft">{t('Один файл со всем архивом и фотографиями. Из него можно восстановиться на новой установке.')}</p>
-        <a className="add-btn self-start" href="/api/archive" download><Download size={14} /> {t('Скачать полный архив')}</a>
+        <Button asChild size="sm" variant="outline" className="self-start"><a href="/api/archive" download><Download /> {t('Скачать полный архив')}</a></Button>
       </Step>
     </div>
   )

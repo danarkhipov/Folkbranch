@@ -148,6 +148,8 @@ export interface HistoryEntry {
   at: number
   actorName: string
   summary: string
+  /** What exactly changed, in words. Not sent to readers. */
+  details?: { label: string; before: string | null; after: string | null }[]
   personIds: string[]
   undoOf: string | null
   undoneAt: number | null

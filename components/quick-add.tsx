@@ -5,6 +5,8 @@ import { api, useApp, useWrite, type QuickType } from '@/lib/client'
 import { lifeYears, personName, type Person } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Mini } from './person-pickers'
+import { Select } from '@/components/ui/select'
+import { inputClass } from '@/components/ui/input'
 
 /** "1920 – 1985", "1920-", "~1876": birth and death as typed. */
 function parseYears(s: string) {
@@ -95,7 +97,7 @@ export function QuickAdd({ state, onClose }: { state: State; onClose: (createdId
           </div>
         )}
         <form onSubmit={(e) => { e.preventDefault(); submit() }} className="flex flex-col gap-2">
-          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={t('Имя и фамилия')} aria-label={t('Имя и фамилия')} className="h-10 rounded-lg border border-input bg-white px-3 text-base font-serif outline-none focus:ring-2 focus:ring-ring/40" />
+          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={t('Имя и фамилия')} aria-label={t('Имя и фамилия')} className={inputClass} />
           {matches.length > 0 && (
             <div className="flex flex-col rounded-lg border border-border overflow-hidden">
               <span className="px-2 pt-1 text-xs text-ink-soft">{t('Уже есть в архиве')}</span>
@@ -106,13 +108,10 @@ export function QuickAdd({ state, onClose }: { state: State; onClose: (createdId
               ))}
             </div>
           )}
-          <input value={years} onChange={(e) => setYears(e.target.value)} placeholder={t('например 1920 – 1985')} aria-label={t('Годы жизни')} title={t('Годы жизни')} className="h-9 rounded-lg border border-input bg-white px-3 outline-none focus:ring-2 focus:ring-ring/40" />
+          <input value={years} onChange={(e) => setYears(e.target.value)} placeholder={t('например 1920 – 1985')} aria-label={t('Годы жизни')} title={t('Годы жизни')} className={inputClass} />
           {isChild && spouses.length > 0 && (
             <label className="flex items-center gap-2 text-xs text-ink-soft">{t('Второй родитель')}
-              <select value={otherParent ?? ''} onChange={(e) => setOther(e.target.value || null)} className="h-9 flex-1 min-w-0 rounded-lg border border-input bg-white px-2 text-sm text-ink">
-                {spouses.map((s) => <option key={s} value={s}>{personName(byId.get(s)!) || t('Скрыто')}</option>)}
-                <option value="">—</option>
-              </select>
+              <Select className="flex-1" aria-label={t('Второй родитель')} value={otherParent ?? ''} onChange={(v) => setOther(v || null)} options={[...spouses.map((s) => ({ value: s, label: personName(byId.get(s)!) || t('Скрыто') })), { value: '', label: '—' }]} />
             </label>
           )}
           {(create.error || linkExisting.error) && <p className="text-xs text-destructive">{t('Не удалось сохранить')}: {String((create.error ?? linkExisting.error)?.message)}</p>}

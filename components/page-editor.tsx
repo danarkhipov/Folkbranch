@@ -15,6 +15,7 @@ import { autosave, clearDraft, loadDraft, type SaveStatus } from '@/lib/autosave
 import { decorateBlocks } from '@/lib/linkify'
 import { personName, type Media, type Page } from '@/lib/types'
 import { GrowText, ReadText } from './person-fields'
+import { inputClass } from '@/components/ui/input'
 
 const Mention = createReactInlineContentSpec(
   { type: 'mention', propSchema: { personId: { default: '' }, label: { default: '' } }, content: 'none' } as const,
@@ -249,7 +250,7 @@ function Editor({ page, personId, onChanged }: { page: Page; personId: string; o
               {sources.filter((s) => s.id).map((s) => <button key={s.id} className="text-left rounded px-2 py-1.5 hover:bg-muted break-anywhere" onMouseDown={(e) => e.preventDefault()} onClick={() => cite(s.id!, s.title || t('Без названия'))}>{s.title || t('Без названия')}</button>)}
               {!sources.some((s) => s.id) && <p className="px-2 py-1 text-xs text-ink-faint">{t('У этого человека пока нет источников')}</p>}
               <form className="flex gap-1 pt-1 border-t border-border" onSubmit={(e) => { e.preventDefault(); createSource() }}>
-                <input value={newSource} onChange={(e) => setNewSource(e.target.value)} placeholder={t('Новый источник')} aria-label={t('Новый источник')} className="h-9 min-w-0 flex-1 rounded-md border border-input bg-white px-2" />
+                <input value={newSource} onChange={(e) => setNewSource(e.target.value)} placeholder={t('Новый источник')} aria-label={t('Новый источник')} className={`${inputClass} flex-1`} />
                 <button className="bar-btn border border-border flex-none" disabled={!newSource.trim()}>{t('Добавить')}</button>
               </form>
             </PopoverContent>

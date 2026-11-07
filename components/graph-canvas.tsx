@@ -13,6 +13,7 @@ import { useLinkDrawing } from './chart-links'
 import { useLineSelection } from './chart-selection'
 import { useChartView } from './chart-view'
 import { type ChartActions, Lines, PersonCard, HitAreas, FamilyDots } from './graph-parts'
+import { Select } from '@/components/ui/select'
 
 export interface CanvasHandle {
   fit: () => void
@@ -114,20 +115,13 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
             <div className="float linkbar" style={{ left: sel.ax, top: sel.ay }} onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
               {selEdges.length > 0 && (
                 <>
-                  <select aria-label={t('Родство')} value={selEdges[0].links[0]?.kind} onChange={(e) => patchSelected({ kind: e.target.value })}>
-                    <option value="birth">{t('родной')}</option>
-                    <option value="adopted">{t('приёмный')}</option>
-                    <option value="step">{t('отчим или мачеха')}</option>
-                  </select>
+                  <Select look="quiet" aria-label={t('Родство')} value={selEdges[0].links[0]?.kind} onChange={(kind) => patchSelected({ kind })} options={[{ value: 'birth', label: t('родной') }, { value: 'adopted', label: t('приёмный') }, { value: 'step', label: t('отчим или мачеха') }]} />
                   {selEdges.length > 1 && <span className="linkbar-count">{t('Выбрано')}: {selEdges.length}</span>}
                 </>
               )}
               {selUnion && (
                 <>
-                  <select aria-label={t('Родство')} value={selUnion.union.kind} onChange={(e) => patchSelected({ kind: e.target.value })}>
-                    <option value="marriage">{t('брак')}</option>
-                    <option value="civil">{t('гражданский')}</option>
-                  </select>
+                  <Select look="quiet" aria-label={t('Родство')} value={selUnion.union.kind} onChange={(kind) => patchSelected({ kind })} options={[{ value: 'marriage', label: t('брак') }, { value: 'civil', label: t('гражданский') }]} />
                 </>
               )}
               <button className="linkbar-del" title={`${t('Удалить связь')} (Delete)`} aria-label={t('Удалить связь')} onClick={removeSelected}><Trash2 size={14} /></button>

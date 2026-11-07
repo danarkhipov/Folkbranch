@@ -68,7 +68,7 @@ const t2 = check('one sheet, everyone', full)
 ok('the owner can print everyone when asked', living.some((n) => t2.includes(n)))
 
 await A.getByText('Склеить из листов').click(); await sleep(300)
-await A.getByLabel('Размер имён').selectOption('12'); await sleep(300)
+await A.getByRole('combobox', { name: 'Размер имён' }).click(); await A.getByRole('option', { name: '12 пт' }).click(); await sleep(300)
 const sheetsText = await A.getByRole('status').innerText()
 const many = await download(A, 'many.pdf')
 check('glued sheets', many)

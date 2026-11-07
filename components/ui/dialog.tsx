@@ -89,8 +89,15 @@ function DialogTitle({
 }
 
 
+function DialogDescription({
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Description>) {
+  return <DialogPrimitive.Description data-slot="dialog-description" {...props} />
+}
+
 export {
   Dialog,
+  DialogDescription,
   DialogContent,
   DialogTitle
 }

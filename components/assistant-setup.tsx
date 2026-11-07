@@ -8,6 +8,8 @@ import { api, useApp } from '@/lib/client'
 import type { AssistantState } from '@/lib/types'
 import { Brand } from './brand-icons'
 import { PanelEdge } from './panel-size'
+import { Select } from '@/components/ui/select'
+import { inputClass } from '@/components/ui/input'
 
 export interface ProviderStatus { connected: boolean; provider: PresetId | 'local' | null; label: string | null; model: string | null; source: 'server' | 'app' | null; keyEnding: string | null }
 export const useProviderStatus = () => useQuery({ queryKey: ['provider'], queryFn: () => api<ProviderStatus>('assistant/provider') })
@@ -24,11 +26,8 @@ export function ModelSelect({ presetId, value, onChange }: { presetId: PresetId;
   return (
     <label className="flex flex-col gap-1 text-xs text-ink-soft">
       {t('Нейросеть')}
-      <select aria-label={t('Нейросеть')} className="h-9 w-full rounded-lg border border-input bg-white px-2 text-sm text-ink" value={custom ? CUSTOM : value || models[0].id} onChange={(e) => { const c = e.target.value === CUSTOM; setCustom(c); onChange(c ? '' : e.target.value) }}>
-        {models.map((m) => <option key={m.id} value={m.id}>{m.label}, {m.price}</option>)}
-        <option value={CUSTOM}>{t('Другая нейросеть…')}</option>
-      </select>
-      {custom && <input aria-label={t('Название нейросети')} placeholder={t('Название нейросети')} className="h-9 w-full rounded-lg border border-input bg-white px-2 font-mono text-ink" value={value} onChange={(e) => onChange(e.target.value)} />}
+      <Select aria-label={t('Нейросеть')} value={custom ? CUSTOM : value || models[0].id} onChange={(v) => { const c = v === CUSTOM; setCustom(c); onChange(c ? '' : v) }} options={[...models.map((m) => ({ value: m.id, label: `${m.label}, ${m.price}` })), { value: CUSTOM, label: t('Другая нейросеть…') }]} />
+      {custom && <input aria-label={t('Название нейросети')} placeholder={t('Название нейросети')} className={`${inputClass} font-mono`} value={value} onChange={(e) => onChange(e.target.value)} />}
       {!custom && current?.note && <span>{t(current.note)}</span>}
       <span className="text-ink-faint">{t('Цена примерно за тысячу страниц текста: ваш вопрос / ответ нейросети')}</span>
     </label>
@@ -78,7 +77,7 @@ export function ProviderForm({ onDone }: { onDone?: () => void }) {
         <li><span className="text-ink-soft">1.</span> <a className="inline-flex items-center gap-1 underline" href={preset.keysUrl} target="_blank" rel="noreferrer noopener">{t('Откройте страницу ключей')} {preset.label} <ExternalLink size={12} /></a></li>
         <li><span className="text-ink-soft">2.</span> {t(preset.howTo)}</li>
         <li className="flex flex-col gap-1.5"><span><span className="text-ink-soft">3.</span> {t('Скопируйте ключ и вставьте его сюда')}</span>
-          <input type="password" autoComplete="off" spellCheck={false} aria-label={t('Ключ')} placeholder={t('Ключ')} className="h-9 w-full rounded-lg border border-input bg-white px-3 font-mono text-xs" value={key} onChange={(e) => { setKey(e.target.value); setError('') }} />
+          <input type="password" autoComplete="off" spellCheck={false} aria-label={t('Ключ')} placeholder={t('Ключ')} className={`${inputClass} font-mono`} value={key} onChange={(e) => { setKey(e.target.value); setError('') }} />
         </li>
       </ol>
       <details>

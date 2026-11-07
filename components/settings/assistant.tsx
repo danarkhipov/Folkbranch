@@ -1,13 +1,17 @@
 'use client'
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { KeyRound, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Section } from '@/components/ui/section'
+import { SwitchRow } from '@/components/ui/switch'
 import { api, useApp } from '@/lib/client'
 import { ModelSelect, ProviderForm, useProviderStatus } from '../assistant-setup'
 import type { PresetId } from '@/lib/agent/presets'
 
 /** Which provider answers, and changing it. */
 function ProviderSettings() {
-  const { t } = useApp()
+  const { t, confirm: ask } = useApp()
   const qc = useQueryClient()
   const { data } = useProviderStatus()
   const [changing, setChanging] = useState(false)
@@ -24,24 +28,25 @@ function ProviderSettings() {
     }
   }
   const remove = async () => {
+    if (!await ask(t('Удалить ключ сервиса?'), t('Удалить ключ'), t('Ассистент перестанет отвечать, пока вы не добавите новый.'))) return
     await api('assistant/provider', { method: 'DELETE' })
     await qc.invalidateQueries({ queryKey: ['provider'] })
     location.reload()
   }
   return (
-    <div className="my-1 flex flex-col gap-2">
+    <Section title={t('Сервис и нейросеть')} description={t('Ассистент работает на вашем ключе: вы платите сервису сами, и то, что ассистент читает, уходит туда.')}>
       {data.connected ? (
         <p className="text-xs text-ink-soft">{t('Сервис')}: {data.label}{data.keyEnding ? `, ${t('ключ')} …${data.keyEnding}` : ''}{data.source === 'server' ? `. ${t('Ключ уже настроен')}` : ''}</p>
       ) : <p className="text-xs text-destructive">{t('Ключ не задан: ассистент не может отвечать')}</p>}
       {data.source === 'app' && !changing && <ModelSelect key={data.provider} presetId={data.provider as PresetId} value={data.model ?? ''} onChange={changeModel} />}
       {modelError && <p role="alert" className="text-xs text-destructive">{modelError}</p>}
       {data.source !== 'server' && (changing || !data.connected ? <ProviderForm onDone={() => setChanging(false)} /> : (
-        <div className="flex gap-3 text-xs">
-          <button type="button" className="bar-btn border border-border" onClick={() => setChanging(true)}>{t('Сменить ключ')}</button>
-          <button type="button" className="bar-btn border border-border" onClick={remove}>{t('Удалить ключ')}</button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={() => setChanging(true)}><KeyRound /> {t('Сменить ключ')}</Button>
+          <Button type="button" variant="danger" onClick={remove}><Trash2 /> {t('Удалить ключ')}</Button>
         </div>
       ))}
-    </div>
+    </Section>
   )
 }
 
@@ -56,15 +61,13 @@ export function AssistantSettings() {
     await qc.invalidateQueries({ queryKey: ['settings'] })
     location.reload()
   }
-  const row = (key: 'assistantEnabled' | 'assistantForReaders', label: string, off = false) => (
-    <label className="flex items-center gap-2 min-h-7"><input type="checkbox" className="accent-[var(--ink)] size-4" disabled={off} checked={data[key]} onChange={(e) => set(key, e.target.checked)} /> {t(label)}</label>
-  )
   return (
-    <section className="flex flex-col gap-2 text-sm">
-      <p className="text-xs text-ink-soft">{t('Чат внутри приложения: отвечает на вопросы о семье и вносит правки с вашего подтверждения.')}</p>
+    <div className="flex min-w-0 flex-col gap-7 text-sm">
+      <Section title={t('Кому доступен')}>
+        <SwitchRow title={t('Включить ассистента')} description={t('Появится для редакторов и владельца.')} checked={data.assistantEnabled} onChange={(on) => set('assistantEnabled', on)} />
+        <SwitchRow title={t('Разрешить читателям пользоваться ассистентом')} description={t('Читатели смогут спрашивать, но не менять. Живых родственников ассистент им не покажет.')} disabled={!data.assistantEnabled} checked={data.assistantForReaders} onChange={(on) => set('assistantForReaders', on)} />
+      </Section>
       <ProviderSettings />
-      {row('assistantEnabled', 'Включить ассистента')}
-      {row('assistantForReaders', 'Разрешить читателям пользоваться ассистентом', !data.assistantEnabled)}
-    </section>
+    </div>
   )
 }

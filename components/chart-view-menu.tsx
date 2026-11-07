@@ -1,50 +1,74 @@
 'use client'
 import { useState } from 'react'
-import { Filter, Trash2, X } from 'lucide-react'
+import { ArrowDownFromLine, ArrowUpFromLine, Check, ChevronsDownUp, ChevronsUpDown, Filter, GitFork, Network, Trash2, UserRound, UsersRound, X, type LucideIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useApp } from '@/lib/client'
 import type { Scope } from '@/lib/graph/select'
 import { personName } from '@/lib/types'
 import type { ChartScope } from './chart-scope'
+import { Mini, PersonPopover } from './person-pickers'
 
-const SCOPES: [Exclude<Scope, 'all'>, string][] = [['ancestors', 'Предки'], ['descendants', 'Потомки'], ['near', 'Ближайшая семья']]
+const SCOPES: [Exclude<Scope, 'all'>, string, string, LucideIcon][] = [
+  ['ancestors', 'Предки', 'родители, бабушки и дедушки и старше', ArrowUpFromLine],
+  ['descendants', 'Потомки', 'дети, внуки и младше', ArrowDownFromLine],
+  ['near', 'Ближайшая семья', 'родители, супруги, дети, братья и сёстры', UsersRound],
+]
 
-/** Which part of the family the chart shows: of the person whose card is open, or of the viewer. */
+/** Which part of the family the chart shows. The person is chosen right here, or comes from the open card. */
 export function ViewMenu({ scope }: { scope: ChartScope }) {
   const { t, focusId, me, byId, family, canEdit, notify } = useApp()
   const [name, setName] = useState('')
-  const root = focusId && byId.has(focusId) ? focusId : me.personId && byId.has(me.personId) ? me.personId : null
-  const rootName = root ? personName(byId.get(root)!) || t('Без названия') : ''
+  const [picked, setPicked] = useState<string | null>(null)
+  const known = (id: string | null | undefined) => (id && byId.has(id) ? id : null)
+  const root = known(picked) ?? known(focusId) ?? known(scope.rootId) ?? known(me.personId)
+  const person = root ? byId.get(root)! : null
+  const rootName = person ? personName(person) || t('Без названия') : ''
   const narrowed = scope.scope !== 'all' || scope.collapsed.length > 0
   const shownName = scope.rootId && byId.has(scope.rootId) ? personName(byId.get(scope.rootId)!) || t('Без названия') : ''
   const fail = (e: Error) => notify(`${t('Не удалось сохранить')}: ${e.message}`)
-  const canFold = !!focusId && (family.children.get(focusId)?.length ?? 0) > 0
-  const row = 'flex items-center gap-2 min-h-8 px-1.5 rounded hover:bg-muted text-left w-full disabled:opacity-50 disabled:hover:bg-transparent'
+  const canFold = !!root && (family.children.get(root)?.length ?? 0) > 0
+  const row = 'flex items-center gap-2.5 min-h-10 px-2 py-1 rounded-lg hover:bg-muted text-left w-full disabled:opacity-50 disabled:hover:bg-transparent aria-pressed:bg-muted'
+  const pick = (id: string) => {
+    setPicked(id)
+    // Changing the person keeps the choice of who to show around them.
+    if (scope.scope !== 'all') scope.show({ scope: scope.scope, rootId: id })
+  }
+  const label = (title: string, line: string) => <span className="min-w-0 flex-1"><span className="block">{t(title)}</span><span className="block text-xs leading-snug text-ink-soft">{t(line)}</span></span>
   return (
     <>
       <Popover>
-        <PopoverTrigger asChild><button className={narrowed ? 'bar-btn on' : 'bar-btn'} title={t('Кого показать')} aria-label={t('Кого показать')}><Filter size={15} /></button></PopoverTrigger>
-        <PopoverContent side="top" align="start" className="w-72 text-sm flex flex-col gap-1 p-2 max-h-[70vh] overflow-auto">
-          <h3 className="text-base font-medium px-1.5">{t('Кого показать')}</h3>
-          <button className={row} aria-pressed={!narrowed} onClick={scope.showAll}>{t('Всю семью')}</button>
-          {SCOPES.map(([s, label]) => (
-            <button key={s} className={row} disabled={!root} aria-pressed={scope.scope === s && scope.rootId === root} onClick={() => scope.show({ scope: s, rootId: root })}>{t(label)}{root && <span className="text-ink-soft truncate">{rootName}</span>}</button>
-          ))}
-          {!root && <p className="px-1.5 text-xs text-ink-soft">{t('Откройте карточку человека, чтобы показать его ветвь.')}</p>}
-          {canFold && <button className={row} onClick={() => scope.toggleCollapse(focusId!)}>{t(scope.collapsed.includes(focusId!) ? 'Показать потомков' : 'Свернуть потомков')}<span className="text-ink-soft truncate">{rootName}</span></button>}
-          {scope.views.length > 0 && <h3 className="text-base font-medium px-1.5 mt-2">{t('Сохранённые виды')}</h3>}
+        <PopoverTrigger asChild><button className={narrowed ? 'bar-btn on' : 'bar-btn'} title={t('Кого показать')} data-hint={t('Вся семья или только предки, потомки и близкие одного человека.')} aria-label={t('Кого показать')}><Filter size={15} /></button></PopoverTrigger>
+        <PopoverContent side="top" align="start" className="w-80 max-w-[calc(100vw-24px)] text-sm flex flex-col gap-0.5 p-2 max-h-[80vh] overflow-auto">
+          <h3 className="text-base font-medium px-2 pb-1">{t('Кого показать')}</h3>
+          <button className={row} aria-pressed={!narrowed} onClick={scope.showAll}><Network size={16} className="flex-none text-ink-soft" />{label('Всю семью', 'все люди архива')}{!narrowed && <Check size={15} className="flex-none" />}</button>
+          <div className="mt-2 flex flex-col gap-1 px-2 pb-1 text-xs text-ink-soft">
+            {t('Только часть семьи вокруг человека')}
+            <PersonPopover onPick={pick}>
+              <button className="flex h-9 w-full min-w-0 items-center gap-2 rounded-lg border border-input bg-white px-2.5 text-left text-sm text-ink">
+                {person ? <Mini person={person} /> : <UserRound size={15} className="flex-none text-ink-soft" />}
+                <span className={person ? 'min-w-0 flex-1 truncate' : 'min-w-0 flex-1 truncate text-ink-faint'}>{person ? rootName : t('Выбрать человека')}</span>
+                <ChevronsUpDown size={14} className="flex-none text-ink-soft" />
+              </button>
+            </PersonPopover>
+          </div>
+          {SCOPES.map(([s, title, line, Icon]) => {
+            const on = scope.scope === s && scope.rootId === root
+            return <button key={s} className={row} disabled={!root} aria-pressed={on} title={root ? undefined : t('Сначала выберите человека')} onClick={() => scope.show({ scope: s, rootId: root })}><Icon size={16} className="flex-none text-ink-soft" />{label(title, line)}{on && <Check size={15} className="flex-none" />}</button>
+          })}
+          {canFold && <button className={row} onClick={() => scope.toggleCollapse(root!)}><ChevronsDownUp size={16} className="flex-none text-ink-soft" />{label(scope.collapsed.includes(root!) ? 'Показать потомков' : 'Свернуть потомков', 'только на схеме, данные не меняются')}</button>}
+          {scope.views.length > 0 && <h3 className="text-xs text-ink-soft px-2 mt-3">{t('Сохранённые виды')}</h3>}
           {scope.views.map((v) => (
             <div key={v.id} className="flex items-center gap-1">
-              <button className={row} aria-pressed={scope.activeId === v.id} onClick={() => scope.open(v)}><span className="truncate">{v.name}</span></button>
+              <button className={row} aria-pressed={scope.activeId === v.id} onClick={() => scope.open(v)}><GitFork size={16} className="flex-none text-ink-soft" /><span className="truncate">{v.name}</span></button>
               {canEdit && <button className="bar-btn !h-8 !min-w-8 !p-0" title={`${t('Удалить вид')}: ${v.name}`} aria-label={`${t('Удалить вид')}: ${v.name}`} onClick={() => scope.remove(v.id).catch(fail)}><Trash2 size={14} /></button>}
             </div>
           ))}
-          {canEdit && (
-            <form className="flex flex-col gap-1 mt-2 px-1.5" onSubmit={(e) => { e.preventDefault(); if (name.trim()) scope.saveAs(name.trim()).then(() => setName('')).catch(fail) }}>
-              <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Сохранить этот вид как')}
-                <input className="h-9 rounded-lg border border-input bg-white px-2 text-sm text-ink" placeholder={t('Например, мамина ветка')} value={name} onChange={(e) => setName(e.target.value)} />
-              </label>
-              <button className="bar-btn border border-border self-start" disabled={!name.trim()}>{t('Сохранить')}</button>
+          {canEdit && narrowed && (
+            <form className="flex flex-col gap-1 mt-3 px-2 text-xs text-ink-soft" onSubmit={(e) => { e.preventDefault(); if (name.trim()) scope.saveAs(name.trim()).then(() => setName('')).catch(fail) }}>
+              <label htmlFor="view-name">{t('Сохранить этот вид, чтобы вернуться к нему или поделиться')}</label>
+              <div className="flex gap-1.5"><Input id="view-name" placeholder={t('Мамина ветка')} value={name} onChange={(e) => setName(e.target.value)} /><Button variant="outline" disabled={!name.trim()}>{t('Сохранить')}</Button></div>
             </form>
           )}
           {canEdit && Object.keys(scope.pins).length > 0 && <button className={`${row} mt-2`} onClick={() => scope.clearPins().catch(fail)}>{t('Вернуть карточки на их места')}</button>}

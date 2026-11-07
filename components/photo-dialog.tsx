@@ -11,6 +11,7 @@ import { findFaces, squareCrop } from '@/lib/faces'
 import { cn } from '@/lib/utils'
 import { personName, type Box, type Media } from '@/lib/types'
 import { Mini, PersonPopover } from './person-pickers'
+import { inputClass } from '@/components/ui/input'
 
 export function PhotoDialog({ state, onClose }: { state: { id: string; list?: string[] } | null; onClose: () => void }) {
   const [index, setIndex] = useState(0)
@@ -169,7 +170,7 @@ function Photo({ id, list, index, setIndex, onClose }: { id: string; list?: stri
                 setPick(null)
                 setCaption('')
               }}>
-                <input aria-label={t('Подпись без карточки')} placeholder={t('Подпись без карточки')} className="h-9 min-w-0 flex-1 rounded-lg border border-input bg-white px-2 text-sm" value={caption} onChange={(e) => setCaption(e.target.value)} />
+                <input aria-label={t('Подпись без карточки')} placeholder={t('Подпись без карточки')} className={`${inputClass} flex-1`} value={caption} onChange={(e) => setCaption(e.target.value)} />
                 <button className="bar-btn border border-border" disabled={!caption.trim()}>{t('Подписать')}</button>
               </form>
             )}

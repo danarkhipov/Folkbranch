@@ -122,7 +122,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .line-hit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: pointer; }
 .line.hover, .union.hover { stroke: var(--accent); }
 .linkbar { position: absolute; transform: translate(-50%, calc(-100% - 8px)) scale(calc(1 / var(--k, 1))); transform-origin: 50% 100%; display: flex; align-items: center; gap: 2px; padding: 3px; white-space: nowrap; font-size: 12px; z-index: 5; cursor: default; }
-.linkbar select { height: 26px; background: transparent; border-radius: 6px; padding: 0 4px; color: var(--ink); }
 .linkbar-count { font-size: 14px; color: var(--ink-soft); padding: 0 4px; font-variant-numeric: tabular-nums; }
 .linkbar-del { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 6px; color: var(--ink-soft); }
 .linkbar-del:hover { color: var(--destructive); background: var(--muted); }
@@ -184,6 +183,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .legend-ring.sex-F { border-color: var(--female); background: #efdccf; }
 
 .float { background: rgb(255 253 248 / .92); backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 1px 2px rgb(60 45 20 / .06), 0 8px 24px rgb(60 45 20 / .08); }
+.hint { position: fixed; z-index: 100; max-width: min(280px, calc(100vw - 16px)); padding: 6px 10px; border-radius: 8px; background: var(--ink); color: #fffdf8; font-size: 13px; line-height: 1.35; box-shadow: 0 8px 24px rgb(60 45 20 / .22); pointer-events: none; animation: hint-in .12s ease-out; }
+.hint-more { color: #d9d2c2; margin-top: 2px; font-weight: 400; }
+@keyframes hint-in { from { opacity: 0; } }
 .bar-btn { height: 36px; min-width: 36px; padding: 0 9px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: var(--ink-soft); font-size: 14px; cursor: pointer; white-space: nowrap; }
 .bar-btn:hover { background: #efe9dc; color: var(--ink); }
 .bar-btn.on { background: var(--ink); color: #fffdf8; }

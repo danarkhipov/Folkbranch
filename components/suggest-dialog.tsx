@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { api, useApp } from '@/lib/client'
 import { personName, type Person } from '@/lib/types'
 import type { Proposal } from '@/lib/ops/proposals'
+import { inputClass } from '@/components/ui/input'
 
 const FIELDS: [keyof Person & string, string][] = [
   ['givenName', 'Имя'], ['patronymic', 'Отчество'], ['surname', 'Фамилия'], ['maidenName', 'Девичья фамилия'],
@@ -22,7 +23,7 @@ export function SuggestDialog({ person, onClose }: { person: Person; onClose: ()
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const input = 'h-9 min-w-0 rounded-lg border border-input bg-white px-3 text-sm text-ink'
+  const input = inputClass
   return (
     <Dialog open onOpenChange={(v) => { if (!v) onClose() }}>
       <DialogContent className="max-w-lg max-h-[calc(100dvh-32px)] overflow-auto">

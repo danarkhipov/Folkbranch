@@ -186,8 +186,9 @@ if (await settings.isVisible().catch(() => false)) {
 const language = async (value, word) => {
   await page.getByRole('button', { name: /^(Settings|Настройки)/ }).first().click()
   const d = page.getByRole('dialog').first()
-  await d.getByRole('button', { name: /^(Archive|Архив)$/ }).click()
-  await d.locator('select').first().selectOption(value)
+  await d.getByRole('button', { name: /^(General|Основное)$/ }).click()
+  await d.getByRole('combobox', { name: /^(Language|Язык)$/ }).click()
+  await page.getByRole('option', { name: value === 'ru' ? 'Русский' : 'English' }).click()
   await page.waitForLoadState('load')
   await page.getByRole('button', { name: word }).first().waitFor({ timeout: 15000 })
   await page.waitForFunction((l) => document.documentElement.lang === l, value)

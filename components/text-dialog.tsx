@@ -7,6 +7,7 @@ import { api, useApp } from '@/lib/client'
 import { layoutFamily, AVATAR_CY, CARD_H } from '@/lib/graph/layout'
 import { parseFamilyText, parsedToGraph, planFamilyText, serializeFamilyText, type TextPlan } from '@/lib/textformat'
 import { personName } from '@/lib/types'
+import { Select } from '@/components/ui/select'
 
 export function MiniGraph({ text }: { text: string }) {
   const { rootsBelow } = useApp()
@@ -50,11 +51,7 @@ export function PlanSummary({ plan, choices, onChoose }: { plan: TextPlan; choic
       {plan.ambiguous.map((a) => (
         <label key={a.ref} className="flex items-center gap-2 text-xs">
           <span className="text-rust">{t('Несколько совпадений')}: {a.name}</span>
-          <select className="border border-input rounded bg-white px-1 py-0.5 min-w-0" value={choices[a.ref] ?? ''} onChange={(e) => onChoose({ ...choices, [a.ref]: e.target.value })}>
-            <option value="" disabled>—</option>
-            {a.candidates.map((c) => <option key={c.id} value={c.id}>{c.name} {c.years}</option>)}
-            <option value="new">{t('Новый человек')}</option>
-          </select>
+          <Select look="small" className="flex-1" aria-label={a.name} value={choices[a.ref] ?? ''} placeholder="—" onChange={(v) => onChoose({ ...choices, [a.ref]: v })} options={[{ value: '', label: '—', disabled: true }, ...a.candidates.map((c) => ({ value: c.id, label: `${c.name} ${c.years}` })), { value: 'new', label: t('Новый человек') }]} />
         </label>
       ))}
       {!plan.ops.length && !plan.errors.length && !plan.ambiguous.length && <p className="text-xs text-ink-faint">{t('Изменений нет')}</p>}

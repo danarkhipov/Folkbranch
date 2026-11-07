@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { Hints } from '@/components/ui/hints'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -16,5 +17,5 @@ export function Providers({ children }: { children: React.ReactNode }) {
       document.removeEventListener('gesturestart', stop)
     }
   }, [])
-  return <QueryClientProvider client={client}><TooltipProvider>{children}</TooltipProvider></QueryClientProvider>
+  return <QueryClientProvider client={client}><TooltipProvider>{children}<Hints /></TooltipProvider></QueryClientProvider>
 }

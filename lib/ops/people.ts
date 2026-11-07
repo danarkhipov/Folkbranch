@@ -197,7 +197,7 @@ export function addUnion(c: Changes, aId: string, bId: string, kind: UnionKind =
   if (!dup) c.insert('unions', { id: newId(), aId, bId, kind, startDate, endDate, place })
 }
 
-const FIELD: Record<string, string> = {
+export const FIELD: Record<string, string> = {
   givenName: 'Имя', surname: 'Фамилия', maidenName: 'Девичья фамилия', patronymic: 'Отчество', otherNames: 'Другие имена', tags: 'Название группы', facts: 'Факты', sources: 'Источники', claims: 'Версии', sex: 'Пол', birthDate: 'Рождение', birthPlace: 'Место рождения',
   deathDate: 'Смерть', deathPlace: 'Место смерти', living: 'Жив', certainty: 'Уверенность',
 }
@@ -231,7 +231,10 @@ export function deletePerson(actor: Actor, id: string) {
 export function updateRelation(actor: Actor, type: 'parent' | 'union', id: string, patch: Record<string, string>) {
   requireRole(actor, 'editor')
   const table = type === 'parent' ? 'parentChild' : 'unions'
-  mutate(actor, { summary: `${say('Связь')}: ${Object.values(patch).filter(Boolean).join(', ')}` }, (c) => c.update(table, id, patch))
+  const db = getDb()
+  const row = type === 'parent' ? db.select().from(schema.parentChild).where(eq(schema.parentChild.id, id)).get() : db.select().from(schema.unions).where(eq(schema.unions.id, id)).get()
+  const ids = !row ? [] : 'parentId' in row ? [row.parentId, row.childId] : [row.aId, row.bId]
+  mutate(actor, { summary: `${say('Связь')}: ${Object.values(patch).filter(Boolean).join(', ')}`, personIds: ids }, (c) => c.update(table, id, patch))
 }
 
 export function removeRelation(actor: Actor, type: 'parent' | 'union', id: string) {

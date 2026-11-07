@@ -31,7 +31,6 @@ const PhotoDialog = dynamic(() => import('./photo-dialog').then((m) => m.PhotoDi
 const ImportDialog = dynamic(() => import('./import-dialog').then((m) => m.ImportDialog), { ssr: false })
 const SettingsDialog = dynamic(() => import('./settings/settings-dialog').then((m) => m.SettingsDialog), { ssr: false })
 const HistoryPanel = dynamic(() => import('./side-panels').then((m) => m.HistoryPanel), { ssr: false })
-const HowRelated = dynamic(() => import('./side-panels').then((m) => m.HowRelated), { ssr: false })
 const ReviewPanel = dynamic(() => import('./review-panel').then((m) => m.ReviewPanel), { ssr: false })
 const PrintDialog = dynamic(() => import('./print-dialog').then((m) => m.PrintDialog), { ssr: false })
 // The card opens on a press, so its tabs need not come with the first screen.
@@ -226,7 +225,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       <GraphCanvas ref={canvas} scope={scope} pathIds={path} groupIds={groupIds} panelOpen={panelOpen} leftInset={side === 'assistant' ? assistantWidth + 12 : 0}/>
 
       <MainBar guest={!!me.guest} familyName={familyName} present={present} mode={barMode} navRef={nav} side={side} draftOps={draftOps} onSearch={() => setSearch(true)} onSide={(next) => { setSide(next); setPath(null) }} onAssistant={toggleAssistant} onSettings={() => setSettings(true)} />
-      <ViewBar onPrint={() => setPrinting(true)} scope={scope} canvas={canvas} rootsBelow={rootsBelow} onFlip={flipChart} groups={groups} onGroups={setGroups} allGroups={allGroups} left={side === 'assistant' ? assistantWidth + 24 : side === 'history' ? 344 : side === 'review' ? 408 : 12} crowded={panelOpen || !!side} />
+      <ViewBar onPrint={() => setPrinting(true)} scope={scope} canvas={canvas} rootsBelow={rootsBelow} onFlip={flipChart} groups={groups} onGroups={setGroups} allGroups={allGroups} left={side === 'assistant' ? assistantWidth + 24 : side === 'history' || side === 'review' ? 408 : 12} crowded={panelOpen || !!side} />
 
       {!ctx.graph.persons.length && ctx.canEdit && (
         <div className="fixed inset-0 grid place-items-center pointer-events-none">
@@ -234,7 +233,6 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
         </div>
       )}
 
-      {side === 'related' && <HowRelated onPath={setPath} onClose={() => { setSide(null); setPath(null) }} />}
       {side === 'history' && <HistoryPanel onClose={() => setSide(null)} />}
       {side === 'review' && <ReviewPanel onClose={() => setSide(null)} />}
       {!assistant.ready && <AssistantSetup state={assistant} open={side === 'assistant'} width={assistantWidth} onWidth={setAssistantWidth} onClose={() => setSide(null)} />}

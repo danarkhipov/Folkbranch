@@ -2,6 +2,9 @@
 import { ImportDialog } from '../import-dialog'
 import { useState } from 'react'
 import { Download, FileText, Upload } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Section } from '@/components/ui/section'
+import { SwitchRow } from '@/components/ui/switch'
 import { useApp } from '@/lib/client'
 import { RestoreForm } from './restore-form'
 
@@ -10,35 +13,30 @@ export function Files({ onText }: { onText: () => void }) {
   const [hide, setHide] = useState(true)
   const [importing, setImporting] = useState(false)
   return (
-    <div className="flex flex-col gap-5 text-sm">
+    <div className="flex min-w-0 flex-col gap-7 text-sm">
       {canEdit && (
-        <section className="flex flex-col gap-1.5">
-          <h3 className="text-base font-medium">{t('Добавить людей из файла')}</h3>
-          <p className="text-xs text-ink-soft">{t('Подойдёт таблица или файл .ged из программы для родословных. Перед добавлением покажем, что изменится. Файл можно просто перетащить на схему.')}</p>
-          <button className="bar-btn self-start border border-border" onClick={() => setImporting(true)}><Upload size={14} /> {t('Выбрать файл')}</button>
+        <Section title={t('Добавить людей из файла')} description={t('Подойдёт таблица или файл .ged из программы для родословных. Перед добавлением покажем, что изменится. Файл можно просто перетащить на схему.')}>
+          <Button variant="outline" className="self-start" onClick={() => setImporting(true)}><Upload /> {t('Выбрать файл')}</Button>
           <ImportDialog open={importing} onOpenChange={setImporting} />
-        </section>
+        </Section>
       )}
-      <section className="flex flex-col gap-1.5">
-        <h3 className="text-base font-medium">{t('Скачать файл для других программ')}</h3>
-        <p className="text-xs text-ink-soft">{t('Файл .ged открывается в программах для родословных. В него входят люди и связи, но не биографии и фотографии.')}</p>
-        {me.role !== 'reader' && <label className="flex items-center gap-2 text-ink"><input type="checkbox" checked={hide} onChange={(e) => setHide(e.target.checked)} /> {t('Не включать живых родственников в файл')}</label>}
-        <a className="bar-btn self-start border border-border" href={`/api/v1/gedcom/export?living=${hide ? 'hide' : 'show'}`}><Download size={14} /> {t('Скачать файл')}</a>
-      </section>
+      <Section title={t('Скачать файл для других программ')} description={t('Файл .ged открывается в программах для родословных. В него входят люди и связи, но не биографии и фотографии.')}>
+        {me.role !== 'reader' && <SwitchRow title={t('Не включать живых родственников в файл')} checked={hide} onChange={setHide} />}
+        <Button asChild variant="outline" className="self-start"><a href={`/api/v1/gedcom/export?living=${hide ? 'hide' : 'show'}`}><Download /> {t('Скачать файл')}</a></Button>
+      </Section>
+      <Section title={t('Схема текстом')} description={t('Вся схема как простой текст: удобно посмотреть, скопировать или дописать сразу много людей.')}>
+        <Button variant="outline" className="self-start" onClick={onText}><FileText /> {t('Открыть текст')}</Button>
+      </Section>
       {me.role === 'owner' && (
-        <section className="flex flex-col gap-1.5">
-          <h3 className="text-base font-medium">{t('Полная копия архива')}</h3>
-          <p className="text-xs text-ink-soft">{t('Все люди, биографии, фото и история в одном файле. Храните его как семейные документы: в нём есть данные живых родственников.')}</p>
-          <a className="bar-btn self-start border border-border" href="/api/archive"><Download size={14} /> {t('Скачать полную копию')}</a>
-          <p className="text-xs text-ink-soft mt-2">{t('Подключённый ключ ассистента в копию не входит, его нужно будет ввести снова.')}</p>
-          <RestoreForm t={t} warning={t('Текущий архив будет заменён содержимым файла. Прежний сохранится на сервере в папке backups, но в приложении вернуть его нельзя.')} />
-        </section>
+        <>
+          <Section title={t('Полная копия архива')} description={t('Все люди, биографии, фото и история в одном файле. Храните его как семейные документы: в нём есть данные живых родственников. Ключ ассистента в копию не входит.')}>
+            <Button asChild variant="outline" className="self-start"><a href="/api/archive"><Download /> {t('Скачать полную копию')}</a></Button>
+          </Section>
+          <Section danger title={t('Восстановить из копии')} description={t('Заменяет весь текущий архив. Перед этим мы ещё раз спросим.')}>
+            <RestoreForm t={t} warning={t('Текущий архив будет заменён содержимым файла. Прежний сохранится на сервере в папке backups, но в приложении вернуть его нельзя.')} />
+          </Section>
+        </>
       )}
-      <section className="flex flex-col gap-1.5">
-        <h3 className="text-base font-medium">{t('Схема текстом')}</h3>
-        <p className="text-xs text-ink-soft">{t('Вся схема как простой текст: удобно посмотреть, скопировать или дописать сразу много людей.')}</p>
-        <button className="bar-btn self-start border border-border" onClick={onText}><FileText size={14} /> {t('Открыть текст')}</button>
-      </section>
     </div>
   )
 }

@@ -6,6 +6,7 @@ import { useApp } from '@/lib/client'
 import { isUrl, splitText } from '@/lib/linkify'
 import { cn } from '@/lib/utils'
 import { type Certainty } from '@/lib/types'
+import { Select } from '@/components/ui/select'
 
 /** Text that wraps and grows with what is typed, so no value is ever cut off, in a line of its own or inside a sentence. */
 export function GrowText({ value, fit, className, ...rest }: { value: string; fit?: boolean; className?: string } & Omit<React.ComponentProps<'textarea'>, 'value'>) {
@@ -148,7 +149,7 @@ export function DateField({ value, onSave, readOnly, placeholder, id }: { value:
     <div className="flex items-baseline gap-1 min-w-0 w-full">
       {rest && (readOnly
         ? q && <span className="text-ink-soft flex-none">{t(QUALIFIERS.find(([k]) => k === q)![1])}</span>
-        : <select aria-label={t('Точность даты')} value={q} onChange={(e) => onSave(e.target.value + rest)} className="flex-none bg-transparent text-ink-soft text-xs rounded hover:bg-muted max-sm:min-h-9">{QUALIFIERS.map(([k, label]) => <option key={k} value={k}>{t(label)}</option>)}</select>)}
+        : <Select look="quiet" className="flex-none" aria-label={t('Точность даты')} value={q} onChange={(v) => onSave(v + rest)} options={QUALIFIERS.map(([k, label]) => ({ value: k, label: t(label) }))} />)}
       <Field id={id} readOnly={readOnly} value={rest} placeholder={placeholder} onSave={(v) => onSave(v.trim() ? (/^[~<>]/.test(v) ? v : q + v) : '')} />
     </div>
   )

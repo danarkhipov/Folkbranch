@@ -25,6 +25,23 @@ describe('references between tables', () => {
   })
 })
 
+describe('the interface kit', () => {
+  const files = sourceFiles('components').filter((f) => !f.startsWith(path.join('components', 'ui')) && !f.startsWith(path.join('components', 'ai-elements')))
+
+  it('has one dropdown: a browser list cannot match the rest of the app', () => {
+    expect(files.filter((f) => /<select\b/.test(readFileSync(f, 'utf8')))).toEqual([])
+  })
+
+  it('has one text field: its look is not copied from screen to screen', () => {
+    expect(files.filter((f) => readFileSync(f, 'utf8').split('\n').some((l) => l.includes('<input') && l.includes('border-input')))).toEqual([])
+  })
+
+  it('every button with only an icon says what it does', () => {
+    const bare = /<button\b(?:(?!title=|aria-label=)[^>])*>\s*<[A-Z]\w* size=\{\d+\}[^>]*\/>\s*<\/button>/
+    expect(files.filter((f) => bare.test(readFileSync(f, 'utf8')))).toEqual([])
+  })
+})
+
 describe('translations', () => {
   const dict = readFileSync('lib/i18n.ts', 'utf8')
   const has = (key: string) => dict.includes(`'${key}':`) || dict.includes(`"${key}":`)

@@ -11,6 +11,8 @@ import { cn } from '@/lib/utils'
 import { yearOf, type Fact, type ClaimField, type Person, type Reliability, type Source } from '@/lib/types'
 import { PersonPopover } from './person-pickers'
 import { AddMenu, Field, GrowText, Hints, OpenAddress, ReadText, TagInput, DateField, Segmented } from './person-fields'
+import { Select } from '@/components/ui/select'
+import { inputClass } from '@/components/ui/input'
 
 const MergeDialog = dynamic(() => import('./merge-dialog').then((m) => m.MergeDialog), { ssr: false })
 
@@ -107,7 +109,7 @@ function SourceRow({ source, readOnly, fresh, onChange, onRemove }: { source: So
         <span className="text-xs text-ink-faint">{t('Что это')}</span>
         {readOnly
           ? <span className="text-ink-soft">{t(RELIABILITY[s.reliability ?? 'copy'])}</span>
-          : <select aria-label={t('Что это')} value={s.reliability ?? 'copy'} onChange={(e) => { const next = { ...s, reliability: e.target.value as Reliability }; setS(next); onChange(next) }} className="pick bg-transparent text-ink rounded hover:bg-muted min-w-0 max-w-full">{Object.entries(RELIABILITY).map(([k, v]) => <option key={k} value={k}>{t(v)}</option>)}</select>}
+          : <Select look="quiet" aria-label={t('Что это')} value={s.reliability ?? 'copy'} onChange={(v) => { const next = { ...s, reliability: v as Reliability }; setS(next); onChange(next) }} options={Object.entries(RELIABILITY).map(([k, v]) => ({ value: k, label: t(v) }))} />}
         {row(personal ? 'Подробнее' : 'Шифр', 'ref', personal ? 'кто рассказал или где хранится' : 'фонд, опись, дело', fresh && !!source.title)}
         {!personal && row('Лист', 'page', 'например, 12')}
         {row('Ссылка', 'url', 'https://…')}
@@ -144,10 +146,7 @@ function Versions({ person, field, current, change, attach }: { person: Person; 
     then(id || null)
   }
   const sourceSelect = (selected: string | null, onPick: (id: string | null) => void) => (
-    <select aria-label={t('Источник')} value={selected ?? ''} onChange={(e) => pick(e.target.value, onPick)} className="pick bg-transparent text-xs text-ink-soft rounded hover:bg-muted min-w-0 max-w-full truncate">
-      <option value="">{t('Указать источник')}</option>
-      {known.map((s) => <option key={s.id} value={s.id}>{s.title || t('Без названия')}</option>)}
-    </select>
+    <Select look="quiet" aria-label={t('Источник')} value={selected ?? ''} onChange={(v) => pick(v, onPick)} options={[{ value: '', label: t('Указать источник') }, ...known.map((s) => ({ value: s.id ?? '', label: s.title || t('Без названия') }))]} />
   )
   const unclaimedName = NAME_FIELDS.includes(field) && !person.claims.some((c) => c.field === field)
   const sourceWord = '+ источник'
@@ -187,7 +186,7 @@ function Versions({ person, field, current, change, attach }: { person: Person; 
         })}
         {canEdit && (
           <form className="flex flex-col gap-1.5" onSubmit={(e) => { e.preventDefault(); const v = value.trim(); if (!v) return; change(addVersion(current(), field, v, pending)); setValue(''); setPending(null) }}>
-            <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={t('Другая версия значения')} aria-label={t('Другая версия значения')} className="h-9 rounded-md border border-input bg-white px-2" />
+            <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={t('Другая версия значения')} aria-label={t('Другая версия значения')} className={inputClass} />
             <div className="flex items-center gap-2 min-w-0">
               {sourceSelect(pending, setPending)}
               <button className="bar-btn border border-border ml-auto flex-none" disabled={!value.trim()}>{t('Добавить')}</button>

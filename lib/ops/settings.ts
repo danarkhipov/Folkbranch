@@ -1,9 +1,10 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { desc, eq, isNull } from 'drizzle-orm'
+import { desc, eq, inArray, isNull } from 'drizzle-orm'
 import { getDb, schema } from '../db'
-import type { HistoryEntry, Role } from '../types'
+import { personName, type HistoryEntry, type Role } from '../types'
 import { Actor, newId, OpError, requireRole, seesOnlyPublic } from './core'
 import { say } from './app-config'
+import { changeDetails, readableSummary } from './history-text'
 import { hiddenPeople } from './people'
 
 export { archiveLang, getSetting, say, setSetting } from './app-config'
@@ -99,13 +100,41 @@ export function setMyPerson(actor: Actor, personId: string | null) {
 
 export function listHistory(actor: Actor, limit = 100): HistoryEntry[] {
   const db = getDb()
-  // Without `changes`: it can hold whole page texts, and this list only shows who did what.
   const h = schema.history
-  const rows = db.select({ id: h.id, at: h.at, actorName: h.actorName, summary: h.summary, personIds: h.personIds, undoOf: h.undoOf, undoneAt: h.undoneAt }).from(h).orderBy(desc(h.at)).limit(limit).all()
+  const rows = db.select({ id: h.id, at: h.at, actorName: h.actorName, summary: h.summary, personIds: h.personIds, changes: h.changes, undoOf: h.undoOf, undoneAt: h.undoneAt }).from(h).orderBy(desc(h.at)).limit(limit).all()
   const hidden = hiddenPeople(actor)
+  const reader = seesOnlyPublic(actor)
+  const names = new Map(db.select({ id: schema.persons.id, givenName: schema.persons.givenName, surname: schema.persons.surname }).from(schema.persons).all().map((p) => [p.id, personName(p)]))
+  const nameOf = (id: string) => names.get(id) || say('Без названия')
+  const relations = new Map([
+    ...db.select({ id: schema.parentChild.id, a: schema.parentChild.parentId, b: schema.parentChild.childId }).from(schema.parentChild).all(),
+    ...db.select({ id: schema.unions.id, a: schema.unions.aId, b: schema.unions.bId }).from(schema.unions).all(),
+  ].map((r) => [r.id, [r.a, r.b]]))
+  const relationEnds = (id: string) => relations.get(id) ?? []
+  // Older relation entries named nobody; for those who may see them, the two people make the line clickable.
+  const people = (stored: string, changes: { table: string; id: string }[]) => {
+    const ids = JSON.parse(stored) as string[]
+    if (ids.length || reader) return ids
+    return relationEnds(changes.find((c) => c.table === 'parentChild' || c.table === 'unions')?.id ?? '')
+  }
+  const undone = rows.map((r) => r.undoOf).filter((id): id is string => !!id)
+  const originals = new Map(undone.length ? db.select({ id: h.id, summary: h.summary, changes: h.changes }).from(h).where(inArray(h.id, undone)).all().map((o) => [o.id, readableSummary(o.summary, JSON.parse(o.changes), nameOf, undefined, relationEnds)]) : [])
   return rows
-    .map((r) => ({ id: r.id, at: r.at, actorName: r.actorName, summary: r.summary, personIds: JSON.parse(r.personIds) as string[], undoOf: r.undoOf, undoneAt: r.undoneAt }))
+    .map((r) => {
+      const changes = JSON.parse(r.changes)
+      const original = r.undoOf ? originals.get(r.undoOf) : undefined
+      const details = reader || r.undoOf ? undefined : changeDetails(changes)
+      const summary = reader ? r.summary : readableSummary(r.summary, changes, nameOf, original, relationEnds)
+      // The lines below say which fields changed, so the first line need not list them too.
+      const person = details?.length && changes.every((c: { table: string }) => c.table === 'persons') ? summary.split(': ')[0] : summary
+      return {
+        id: r.id, at: r.at, actorName: r.actorName, personIds: people(r.personIds, changes), undoOf: r.undoOf, undoneAt: r.undoneAt,
+        // Readers get only the entries about people they can see, and never the values.
+        summary: person,
+        ...(details ? { details } : {}),
+      }
+    })
     // Summaries contain names, so a reader sees only entries about people visible to them
     // and never entries with no named subject, which could be about anyone.
-    .filter((e) => !seesOnlyPublic(actor) || (e.personIds.length > 0 && e.personIds.every((id) => !hidden.has(id))))
+    .filter((e) => !reader || (e.personIds.length > 0 && e.personIds.every((id) => !hidden.has(id))))
 }

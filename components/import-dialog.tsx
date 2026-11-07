@@ -8,6 +8,7 @@ import { COLUMN_FIELDS, detectKind, guessMapping, jsonToTable, parseCsv, rowsToT
 import { familyWords, peopleWords } from '@/lib/names'
 import { parseFamilyText, planFamilyText } from '@/lib/textformat'
 import { MiniGraph, PlanSummary } from './text-dialog'
+import { Select } from '@/components/ui/select'
 
 const KIND_LABEL: Record<ImportKind, string> = { gedcom: 'GEDCOM', table: 'таблица CSV', xlsx: 'таблица Excel', json: 'JSON', text: 'текстовый формат' }
 
@@ -118,9 +119,7 @@ export function ImportDialog({ open, file, onOpenChange }: { open: boolean; file
                   <tr>{table.headers.map((h, i) => (
                     <th key={i} className="p-1.5 text-left font-normal whitespace-nowrap align-top">
                       <div className="text-ink-soft mb-1">{h || '—'}</div>
-                      <select aria-label={h} value={mapping[i] ?? ''} onChange={(e) => setMapping(mapping.map((m, j) => (j === i ? (e.target.value as ColumnField) : m === e.target.value ? '' : m)))} className="w-full rounded border border-input bg-white px-1 py-0.5">
-                        {COLUMN_FIELDS.map(([f, label]) => <option key={f} value={f}>{t(label)}</option>)}
-                      </select>
+                      <Select look="small" aria-label={h} value={mapping[i] ?? ''} onChange={(v) => setMapping(mapping.map((m, j) => (j === i ? (v as ColumnField) : m === v ? '' : m)))} options={COLUMN_FIELDS.map(([f, label]) => ({ value: f, label: t(label) }))} />
                     </th>
                   ))}</tr>
                 </thead>

@@ -7,8 +7,10 @@ import { api, useApp } from '@/lib/client'
 import { clock, useRecorder } from '@/lib/use-recorder'
 import { personName, type Person, type Story } from '@/lib/types'
 import { PersonPopover } from './person-pickers'
+import { Select } from '@/components/ui/select'
+import { inputClass } from '@/components/ui/input'
 
-const input = 'h-9 min-w-0 rounded-lg border border-input bg-white px-3 text-sm text-ink'
+const input = inputClass
 const label = 'flex flex-col gap-1 text-xs text-ink-soft'
 const primary = 'h-9 self-start rounded-lg bg-ink px-3 text-sm text-white disabled:opacity-40'
 const NO_MIC = { insecure: 'Запись голоса работает только по защищённому адресу (https). Можно выбрать файл.', unsupported: 'Этот браузер не умеет записывать звук. Можно выбрать файл.', denied: 'Нет доступа к микрофону. Разрешите его в браузере или выберите файл.' }
@@ -166,9 +168,7 @@ export function StoryFactDialog({ story, teller, person, onClose }: { story: Sto
           <p className="text-sm text-ink-soft">{t('Источником будет этот рассказ. Факт появится в сведениях со ссылкой на него.')}</p>
           {story.about.length > 1 && (
             <label className={label}>{t('О ком этот рассказ')}
-              <select className={input} value={personId} onChange={(e) => setPersonId(e.target.value)}>
-                {story.about.map((id) => <option key={id} value={id}>{personName(byId.get(id)!)}</option>)}
-              </select>
+              <Select aria-label={t('О ком этот рассказ')} value={personId} onChange={setPersonId} options={story.about.map((id) => ({ value: id, label: personName(byId.get(id)!) }))} />
             </label>
           )}
           <label className={label}>{t('Что произошло')}

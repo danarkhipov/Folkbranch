@@ -6,6 +6,7 @@ import { useApp } from '@/lib/client'
 import { CARD_H, layoutFamily } from '@/lib/graph/layout'
 import { PAPERS, planOneSheet, planSheets, readability, type Paper } from '@/lib/graph/print-plan'
 import type { Graph, Person } from '@/lib/types'
+import { Select } from '@/components/ui/select'
 
 const SIZES = [7, 8, 9, 10, 12]
 const hide = (p: Person): Person => ({ ...p, givenName: '', surname: '', maidenName: '', patronymic: '', birthDate: '', birthYear: null, birthPlace: '', sex: 'U', avatarMediaId: null, avatarCrop: null, hidden: true })
@@ -48,8 +49,6 @@ export function PrintDialog({ graph, onClose }: { graph: Graph; onClose: () => v
       setBusy(null)
     }
   }
-
-  const select = 'h-9 rounded-lg border border-input bg-white px-2 text-sm text-ink'
   const label = 'flex flex-col gap-1 text-xs text-ink-soft'
   return (
     <Dialog open onOpenChange={(o) => !o && busy === null && onClose()}>
@@ -70,21 +69,15 @@ export function PrintDialog({ graph, onClose }: { graph: Graph; onClose: () => v
             </div>
             {mode === 'one' ? (
               <label className={label}>{t('Бумага')}
-                <select className={select} value={paper} onChange={(e) => setPaper(e.target.value as Paper)}>
-                  {(Object.keys(PAPERS) as Paper[]).map((p) => <option key={p} value={p}>{p}, {PAPERS[p][0]} × {PAPERS[p][1]} {t('мм')}</option>)}
-                </select>
+                <Select aria-label={t('Бумага')} value={paper} onChange={(v) => setPaper(v as Paper)} options={(Object.keys(PAPERS) as Paper[]).map((p) => ({ value: p, label: `${p}, ${PAPERS[p][0]} × ${PAPERS[p][1]} ${t('мм')}` }))} />
               </label>
             ) : (
               <>
                 <label className={label}>{t('Бумага')}
-                  <select className={select} value={sheet} onChange={(e) => setSheet(e.target.value as Paper)}>
-                    {(['A4', 'A3'] as Paper[]).map((p) => <option key={p} value={p}>{p}</option>)}
-                  </select>
+                  <Select aria-label={t('Бумага')} value={sheet} onChange={(v) => setSheet(v as Paper)} options={(['A4', 'A3'] as Paper[]).map((p) => ({ value: p, label: p }))} />
                 </label>
                 <label className={label}>{t('Размер имён')}
-                  <select className={select} value={namePt} onChange={(e) => setNamePt(Number(e.target.value))}>
-                    {SIZES.map((n) => <option key={n} value={n}>{n} {t('пт')}</option>)}
-                  </select>
+                  <Select aria-label={t('Размер имён')} value={String(namePt)} onChange={(v) => setNamePt(Number(v))} options={SIZES.map((n) => ({ value: String(n), label: `${n} ${t('пт')}` }))} />
                 </label>
               </>
             )}
