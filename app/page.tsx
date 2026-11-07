@@ -2,6 +2,7 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { guestActor } from '@/lib/api-auth'
 import { getAuth, providers } from '@/lib/auth'
+import { localLoginAllowed } from '@/lib/local-login'
 import { archiveLang, getSetting, hasUsers, ownCard } from '@/lib/ops/settings'
 import { assistantState } from '@/lib/agent/agent'
 import { FamilyApp } from '@/components/family-app'
@@ -15,7 +16,7 @@ export default async function Home() {
   const session = await getAuth().api.getSession({ headers: h })
   if (!session) {
     const guest = guestActor(h)
-    if (!guest) redirect('/login')
+    if (!guest) redirect(localLoginAllowed(h.get('host')) ? '/api/auth/family/local' : '/login')
     return <FamilyApp assistant={{ ready: false, reason: 'readers', canFix: false }} me={{ id: guest.userId, name: guest.name, role: 'reader', personId: null, guest: true }} lang={archiveLang()} familyName={getSetting('familyName') ?? ''} providers={{ google: false, yandex: false }} />
   }
   const u = session.user as typeof session.user & { role: Role; personId: string | null }

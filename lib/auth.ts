@@ -8,6 +8,7 @@ import { nextCookies } from 'better-auth/next-js'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb, schema } from './db'
+import { localLoginAllowed } from './local-login'
 import { findInvite, findOwnerId, hasUsers, isRecoveryToken, setSetting } from './ops/settings'
 import { loadDemo } from './demo'
 import { publicOrigins, publicUrl } from './public-url'
@@ -69,6 +70,14 @@ const familyAccess = () =>
           await createFamilyUser(ctx, invite.name, invite.role, invite.personId)
         }
         return ctx.json({ ok: true })
+      }),
+      local: createAuthEndpoint('/family/local', { method: 'GET' }, async (ctx) => {
+        if (!localLoginAllowed(ctx.headers?.get('host'))) throw new APIError('FORBIDDEN', { message: 'not on this computer' })
+        const owner = await ctx.context.internalAdapter.findUserById(findOwnerId() ?? '')
+        if (!owner) throw ctx.redirect('/setup')
+        const session = await ctx.context.internalAdapter.createSession(owner.id)
+        await setSessionCookie(ctx, { session, user: owner })
+        throw ctx.redirect('/')
       }),
     },
   }) satisfies BetterAuthPlugin

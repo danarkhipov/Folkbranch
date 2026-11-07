@@ -15,6 +15,8 @@ The app opens on http://localhost:3417 with its data in `./data`, which Git igno
 
 If a page keeps reloading by itself in `pnpm dev`, the development cache is stale. Stop the server, run `rm -rf .next/dev` and start it again. Your data is not in there.
 
+In `pnpm dev` you are signed in as the owner by yourself, on this computer only, so signing out brings you straight back. To try another role, open an invitation link. A build does this only with `FOLKBRANCH_LOCAL_LOGIN=1` and a `localhost` address; never set it on a server.
+
 ## Check it
 
 | Command | What it runs |

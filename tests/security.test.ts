@@ -9,6 +9,7 @@ import { assistantResponse } from '../lib/agent/respond'
 import { saveAttachment } from '../lib/agent/attachments'
 import { assistantActor } from '../lib/agent/agent'
 import { fetchRemote, isPrivateAddress, readMediaFile, uploadMedia } from '../lib/ops/media'
+import { localLoginAllowed } from '../lib/local-login'
 import { fromOurPages } from '../lib/same-origin'
 import { editor, loadFamily, owner, reader } from './fixture-family'
 
@@ -110,5 +111,26 @@ describe('what a camera recorded', () => {
     const m = await uploadMedia(owner, withGps, 'дом.jpg', f.ivan.id)
     expect((await sharp((await readMediaFile(reader, m.id, 'orig')).data).metadata()).exif).toBeUndefined()
     expect((await sharp((await readMediaFile(editor, m.id, 'orig')).data).metadata()).exif).toBeDefined()
+  })
+})
+
+describe('signing in without a link', () => {
+  const dev = { NODE_ENV: 'development' }
+  const prod = { NODE_ENV: 'production' }
+  it('works only on this computer', () => {
+    for (const host of ['localhost:3417', '127.0.0.1:3417', '[::1]:3417', 'localhost']) expect(localLoginAllowed(host, dev), host).toBe(true)
+    for (const host of ['192.168.1.5:3417', 'family.example.org', 'localhost.example.org', 'evil.test:3417', '', null]) expect(localLoginAllowed(host, dev), String(host)).toBe(false)
+  })
+  it('is off in a real install unless asked for', () => {
+    expect(localLoginAllowed('localhost:3000', prod)).toBe(false)
+    expect(localLoginAllowed('localhost:3000', { NODE_ENV: 'production', FOLKBRANCH_LOCAL_LOGIN: '0' })).toBe(false)
+    expect(localLoginAllowed('localhost:3000', { NODE_ENV: 'production', FOLKBRANCH_LOCAL_LOGIN: '1' })).toBe(true)
+  })
+  it('stays off when the app is set up on a public address, whatever the request says', () => {
+    const before = process.env.BETTER_AUTH_URL
+    process.env.BETTER_AUTH_URL = 'https://family.example.org'
+    expect(localLoginAllowed('localhost:3000', dev)).toBe(false)
+    if (before === undefined) delete process.env.BETTER_AUTH_URL
+    else process.env.BETTER_AUTH_URL = before
   })
 })

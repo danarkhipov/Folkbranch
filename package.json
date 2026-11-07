@@ -25,7 +25,7 @@
   },
   "bugs": "https://github.com/danarkhipov/folkbranch/issues",
   "scripts": {
-    "dev": "next dev -p 3417",
+    "dev": "next dev -H 127.0.0.1 -p 3417",
     "build": "next build",
     "start": "next start",
     "lint": "tsc --noEmit",
