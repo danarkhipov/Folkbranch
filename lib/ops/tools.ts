@@ -191,7 +191,7 @@ export const CORE_TOOLS = ['search_people', 'query_people', 'search_archive', 'g
 export const TOOL_GROUPS: Record<string, { about: string; tools: string[] }> = {
   people: { about: 'many at once, relatives, gaps, overview, link details, whole tree, tables', tools: ['update_people', 'get_relatives', 'find_gaps', 'get_overview', 'update_relation', 'remove_parent_links', 'export_text', 'preview_text', 'parse_table'] },
   sources: { about: 'removing sources, versions of values', tools: ['remove_source', 'add_version', 'choose_version', 'reject_version', 'restore_version'] },
-  files: { about: 'photos, avatars, attached files, GEDCOM', tools: ['list_photos', 'save_attachment', 'set_avatar', 'tag_photo', 'untag_photo', 'update_photo', 'delete_photo', 'upload_photo', 'read_attachment', 'import_gedcom_attachment', 'export_gedcom', 'preview_gedcom', 'import_gedcom'] },
+  files: { about: 'photos, avatars, attached files, GEDCOM, research cases', tools: ['import_kinship_case', 'list_photos', 'save_attachment', 'set_avatar', 'tag_photo', 'untag_photo', 'update_photo', 'delete_photo', 'upload_photo', 'read_attachment', 'import_gedcom_attachment', 'export_gedcom', 'preview_gedcom', 'import_gedcom'] },
   pages: { about: 'pages about people', tools: ['list_pages', 'get_page', 'create_page', 'update_page', 'move_page', 'delete_page'] },
   screen: { about: 'show someone or a path on the chart', tools: ['focus_person', 'show_path', 'set_chart_direction'] },
   admin: { about: 'archive name, language, people with access, invitations', tools: ['get_settings', 'update_settings', 'list_users', 'set_user_role', 'list_invites', 'create_invite', 'revoke_invite'] },

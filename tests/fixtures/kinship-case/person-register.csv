@@ -1,0 +1,6 @@
+person_id,preferred_label,living_status,names_as_written,normalized_name_variants,birth_estimate,death_estimate,places,historical_jurisdictions,relatives_as_reported,occupation_or_status,confession_or_community_as_recorded,source_artifact_ids,candidate_status,merge_or_split_rationale,notes
+P-001,Иван Петрович Соколов,deceased,Ивана Петрова Соколова,Sokolov Ivan,1880,1942,Кострома,Костромская губерния,,плотник,,A-001;A-002,confirmed,,
+P-002,Соколова Анна Ивановна,deceased,Анна,,~1885,после 1950,Кострома,,,,,A-001,confirmed,,
+P-003,Пётр Иванович Соколов,living,Пётр,,1950,,Москва,,,,,,confirmed,,адрес не нужен
+P-004,Иван Соколов,unknown,Иван Соколов,,около 1881,,Ярославль,,,,,A-003,candidate,Может быть другим человеком того же имени,
+P-005,Иван Соколов из Твери,deceased,,,1879,1930,,,,,,,rejected,Другой человек,

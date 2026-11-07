@@ -1,0 +1,5 @@
+relationship_id,person_a_id,relationship_type,person_b_id,biological_legal_household,claim_ids,supporting_artifact_ids,contradicting_artifact_ids,independence_groups,status,confidence,rationale
+R-001,P-001,spouse,P-002,legal,C-002,A-001,,G1,single-source,moderate,Запись о браке
+R-002,P-001,parent,P-003,biological,,A-001;A-002,,G1;G2,corroborated,high,Две независимые записи
+R-003,P-004,parent,P-003,biological,,A-003,,G3,hypothesis,low,Совпало только имя
+R-004,P-002,mother,P-003,adoptive,,A-002,,G2,strongly-corroborated,high,Документы об усыновлении

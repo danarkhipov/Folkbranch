@@ -1,0 +1,4 @@
+artifact_id,captured_at,source_title,source_url_or_path,source_type,repository_or_archive,archival_reference,record_date,place_as_written,language_script,person_ids,names_as_written,summary,provenance_level,directness,originality,independence_group,legibility,access_notes,sha256,related_claim_ids,reliability_notes,status
+A-001,2026-11-01,Метрическая книга,https://example.org/record/1,church-book,ГАКО,ф. 130 оп. 1 д. 5,1880,Кострома,ru,P-001;P-002,,,primary,direct,original,G1,,,,C-001,,reviewed
+A-002,2026-11-02,Перепись,/Users/someone/private/scan.jpg,census,ГАКО,ф. 2 оп. 3 д. 4,1926,Кострома,ru,P-001;P-003,,,secondary,indirect,transcript,G2,,,,,,reviewed
+A-003,2026-11-03,Индекс имён,,index,,,,,ru,P-004,,,tertiary,lead-only,index,G3,,,,,,lead

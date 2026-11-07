@@ -56,6 +56,7 @@ const CAREFUL: Record<string, [string, string]> = {
   remove_relation: ['Удалить связь', 'Delete a link'],
   remove_parent_links: ['Удалить связи', 'Delete links'],
   import_gedcom: ['Импортировать GEDCOM', 'Import GEDCOM'],
+  import_kinship_case: ['Добавить дело из исследования', 'Add a research case'],
   delete_page: ['Удалить страницу', 'Delete a page'],
   delete_photo: ['Удалить фото', 'Delete a photo'],
   untag_photo: ['Снять отметку с фото', 'Remove a photo tag'],

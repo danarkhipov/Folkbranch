@@ -186,7 +186,7 @@ export function addParent(c: Changes, parentId: string, childId: string, kind: P
   c.insert('parentChild', { id: newId(), parentId, childId, kind, certainty })
 }
 
-export function addUnion(c: Changes, aId: string, bId: string, kind: UnionKind = 'marriage', startDate = '', endDate = '', place = '') {
+export function addUnion(c: Changes, aId: string, bId: string, kind: UnionKind = 'marriage', startDate = '', endDate = '', place = '', certainty?: Certainty) {
   const db = getDb()
   const s = schema.unions
   // A marriage never joins siblings, or a parent and their child: the chart would draw a couple dot between them.
@@ -194,7 +194,7 @@ export function addUnion(c: Changes, aId: string, bId: string, kind: UnionKind =
   const pa = parentsOf(aId), pb = parentsOf(bId)
   if (pa.some((p) => pb.includes(p)) || pa.includes(bId) || pb.includes(aId)) return
   const dup = db.select().from(s).where(or(and(eq(s.aId, aId), eq(s.bId, bId)), and(eq(s.aId, bId), eq(s.bId, aId)))).get()
-  if (!dup) c.insert('unions', { id: newId(), aId, bId, kind, startDate, endDate, place })
+  if (!dup) c.insert('unions', { id: newId(), aId, bId, kind, startDate, endDate, place, ...(certainty ? { certainty } : {}) })
 }
 
 export const FIELD: Record<string, string> = {

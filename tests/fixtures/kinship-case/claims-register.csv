@@ -1,0 +1,4 @@
+claim_id,claim_text,subject_person_ids,claim_type,artifact_ids,supporting_independence_groups,contradicting_artifact_ids,status,confidence,rationale,next_action
+C-001,Родился в 1880 году,P-001,birth,A-001,G1,,single-source,moderate,Метрическая книга,Искать вторую запись
+C-002,Брак заключён в 1905 году,P-001;P-002,marriage,A-001,G1,,hypothesis,low,Только семейный рассказ,
+C-003,Умер в 1941 году,P-001,death,A-004,G4,A-002,contradicted,low,Другой документ называет 1942 год,

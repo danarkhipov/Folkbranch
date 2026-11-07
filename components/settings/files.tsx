@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Section } from '@/components/ui/section'
 import { SwitchRow } from '@/components/ui/switch'
 import { api, useApp } from '@/lib/client'
+import { KinshipCase } from './kinship-case'
 import { RestoreForm } from './restore-form'
 
 export function Files({ onText }: { onText: () => void }) {
@@ -23,6 +24,7 @@ export function Files({ onText }: { onText: () => void }) {
           <ImportDialog open={importing} onOpenChange={setImporting} />
         </Section>
       )}
+      {canEdit && <KinshipCase />}
       <Section title={t('Скачать файл для других программ')} description={t('Файл .ged открывается в программах для родословных. В него входят люди и связи, но не биографии и фотографии.')}>
         {me.role !== 'reader' && <SwitchRow title={t('Не включать живых родственников в файл')} checked={hide} onChange={setHide} />}
         <Button asChild variant="outline" className="self-start"><a href={`/api/v1/gedcom/export?living=${hide ? 'hide' : 'show'}`}><Download /> {t('Скачать файл')}</a></Button>
