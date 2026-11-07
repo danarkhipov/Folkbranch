@@ -1,9 +1,10 @@
 // Finding things in the archive: by what is written anywhere, or by exact conditions on people.
 import MiniSearch from 'minisearch'
 import { z } from 'zod'
+import { dataStamp } from '../db'
 import { blocksToMarkdown } from '../markdown'
 import { lifeYears, type Person } from '../types'
-import type { Actor } from './core'
+import { seesOnlyPublic, type Actor } from './core'
 import { listAllMedia } from './media'
 import { readablePages } from './pages'
 import { getGraph } from './people'
@@ -20,8 +21,13 @@ const personText = (p: Person) => [
 
 interface Doc { id: string; kind: 'person' | 'page' | 'photo'; refId: string; personId: string | null; title: string; text: string }
 
-/** Looks through people, pages and photo captions, forgiving typos and Russian word endings. */
-export function searchArchive(actor: Actor, query: string, limit = 20) {
+const shared = globalThis as unknown as { __folkbranchArchive?: { stamp: string; index: MiniSearch<Doc> } }
+
+/** Built once per change for those who see everything. Others see less, so theirs is built for them. */
+function archiveIndex(actor: Actor) {
+  const stamp = dataStamp()
+  const reusable = !seesOnlyPublic(actor) && !actor.guest
+  if (reusable && stamp && shared.__folkbranchArchive?.stamp === stamp) return shared.__folkbranchArchive.index
   const people = getGraph(actor).persons.filter((p) => !p.hidden)
   const docs: Doc[] = [
     ...people.map((p): Doc => ({ id: `person:${p.id}`, kind: 'person', refId: p.id, personId: p.id, title: fullName(p), text: personText(p) })),
@@ -30,6 +36,13 @@ export function searchArchive(actor: Actor, query: string, limit = 20) {
   ]
   const index = new MiniSearch<Doc>({ fields: ['title', 'text'], storeFields: ['kind', 'refId', 'personId', 'title', 'text'], processTerm: (t) => normal(t) })
   index.addAll(docs)
+  if (reusable && stamp) shared.__folkbranchArchive = { stamp, index }
+  return index
+}
+
+/** Looks through people, pages and photo captions, forgiving typos and Russian word endings. */
+export function searchArchive(actor: Actor, query: string, limit = 20) {
+  const index = archiveIndex(actor)
   const options = { prefix: (t: string) => t.length > 2, fuzzy: (t: string) => (t.length > 3 ? 0.25 : false), boost: { title: 3 } }
   // Every word if possible, any word otherwise.
   const every = index.search(query, { ...options, combineWith: 'AND' })

@@ -10,6 +10,7 @@ import { get, human, op, type Route } from '../router'
 export const exchangeRoutes: Route[] = [
   get('gaps', 'What is unfinished, person by person', ({ actor }) => findGaps(actor, { limit: 200 }).map(({ person, ...r }) => ({ id: person.id, ...r }))),
   get('history', 'Recent changes', ({ actor, query }) => settings.listHistory(actor, Math.min(Number(query.get('limit')) || 100, 500))),
+  get('persons/:id/history', 'What was changed about one person, by whom and when', ({ actor, params }) => settings.listHistory(actor, 100, params.id)),
   op('POST', 'history/:id/undo', 'undo', ({ params }) => ({ historyId: params.id })),
 
   get('text/export', 'The graph in the text format', ({ actor }) => new Response(serializeFamilyText(people.getGraph(actor), settings.getSetting('familyName') ?? ''), { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })),

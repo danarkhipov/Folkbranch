@@ -41,7 +41,7 @@ export function ReviewPanel({ onClose }: { onClose: () => void }) {
                     {o.details?.map((line, j) => <div key={j} className="text-xs text-ink-soft break-words whitespace-pre-wrap">{line}</div>)}
                     {o.audio && <audio controls preload="none" className="mt-1 h-8 w-full" src={`/api/v1/proposals/${d.id}/ops/${i}/audio`} />}
                   </div>
-                  <button title={t('Убрать эту правку')} disabled={busy} className="hidden group-hover:block text-ink-faint hover:text-destructive flex-none self-start" onClick={() => act(() => api(`proposals/${d.id}/ops/${i}`, { method: 'DELETE' }))}><X size={13} /></button>
+                  <button title={t('Убрать эту правку')} disabled={busy} className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 text-ink-faint hover:text-destructive flex-none self-start" onClick={() => act(() => api(`proposals/${d.id}/ops/${i}`, { method: 'DELETE' }))}><X size={13} /></button>
                 </div>
               ))}
             </div>

@@ -8,6 +8,6 @@ import { LoginScreen } from '@/components/auth-screens'
 export const dynamic = 'force-dynamic'
 
 export default async function Login() {
-  if (localLoginAllowed((await headers()).get('host'))) redirect('/api/auth/family/local')
+  if (localLoginAllowed(await headers())) redirect('/api/auth/family/local')
   return <LoginScreen lang={archiveLang()} familyName={getSetting('familyName') ?? ''} providers={providers()} />
 }

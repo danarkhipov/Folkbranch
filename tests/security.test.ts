@@ -3,7 +3,10 @@ import { MockLanguageModelV4, simulateReadableStream } from 'ai/test'
 import { readUIMessageStream, type UIMessage, type UIMessageChunk } from 'ai'
 import sharp from 'sharp'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { externalLinks } from '../lib/agent/agent'
+import { changesWhoIsLiving, externalLinks } from '../lib/agent/agent'
+import { isMediaFileName } from '../lib/ops/archive'
+import { createPerson, deletePerson } from '../lib/ops/people'
+import { listHistory } from '../lib/ops/settings'
 import { countTokens, overLimit } from '../lib/agent/limits'
 import { assistantResponse } from '../lib/agent/respond'
 import { saveAttachment } from '../lib/agent/attachments'
@@ -117,20 +120,53 @@ describe('what a camera recorded', () => {
 describe('signing in without a link', () => {
   const dev = { NODE_ENV: 'development' }
   const prod = { NODE_ENV: 'production' }
+  const from = (host: string | null, more: Record<string, string> = {}) => ({ get: (name: string) => (name === 'host' ? host : more[name] ?? null) })
   it('works only on this computer', () => {
-    for (const host of ['localhost:3417', '127.0.0.1:3417', '[::1]:3417', 'localhost']) expect(localLoginAllowed(host, dev), host).toBe(true)
-    for (const host of ['192.168.1.5:3417', 'family.example.org', 'localhost.example.org', 'evil.test:3417', '', null]) expect(localLoginAllowed(host, dev), String(host)).toBe(false)
+    for (const host of ['localhost:3417', '127.0.0.1:3417', '[::1]:3417', 'localhost']) expect(localLoginAllowed(from(host), dev), host).toBe(true)
+    for (const host of ['192.168.1.5:3417', 'family.example.org', 'localhost.example.org', 'evil.test:3417', '', null]) expect(localLoginAllowed(from(host), dev), String(host)).toBe(false)
+  })
+  it('refuses what arrived through a tunnel or a proxy, even if it says localhost', () => {
+    expect(localLoginAllowed(from('localhost:3417', { 'x-forwarded-for': '127.0.0.1' }), dev)).toBe(true)
+    expect(localLoginAllowed(from('localhost:3417', { 'x-forwarded-for': '203.0.113.9' }), dev)).toBe(false)
+    expect(localLoginAllowed(from('localhost:3417', { 'cf-connecting-ip': '203.0.113.9' }), dev)).toBe(false)
+    expect(localLoginAllowed(from('localhost:3417', { 'ngrok-trace-id': 'x' }), dev)).toBe(false)
   })
   it('is off in a real install unless asked for', () => {
-    expect(localLoginAllowed('localhost:3000', prod)).toBe(false)
-    expect(localLoginAllowed('localhost:3000', { NODE_ENV: 'production', FOLKBRANCH_LOCAL_LOGIN: '0' })).toBe(false)
-    expect(localLoginAllowed('localhost:3000', { NODE_ENV: 'production', FOLKBRANCH_LOCAL_LOGIN: '1' })).toBe(true)
+    expect(localLoginAllowed(from('localhost:3000'), prod)).toBe(false)
+    expect(localLoginAllowed(from('localhost:3000'), { NODE_ENV: 'production', FOLKBRANCH_LOCAL_LOGIN: '0' })).toBe(false)
+    expect(localLoginAllowed(from('localhost:3000'), { NODE_ENV: 'production', FOLKBRANCH_LOCAL_LOGIN: '1' })).toBe(true)
   })
   it('stays off when the app is set up on a public address, whatever the request says', () => {
     const before = process.env.BETTER_AUTH_URL
     process.env.BETTER_AUTH_URL = 'https://family.example.org'
-    expect(localLoginAllowed('localhost:3000', dev)).toBe(false)
+    expect(localLoginAllowed(from('localhost:3000'), dev)).toBe(false)
     if (before === undefined) delete process.env.BETTER_AUTH_URL
     else process.env.BETTER_AUTH_URL = before
+  })
+})
+
+describe('what the audit found', () => {
+  it('a restored copy cannot lead file reads out of the media folder', () => {
+    for (const bad of ['../../proc/self/environ', '/etc/passwd', '..', 'a/b', '.hidden']) expect(isMediaFileName(bad), bad).toBe(false)
+    for (const good of ['abc.jpg', 'x_1-2.webp']) expect(isMediaFileName(good), good).toBe(true)
+  })
+
+  it('a reader sees no trace of someone deleted, who may have been living', () => {
+    const p = createPerson(owner, { givenName: 'Удалённая', surname: 'Живущая', sex: 'F', birthDate: '1990', deathDate: '', birthPlace: '' })
+    deletePerson(owner, p.id)
+    expect(JSON.stringify(listHistory(reader))).not.toContain('Живущая')
+    expect(JSON.stringify(listHistory(owner))).toContain('Живущая')
+  })
+
+  it('the assistant asks before marking anyone as dead', () => {
+    expect(changesWhoIsLiving({ id: 'x', patch: { living: false } })).toBe(true)
+    expect(changesWhoIsLiving({ id: 'x', patch: { deathDate: '1990' } })).toBe(true)
+    expect(changesWhoIsLiving({ id: 'x', patch: { birthPlace: 'Тула' } })).toBe(false)
+  })
+
+  it('a link with no scheme counts as leading elsewhere', () => {
+    expect(externalLinks({ href: '//evil.example/?d=1' })).toEqual(['//evil.example/?d=1'])
+    expect(externalLinks({ url: '/api/v1/media/x/file' })).toEqual([])
+    expect(externalLinks({ url: 'https://a.example/x' })).toEqual(['https://a.example/x'])
   })
 })

@@ -44,7 +44,10 @@ export function assistantActor(actor: Actor, since?: number): Actor {
   return { ...actor, name: `${say('Ассистент')} → ${actor.name}`, assistant: true, since }
 }
 
-export const externalLinks = (input: unknown) => [...new Set(JSON.stringify(input ?? '').match(/https?:\/\/[^\s"')\\]+/gi) ?? [])]
+export const externalLinks = (input: unknown) => [...new Set(JSON.stringify(input ?? '').match(/(?:https?:|(?<![\w:/.-]))\/\/[^\s"')\\]+/gi) ?? [])]
+
+/** Marking someone as dead shows them to readers and links, so a person always sees that first, whatever a text told the model. */
+export const changesWhoIsLiving = (input: unknown) => /"(living|deathDate)"\s*:/.test(JSON.stringify(input ?? ''))
 
 /** What the assistant's button leads this person to: the chat, or why there is none and what to do. */
 export function assistantState(actor: Actor): AssistantState {
@@ -181,7 +184,7 @@ export function buildAgent(person: Actor, opts: { model?: LanguageModel; trustWr
       // A link written into the archive or fetched by the server can carry data out, so a person always sees it.
       const outward = status === 'not-applicable' && def?.risk === 'read' ? [] : externalLinks(toolCall.input)
       if (outward.length) return { type: 'user-approval' as const, reason: [def?.describe?.(actor, toolCall.input), `${say('Внешние ссылки')}: ${outward.join(', ')}`].filter(Boolean).join('\n') }
-      if (status === 'not-applicable' && def?.risk === 'write' && ++unasked > MAX_UNASKED_WRITES) status = 'user-approval'
+      if (status === 'not-applicable' && def?.risk === 'write' && ((toolCall.toolName.startsWith('update_') && changesWhoIsLiving(toolCall.input)) || ++unasked > MAX_UNASKED_WRITES)) status = 'user-approval'
       // The reason reaches the person's confirmation card, not the model.
       return status === 'user-approval' ? { type: status, reason: def?.describe?.(actor, toolCall.input) ?? '' } : status
     },

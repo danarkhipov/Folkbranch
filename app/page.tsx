@@ -16,7 +16,7 @@ export default async function Home() {
   const session = await getAuth().api.getSession({ headers: h })
   if (!session) {
     const guest = guestActor(h)
-    if (!guest) redirect(localLoginAllowed(h.get('host')) ? '/api/auth/family/local' : '/login')
+    if (!guest) redirect(localLoginAllowed(h) ? '/api/auth/family/local' : '/login')
     return <FamilyApp assistant={{ ready: false, reason: 'readers', canFix: false }} me={{ id: guest.userId, name: guest.name, role: 'reader', personId: null, guest: true }} lang={archiveLang()} familyName={getSetting('familyName') ?? ''} providers={{ google: false, yandex: false }} />
   }
   const u = session.user as typeof session.user & { role: Role; personId: string | null }

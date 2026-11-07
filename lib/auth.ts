@@ -72,7 +72,7 @@ const familyAccess = () =>
         return ctx.json({ ok: true })
       }),
       local: createAuthEndpoint('/family/local', { method: 'GET' }, async (ctx) => {
-        if (!localLoginAllowed(ctx.headers?.get('host'))) throw new APIError('FORBIDDEN', { message: 'not on this computer' })
+        if (!ctx.headers || !localLoginAllowed(ctx.headers)) throw new APIError('FORBIDDEN', { message: 'not on this computer' })
         const owner = await ctx.context.internalAdapter.findUserById(findOwnerId() ?? '')
         if (!owner) throw ctx.redirect('/setup')
         const session = await ctx.context.internalAdapter.createSession(owner.id)

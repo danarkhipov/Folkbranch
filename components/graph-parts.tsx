@@ -71,7 +71,7 @@ export const PersonCard = memo(function PersonCard({ p, left, top, className, se
       className={className}
       style={{ left, top }}
       onClick={open}
-      onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) open() }}
+      onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); open() } }}
       onMouseEnter={() => acts.current.hover(p.id)}
       onMouseLeave={() => acts.current.hover(null)}
       onPointerEnter={() => setHovered(true)}
@@ -158,7 +158,7 @@ export const FamilyDots = memo(function FamilyDots({ unions, active, canEdit, ac
 function CardTools({ id, rootsBelow, lang, acts }: { id: string; rootsBelow: boolean; lang: Lang; acts: Acts }) {
   const stop = (e: React.SyntheticEvent) => e.stopPropagation()
   const add = (type: QuickType, label: string, side: string, key = side) => (
-    <button key={key} tabIndex={-1} className={`tool add ${side}`} title={`${translate(lang, label)}. ${translate(lang, 'Протяните к человеку, чтобы связать')}`} aria-label={translate(lang, label)} onPointerDown={(e) => acts.current.drag(e, id)} onClick={() => acts.current.add(type, id)}><Plus strokeWidth={2.5} /></button>
+    <button key={key} className={`tool add ${side}`} title={`${translate(lang, label)}. ${translate(lang, 'Протяните к человеку, чтобы связать')}`} aria-label={translate(lang, label)} onPointerDown={(e) => acts.current.drag(e, id)} onClick={() => acts.current.add(type, id)}><Plus strokeWidth={2.5} /></button>
   )
   return (
     <div className="tools" onClick={stop} onPointerDown={stop} onMouseDown={stop} onDoubleClick={stop} onKeyDown={stop}>

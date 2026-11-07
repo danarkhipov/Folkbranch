@@ -54,7 +54,7 @@ export const OUTPUTS: Record<string, z.ZodType> = {
   preview_text: z.object({ creates: z.array(text), updates: z.array(z.unknown()), relations: z.number(), ambiguous: z.array(z.unknown()), errors: z.array(z.unknown()), operations: z.number() }),
   export_gedcom: text,
   preview_gedcom: z.object({ version: text, persons: z.number(), families: z.number(), sample: z.array(text), existing: z.number() }),
-  get_history: z.array(z.object({ id, at: z.number(), actorName: text, summary: text, details: z.array(z.object({ label: text, before: text.nullable(), after: text.nullable() })).optional(), personIds: z.array(id), undoOf: id.nullable(), undoneAt: z.number().nullable() })),
+  get_history: z.array(z.object({ id, at: z.number(), actorName: text, userId: text, byAgent: z.boolean(), summary: text, details: z.array(z.object({ label: text, before: text.nullable(), after: text.nullable() })).optional(), personIds: z.array(id), undoOf: id.nullable(), undoneAt: z.number().nullable() })),
   my_proposals: z.array(proposal),
   query_people: z.object({ total: z.number(), people: z.array(brief.extend({ birthPlace: text.optional(), deathPlace: text.optional() })), groups: z.array(z.object({ key: text, count: z.number() })).optional() }),
   search_archive: z.object({ total: z.number(), results: z.array(z.object({ kind: text, id, personId: id.nullish(), title: text, snippet: text })) }),

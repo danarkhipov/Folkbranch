@@ -25,6 +25,7 @@ const SPARE_BYTES = 16 * 1024 * 1024
 /** Only tables and indexes: a view or a trigger in a file from elsewhere could run on later queries. */
 const FORBIDDEN_KINDS = ['view', 'trigger']
 const REQUIRED_TABLES = ['persons', 'parent_child', 'unions', 'media', 'user', 'settings', '__drizzle_migrations']
+export const isMediaFileName = (name: string) => /^[A-Za-z0-9_-][A-Za-z0-9_.-]*$/.test(name)
 const SAFE_NAME = /^(family\.db|manifest\.json|media\/[A-Za-z0-9_-][A-Za-z0-9_.-]*)$/
 
 interface ManifestFile { path: string; size: number; sha256: string }
@@ -174,6 +175,9 @@ async function inspectDatabase(file: string, newestKnown: number) {
     if (db.pragma('integrity_check', { simple: true }) !== 'ok') throw refuse('Файл копии повреждён')
     const made = db.prepare('select max(created_at) from __drizzle_migrations').pluck().get() as number
     if (made > newestKnown) throw refuse('Копия сделана более новой версией приложения. Сначала обновите приложение', 409)
+    // A file name from the copy is later joined to the media folder: it must not lead out of it.
+    const names = db.prepare('select filename from media').pluck().all() as string[]
+    if (names.some((n) => !isMediaFileName(n))) throw refuse('В файле копии есть лишние файлы')
     const count = (t: string) => db.prepare(`select count(*) from ${t}`).pluck().get() as number
     const owner = db.prepare("select id, name from user where role = 'owner' limit 1").get() as { id: string; name: string } | undefined
     let login: string | null = null

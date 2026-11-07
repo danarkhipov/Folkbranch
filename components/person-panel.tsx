@@ -2,7 +2,7 @@
 import { useContext, useEffect, useRef, useState, type RefObject } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import dynamic from 'next/dynamic'
-import { Maximize2, Minimize2, PencilLine, Search, Trash2, X } from 'lucide-react'
+import { History, Maximize2, Minimize2, PencilLine, Search, Trash2, X } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { api, Presence, useApp, usePersonSave } from '@/lib/client'
 import { yourTerm } from '@/lib/kinship'
@@ -10,7 +10,7 @@ import { editValue,  } from '@/lib/claims'
 import { patronymicFrom } from '@/lib/names'
 import { normal } from '@/lib/search/words'
 import { cn } from '@/lib/utils'
-import { personName, type ClaimField, type PageMeta, type Person } from '@/lib/types'
+import { personName, type ClaimField, type HistoryEntry, type PageMeta, type Person } from '@/lib/types'
 import { PanelEdge, useStoredSize } from './panel-size'
 import { MatchLine, useEsc, type SearchHit } from './person-pickers'
 import { Field, SearchTerms } from './person-fields'
@@ -20,8 +20,10 @@ import { FamilyTab } from './person-family'
 import { PhotosTab } from './person-photos'
 import { Details } from './person-details'
 import { StoriesTab } from './person-stories'
+import { PersonHistory } from './side-panels'
 
 const NO_TERMS: string[] = []
+const RECENT = 7 * 24 * 3600 * 1000
 /** Found in the card's own heading: no need to leave the tab the card opens on. */
 const HEADER_KEYS = new Set(['givenName', 'surname', 'patronymic', 'maidenName'])
 
@@ -92,6 +94,10 @@ export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { pe
   /** A name with versions keeps them in step: typing corrects the main one. */
   const saveName = (key: ClaimField) => (v: string) => patch.mutate(person.claims.some((c) => c.field === key) ? editValue(person, key, v) : { [key]: v })
   const { data: pageList } = useQuery({ queryKey: ['pages', person.id], queryFn: () => api<PageMeta[]>(`persons/${person.id}/pages`) })
+  const { data: changes } = useQuery({ queryKey: ['history', person.id], queryFn: () => api<HistoryEntry[]>(`persons/${person.id}/history`), enabled: !me.guest })
+  // Someone else's recent edit is worth a word before anyone relies on the card.
+  const last = changes?.find((r) => !r.undoOf && !r.undoneAt)
+  const changedByOther = last && last.userId !== me.id && Date.now() - last.at < RECENT ? last : null
   const [tab, setTab] = useState<string | null>(hit?.matches.find((m) => !HEADER_KEYS.has(m.key))?.tab ?? (hit ? 'details' : null))
   const [pageId, setPageId] = useState<string | undefined>(hit?.matches.find((m) => m.tab === 'pages')?.refId)
   const box = useRef<HTMLElement>(null)
@@ -140,6 +146,12 @@ export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { pe
         </div>
       </header>
 
+      {changedByOther && !hit && (
+        <button className="mx-3 mb-2 flex flex-none items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1.5 text-left text-xs text-ink-soft hover:text-ink" onClick={() => setTab('history')}>
+          <History size={13} className="flex-none" />
+          <span className="min-w-0 break-anywhere">{t('Последнее изменение')}: {changedByOther.actorName}, {new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(changedByOther.at)}{changedByOther.details?.length ? ` · ${changedByOther.details.map((d) => d.label).join(', ')}` : ''}</span>
+        </button>
+      )}
       {hit && (
         <div className="mx-3 mb-2 flex flex-none items-start gap-2 rounded-lg bg-muted px-2.5 py-1.5 text-xs max-h-28 overflow-y-auto">
           <Search size={13} className="mt-0.5 flex-none text-ink-soft" />
@@ -157,6 +169,7 @@ export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { pe
           <TabsTrigger value="family" className="text-sm">{t('Семья')}</TabsTrigger>
           <TabsTrigger value="photos" className="text-sm">{t('Фото')}</TabsTrigger>
           <TabsTrigger value="stories" className="text-sm">{t('Рассказы')}</TabsTrigger>
+          {!me.guest && <TabsTrigger value="history" aria-label={t('История изменений')} title={t('История изменений')} data-hint={t('Кто и что менял в этой карточке. Любое изменение можно откатить.')} className="text-sm"><History size={15} /></TabsTrigger>}
         </TabsList>
         <TabsContent value="pages" className="flex-1 min-h-0 overflow-hidden"><Pages key={pageId} person={person} full={full} startAt={pageId} onDetails={() => go('details')} /></TabsContent>
         <TabsContent value="details" className="flex-1 min-h-0 overflow-auto pt-3">
@@ -165,6 +178,7 @@ export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { pe
         <TabsContent value="family" className="flex-1 min-h-0 overflow-auto pt-3"><FamilyTab person={person} /></TabsContent>
         <TabsContent value="photos" className="flex-1 min-h-0 overflow-auto"><PhotosTab person={person} /></TabsContent>
         <TabsContent value="stories" className="flex-1 min-h-0 overflow-auto"><StoriesTab person={person} /></TabsContent>
+        {!me.guest && <TabsContent value="history" className="flex-1 min-h-0 overflow-auto pt-3"><PersonHistory personId={person.id} /></TabsContent>}
       </Tabs>
       {suggesting && <SuggestDialog person={person} onClose={() => setSuggesting(false)} />}
     </aside>

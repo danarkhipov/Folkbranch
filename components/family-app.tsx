@@ -7,7 +7,7 @@ import { App, Presence, api, undoFailure, useProposals, useTr, useWrite, type Ap
 import { Family } from '@/lib/kinship'
 import { personName, type Graph, type HistoryEntry, type Lang, type Me } from '@/lib/types'
 import { GraphCanvas, type CanvasHandle } from './graph-canvas'
-import { ConnectionNotice, MainBar, ViewBar, type Side } from './chart-bars'
+import { ConnectionNotice, MainBar, ShowBars, ViewBar, type Side } from './chart-bars'
 import { useChartScope } from './chart-scope'
 import { QuickAdd } from './quick-add'
 import { ConfirmDialog, SearchDialog, type SearchHit } from './person-pickers'
@@ -48,6 +48,13 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
   const [focusId, setFocusId] = useState<string | null>(() => (typeof location !== 'undefined' ? new URLSearchParams(location.search).get('p') : null))
   const present = useLive(focusId, !me.guest)
   const [search, setSearch] = useState(false)
+  const [barsHidden, setBarsHidden] = useState(false)
+  useEffect(() => { try { setBarsHidden(localStorage.getItem('bars-hidden') === '1') } catch {} }, [])
+  const hideBars = (hidden: boolean) => {
+    setBarsHidden(hidden)
+    if (hidden) setSide(null)
+    try { localStorage.setItem('bars-hidden', hidden ? '1' : '0') } catch {}
+  }
   const [searchHit, setSearchHit] = useState<SearchHit | null>(null)
   const [side, setSide] = useState<Side>(null)
   // Mounted on first use and kept, so the conversation survives closing the panel.
@@ -89,6 +96,8 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
     return () => { window.removeEventListener('dragover', over); window.removeEventListener('drop', drop) }
   }, [me.role])
   const [rootsBelow, setRootsBelow] = useState(true)
+  const rootsBelowRef = useRef(rootsBelow)
+  rootsBelowRef.current = rootsBelow
   useEffect(() => {
     try { if (localStorage.getItem('chart-direction') === 'down') setRootsBelow(false) } catch {}
   }, [])
@@ -131,6 +140,29 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
     return () => window.removeEventListener('keydown', h)
   }, [])
 
+  // On the chart, arrows walk the family: up and down through generations, sideways to a spouse or a brother or sister.
+  const lookupsRef = useRef<{ family: Family } | null>(null)
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      const here = (e.target as HTMLElement).closest?.<HTMLElement>('.pcard[data-person]')
+      const family = lookupsRef.current?.family
+      if (!here || !family || !e.key.startsWith('Arrow') || (e.target as HTMLElement) !== here) return
+      const id = here.dataset.person!
+      const parents = family.parents.get(id) ?? []
+      const children = family.children.get(id) ?? []
+      const side = [...(family.spouses.get(id) ?? []), ...parents.flatMap((p) => family.children.get(p) ?? []).filter((c) => c !== id)]
+      const older = rootsBelowRef.current ? e.key === 'ArrowDown' : e.key === 'ArrowUp'
+      const younger = rootsBelowRef.current ? e.key === 'ArrowUp' : e.key === 'ArrowDown'
+      const next = older ? parents[0] : younger ? children[0] : e.key === 'ArrowRight' ? side[0] : side.at(-1)
+      if (!next) return
+      e.preventDefault()
+      canvas.current?.center(next)
+      requestAnimationFrame(() => requestAnimationFrame(() => document.querySelector<HTMLElement>(`.pcard[data-person="${next}"]`)?.focus({ preventScroll: true })))
+    }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [])
+
   const qc = useQueryClient()
   const [toast, setToast] = useState<{ text: string; actions: { label: string; run: () => void }[] } | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -156,6 +188,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
 
   // Rebuilt when the family changes, not on each click.
   const lookups = useMemo(() => (graph ? { byId: new Map(graph.persons.map((p) => [p.id, p])), family: new Family(graph) } : null), [graph])
+  lookupsRef.current = lookups
   const ctx = useMemo<AppCtx | null>(() => {
     if (!graph || !lookups) return null
     return {
@@ -225,8 +258,9 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       <ConnectionNotice t={t} />
       <GraphCanvas ref={canvas} scope={scope} pathIds={path} groupIds={groupIds} panelOpen={panelOpen} leftInset={side === 'assistant' ? assistantWidth + 12 : 0}/>
 
-      <MainBar guest={!!me.guest} familyName={familyName} present={present} mode={barMode} navRef={nav} side={side} draftOps={draftOps} onSearch={() => setSearch(true)} onSide={(next) => { setSide(next); setPath(null) }} onAssistant={toggleAssistant} onSettings={() => setSettings(true)} />
-      <ViewBar onPrint={() => setPrinting(true)} scope={scope} canvas={canvas} rootsBelow={rootsBelow} onFlip={flipChart} groups={groups} onGroups={setGroups} allGroups={allGroups} left={side === 'assistant' ? assistantWidth + 24 : side === 'history' || side === 'review' ? 408 : 12} crowded={panelOpen || !!side} />
+      {barsHidden && <ShowBars onShow={() => hideBars(false)} />}
+      {!barsHidden && <MainBar onHide={() => hideBars(true)} guest={!!me.guest} familyName={familyName} present={present} mode={barMode} navRef={nav} side={side} draftOps={draftOps} onSearch={() => setSearch(true)} onSide={(next) => { setSide(next); setPath(null) }} onAssistant={toggleAssistant} onSettings={() => setSettings(true)} />}
+      {!barsHidden && <ViewBar onPrint={() => setPrinting(true)} scope={scope} canvas={canvas} rootsBelow={rootsBelow} onFlip={flipChart} groups={groups} onGroups={setGroups} allGroups={allGroups} left={side === 'assistant' ? assistantWidth + 24 : side === 'history' || side === 'review' ? 408 : 12} crowded={panelOpen || !!side} />}
 
       {!ctx.graph.persons.length && ctx.canEdit && (
         <div className="fixed inset-0 grid place-items-center pointer-events-none">

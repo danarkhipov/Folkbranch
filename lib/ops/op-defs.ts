@@ -229,11 +229,11 @@ function assertSafeBlocks(actor: Actor, content: unknown) {
     if (Array.isArray(n)) return n.forEach(walk)
     if (!n || typeof n !== 'object') return
     const o = n as Record<string, any>
-    if (typeof o.href === 'string' && !/^(https?:|mailto:|\/)/i.test(o.href)) throw new OpError(400, `link not allowed: ${o.href}`)
+    if (typeof o.href === 'string' && !/^(https?:|mailto:|\/(?!\/))/i.test(o.href)) throw new OpError(400, `link not allowed: ${o.href}`)
     const url = o.props?.url
     if (typeof url === 'string' && url) {
       if (actor.tokenId && !url.startsWith('/api/v1/media/')) throw new OpError(400, 'files in a page must be uploaded with upload_photo first')
-      if (!/^(https?:|\/)/i.test(url)) throw new OpError(400, `url not allowed: ${url}`)
+      if (!/^(https?:|\/(?!\/))/i.test(url)) throw new OpError(400, `url not allowed: ${url}`)
     }
     Object.values(o).forEach(walk)
   }

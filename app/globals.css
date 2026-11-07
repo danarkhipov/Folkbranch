@@ -292,6 +292,8 @@ textarea.inline-input:hover, textarea.inline-input:focus { box-shadow: 0 1px 0 v
 .panel .bn-editor button, .panel .bn-side-menu button { min-height: 0; }
 
 /* The main bar: words where there is room, icons with tooltips where not, and on phones a tab bar. */
+@media (min-width: 640px) { .settings-item.on { box-shadow: inset 3px 0 var(--accent); } }
+.family-name { font-variant-numeric: lining-nums; position: relative; top: -2px; }
 .nav-label { display: none; }
 .main-bar:not(.compact) .nav-label { display: inline; }
 .main-bar.no-name .family-name, .main-bar.no-name .sep { display: none; }
@@ -301,6 +303,7 @@ textarea.inline-input:hover, textarea.inline-input:focus { box-shadow: 0 1px 0 v
 @media (max-width: 640px) {
   .main-bar { top: auto; left: 8px; right: 8px; bottom: 8px; justify-content: space-around; z-index: 40; }
   .main-bar .family-name, .main-bar .sep, .main-bar .bar-logo { display: none; }
+  .show-bars { top: auto; bottom: 8px; left: 8px; }
   .main-bar .bar-btn { flex: 1; flex-direction: column; gap: 2px; height: 48px; min-width: 0; height: 48px; padding: 0 2px; font-size: 13px; line-height: 1.35; white-space: normal; text-align: center; }
   .main-bar .bar-btn .nav-label { white-space: normal; }
   .main-bar .nav-label { display: block; white-space: nowrap; }
@@ -347,3 +350,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
 .pcard .movable { cursor: grab; }
 .pcard .folded { margin-top: 3px; padding: 0 7px; border-radius: 99px; border: 1px solid var(--line); background: #fffdf8; color: var(--ink); font-size: calc(13px * var(--lbl, 1)); line-height: 1.5; white-space: nowrap; }
 .pcard .folded:hover { background: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}

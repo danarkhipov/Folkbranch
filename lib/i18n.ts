@@ -323,6 +323,13 @@ const en: Record<string, string> = {
   'внук': 'grandson',
   'бабушка': 'grandmother',
   'дедушка': 'grandfather',
+  'агент': 'agent',
+  'Скрыть панели': 'Hide panels',
+  'Показать панели': 'Show panels',
+  'Останется одна кнопка, а схема займёт весь экран.': 'One button stays and the chart fills the screen.',
+  'Последнее изменение': 'Last change',
+  'История изменений': 'Change history',
+  'Кто и что менял в этой карточке. Любое изменение можно откатить.': 'Who changed what in this card. Any change can be rolled back.',
 }
 
 export const translate = (lang: Lang, key: string) => (lang === 'en' ? (en[key] ?? key) : key)

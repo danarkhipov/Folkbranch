@@ -1,6 +1,6 @@
 'use client'
 import { useState, type ComponentType } from 'react'
-import { ArrowLeftRight, KeyRound, ListChecks, SlidersHorizontal, UserRound, Users } from 'lucide-react'
+import { DatabaseBackup, KeyRound, ListChecks, SlidersHorizontal, UserRound, Users } from 'lucide-react'
 import { AssistantIcon } from '../assistant-icon'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useApp } from '@/lib/client'
@@ -23,7 +23,7 @@ const SECTIONS: Record<Section, [string, string, ComponentType<{ size?: number }
   people: ['Пользователи и доступ', 'Кто входит в архив и что может в нём делать, а кому хватит ссылки для просмотра.', Users],
   assistant: ['ИИ-ассистент', 'Чат внутри приложения: отвечает на вопросы о семье и вносит правки с вашего подтверждения.', AssistantIcon],
   agents: ['Агенты и MCP', 'Подключите Claude, Codex или другую программу: она сможет читать архив и предлагать правки.', KeyRound],
-  data: ['Данные и резервные копии', 'Добавить людей из файла, скачать данные, сделать копию архива.', ArrowLeftRight],
+  data: ['Данные и резервные копии', 'Добавить людей из файла, скачать данные, сделать копию архива.', DatabaseBackup],
 }
 
 export function SettingsDialog({ open, onOpenChange, familyName, providers, onText }: { open: boolean; onOpenChange: (v: boolean) => void; familyName: string; providers: { google: boolean; yandex: boolean }; onText: () => void }) {
@@ -38,14 +38,14 @@ export function SettingsDialog({ open, onOpenChange, familyName, providers, onTe
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[min(680px,calc(100dvh-32px))] max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
         <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
-          <nav aria-label={t('Настройки')} className="flex shrink-0 gap-0.5 overflow-x-auto border-b border-border p-2 sm:w-52 sm:flex-col sm:overflow-y-auto sm:border-b-0 sm:border-r sm:bg-muted/40">
-            <DialogTitle className="hidden px-2.5 pt-1.5 pb-2 font-serif text-lg font-medium sm:block">{t('Настройки')}</DialogTitle>
+          <nav aria-label={t('Настройки')} className="flex shrink-0 gap-0.5 overflow-x-auto border-b border-border p-2 sm:w-[268px] sm:flex-col sm:overflow-y-auto sm:border-b-0 sm:border-r sm:bg-muted/40">
+            <DialogTitle className="hidden px-2.5 pt-1.5 pb-3 font-serif text-lg font-medium sm:block">{t('Настройки')}</DialogTitle>
             {groups.map(([group, ids]) => (
-              <div key={group} className="contents">
-                {group && <div className="hidden px-2.5 pt-3 pb-1 text-xs text-ink-soft sm:block">{t(group)}</div>}
+              <div key={group} className={group ? 'contents sm:mt-4 sm:block sm:border-t sm:border-[#d9d0bd] sm:pt-3.5' : 'contents sm:block'}>
+                {group && <div className="hidden px-2.5 pb-1.5 font-serif text-sm font-semibold text-ink sm:block">{t(group)}</div>}
                 {ids.map((id) => {
                   const Icon = SECTIONS[id][2]
-                  return <button key={id} className={`flex shrink-0 items-center gap-2 rounded-lg px-2.5 min-h-9 text-left text-sm ${section === id ? 'bg-muted font-medium text-ink' : 'text-ink-soft hover:bg-muted/60'}`} aria-current={section === id ? 'page' : undefined} onClick={() => setSection(id)}><Icon size={15} /> {t(SECTIONS[id][0])}</button>
+                  return <button key={id} className={`settings-item flex shrink-0 items-center gap-2 rounded-lg px-2.5 min-h-[34px] whitespace-nowrap text-left text-sm sm:w-full ${section === id ? 'on bg-muted font-medium text-ink' : 'text-[#5a5245] hover:bg-muted/60 hover:text-ink'}`} aria-current={section === id ? 'page' : undefined} onClick={() => setSection(id)}><span className="flex-none"><Icon size={15} /></span> {t(SECTIONS[id][0])}</button>
                 })}
               </div>
             ))}

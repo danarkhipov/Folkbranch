@@ -147,6 +147,9 @@ export interface HistoryEntry {
   id: string
   at: number
   actorName: string
+  userId: string
+  /** Made through a key by a program, not by a person in the app. */
+  byAgent: boolean
   summary: string
   /** What exactly changed, in words. Not sent to readers. */
   details?: { label: string; before: string | null; after: string | null }[]

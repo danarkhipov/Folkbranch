@@ -1,11 +1,11 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { and, desc, eq, inArray, isNull, ne } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, like, ne, or } from 'drizzle-orm'
 import { getDb, schema } from '../db'
 import { personName, type HistoryEntry, type Role } from '../types'
 import { Actor, newId, OpError, requireRole, seesOnlyPublic } from './core'
 import { say } from './app-config'
 import { changeDetails, readableSummary } from './history-text'
-import { hiddenPeople } from './people'
+import { getGraph, hiddenPeople } from './people'
 
 export { archiveLang, getSetting, say, setSetting } from './app-config'
 
@@ -99,18 +99,22 @@ export function setMyPerson(actor: Actor, personId: string | null) {
   getDb().update(schema.user).set({ personId }).where(eq(schema.user.id, actor.userId)).run()
 }
 
-export function listHistory(actor: Actor, limit = 100): HistoryEntry[] {
+export function listHistory(actor: Actor, limit = 100, personId?: string): HistoryEntry[] {
   const db = getDb()
   const h = schema.history
-  const rows = db.select({ id: h.id, at: h.at, actorName: h.actorName, summary: h.summary, personIds: h.personIds, changes: h.changes, undoOf: h.undoOf, undoneAt: h.undoneAt }).from(h).orderBy(desc(h.at)).limit(limit).all()
+  // A person's id is in the entry itself or, for older ones, in what the entry changed.
+  const about = personId ? or(like(h.personIds, `%"${personId}"%`), like(h.changes, `%"${personId}"%`)) : undefined
+  const rows = db.select({ id: h.id, at: h.at, actorName: h.actorName, userId: h.userId, tokenId: h.tokenId, summary: h.summary, personIds: h.personIds, changes: h.changes, undoOf: h.undoOf, undoneAt: h.undoneAt }).from(h).where(about).orderBy(desc(h.at)).limit(limit).all()
   const hidden = hiddenPeople(actor)
   const reader = seesOnlyPublic(actor)
-  const names = new Map(db.select({ id: schema.persons.id, givenName: schema.persons.givenName, surname: schema.persons.surname }).from(schema.persons).all().map((p) => [p.id, personName(p)]))
+  // From the graph already in memory: a person this actor may not see has no name here either.
+  const graph = getGraph(actor)
+  const names = new Map(graph.persons.map((p) => [p.id, personName(p)]))
   const nameOf = (id: string) => names.get(id) || say('Без названия')
   const relations = new Map([
-    ...db.select({ id: schema.parentChild.id, a: schema.parentChild.parentId, b: schema.parentChild.childId }).from(schema.parentChild).all(),
-    ...db.select({ id: schema.unions.id, a: schema.unions.aId, b: schema.unions.bId }).from(schema.unions).all(),
-  ].map((r) => [r.id, [r.a, r.b]]))
+    ...graph.parentChild.map((r): [string, string[]] => [r.id, [r.parentId, r.childId]]),
+    ...graph.unions.map((r): [string, string[]] => [r.id, [r.aId, r.bId]]),
+  ])
   const relationEnds = (id: string) => relations.get(id) ?? []
   // Older relation entries named nobody; for those who may see them, the two people make the line clickable.
   const people = (stored: string, changes: { table: string; id: string }[]) => {
@@ -129,7 +133,7 @@ export function listHistory(actor: Actor, limit = 100): HistoryEntry[] {
       // The lines below say which fields changed, so the first line need not list them too.
       const person = details?.length && changes.every((c: { table: string }) => c.table === 'persons') ? summary.split(': ')[0] : summary
       return {
-        id: r.id, at: r.at, actorName: r.actorName, personIds: people(r.personIds, changes), undoOf: r.undoOf, undoneAt: r.undoneAt,
+        id: r.id, at: r.at, actorName: r.actorName, userId: r.userId, byAgent: !!r.tokenId, personIds: people(r.personIds, changes), undoOf: r.undoOf, undoneAt: r.undoneAt,
         // Readers get only the entries about people they can see, and never the values.
         summary: person,
         ...(details ? { details } : {}),
@@ -137,5 +141,8 @@ export function listHistory(actor: Actor, limit = 100): HistoryEntry[] {
     })
     // Summaries contain names, so a reader sees only entries about people visible to them
     // and never entries with no named subject, which could be about anyone.
-    .filter((e) => !reader || (e.personIds.length > 0 && e.personIds.every((id) => !hidden.has(id))))
+    // Someone deleted since is in no list, so they count as unseen, not as visible.
+    .filter((e) => !reader || (e.personIds.length > 0 && e.personIds.every((id) => names.has(id) && !hidden.has(id))))
+    // In a person's card, not what merely passed through them, such as a whole family loaded at once.
+    .filter((e) => !personId || e.personIds.includes(personId))
 }

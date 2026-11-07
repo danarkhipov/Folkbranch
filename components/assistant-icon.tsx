@@ -1,6 +1,6 @@
-import { Sparkles } from 'lucide-react'
+import { Sparkle } from 'lucide-react'
 
-/** Sparkles are what most people now read as AI. */
-export function AssistantIcon({ size = 20 }: { size?: number }) {
-  return <Sparkles size={size} strokeWidth={2} className="flex-none" aria-hidden="true" />
+/** One star: said to mean AI by now, and as quiet as the icons beside it. */
+export function AssistantIcon({ size = 16 }: { size?: number }) {
+  return <Sparkle size={size} strokeWidth={2} className="flex-none" aria-hidden="true" />
 }
