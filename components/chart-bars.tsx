@@ -14,10 +14,10 @@ import { Logo } from './logo'
 
 export type Side = 'history' | 'review' | 'assistant' | null
 
-export function MainBar({ onHide, guest, familyName, present, mode, navRef, side, draftOps, onSearch, onSide, onAssistant, onSettings }: { onHide: () => void;  guest: boolean; familyName: string; present: Present[]; mode: 'full' | 'no-name' | 'compact'; navRef: RefObject<HTMLElement | null>; side: Side; draftOps: number; onSearch: () => void; onSide: (next: Side) => void; onAssistant: () => void; onSettings: () => void }) {
+export function MainBar({ folded, onHide, guest, familyName, present, mode, navRef, side, draftOps, onSearch, onSide, onAssistant, onSettings }: { folded: boolean; onHide: () => void;  guest: boolean; familyName: string; present: Present[]; mode: 'full' | 'no-name' | 'compact'; navRef: RefObject<HTMLElement | null>; side: Side; draftOps: number; onSearch: () => void; onSide: (next: Side) => void; onAssistant: () => void; onSettings: () => void }) {
   const { t, canEdit } = useApp()
   return (
-      <nav aria-label={t('Главное меню')} ref={navRef} className={cn('float main-bar fixed left-3 top-3 z-10 flex items-center gap-0.5 p-1', mode !== 'full' && mode)}>
+      <nav aria-label={t('Главное меню')} ref={navRef} inert={folded} className={cn('float main-bar fixed left-3 top-3 z-10 flex items-center gap-0.5 p-1', mode !== 'full' && mode, folded && 'folded')}>
         <Logo size={22} className="bar-logo ml-1.5 flex-none" />
         <span className="family-name font-serif font-medium text-base px-2.5 max-w-[220px] truncate">{familyName}</span>
         {present.length > 0 && <span className="presence" title={`${t('Сейчас в архиве')}: ${present.map((o) => o.name).join(', ')}`} aria-label={`${t('Сейчас в архиве')}: ${present.map((o) => o.name).join(', ')}`} role="img">{present.slice(0, 3).map((o) => <span key={o.id}>{o.name.slice(0, 1).toUpperCase()}</span>)}{present.length > 3 && <span>+{present.length - 3}</span>}</span>}
@@ -34,16 +34,16 @@ export function MainBar({ onHide, guest, familyName, present, mode, navRef, side
 }
 
 /** All that is left when the panels are hidden. */
-export function ShowBars({ onShow }: { onShow: () => void }) {
+export function ShowBars({ folded, onShow }: { folded: boolean; onShow: () => void }) {
   const { t } = useApp()
-  return <button className="show-bars fixed left-3 top-3 z-10" title={t('Показать панели')} data-hint={t('Вернуть панели управления.')} aria-label={t('Показать панели')} onClick={onShow}><span className="float show-bars-face"><Logo size={22} className="flex-none" /></span></button>
+  return <button inert={!folded} className={cn('show-bars fixed left-3 top-3 z-10', folded && 'folded')} title={t('Показать панели')} data-hint={t('Вернуть панели управления.')} aria-label={t('Показать панели')} onClick={onShow}><span className="float show-bars-face"><Logo size={22} className="flex-none" /></span></button>
 }
 
 /** Only about how the chart looks; it steps aside for a panel on the left. */
-export function ViewBar({ onPrint, scope, canvas, rootsBelow, onFlip, groups, onGroups, allGroups, left, crowded }: { onPrint: () => void; scope: ChartScope; canvas: RefObject<CanvasHandle | null>; rootsBelow: boolean; onFlip: () => void; groups: string[]; onGroups: (next: string[]) => void; allGroups: [string, number][]; left: number; crowded: boolean }) {
+export function ViewBar({ folded, onPrint, scope, canvas, rootsBelow, onFlip, groups, onGroups, allGroups, left, crowded }: { folded: boolean; onPrint: () => void; scope: ChartScope; canvas: RefObject<CanvasHandle | null>; rootsBelow: boolean; onFlip: () => void; groups: string[]; onGroups: (next: string[]) => void; allGroups: [string, number][]; left: number; crowded: boolean }) {
   const { t } = useApp()
   return (
-      <div aria-label={t('Вид схемы')} role="toolbar" className={cn('float view-bar fixed bottom-3 z-10 flex items-center gap-0.5 p-1', crowded && 'crowded')} style={{ left }}>
+      <div aria-label={t('Вид схемы')} role="toolbar" inert={folded} className={cn('float view-bar fixed bottom-3 z-10 flex items-center gap-0.5 p-1', crowded && 'crowded', folded && 'folded')} style={{ left }}>
         <button className="bar-btn" title={t('Отдалить')} data-hint={t('Показать больше людей на экране.')} aria-label={t('Отдалить')} onClick={() => canvas.current?.zoomBy(0.75)}><Minus size={15} /></button>
         <button className="bar-btn" title={t('Приблизить')} data-hint={t('Показать людей крупнее.')} aria-label={t('Приблизить')} onClick={() => canvas.current?.zoomBy(1.33)}><Plus size={15} /></button>
         <button className="bar-btn" title={t(rootsBelow ? 'Сейчас старшие снизу. Показать старших сверху' : 'Сейчас старшие сверху. Показать старших снизу')} aria-label={t('Перевернуть схему')} onClick={onFlip}><ArrowUpDown size={15} /></button>

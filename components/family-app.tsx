@@ -42,6 +42,8 @@ const TextDialog = dynamic(() => import('./text-dialog').then((m) => m.TextDialo
 const NARROW = 960
 /** Long enough to read and to reach the button in it from the keyboard; it stays while in use. */
 const TOAST_MS = 12_000
+/** How long the panel takes to slide behind the logo; its button appears only then. */
+const FOLD_MS = 340
 
 /** Closing a panel puts the keyboard back where it was, not at the top of the page. */
 function useFocusReturn(open: boolean) {
@@ -65,12 +67,14 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
   const [focusId, setFocusId] = useState<string | null>(() => (typeof location !== 'undefined' ? new URLSearchParams(location.search).get('p') : null))
   const present = useLive(focusId, !me.guest)
   const [search, setSearch] = useState(false)
-  const [barsHidden, setBarsHidden] = useState(false)
-  useEffect(() => { try { setBarsHidden(localStorage.getItem('bars-hidden') === '1') } catch {} }, [])
+  // Nothing of the bars is drawn before the data comes, so reading this here cannot differ from the server's page.
+  const [barsHidden, setBarsHidden] = useState(() => { try { return typeof localStorage !== 'undefined' && localStorage.getItem('bars-hidden') === '1' } catch { return false } })
   const hideBars = (hidden: boolean) => {
     setBarsHidden(hidden)
     if (hidden) setSide(null)
     try { localStorage.setItem('bars-hidden', hidden ? '1' : '0') } catch {}
+    // The button just pressed is going away: the keyboard moves to the one that brings it back.
+    setTimeout(() => document.querySelector<HTMLElement>(hidden ? '.show-bars' : '.hide-bars')?.focus({ preventScroll: true }), hidden ? FOLD_MS : 0)
   }
   const [searchHit, setSearchHit] = useState<SearchHit | null>(null)
   const [side, setSide] = useState<Side>(null)
@@ -284,12 +288,12 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       <Presence.Provider value={present}>
       <ConnectionNotice t={t} />
       <a href="#chart" className="skip-link bar-btn float" onClick={(e) => { e.preventDefault(); document.querySelector<HTMLElement>('.card-main')?.focus() }}>{t('Перейти к схеме')}</a>
-      {barsHidden && <ShowBars onShow={() => hideBars(false)} />}
-      {!barsHidden && <MainBar onHide={() => hideBars(true)} guest={!!me.guest} familyName={familyName} present={present} mode={barMode} navRef={nav} side={side} draftOps={draftOps} onSearch={() => setSearch(true)} onSide={(next) => { setSide(next); setPath(null) }} onAssistant={toggleAssistant} onSettings={() => setSettings(true)} />}
+      <ShowBars folded={barsHidden} onShow={() => hideBars(false)} />
+      <MainBar folded={barsHidden} onHide={() => hideBars(true)} guest={!!me.guest} familyName={familyName} present={present} mode={barMode} navRef={nav} side={side} draftOps={draftOps} onSearch={() => setSearch(true)} onSide={(next) => { setSide(next); setPath(null) }} onAssistant={toggleAssistant} onSettings={() => setSettings(true)} />
       <main id="chart" aria-label={t('Схема семьи')}>
       <GraphCanvas ref={canvas} scope={scope} pathIds={path} groupIds={groupIds} panelOpen={panelOpen} leftInset={side === 'assistant' ? assistantWidth + 12 : 0}/>
 
-      {!barsHidden && <ViewBar onPrint={() => setPrinting(true)} scope={scope} canvas={canvas} rootsBelow={rootsBelow} onFlip={flipChart} groups={groups} onGroups={setGroups} allGroups={allGroups} left={side === 'assistant' ? assistantWidth + 24 : side === 'history' || side === 'review' ? 408 : 12} crowded={panelOpen || !!side} />}
+      <ViewBar folded={barsHidden} onPrint={() => setPrinting(true)} scope={scope} canvas={canvas} rootsBelow={rootsBelow} onFlip={flipChart} groups={groups} onGroups={setGroups} allGroups={allGroups} left={side === 'assistant' ? assistantWidth + 24 : side === 'history' || side === 'review' ? 408 : 12} crowded={panelOpen || !!side} />
       </main>
 
       {!ctx.graph.persons.length && ctx.canEdit && (

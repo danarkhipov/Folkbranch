@@ -300,12 +300,18 @@ textarea.inline-input:hover, textarea.inline-input:focus { box-shadow: 0 1px 0 v
 .skip-link { position: fixed; left: 12px; top: -60px; z-index: 60; }
 .skip-link:focus { top: 12px; }
 aside.panel:focus { outline: none; }
-.show-bars { display: block; padding: 0 14px 0 0; }
-/* The folded panel shows from behind the logo, so it is plain there is more to open. */
+/* Folding: the panel slides in behind its logo, and its edge stays showing, so it is plain there is more to open. */
+.main-bar { clip-path: inset(-30px -30px -30px -30px round 12px); transition: clip-path .32s cubic-bezier(.3, .7, .2, 1), opacity .1s .32s, visibility 0s; }
+.main-bar > :not(.bar-logo) { transition: transform .32s cubic-bezier(.3, .7, .2, 1), opacity .22s; }
+.main-bar.folded { clip-path: inset(0 calc(100% - 46px) 0 0 round 12px); opacity: 0; visibility: hidden; transition: clip-path .32s cubic-bezier(.3, .7, .2, 1), opacity 0s .32s, visibility 0s .32s; }
+.main-bar.folded > :not(.bar-logo) { transform: translateX(-120px); opacity: 0; }
+.view-bar { transition: transform .32s cubic-bezier(.3, .7, .2, 1), opacity .22s, left .2s; }
+.view-bar.folded { transform: translateY(24px); opacity: 0; visibility: hidden; transition: transform .32s, opacity .22s, visibility 0s .32s; }
+.show-bars { display: block; padding: 0 14px 0 0; opacity: 0; visibility: hidden; transition: opacity 0s, visibility 0s; }
+.show-bars.folded { opacity: 1; visibility: visible; transition: opacity .01s .3s, visibility 0s .3s; }
 .show-bars::before { content: ''; position: absolute; inset: 5px 0 5px 24px; background: #f3eee2; border: 1px solid var(--border); border-radius: 0 10px 10px 0; box-shadow: 0 1px 2px rgb(60 45 20 / .06); transition: transform .12s; }
 .show-bars:hover::before { transform: translateX(4px); }
 .show-bars-face { position: relative; display: flex; align-items: center; width: 46px; height: 46px; padding-left: 10px; }
-.panel header .grow-text { min-height: 24px; }
 .nav-label { display: none; }
 .main-bar:not(.compact) .nav-label { display: inline; }
 .main-bar.no-name .family-name, .main-bar.no-name .sep { display: none; }
