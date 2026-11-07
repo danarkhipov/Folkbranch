@@ -1,6 +1,7 @@
 'use client'
 import type { Box } from '../types'
 import { readDevice } from './device'
+import { chosen } from './models'
 
 let worker: Worker | null = null
 let nextId = 1
@@ -28,7 +29,8 @@ function call<T>(message: Record<string, unknown>, image: ImageBitmap) {
 
 /** Faces on a photo, as parts of its width and height. A weak device skips the closer look at small faces. */
 export async function findFaces(source: ImageBitmapSource) {
-  return call<Box[]>({ type: 'faces', closer: readDevice().tier !== 'weak' }, await createImageBitmap(source))
+  const model = chosen('faces').files[1].name
+  return call<Box[]>({ type: 'faces', model, closer: readDevice().tier !== 'weak' }, await createImageBitmap(source))
 }
 
 /** A list of numbers that stands for this face, or nothing if no face is there. */

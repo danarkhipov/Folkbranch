@@ -6,58 +6,108 @@ import { readDevice } from './device'
 const CACHE = 'folkbranch-models'
 export const ORT_VERSION = '1.31.0-dev.20260914-8d85527a0'
 const ort = (file: string) => [`https://unpkg.com/onnxruntime-web@${ORT_VERSION}/dist/${file}`, `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/${file}`]
-const opencv = (repo: string, file: string, revision: string) => [`https://huggingface.co/opencv/${repo}/resolve/${revision}/${file}`]
+const hf = (repo: string, file: string) => [`https://huggingface.co/${repo}/resolve/main/${file}`]
 
 interface ModelFile { name: string; urls: string[]; bytes: number; sha256: string }
 const RUNTIME: ModelFile = { name: 'ort.wasm', urls: ort('ort-wasm-simd-threaded.wasm'), bytes: 14264838, sha256: '06ba057753da3847e4c24f02d91ab133455b0817c69a44993a9a53a2146df9e3' }
-const DETECTOR: ModelFile = { name: 'yunet.onnx', urls: opencv('face_detection_yunet', 'face_detection_yunet_2023mar.onnx', 'main'), bytes: 232589, sha256: '8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4' }
-const COMPARER: ModelFile = { name: 'sface.onnx', urls: opencv('face_recognition_sface', 'face_recognition_sface_2021dec_int8.onnx', 'main'), bytes: 9896933, sha256: '2b0e941e6f16cc048c20aee0c8e31f569118f65d702914540f7bfdc14048d78a' }
+const YUNET: ModelFile = { name: 'yunet.onnx', urls: hf('opencv/face_detection_yunet', 'face_detection_yunet_2023mar.onnx'), bytes: 232589, sha256: '8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4' }
+const YOLO_N: ModelFile = { name: 'yolov8n-face.onnx', urls: hf('deepghs/yolo-face', 'yolov8n-face/model.onnx'), bytes: 12139175, sha256: 'fd27189bfe5750a017648445700473459a6d02e7c3b0a3bfd8a54af77dd3b046' }
+const YOLO_M: ModelFile = { name: 'yolov11m-face.onnx', urls: hf('deepghs/yolo-face', 'yolov11m-face/model.onnx'), bytes: 80307967, sha256: '0136c7938193241ebde248abc0678455c01120976dacea425af53d72fc4a70a3' }
+const SFACE: ModelFile = { name: 'sface.onnx', urls: hf('opencv/face_recognition_sface', 'face_recognition_sface_2021dec_int8.onnx'), bytes: 9896933, sha256: '2b0e941e6f16cc048c20aee0c8e31f569118f65d702914540f7bfdc14048d78a' }
+const GIGAAM: ModelFile = { name: 'gigaam.onnx', urls: hf('istupakov/gigaam-v3-onnx', 'v3_e2e_ctc.int8.onnx'), bytes: 224893347, sha256: '2e3fcb7a7b66030336fd10c2fcfb033bd1dc7e1bf238fe5cfd83b1d0cfc9d28e' }
+const GIGAAM_WORDS: ModelFile = { name: 'gigaam-vocab.txt', urls: hf('istupakov/gigaam-v3-onnx', 'v3_e2e_ctc_vocab.txt'), bytes: 2007, sha256: '142de7570b3de5b3035ce111a89c228e80e6085273731d944093ddf24fa539cd' }
 
 export type Pack = 'faces' | 'recognize' | 'speech'
-const FILES: Record<'faces' | 'recognize', ModelFile[]> = { faces: [RUNTIME, DETECTOR], recognize: [RUNTIME, DETECTOR, COMPARER] }
-
-export const SPEECH_MODELS = { small: { id: 'onnx-community/whisper-tiny', mb: 50 }, large: { id: 'onnx-community/whisper-base', mb: 85 } }
-export const speechModel = () => SPEECH_MODELS[readDevice().tier === 'strong' ? 'large' : 'small']
-
-/** About how much a pack adds to this browser, for saying so before it is fetched. */
-export function packSize(pack: Pack) {
-  if (pack === 'speech') return speechModel().mb
-  const files = pack === 'recognize' && states.faces.status === 'ready' ? [COMPARER] : FILES[pack]
-  return Math.max(1, Math.round(files.reduce((n, f) => n + f.bytes, 0) / 1024 / 1024))
+export interface Variant {
+  id: string
+  feature: Pack
+  name: string
+  /** What the choice gives, in numbers from our own measurements. */
+  facts: string
+  files: ModelFile[]
+  /** Fetched through the speech library into its own cache, with an approximate size. */
+  whisper?: { repo: string; mb: number }
+  languages?: string[]
+  /** Which kinds of device this suits by default. */
+  suits: ('weak' | 'normal' | 'strong')[]
 }
+
+export const VARIANTS: Variant[] = [
+  { id: 'yolo8n', feature: 'faces', name: 'Точная', facts: 'Находит 97% лиц, около 0,7 секунды на снимок', files: [RUNTIME, YOLO_N], suits: ['normal', 'strong'] },
+  { id: 'yunet', feature: 'faces', name: 'Лёгкая', facts: 'Находит 91% лиц, около 0,15 секунды на снимок', files: [RUNTIME, YUNET], suits: ['weak'] },
+  { id: 'yolo11m', feature: 'faces', name: 'Максимальная', facts: 'Находит 99% лиц, около 4 секунд на снимок', files: [RUNTIME, YOLO_M], suits: [] },
+  { id: 'sface', feature: 'recognize', name: 'SFace', facts: 'Точность 97%, на снимках одного человека в разном возрасте 92%. Более крупные модели в наших замерах не оказались лучше.', files: [RUNTIME, YUNET, SFACE], suits: ['weak', 'normal', 'strong'] },
+  { id: 'gigaam', feature: 'speech', name: 'GigaAM, для русского', facts: 'Ошибается в 12% слов, расшифровывает в 10 раз быстрее записи, сама ставит знаки препинания', files: [RUNTIME, GIGAAM, GIGAAM_WORDS], languages: ['ru'], suits: ['normal', 'strong'] },
+  { id: 'whisper-base', feature: 'speech', name: 'Whisper, лёгкая', facts: 'На русском ошибается в 37% слов, в 5 раз быстрее записи. Подойдёт для слабого устройства и для других языков', files: [], whisper: { repo: 'onnx-community/whisper-base', mb: 85 }, suits: ['weak'] },
+]
+const byId = (id: string) => VARIANTS.find((v) => v.id === id)!
+const language = () => (typeof document === 'undefined' ? 'en' : document.documentElement.lang)
+
+export const variantsFor = (feature: Pack) => VARIANTS.filter((v) => v.feature === feature && (!v.languages || v.languages.includes(language())))
+
+const CHOICE = 'smart-model-choice'
+function readChoice(): Partial<Record<Pack, string>> {
+  try { return JSON.parse(localStorage.getItem(CHOICE) ?? '{}') } catch { return {} }
+}
+/** The one this device uses: the person's choice, or what suits it. */
+export function chosen(feature: Pack) {
+  const list = variantsFor(feature)
+  const mine = list.find((v) => v.id === readChoice()[feature])
+  if (mine) return mine
+  const tier = readDevice().tier
+  return list.find((v) => v.suits.includes(tier)) ?? list[0]
+}
+export const recommended = (v: Variant) => v.suits.includes(readDevice().tier)
+export function choose(id: string) {
+  const v = byId(id)
+  try { localStorage.setItem(CHOICE, JSON.stringify({ ...readChoice(), [v.feature]: id })) } catch {}
+  version++
+  listeners.forEach((l) => l())
+}
+
+/** About how many megabytes this would add to the browser now, counting only what is not here yet. */
+export function variantSize(id: string) {
+  const v = byId(id)
+  if (v.whisper) return v.whisper.mb
+  const here = new Set(VARIANTS.filter((o) => o.id !== id && states[o.id]?.status === 'ready').flatMap((o) => o.files))
+  const ready = states[id]?.status === 'ready'
+  return Math.max(1, Math.round(v.files.filter((f) => ready || !here.has(f)).reduce((n, f) => n + f.bytes, 0) / 1024 / 1024))
+}
+export const packSize = (pack: Pack) => variantSize(chosen(pack).id)
 
 export interface PackState { status: 'unknown' | 'none' | 'busy' | 'ready' | 'unavailable'; loaded: number; total: number; failed: boolean }
 const blank: PackState = { status: 'unknown', loaded: 0, total: 0, failed: false }
-const states: Record<Pack, PackState> = { faces: blank, recognize: blank, speech: blank }
-const running: Partial<Record<Pack, AbortController>> = {}
+const states: Record<string, PackState> = {}
+const running: Record<string, AbortController> = {}
 const listeners = new Set<() => void>()
-const set = (pack: Pack, next: Partial<PackState>) => { states[pack] = { ...states[pack], ...next }; listeners.forEach((l) => l()) }
+let version = 0
+const set = (id: string, next: Partial<PackState>) => { states[id] = { ...(states[id] ?? blank), ...next }; version++; listeners.forEach((l) => l()) }
 const subscribe = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l) } }
 
-// The same address from the page and from the worker, which live at different paths.
+// The same address from the page and from a worker, which live at different paths.
 const key = (name: string) => `/smart-models/${name}`
+const whisperFlag = (repo: string) => `speech-model:${repo}`
 
-const SPEECH_FLAG = 'speech-model'
-const speechHere = async () => {
-  let id: string | null = null
-  try { id = localStorage.getItem(SPEECH_FLAG) } catch {}
-  if (!id) return false
-  const names = await caches.keys()
-  for (const n of names.filter((x) => x.includes('transformers'))) if ((await (await caches.open(n)).keys()).some((r) => r.url.includes(id!))) return true
+async function whisperHere(repo: string) {
+  try { if (!localStorage.getItem(whisperFlag(repo))) return false } catch { return false }
+  for (const n of (await caches.keys()).filter((x) => x.includes('transformers'))) if ((await (await caches.open(n)).keys()).some((r) => r.url.includes(repo))) return true
   return false
 }
 
-async function refresh(pack: Pack) {
-  if (running[pack]) return
-  if (typeof caches === 'undefined') return set(pack, { status: 'unavailable' })
-  const here = pack === 'speech' ? await speechHere() : (await Promise.all(FILES[pack].map(async (f) => !!(await (await caches.open(CACHE)).match(key(f.name)))))).every(Boolean)
-  set(pack, { status: here ? 'ready' : 'none' })
+async function refresh(id: string) {
+  if (running[id]) return
+  if (typeof caches === 'undefined') return set(id, { status: 'unavailable' })
+  const v = byId(id)
+  const store = await caches.open(CACHE)
+  const here = v.whisper ? await whisperHere(v.whisper.repo) : (await Promise.all(v.files.map(async (f) => !!(await store.match(key(f.name)))))).every(Boolean)
+  set(id, { status: here ? 'ready' : 'none' })
 }
-const refreshAll = () => Promise.all((['faces', 'recognize', 'speech'] as Pack[]).map(refresh))
+const refreshAll = () => Promise.all(VARIANTS.map((v) => refresh(v.id)))
 
 async function fetchFile(file: ModelFile, signal: AbortSignal, onBytes: (n: number) => void) {
   let lastError: unknown
   for (const url of file.urls) {
+    let counted = 0
     try {
       const r = await fetch(url, { signal })
       if (!r.ok || !r.body) throw new Error(`${r.status}`)
@@ -67,6 +117,7 @@ async function fetchFile(file: ModelFile, signal: AbortSignal, onBytes: (n: numb
         const { done, value } = await reader.read()
         if (done) break
         parts.push(value)
+        counted += value.length
         onBytes(value.length)
       }
       const blob = new Blob(parts)
@@ -78,66 +129,81 @@ async function fetchFile(file: ModelFile, signal: AbortSignal, onBytes: (n: numb
       return blob
     } catch (e) {
       if ((e as Error).name === 'AbortError') throw e
+      onBytes(-counted)
       lastError = e
     }
   }
   throw lastError
 }
 
-/** Fetches what is missing. Safe to press twice: a pack already on its way just keeps going. */
-export async function downloadPack(pack: Pack) {
-  if (running[pack]) return
-  const stop = (running[pack] = new AbortController())
-  set(pack, { status: 'busy', loaded: 0, total: 0, failed: false })
+/** Fetches what is missing and makes it the one in use. Safe to press twice. */
+export async function downloadVariant(id: string) {
+  if (running[id]) return
+  const stop = (running[id] = new AbortController())
+  const v = byId(id)
+  set(id, { status: 'busy', loaded: 0, total: 0, failed: false })
   try {
-    if (pack === 'speech') {
-      const { prepareSpeech } = await import('./speech')
-      const { id } = speechModel()
-      await prepareSpeech(id, (loaded, total) => set(pack, { loaded, total }), stop.signal)
-      try { localStorage.setItem(SPEECH_FLAG, id) } catch {}
+    if (v.whisper) {
+      const { prepareWhisper } = await import('./speech')
+      await prepareWhisper(v.whisper.repo, (loaded, total) => set(id, { loaded, total }), stop.signal)
+      try { localStorage.setItem(whisperFlag(v.whisper.repo), '1') } catch {}
     } else {
       navigator.storage?.persist?.().catch(() => {})
       const store = await caches.open(CACHE)
       const missing: ModelFile[] = []
-      for (const f of FILES[pack]) if (!(await store.match(key(f.name)))) missing.push(f)
-      const total = missing.reduce((n, f) => n + f.bytes, 0)
+      for (const f of v.files) if (!(await store.match(key(f.name)))) missing.push(f)
       let loaded = 0
-      set(pack, { total })
+      set(id, { total: missing.reduce((n, f) => n + f.bytes, 0) })
       for (const f of missing) {
-        const blob = await fetchFile(f, stop.signal, (n) => { loaded += n; set(pack, { loaded }) })
+        const blob = await fetchFile(f, stop.signal, (n) => { loaded += n; set(id, { loaded }) })
         await store.put(key(f.name), new Response(blob))
       }
     }
-    delete running[pack]
+    delete running[id]
+    choose(id)
     await refreshAll()
   } catch (e) {
-    delete running[pack]
+    delete running[id]
     const stopped = (e as Error).name === 'AbortError'
     if (!stopped) console.error(e)
     await refreshAll()
-    if (!stopped) set(pack, { failed: true })
+    if (!stopped) set(id, { failed: true })
   }
 }
+export const cancelVariant = (id: string) => running[id]?.abort()
+export const downloadPack = (pack: Pack) => downloadVariant(chosen(pack).id)
+export const cancelPack = (pack: Pack) => cancelVariant(chosen(pack).id)
 
-export const cancelPack = (pack: Pack) => running[pack]?.abort()
-
-/** Removes a pack, and what cannot work without it. What another pack still needs stays. */
-export async function removePack(pack: Pack) {
-  if (pack === 'speech') {
-    const names = await caches.keys()
-    await Promise.all(names.filter((n) => n.includes('transformers')).map((n) => caches.delete(n)))
-    try { localStorage.removeItem(SPEECH_FLAG) } catch {}
+/** Removes one model. What another downloaded model still needs stays. */
+export async function removeVariant(id: string) {
+  const v = byId(id)
+  if (v.whisper) {
+    for (const n of (await caches.keys()).filter((x) => x.includes('transformers'))) {
+      const c = await caches.open(n)
+      for (const r of await c.keys()) if (r.url.includes(v.whisper.repo)) await c.delete(r)
+    }
+    try { localStorage.removeItem(whisperFlag(v.whisper.repo)) } catch {}
   } else {
     const store = await caches.open(CACHE)
-    const keep = pack === 'recognize' ? states.faces.status === 'ready' ? FILES.faces : [] : []
-    for (const f of [...FILES.faces, ...FILES.recognize]) if (!keep.includes(f) && (pack === 'faces' || f === COMPARER || !FILES.faces.includes(f))) await store.delete(key(f.name))
-    await new Promise((r) => { const q = indexedDB.deleteDatabase('folkbranch-face-prints'); q.onsuccess = q.onerror = q.onblocked = r })
+    const needed = new Set(VARIANTS.filter((o) => o.id !== id && states[o.id]?.status === 'ready').flatMap((o) => o.files))
+    for (const f of v.files) if (!needed.has(f)) await store.delete(key(f.name))
   }
+  if (v.feature === 'recognize') await new Promise((r) => { const q = indexedDB.deleteDatabase('folkbranch-face-prints'); q.onsuccess = q.onerror = q.onblocked = r })
   await refreshAll()
 }
 
-export function useModel(pack: Pack) {
-  const state = useSyncExternalStore(subscribe, () => states[pack], () => blank)
-  useEffect(() => { if (state.status === 'unknown') refresh(pack) }, [pack, state.status])
+export function useVariant(id: string) {
+  const state = useSyncExternalStore(subscribe, () => states[id] ?? blank, () => blank)
+  // All of them: the size offered depends on what the other models already brought.
+  useEffect(() => { if (state.status === 'unknown') refreshAll() }, [state.status])
   return state
+}
+/** The state of the model this device uses for a feature. */
+export function useModel(pack: Pack) {
+  useSyncExternalStore(subscribe, () => version, () => 0)
+  return useVariant(typeof window === 'undefined' ? '' : chosen(pack).id)
+}
+export function useChosen(pack: Pack) {
+  useSyncExternalStore(subscribe, () => version, () => 0)
+  return chosen(pack)
 }

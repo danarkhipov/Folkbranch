@@ -25,6 +25,7 @@ export function ModelPrompt({ pack, children, compact }: { pack: Pack; children?
         )
         : <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => downloadPack(pack)}><Download /> {t('Скачать модель')}, {packSize(pack)} {t('МБ')}</Button>}
       {m.failed && <p role="alert" className="text-xs text-destructive">{t('Не удалось скачать модель. Проверьте соединение и попробуйте ещё раз.')}</p>}
+      {!compact && m.status === 'none' && <p className="text-xs text-ink-soft">{t('Другие модели можно выбрать в настройках, в разделе «Умные функции».')}</p>}
     </div>
   )
 }

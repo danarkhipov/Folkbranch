@@ -75,6 +75,7 @@ Backups, updates and hosting on Railway are in the [self-hosting guide](docs/SEL
 
 **Smart features, on this device**
 - Nothing downloads until you press the button, one model at a time and separately on each device. The app works the same without them.
+- Choose how much to download. Finding faces comes in three sizes, from 91% of faces at 14 MB to 99% at 90 MB. Russian speech uses GigaAM, which got 12% of words wrong in our test where a small Whisper got 37%.
 - Find faces in a photo, even in old group photos, and get a suggestion of who it is from faces you already tagged. A name appears only when you confirm it.
 - Go through all your photos at once for familiar faces, and set portraits for people who have none.
 - Speak to the assistant instead of typing. The words are recognised on your device, and you send them.

@@ -1,3 +1,4 @@
+// Whisper. Without the limits on repeating it can say one word over and over: measured, that doubled its errors.
 // Reads speech away from the page, so the app stays usable however slow the device is.
 import { env, pipeline } from '@huggingface/transformers'
 import { RATE, splitAtQuiet } from './audio'
@@ -28,7 +29,7 @@ self.onmessage = async ({ data: job }: MessageEvent<Job>) => {
     let text = ''
     for (let i = 0; i < pieces.length; i++) {
       send({ type: 'reading', done: i, total: pieces.length })
-      const out = await read(samples.subarray(pieces[i][0], pieces[i][1]), { language: job.language, task: 'transcribe', sampling_rate: RATE } as never)
+      const out = await read(samples.subarray(pieces[i][0], pieces[i][1]), { language: job.language, task: 'transcribe', sampling_rate: RATE, no_repeat_ngram_size: 3, repetition_penalty: 1.1, max_new_tokens: 200 } as never)
       text = `${text} ${(Array.isArray(out) ? out[0] : out).text.trim()}`.trim()
       send({ type: 'text', text })
     }

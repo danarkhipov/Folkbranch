@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { rateDevice } from '../lib/smart/device'
 import { splitAtQuiet } from '../lib/smart/audio'
 import { bestMatch, SAME_PERSON } from '../lib/smart/face-match'
+import { gigaamFeatures, MELS, readLetters } from '../lib/smart/gigaam'
 
 describe('the device', () => {
   const base = { cores: 8, memoryGB: 8, saveData: false }
@@ -52,6 +53,23 @@ describe('naming a face', () => {
   })
   it('takes each person by their closest photo', () => {
     expect(bestMatch([{ personId: 'a', score: 0.6 }, { personId: 'a', score: 0.9 }, { personId: 'b', score: 0.7 }])).toEqual({ personId: 'a', score: 0.9 })
+  })
+})
+
+describe('reading Russian speech', () => {
+  it('turns a recording into one column of 64 bands per 10 ms', () => {
+    const { features, steps } = gigaamFeatures(new Float32Array(16000).fill(0.1))
+    expect(steps).toBe(99)
+    expect(features.length).toBe(MELS * 99)
+    expect(features.every(Number.isFinite)).toBe(true)
+  })
+  it('survives a recording shorter than one window', () => {
+    expect(gigaamFeatures(new Float32Array(10)).steps).toBe(1)
+  })
+  it('drops repeats and pauses, and reads word marks as spaces', () => {
+    const letters = ['<unk>', 'а', 'б', '▁', '<blk>']
+    const one = (i: number) => letters.map((_, v) => (v === i ? 1 : 0))
+    expect(readLetters([1, 1, 4, 1, 3, 2].flatMap(one), 6, 5, letters)).toBe('аа б')
   })
 })
 

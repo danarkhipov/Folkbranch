@@ -1,25 +1,8 @@
 // Finds and compares faces away from the page, so the app stays usable however slow the device is.
-import * as ort from 'onnxruntime-web/wasm'
 import type { Box } from '../types'
+import { ort, prepare, session } from './ort-files'
 
 interface Found extends Box { score: number; marks: [number, number][] }
-
-const opened = new Map<string, Promise<ort.InferenceSession>>()
-const fromCache = async (name: string) => { const hit = await (await caches.open('folkbranch-models')).match(`/smart-models/${name}`); if (!hit) throw new Error(`${name} is not downloaded`); return new Uint8Array(await hit.arrayBuffer()) }
-let ready: Promise<void> | null = null
-function prepare(threads: number) {
-  return (ready ??= (async () => {
-    ort.env.wasm.wasmBinary = (await fromCache('ort.wasm')).buffer as ArrayBuffer
-    ort.env.wasm.wasmPaths = { mjs: `${self.location.origin}/ort/ort-wasm-simd-threaded.mjs` }
-    ort.env.wasm.numThreads = threads
-    ort.env.logLevel = 'error'
-  })())
-}
-const session = (name: string) => {
-  let s = opened.get(name)
-  if (!s) { s = fromCache(name).then((bytes) => ort.InferenceSession.create(bytes, { executionProviders: ['wasm'] })); opened.set(name, s) }
-  return s
-}
 
 const SIDE = 640
 function suppress(boxes: Found[]) {
@@ -65,17 +48,43 @@ async function look(source: CanvasImageSource, width: number, height: number, th
   return suppress(found)
 }
 
+/** The larger detectors: a square picture, grey around it, and boxes with no marks for eyes and nose. */
+async function lookYolo(source: CanvasImageSource, width: number, height: number, model: string): Promise<Found[]> {
+  const s = await session(model)
+  const k = SIDE / Math.max(width, height), dw = width * k, dh = height * k, px = (SIDE - dw) / 2, py = (SIDE - dh) / 2
+  const canvas = new OffscreenCanvas(SIDE, SIDE)
+  const g = canvas.getContext('2d', { willReadFrequently: true })!
+  g.fillStyle = 'rgb(114,114,114)'
+  g.fillRect(0, 0, SIDE, SIDE)
+  g.drawImage(source, px, py, dw, dh)
+  const d = g.getImageData(0, 0, SIDE, SIDE).data
+  const n = SIDE * SIDE
+  const input = new Float32Array(3 * n)
+  for (let i = 0; i < n; i++) { input[i] = d[i * 4] / 255; input[i + n] = d[i * 4 + 1] / 255; input[i + 2 * n] = d[i * 4 + 2] / 255 }
+  const out = (await s.run({ [s.inputNames[0]]: new ort.Tensor('float32', input, [1, 3, SIDE, SIDE]) }))[s.outputNames[0]]
+  const a = out.data as Float32Array, count = out.dims[2]
+  const found: Found[] = []
+  for (let i = 0; i < count; i++) {
+    const score = a[4 * count + i]
+    if (score < 0.4) continue
+    const w = a[2 * count + i], h = a[3 * count + i]
+    found.push({ x: (a[i] - w / 2 - px) / k, y: (a[count + i] - h / 2 - py) / k, w: w / k, h: h / k, score, marks: [] })
+  }
+  return suppress(found)
+}
+
 /** The whole picture, then overlapping parts of it when asked: small faces in a group need a closer look. */
-async function faces(image: ImageBitmap, closer: boolean) {
+async function faces(image: ImageBitmap, closer: boolean, model: string) {
   const W = image.width, H = image.height
-  const all = await look(image, W, H, 0.6)
+  const look1 = (source: CanvasImageSource, w: number, h: number) => (model === 'yunet.onnx' ? look(source, w, h, 0.6) : lookYolo(source, w, h, model))
+  const all = await look1(image, W, H)
   if (closer && Math.max(W, H) >= 800) {
     const side = Math.round(Math.max(W, H) * 0.55), tw = Math.min(W, side), th = Math.min(H, side), nx = W > side ? 3 : 1, ny = H > side ? 3 : 1
     for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
       const ox = nx === 1 ? 0 : Math.round((i * (W - tw)) / (nx - 1)), oy = ny === 1 ? 0 : Math.round((j * (H - th)) / (ny - 1))
       const part = new OffscreenCanvas(tw, th)
       part.getContext('2d')!.drawImage(image, ox, oy, tw, th, 0, 0, tw, th)
-      for (const b of await look(part, tw, th, 0.6)) all.push({ ...b, x: b.x + ox, y: b.y + oy, marks: b.marks.map(([x, y]) => [x + ox, y + oy]) })
+      for (const b of await look1(part, tw, th)) all.push({ ...b, x: b.x + ox, y: b.y + oy, marks: b.marks.map(([x, y]) => [x + ox, y + oy]) })
     }
   }
   return suppress(all)
@@ -129,7 +138,7 @@ self.onmessage = async ({ data: m }) => {
     let result: unknown = null
     if (m.type === 'faces') {
       const W = m.image.width, H = m.image.height
-      result = (await faces(m.image, m.closer)).filter((f) => f.w >= 12 && f.h >= 12).map((f) => ({ x: f.x / W, y: f.y / H, w: f.w / W, h: f.h / H }))
+      result = (await faces(m.image, m.closer, m.model)).filter((f) => f.w >= 12 && f.h >= 12).map((f) => ({ x: f.x / W, y: f.y / H, w: f.w / W, h: f.h / H }))
     } else if (m.type === 'describe') result = await describe(m.image, m.box)
     m.image?.close?.()
     ;(self as unknown as Worker).postMessage({ id: m.id, result })
