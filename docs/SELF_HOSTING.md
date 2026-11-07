@@ -80,7 +80,7 @@ An empty instance can be claimed only with a code, so a stranger who finds it fi
 | `./folkbranch connect` | Connect Claude Code or Codex over MCP |
 | `./folkbranch token create --name NAME` | Connect an agent, see [AGENTS.md](AGENTS.md) |
 | `./folkbranch token list`, `./folkbranch token revoke ID` | See and cut off tokens |
-| `./folkbranch login-link` | One-time sign-in link for the owner, for when you are locked out |
+| `./folkbranch login-link` | One-time sign-in link for the owner, for when you are locked out. With `--now` it signs in on opening, without a button: use it only on this computer, not in a message |
 | `./folkbranch backup` | Consistent copy of the database and photos, safe while running |
 | `./folkbranch doctor` | Where the data is and what is in it |
 

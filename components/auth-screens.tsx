@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { translate } from '@/lib/i18n'
 import type { Lang } from '@/lib/types'
 import { Brand } from './brand-icons'
@@ -80,10 +80,23 @@ export function LoginScreen({ lang, familyName, providers }: { lang: Lang; famil
   )
 }
 
-export function InviteScreen({ token, lang, familyName, name, valid }: { token: string; lang: Lang; familyName: string; name: string; valid: boolean }) {
+export function InviteScreen({ token, lang, familyName, name, valid, auto }: { token: string; lang: Lang; familyName: string; name: string; valid: boolean; auto?: boolean }) {
   useHtmlLang(lang)
   const t = (k: string) => translate(lang, k)
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState(!!auto)
+  const accept = async () => {
+    setBusy(true)
+    const r = await post('/api/auth/family/accept', { token })
+    if (r.ok) location.href = '/'
+    else location.reload()
+  }
+  // Only the owner's own command on this computer asks for it: it comes from no message that a link preview could open.
+  const started = useRef(false)
+  useEffect(() => {
+    if (!auto || !valid || started.current) return
+    started.current = true
+    void accept()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <main className={shell}>
       <div className={card}>
@@ -94,12 +107,7 @@ export function InviteScreen({ token, lang, familyName, name, valid }: { token: 
             <h1 className="font-serif text-2xl font-medium -mt-2">{familyName}</h1>
             {name && <p>{t('Вы войдёте как')}: {name}. {t('Если это не вы, попросите новую ссылку.')}</p>}
             {/* A button, not an automatic sign-in: link previews in messengers must not burn the one-time link. */}
-            <button className={primary} disabled={busy} onClick={async () => {
-              setBusy(true)
-              const r = await post('/api/auth/family/accept', { token })
-              if (r.ok) location.href = '/'
-              else location.reload()
-            }}>{t('Принять приглашение')}</button>
+            <button className={primary} disabled={busy} onClick={accept}>{t('Принять приглашение')}</button>
           </>
         ) : (
           <>

@@ -83,7 +83,7 @@ function tokenRevoke(o) {
 }
 
 /** Gets the owner back in: a one-time link, the same kind an invitation uses. */
-function loginLink() {
+function loginLink(now) {
   const db = open()
   const owner = db.prepare("select id, name from user where role = 'owner' limit 1").get()
   if (!owner) fail('Nobody has claimed this archive yet: open /setup.')
@@ -91,7 +91,7 @@ function loginLink() {
   const now = Date.now()
   db.prepare('insert into invites (id, token_hash, name, role, user_id, created_by, created_at, expires_at) values (?, ?, ?, ?, ?, ?, ?, ?)')
     .run(newId(), hash(token), owner.name, 'owner', owner.id, 'cli', now, now + DAY)
-  console.log(`One-time sign-in link for ${owner.name}, valid for a day:\n\n  ${baseUrl()}/invite/${token}`)
+  console.log(`One-time sign-in link for ${owner.name}, valid for a day:\n\n  ${baseUrl()}/invite/${token}${now ? '?go=1' : ''}`)
 }
 
 async function backup(o) {
@@ -124,7 +124,7 @@ const HELP = `Folkbranch, server commands
                      writes wait for your review unless you pass --direct.
   token list         Tokens that are still active
   token revoke ID    Cut a token off at once
-  login-link         A one-time sign-in link for the owner
+  login-link [--now] A one-time sign-in link for the owner; --now signs in on opening, for this computer only
   backup [DIR]       A consistent copy of the database and photos
   doctor             Where the data is and what is in it
 `
@@ -133,7 +133,7 @@ const [cmd, sub, ...rest] = process.argv.slice(2)
 if (cmd === 'token' && sub === 'create') tokenCreate(parse(rest))
 else if (cmd === 'token' && sub === 'list') tokenList()
 else if (cmd === 'token' && sub === 'revoke') tokenRevoke(parse(rest))
-else if (cmd === 'login-link') loginLink()
+else if (cmd === 'login-link') loginLink(sub === '--now')
 else if (cmd === 'backup') await backup(parse([sub, ...rest].filter(Boolean)))
 else if (cmd === 'doctor') doctor()
 else { console.log(HELP); if (cmd && cmd !== 'help' && cmd !== '--help') process.exit(1) }
