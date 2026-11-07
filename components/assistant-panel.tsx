@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import { Confirmation, ConfirmationAction, ConfirmationActions, ConfirmationRequest } from '@/components/ai-elements/confirmation'
 import { Conversation, ConversationContent, ConversationScrollButton } from '@/components/ai-elements/conversation'
 import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message'
+import { DictateButton } from './dictate-button'
 import { PromptInput, PromptInputBody, PromptInputButton, PromptInputFooter, PromptInputSubmit, PromptInputTextarea, PromptInputTools, usePromptInputAttachments, type PromptInputMessage } from '@/components/ai-elements/prompt-input'
 import { PanelEdge } from './panel-size'
 import { changesData, isOrdinaryEdit, toolLabel } from '@/lib/agent/labels'
@@ -167,7 +168,7 @@ export default function AssistantPanel({ open, width, onWidth, onClose, onPath, 
           <PromptInputTextarea aria-label={t('Сообщение ассистенту')} placeholder={t(pending.length ? 'Сначала ответьте на вопрос выше' : 'Спросите или попросите изменить…')} disabled={pending.length > 0} />
         </PromptInputBody>
         <PromptInputFooter>
-          <PromptInputTools><AttachButton /></PromptInputTools>
+          <PromptInputTools><AttachButton /><DictateButton /></PromptInputTools>
           <PromptInputSubmit labels={{ send: t('Отправить'), stop: t('Остановить') }} status={status} onStop={stop} disabled={pending.length > 0} className="size-7 rounded-full">{busy ? undefined : <ArrowUp className="size-4" />}</PromptInputSubmit>
         </PromptInputFooter>
       </PromptInput>

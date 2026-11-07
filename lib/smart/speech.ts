@@ -108,5 +108,5 @@ export async function transcribe(blob: Blob, lang: Lang, onProgress: (p: SpeechP
 export async function forgetModels() {
   const names = await caches.keys().catch(() => [] as string[])
   await Promise.all(names.filter((n) => n.includes('transformers')).map((n) => caches.delete(n)))
-  await new Promise((r) => { const q = indexedDB.deleteDatabase('folkbranch-faces'); q.onsuccess = q.onerror = q.onblocked = r })
+  for (const db of ['folkbranch-faces', 'tensorflowjs']) await new Promise((r) => { const q = indexedDB.deleteDatabase(db); q.onsuccess = q.onerror = q.onblocked = r })
 }

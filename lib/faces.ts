@@ -34,3 +34,10 @@ export function squareCrop(box: Box, photoW: number, photoH: number): Box {
   const y = Math.min(photoH - side, Math.max(0, px.y + px.h / 2 - side / 2))
   return { x: x / photoW, y: y / photoH, w: side / photoW, h: side / photoH }
 }
+
+/** How much of the smaller box lies inside the other: above a third they are taken to be one face. */
+export function overlap(a: Box, b: Box) {
+  const w = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x))
+  const h = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y))
+  return (w * h) / Math.min(a.w * a.h, b.w * b.h)
+}

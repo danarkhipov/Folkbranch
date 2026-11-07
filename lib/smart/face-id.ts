@@ -3,7 +3,6 @@ import type { Box, MediaTag } from '../types'
 import { bestMatch, type Guess } from './face-match'
 
 // Everything here stays in this browser: the likeness of a face is not written to the server or sent anywhere.
-const MODELS = 'https://cdn.jsdelivr.net/npm/@vladmandic/human@3.3.6/models/'
 /** Several photos of a person are enough, and a device should not be asked to read the whole archive. */
 const PER_PERSON = 5
 const MAX_FACES = 150
@@ -16,26 +15,29 @@ function getHuman() {
     // Served as it is, so a library this large stays out of the app's own bundles.
     const { Human } = await import(/* turbopackIgnore: true */ /* webpackIgnore: true */ '/human/human.esm.js' as string) as typeof import('@vladmandic/human')
     const h = new Human({
-      modelBasePath: MODELS, backend: 'webgl', debug: false, cacheSensitivity: 0, filter: { enabled: false },
+      modelBasePath: `${location.origin}/human/models/`, backend: 'webgl', debug: false, cacheSensitivity: 0, filter: { enabled: false },
       face: { enabled: true, detector: { rotation: true, maxDetected: 1, return: false }, mesh: { enabled: true }, iris: { enabled: false }, description: { enabled: true }, emotion: { enabled: false }, antispoof: { enabled: false }, liveness: { enabled: false } },
       body: { enabled: false }, hand: { enabled: false }, object: { enabled: false }, gesture: { enabled: false }, segmentation: { enabled: false },
     })
     // A device that cannot run this says so rather than leaving someone waiting.
-    await Promise.race([h.load(), new Promise((_, reject) => setTimeout(() => reject(new Error('the model did not load in time')), 90_000))])
+    await Promise.race([h.init().then(() => h.load()), new Promise((_, reject) => setTimeout(() => reject(new Error('the model did not load in time')), 120_000))])
     return h
-  })())
+  })().catch((e) => { human = null; throw e }))
 }
 
-function store(mode: IDBTransactionMode) {
+type Shelf = 'faces' | 'seen' | 'refused'
+
+function store(mode: IDBTransactionMode, shelf: Shelf = 'faces') {
   return new Promise<IDBObjectStore>((resolve, reject) => {
-    const q = indexedDB.open('folkbranch-faces', 1)
-    q.onupgradeneeded = () => q.result.createObjectStore('faces')
+    const q = indexedDB.open('folkbranch-faces', 2)
+    q.onupgradeneeded = () => { for (const s of ['faces', 'seen', 'refused']) if (!q.result.objectStoreNames.contains(s)) q.result.createObjectStore(s) }
     q.onerror = () => reject(q.error)
-    q.onsuccess = () => resolve(q.result.transaction('faces', mode).objectStore('faces'))
+    q.onsuccess = () => resolve(q.result.transaction(shelf, mode).objectStore(shelf))
   })
 }
-const remembered = async (key: string) => { const s = await store('readonly'); return new Promise<number[] | undefined>((r) => { const q = s.get(key); q.onsuccess = () => r(q.result); q.onerror = () => r(undefined) }) }
-const remember = async (key: string, value: number[]) => { (await store('readwrite')).put(value, key) }
+const remembered = async <T = number[]>(key: string, shelf: Shelf = 'faces') => { const s = await store('readonly', shelf); return new Promise<T | undefined>((r) => { const q = s.get(key); q.onsuccess = () => r(q.result); q.onerror = () => r(undefined) }) }
+const remember = async (key: string, value: unknown, shelf: Shelf = 'faces') => { (await store('readwrite', shelf)).put(value, key) }
+const keysOf = async (shelf: Shelf) => { const s = await store('readonly', shelf); return new Promise<Set<string>>((r) => { const q = s.getAllKeys(); q.onsuccess = () => r(new Set(q.result as string[])); q.onerror = () => r(new Set()) }) }
 
 function crop(img: HTMLImageElement | ImageBitmap, box: Box, W: number, H: number) {
   // The model finds the face itself, so it needs some of what is around it.
@@ -102,4 +104,67 @@ export async function guessFaces(img: HTMLImageElement, boxes: Box[], known: { p
     await breathe()
   }
   return out
+}
+
+export interface FaceSuggestion { key: string; mediaId: string; box: Box; personId: string; score: number; thumb: string; width: number; height: number }
+
+const boxKey = (mediaId: string, personId: string) => `${mediaId}:${personId}`
+
+/** "This is not them" is remembered on this device, so nobody is asked the same thing twice. */
+export const refuseFace = (s: FaceSuggestion) => remember(s.key, 1, 'refused')
+/** Asks again about every photo, for when more faces have been tagged since. */
+export async function forgetScans() {
+  (await store('readwrite', 'seen')).clear()
+  ;(await store('readwrite', 'refused')).clear()
+}
+
+function loadImage(url: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('photo did not load'))
+    img.src = url
+  })
+}
+
+function thumbnail(img: HTMLImageElement, box: Box) {
+  const c = crop(img, { x: box.x + box.w * 0.1, y: box.y + box.h * 0.1, w: box.w * 0.8, h: box.h * 0.8 }, img.naturalWidth, img.naturalHeight)
+  const small = document.createElement('canvas')
+  small.width = small.height = 96
+  const side = Math.min(c.width, c.height)
+  small.getContext('2d')!.drawImage(c, (c.width - side) / 2, (c.height - side) / 2, side, side, 0, 0, 96, 96)
+  return small.toDataURL('image/jpeg', 0.8)
+}
+
+/** Goes through photos not yet looked at, a limited number at a time, and reports each face it can put a name to. */
+export async function scanPhotos(
+  photos: { id: string; url: string; tags: MediaTag[] }[],
+  known: { personId: string; face: number[] }[],
+  { limit, pause, onProgress, onFound, signal }: { limit: number; pause: number; onProgress: (done: number, total: number) => void; onFound: (s: FaceSuggestion) => void; signal: AbortSignal },
+) {
+  const { findFaces, overlap } = await import('../faces')
+  const seen = await keysOf('seen')
+  const refused = await keysOf('refused')
+  const waiting = photos.filter((p) => !seen.has(p.id))
+  const now = waiting.slice(0, limit)
+  for (let i = 0; i < now.length; i++) {
+    if (signal.aborted) throw new DOMException('Stopped', 'AbortError')
+    onProgress(i, now.length)
+    const photo = now[i]
+    const img = await loadImage(photo.url).catch(() => null)
+    if (img) {
+      const framed = photo.tags.filter((t) => t.x !== null) as (MediaTag & Box)[]
+      const faces = (await findFaces(img)).filter((f) => !framed.some((t) => overlap(f, t) > 0.3))
+      const here = new Set(framed.flatMap((t) => t.personId ?? []))
+      const guesses = await guessFaces(img, faces, known.filter((k) => !here.has(k.personId)), signal)
+      guesses.forEach((g, j) => {
+        if (!g || refused.has(boxKey(photo.id, g.personId))) return
+        onFound({ key: boxKey(photo.id, g.personId), mediaId: photo.id, box: faces[j], personId: g.personId, score: g.score, thumb: thumbnail(img, faces[j]), width: img.naturalWidth, height: img.naturalHeight })
+      })
+    }
+    await remember(photo.id, 1, 'seen')
+    // Rests between photos, longer on a weak device, so the page keeps answering.
+    await new Promise((r) => setTimeout(r, pause))
+  }
+  return { left: waiting.length - now.length }
 }

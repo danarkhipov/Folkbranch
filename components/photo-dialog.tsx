@@ -7,7 +7,7 @@ import Zoom from 'yet-another-react-lightbox/plugins/zoom'
 import 'yet-another-react-lightbox/styles.css'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { api, mediaUrl, useApp, useWrite } from '@/lib/client'
-import { findFaces, squareCrop } from '@/lib/faces'
+import { findFaces, overlap, squareCrop } from '@/lib/faces'
 import { useSmart } from '@/lib/smart/settings'
 import type { FaceProgress, Guess } from '@/lib/smart/face-id'
 import { cn } from '@/lib/utils'
@@ -244,12 +244,6 @@ function Photo({ id, list, index, setIndex, onClose }: { id: string; list?: stri
 }
 
 const pos = (b: Box): React.CSSProperties => ({ left: `${b.x * 100}%`, top: `${b.y * 100}%`, width: `${b.w * 100}%`, height: `${b.h * 100}%` })
-
-function overlap(a: Box, b: Box) {
-  const w = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x))
-  const h = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y))
-  return (w * h) / Math.min(a.w * a.h, b.w * b.h)
-}
 
 function MetaField({ value, onSave, placeholder, className, readOnly }: { value: string; onSave: (v: string) => void; placeholder: string; className?: string; readOnly: boolean }) {
   const [v, setV] = useState(value)

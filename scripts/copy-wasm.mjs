@@ -12,9 +12,10 @@ if (fs.existsSync(speech)) {
   fs.copyFileSync(loader, 'public/ort/ort-wasm-simd-threaded.asyncify.mjs')
 }
 
-// The face recognition library, served as it is and loaded only when someone turns it on. Its models come from a CDN.
-const faces = 'node_modules/@vladmandic/human/dist/human.esm.js'
+// The face recognition library and its three models, served by the app: a CDN can be far too slow, and this is only about 10 MB.
+const faces = 'node_modules/@vladmandic/human'
 if (fs.existsSync(faces)) {
-  fs.mkdirSync('public/human', { recursive: true })
-  fs.copyFileSync(faces, 'public/human/human.esm.js')
+  fs.mkdirSync('public/human/models', { recursive: true })
+  fs.copyFileSync(path.join(faces, 'dist/human.esm.js'), 'public/human/human.esm.js')
+  for (const model of ['blazeface', 'facemesh', 'faceres']) for (const ext of ['json', 'bin']) fs.copyFileSync(path.join(faces, 'models', `${model}.${ext}`), `public/human/models/${model}.${ext}`)
 }
