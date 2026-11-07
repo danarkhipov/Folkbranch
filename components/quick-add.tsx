@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { Mini } from './person-pickers'
 import { Select } from '@/components/ui/select'
 import { inputClass } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 /** "1920 – 1985", "1920-", "~1876": birth and death as typed. */
 function parseYears(s: string) {
@@ -115,9 +116,9 @@ export function QuickAdd({ state, onClose }: { state: State; onClose: (createdId
             </label>
           )}
           {(create.error || linkExisting.error) && <p className="text-xs text-destructive">{t('Не удалось сохранить')}: {String((create.error ?? linkExisting.error)?.message)}</p>}
-          <button className="h-10 rounded-lg bg-ink text-white disabled:opacity-40 mt-1" disabled={!name.trim() || create.isPending}>
+          <Button size="lg" className="mt-1" disabled={!name.trim() || create.isPending}>
             {t('Добавить')}
-          </button>
+          </Button>
         </form>
       </DialogContent>
     </Dialog>

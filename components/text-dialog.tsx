@@ -8,6 +8,7 @@ import { layoutFamily, AVATAR_CY, CARD_H } from '@/lib/graph/layout'
 import { parseFamilyText, parsedToGraph, planFamilyText, serializeFamilyText, type TextPlan } from '@/lib/textformat'
 import { personName } from '@/lib/types'
 import { Select } from '@/components/ui/select'
+import { textareaClass } from '@/components/ui/textarea'
 
 export function MiniGraph({ text }: { text: string }) {
   const { rootsBelow } = useApp()
@@ -84,7 +85,7 @@ export function TextDialog({ open, onOpenChange }: { open: boolean; onOpenChange
       <DialogContent className="max-w-[min(1200px,calc(100vw-32px))] sm:max-w-[min(1200px,calc(100vw-32px))] h-[calc(100vh-64px)] flex flex-col gap-3">
         <DialogTitle className="font-serif font-medium text-lg">{t('Текстовый вид графа')}</DialogTitle>
         <div className="grid md:grid-cols-2 gap-3 flex-1 min-h-0">
-          <textarea value={text} readOnly={!canEdit} spellCheck={false} onChange={(e) => setText(e.target.value)} className="min-h-0 h-full resize-none rounded-lg border border-input bg-white p-3 font-mono text-xs leading-5 outline-none focus:ring-2 focus:ring-ring/40 whitespace-pre" />
+          <textarea value={text} readOnly={!canEdit} spellCheck={false} onChange={(e) => setText(e.target.value)} className={`${textareaClass} min-h-0 h-full resize-none`} />
           <div className="min-h-0 flex flex-col gap-2">
             <div className="flex-1 min-h-0 rounded-lg bg-paper border border-border overflow-hidden"><MiniGraph text={text} /></div>
             <div className="text-sm flex flex-col gap-1 max-h-[40%] overflow-auto">

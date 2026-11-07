@@ -5,6 +5,7 @@ import { ArrowLeftRight } from 'lucide-react'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { api, useApp } from '@/lib/client'
 import { lifeYears } from '@/lib/types'
+import { Button } from '@/components/ui/button'
 
 interface Side { id: string; name: string; updatedAt: number; parents: number; children: number; unions: number; pages: number; photos: number; stories: number }
 interface Plan { blocked: string | null; warnings: string[]; fields: { field: string; keep: string; drop: string }[]; keep: Side; drop: Side }
@@ -77,7 +78,7 @@ export function MergeDialog({ a, b, onClose }: { a: string; b: string; onClose: 
             {error && <p role="alert" className="text-destructive break-anywhere">{error}</p>}
             <p className="text-xs text-ink-soft">{t('Вернуть всё как было можно в разделе «История».')}</p>
             <div className="flex gap-2">
-              <button type="button" className="h-9 rounded-lg bg-ink px-3 text-white disabled:opacity-40" disabled={busy || !!plan.blocked} onClick={go}>{t('Объединить')}</button>
+              <Button type="button" disabled={busy || !!plan.blocked} onClick={go}>{t('Объединить')}</Button>
               <button type="button" className="bar-btn border border-border" onClick={onClose}>{t('Отмена')}</button>
             </div>
           </div>

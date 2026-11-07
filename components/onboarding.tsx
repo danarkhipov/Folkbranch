@@ -2,6 +2,7 @@
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { useApp } from '@/lib/client'
 import { SetupGuide } from './settings/setup-guide'
+import { Button } from '@/components/ui/button'
 
 /** Right after the archive is made. Nothing here is required, and it all stays in the settings. */
 export function Onboarding({ onClose, onImport, onFirstPerson }: { onClose: () => void; onImport: () => void; onFirstPerson: () => void }) {
@@ -12,7 +13,7 @@ export function Onboarding({ onClose, onImport, onFirstPerson }: { onClose: () =
         <DialogTitle className="font-serif text-xl font-medium">{t('Архив создан. Что дальше?')}</DialogTitle>
         <p className="text-sm text-ink-soft">{t('Обязательного здесь ничего нет. Всё это можно сделать потом: Настройки → Настройка.')}</p>
         <SetupGuide onImport={onImport} onFirstPerson={onFirstPerson} />
-        <button type="button" className="h-9 self-start rounded-lg bg-ink px-3 text-sm text-white" onClick={onClose}>{t('Перейти к архиву')}</button>
+        <Button type="button" className="self-start" onClick={onClose}>{t('Перейти к архиву')}</Button>
       </DialogContent>
     </Dialog>
   )

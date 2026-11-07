@@ -10,6 +10,7 @@ import { Brand } from './brand-icons'
 import { PanelEdge } from './panel-size'
 import { Select } from '@/components/ui/select'
 import { inputClass } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 export interface ProviderStatus { connected: boolean; provider: PresetId | 'local' | null; label: string | null; model: string | null; source: 'server' | 'app' | null; keyEnding: string | null }
 export const useProviderStatus = () => useQuery({ queryKey: ['provider'], queryFn: () => api<ProviderStatus>('assistant/provider') })
@@ -85,7 +86,7 @@ export function ProviderForm({ onDone }: { onDone?: () => void }) {
         <div className="mt-2"><ModelSelect presetId={id} value={model} onChange={setModel} /></div>
       </details>
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
-      <button className="h-9 rounded-lg bg-ink px-3 text-white disabled:opacity-50" disabled={busy || key.trim().length < 10}>{t(busy ? 'Проверяю ключ…' : 'Проверить и подключить')}</button>
+      <Button disabled={busy || key.trim().length < 10}>{t(busy ? 'Проверяю ключ…' : 'Проверить и подключить')}</Button>
     </form>
   )
 }
@@ -113,7 +114,7 @@ export default function AssistantSetup({ state, open, onClose, width, onWidth }:
         {reason === 'off' && state.canFix && (
           <>
             <p>{t('Ассистент выключен. Включите его, чтобы задавать вопросы о семье.')}</p>
-            <button className="h-9 rounded-lg bg-ink px-3 text-white" onClick={enable}>{t('Включить ассистента')}</button>
+            <Button onClick={enable}>{t('Включить ассистента')}</Button>
           </>
         )}
         {reason === 'no-key' && state.canFix && (

@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { ArrowUpDown, CircleHelp, ClipboardCheck, EyeOff, Clock, Minus, Plus, Printer, Search, Settings, Tags } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useApp } from '@/lib/client'
@@ -12,13 +12,54 @@ import { ViewMenu } from './chart-view-menu'
 import { Legend } from './graph-parts'
 import { Logo } from './logo'
 
+/** The bar's height: folded, it is a square. */
+const FOLDED_WIDTH = 46
+
 export type Side = 'history' | 'review' | 'assistant' | null
 
-export function MainBar({ folded, onHide, guest, familyName, present, mode, navRef, side, draftOps, onSearch, onSide, onAssistant, onSettings }: { folded: boolean; onHide: () => void;  guest: boolean; familyName: string; present: Present[]; mode: 'full' | 'no-name' | 'compact'; navRef: RefObject<HTMLElement | null>; side: Side; draftOps: number; onSearch: () => void; onSide: (next: Side) => void; onAssistant: () => void; onSettings: () => void }) {
+/**
+ * One and the same bar narrows to a square around its logo and opens again, so nothing is swapped and nothing jumps.
+ * A width can only be animated between numbers, so it is measured first.
+ */
+function useFoldWidth(navRef: RefObject<HTMLElement | null>, folded: boolean) {
+  const first = useRef(true)
+  useLayoutEffect(() => {
+    const bar = navRef.current
+    if (!bar) return
+    const instant = first.current
+    first.current = false
+    if (instant) { if (folded) bar.style.width = `${FOLDED_WIDTH}px`; return }
+    if (folded) {
+      bar.style.width = `${bar.offsetWidth}px`
+      void bar.offsetWidth
+      bar.style.width = `${FOLDED_WIDTH}px`
+      return
+    }
+    bar.style.width = ''
+    const open = bar.offsetWidth
+    bar.style.width = `${FOLDED_WIDTH}px`
+    void bar.offsetWidth
+    bar.style.width = `${open}px`
+    const done = (e: TransitionEvent) => {
+      if (e.target !== bar || e.propertyName !== 'width') return
+      bar.style.width = ''
+      bar.removeEventListener('transitionend', done)
+    }
+    bar.addEventListener('transitionend', done)
+    return () => bar.removeEventListener('transitionend', done)
+  }, [navRef, folded])
+}
+
+export function MainBar({ folded, onHide, onShow, guest, familyName, present, mode, navRef, side, draftOps, onSearch, onSide, onAssistant, onSettings }: { folded: boolean; onHide: () => void; onShow: () => void;  guest: boolean; familyName: string; present: Present[]; mode: 'full' | 'no-name' | 'compact'; navRef: RefObject<HTMLElement | null>; side: Side; draftOps: number; onSearch: () => void; onSide: (next: Side) => void; onAssistant: () => void; onSettings: () => void }) {
   const { t, canEdit } = useApp()
+  useFoldWidth(navRef, folded)
   return (
-      <nav aria-label={t('Главное меню')} ref={navRef} inert={folded} className={cn('float main-bar fixed left-3 top-3 z-10 flex items-center gap-0.5 p-1', mode !== 'full' && mode, folded && 'folded')}>
-        <Logo size={22} className="bar-logo ml-1.5 flex-none" />
+    <>
+      <span className={cn('bar-peek fixed left-3 top-3', folded && 'folded')} aria-hidden="true" />
+      <nav aria-label={t('Главное меню')} ref={navRef} className={cn('float main-bar fixed left-3 top-3 z-10 flex items-center p-1', mode !== 'full' && mode, folded && 'folded')}>
+        <Logo size={22} className="bar-logo flex-none" />
+        <button className="show-bars" inert={!folded} title={t('Показать панели')} data-hint={t('Вернуть панели управления.')} aria-label={t('Показать панели')} onClick={onShow} />
+        <div className="bar-rest flex items-center gap-0.5" inert={folded}>
         <span className="family-name font-serif font-medium text-base px-2.5 max-w-[220px] truncate">{familyName}</span>
         {present.length > 0 && <span className="presence" title={`${t('Сейчас в архиве')}: ${present.map((o) => o.name).join(', ')}`} aria-label={`${t('Сейчас в архиве')}: ${present.map((o) => o.name).join(', ')}`} role="img">{present.slice(0, 3).map((o) => <span key={o.id}>{o.name.slice(0, 1).toUpperCase()}</span>)}{present.length > 3 && <span>+{present.length - 3}</span>}</span>}
         <span className="sep w-px h-5 bg-border mx-0.5" />
@@ -29,14 +70,10 @@ export function MainBar({ folded, onHide, guest, familyName, present, mode, navR
         {!guest && <button className="bar-btn" title={t('Настройки')} data-hint={t('Аккаунт, люди и доступ, файлы, подключения.')} aria-label={t('Настройки')} onClick={onSettings}><Settings size={16} /> <span className="nav-label">{t('Настройки')}</span></button>}
         <button className="bar-btn hide-bars" title={t('Скрыть панели')} data-hint={t('Останется одна кнопка, а схема займёт весь экран.')} aria-label={t('Скрыть панели')} onClick={onHide}><EyeOff size={16} /></button>
         {guest && <span className="nav-label px-2 text-xs text-ink-soft whitespace-nowrap">{t('Просмотр по ссылке')}</span>}
+        </div>
       </nav>
+    </>
   )
-}
-
-/** All that is left when the panels are hidden. */
-export function ShowBars({ folded, onShow }: { folded: boolean; onShow: () => void }) {
-  const { t } = useApp()
-  return <button inert={!folded} className={cn('show-bars fixed left-3 top-3 z-10', folded && 'folded')} title={t('Показать панели')} data-hint={t('Вернуть панели управления.')} aria-label={t('Показать панели')} onClick={onShow}><span className="float show-bars-face"><Logo size={22} className="flex-none" /></span></button>
 }
 
 /** Only about how the chart looks; it steps aside for a panel on the left. */

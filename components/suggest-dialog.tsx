@@ -6,6 +6,8 @@ import { api, useApp } from '@/lib/client'
 import { personName, type Person } from '@/lib/types'
 import type { Proposal } from '@/lib/ops/proposals'
 import { inputClass } from '@/components/ui/input'
+import { textareaClass } from '@/components/ui/textarea'
+import { Button } from '@/components/ui/button'
 
 const FIELDS: [keyof Person & string, string][] = [
   ['givenName', 'Имя'], ['patronymic', 'Отчество'], ['surname', 'Фамилия'], ['maidenName', 'Девичья фамилия'],
@@ -51,13 +53,13 @@ export function SuggestDialog({ person, onClose }: { person: Person; onClose: ()
             ))}
           </div>
           <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Что ещё рассказать')}
-            <textarea className="min-h-20 rounded-lg border border-input bg-white px-3 py-2 text-sm text-ink" maxLength={4000} value={text} onChange={(e) => setText(e.target.value)} />
+            <textarea className={`${textareaClass} min-h-20`} maxLength={4000} value={text} onChange={(e) => setText(e.target.value)} />
           </label>
           <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Откуда это известно')}
             <input className={input} maxLength={300} placeholder={t('Например, со слов тёти или из письма')} value={note} onChange={(e) => setNote(e.target.value)} />
           </label>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-          <button className="h-9 self-start rounded-lg bg-ink px-3 text-sm text-white disabled:opacity-40" disabled={busy}>{t('Отправить')}</button>
+          <Button className="self-start" disabled={busy}>{t('Отправить')}</Button>
         </form>
         {mine.length > 0 && (
           <section className="text-sm">

@@ -1,5 +1,5 @@
 'use client'
-import { useContext, useEffect, useRef, useState, type RefObject } from 'react'
+import { useContext, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import dynamic from 'next/dynamic'
 import { History, Maximize2, Minimize2, PencilLine, Search, Trash2, X } from 'lucide-react'
@@ -103,7 +103,10 @@ export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { pe
   const box = useRef<HTMLElement>(null)
   // From the keyboard, the card that just opened is where to go on from. A mouse stays where it is.
   useEffect(() => { if (document.activeElement?.matches('.card-main:focus-visible')) box.current?.focus({ preventScroll: true }) }, [])
-  useSearchMarks(box, hit?.terms ?? [], tab)
+  // What a search found, or else what someone else just changed: the same mark, the same way to find it.
+  const changedValues = changedByOther?.details?.flatMap((d) => (d.after ? [d.after] : [])) ?? NO_TERMS
+  const terms = useMemo(() => hit?.terms ?? (changedValues.length ? changedValues : NO_TERMS), [hit, changedValues.join('\n')]) // eslint-disable-line react-hooks/exhaustive-deps
+  useSearchMarks(box, terms, tab)
   /** Opens a tab and, when given, puts the cursor in that field. */
   const go = (next: string, fieldId?: string) => {
     setTab(next)
@@ -119,7 +122,7 @@ export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { pe
   const longName = personName(person).length > 28
 
   return (
-    <SearchTerms.Provider value={hit?.terms ?? NO_TERMS}>
+    <SearchTerms.Provider value={terms}>
     <aside ref={box} tabIndex={-1} aria-label={personName(person) || t('Без названия')} className={cn('panel', full && 'full')} style={{ '--panel-w': `${width}px`, '--panel-h': `${height}px` } as React.CSSProperties}>
       <PanelEdge edge="left" label="Ширина карточки" width={width} home={480} onWidth={setWidth} className="max-sm:hidden" />
       <PanelEdge edge="top" label="Высота карточки" width={height} home={Math.round((typeof window === 'undefined' ? 800 : window.innerHeight) * 0.7)} onWidth={setHeight} className="sm:hidden" />

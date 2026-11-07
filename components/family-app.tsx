@@ -7,7 +7,7 @@ import { App, Presence, api, undoFailure, useProposals, useTr, useWrite, type Ap
 import { Family } from '@/lib/kinship'
 import { personName, type Graph, type HistoryEntry, type Lang, type Me } from '@/lib/types'
 import { GraphCanvas, type CanvasHandle } from './graph-canvas'
-import { ConnectionNotice, MainBar, ShowBars, ViewBar, type Side } from './chart-bars'
+import { ConnectionNotice, MainBar, ViewBar, type Side } from './chart-bars'
 import { useChartScope } from './chart-scope'
 import { QuickAdd } from './quick-add'
 import { ConfirmDialog, SearchDialog, type SearchHit } from './person-pickers'
@@ -42,8 +42,6 @@ const TextDialog = dynamic(() => import('./text-dialog').then((m) => m.TextDialo
 const NARROW = 960
 /** Long enough to read and to reach the button in it from the keyboard; it stays while in use. */
 const TOAST_MS = 12_000
-/** How long the panel takes to slide behind the logo; its button appears only then. */
-const FOLD_MS = 340
 
 /** Closing a panel puts the keyboard back where it was, not at the top of the page. */
 function useFocusReturn(open: boolean) {
@@ -74,7 +72,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
     if (hidden) setSide(null)
     try { localStorage.setItem('bars-hidden', hidden ? '1' : '0') } catch {}
     // The button just pressed is going away: the keyboard moves to the one that brings it back.
-    setTimeout(() => document.querySelector<HTMLElement>(hidden ? '.show-bars' : '.hide-bars')?.focus({ preventScroll: true }), hidden ? FOLD_MS : 0)
+    requestAnimationFrame(() => document.querySelector<HTMLElement>(hidden ? '.show-bars' : '.hide-bars')?.focus({ preventScroll: true }))
   }
   const [searchHit, setSearchHit] = useState<SearchHit | null>(null)
   const [side, setSide] = useState<Side>(null)
@@ -258,7 +256,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
     const card = document.querySelector<HTMLElement>('aside.panel')
     const measure = () => {
       const bar = nav.current
-      if (bar && !bar.classList.contains('compact') && !bar.classList.contains('no-name')) {
+      if (bar && !bar.classList.contains('compact') && !bar.classList.contains('no-name') && !bar.classList.contains('folded') && !bar.style.width) {
         barFull.current = bar.offsetWidth
         barName.current = (bar.querySelector<HTMLElement>('.family-name')?.offsetWidth ?? 90) + 30 // the name, its divider, tighter buttons
       }
@@ -288,8 +286,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       <Presence.Provider value={present}>
       <ConnectionNotice t={t} />
       <a href="#chart" className="skip-link bar-btn float" onClick={(e) => { e.preventDefault(); document.querySelector<HTMLElement>('.card-main')?.focus() }}>{t('Перейти к схеме')}</a>
-      <ShowBars folded={barsHidden} onShow={() => hideBars(false)} />
-      <MainBar folded={barsHidden} onHide={() => hideBars(true)} guest={!!me.guest} familyName={familyName} present={present} mode={barMode} navRef={nav} side={side} draftOps={draftOps} onSearch={() => setSearch(true)} onSide={(next) => { setSide(next); setPath(null) }} onAssistant={toggleAssistant} onSettings={() => setSettings(true)} />
+      <MainBar folded={barsHidden} onHide={() => hideBars(true)} onShow={() => hideBars(false)} guest={!!me.guest} familyName={familyName} present={present} mode={barMode} navRef={nav} side={side} draftOps={draftOps} onSearch={() => setSearch(true)} onSide={(next) => { setSide(next); setPath(null) }} onAssistant={toggleAssistant} onSettings={() => setSettings(true)} />
       <main id="chart" aria-label={t('Схема семьи')}>
       <GraphCanvas ref={canvas} scope={scope} pathIds={path} groupIds={groupIds} panelOpen={panelOpen} leftInset={side === 'assistant' ? assistantWidth + 12 : 0}/>
 

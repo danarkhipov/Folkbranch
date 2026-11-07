@@ -10,10 +10,13 @@ import { PersonPopover } from './person-pickers'
 import { Select } from '@/components/ui/select'
 import { TranscribeButton } from './transcribe-button'
 import { inputClass } from '@/components/ui/input'
+import { textareaClass } from '@/components/ui/textarea'
+import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 const input = inputClass
 const label = 'flex flex-col gap-1 text-xs text-ink-soft'
-const primary = 'h-9 self-start rounded-lg bg-ink px-3 text-sm text-white disabled:opacity-40'
+const primary = cn(buttonVariants(), 'self-start')
 const NO_MIC = { insecure: 'Запись голоса работает только по защищённому адресу (https). Можно выбрать файл.', unsupported: 'Этот браузер не умеет записывать звук. Можно выбрать файл.', denied: 'Нет доступа к микрофону. Разрешите его в браузере или выберите файл.' }
 
 /** A voice from the microphone or from a file, with the words as far as anyone has written them down. */
@@ -128,7 +131,7 @@ export function StoryDialog({ person, story, onClose }: { person: Person; story:
             </div>
           </div>
           <label className={label}>{t('Текст или расшифровка')}
-            <textarea className="min-h-24 rounded-lg border border-input bg-white px-3 py-2 text-sm text-ink" maxLength={20000} value={body} onChange={(e) => setBody(e.target.value)} />
+            <textarea className={`${textareaClass} min-h-24`} maxLength={20000} value={body} onChange={(e) => setBody(e.target.value)} />
           </label>
           {(preview || story?.hasAudio) && !rec.recording && <TranscribeButton current={body} onText={setBody} getAudio={async () => { if (preview) return preview; const r = await fetch(`/api/v1/stories/${story!.id}/audio`); if (!r.ok) throw new Error(r.statusText); return r.blob() }} />}
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
@@ -181,7 +184,7 @@ export function StoryFactDialog({ story, teller, person, onClose }: { story: Sto
             <label className={label}>{t('Место')}<input className={input} maxLength={120} value={place} onChange={(e) => setPlace(e.target.value)} /></label>
           </div>
           <label className={label}>{t('Подробности')}
-            <textarea className="min-h-16 rounded-lg border border-input bg-white px-3 py-2 text-sm text-ink" maxLength={800} value={note} onChange={(e) => setNote(e.target.value)} />
+            <textarea className={`${textareaClass} min-h-16`} maxLength={800} value={note} onChange={(e) => setNote(e.target.value)} />
           </label>
           <p className="text-xs text-ink-soft">{t('Источник')}: {source}</p>
           <button className={primary} disabled={busy}>{t('Сохранить')}</button>

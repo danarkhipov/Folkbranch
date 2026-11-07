@@ -5,7 +5,7 @@ import { APIError, createAuthEndpoint } from 'better-auth/api'
 import { setSessionCookie } from 'better-auth/cookies'
 import { genericOAuth } from 'better-auth/plugins'
 import { nextCookies } from 'better-auth/next-js'
-import { eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb, schema } from './db'
 import { localLoginAllowed } from './local-login'
@@ -59,7 +59,7 @@ const familyAccess = () =>
         if (!invite) throw new APIError('BAD_REQUEST', { message: 'invalid invite' })
         const db = getDb()
         // Burn the link first, so a concurrent request cannot use it twice.
-        const burned = db.update(schema.invites).set({ usedAt: new Date() }).where(eq(schema.invites.id, invite.id)).run()
+        const burned = db.update(schema.invites).set({ usedAt: new Date() }).where(and(eq(schema.invites.id, invite.id), isNull(schema.invites.usedAt))).run()
         if (!burned.changes) throw new APIError('BAD_REQUEST', { message: 'invalid invite' })
         if (invite.userId) {
           const existing = await ctx.context.internalAdapter.findUserById(invite.userId)

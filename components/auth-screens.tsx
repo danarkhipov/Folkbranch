@@ -6,11 +6,12 @@ import { Brand } from './brand-icons'
 import { Logo } from './logo'
 import { RestoreForm } from './settings/restore-form'
 import { inputClass } from '@/components/ui/input'
+import { buttonVariants } from '@/components/ui/button'
 
 const shell = 'canvas !overflow-auto !cursor-default grid place-items-center p-4'
 const card = 'float w-full max-w-sm p-6 flex flex-col gap-3'
 const field = inputClass
-const primary = 'h-10 rounded-lg bg-ink text-white disabled:opacity-40'
+const primary = buttonVariants({ size: 'lg' })
 
 const post = (url: string, body: unknown) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
 

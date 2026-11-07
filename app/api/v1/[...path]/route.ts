@@ -24,6 +24,8 @@ async function handle(req: Request, ctx: { params: Promise<{ path: string[] }> }
   const found = match(routes, req.method, path)
   if (!found) return Response.json({ error: 'not found' }, { status: 404 })
   // Before the body is read into memory.
+  // A body of unstated length could be any size: it is refused rather than counted in memory.
+  if (req.method !== 'GET' && req.headers.get('transfer-encoding')?.includes('chunked')) return Response.json({ error: 'length required' }, { status: 411 })
   if (Number(req.headers.get('content-length') ?? 0) > MAX_BODY) return Response.json({ error: 'file too large' }, { status: 413 })
   try {
     const h = await headers()

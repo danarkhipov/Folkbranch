@@ -16,6 +16,7 @@ export async function POST(req: Request) {
   const h = await headers()
   if (hasBearer(h)) return Response.json({ error: 'not available to tokens' }, { status: 403 })
   if (!fromOurPages(h)) return Response.json({ error: 'bad origin' }, { status: 403 })
+  if (h.get('transfer-encoding')?.includes('chunked')) return Response.json({ error: 'length required' }, { status: 411 })
   if (Number(h.get('content-length') ?? 0) > MAX_BODY) return Response.json({ error: 'conversation too long' }, { status: 413 })
   const actor = await getActor(h)
   if (!actor) return Response.json({ error: 'unauthorized' }, { status: 401 })

@@ -37,6 +37,10 @@ export function readableSummary(summary: string, changes: Change[], nameOf: (id:
   return summary
 }
 
+const titles = (raw: unknown) => {
+  try { return (JSON.parse(String(raw)) as { title?: string }[]).map((s) => s.title ?? '').filter(Boolean) } catch { return [] }
+}
+
 /** What exactly changed. Long texts and lists are named, not repeated: they can hold whole pages. */
 export function changeDetails(changes: Change[]): NonNullable<HistoryEntry['details']> {
   const out: NonNullable<HistoryEntry['details']> = []
@@ -49,6 +53,12 @@ export function changeDetails(changes: Change[]): NonNullable<HistoryEntry['deta
     if (c.table !== 'persons') continue
     for (const k of Object.keys(FIELD)) {
       if (JSON.stringify(c.before[k]) === JSON.stringify(c.after[k])) continue
+      if (k === 'sources') {
+        // Which source was added or removed says more than that the list changed.
+        const was = titles(c.before[k]), now = titles(c.after[k])
+        out.push({ label: say(FIELD[k]), before: short(was.filter((x) => !now.includes(x)).join(', ')), after: short(now.filter((x) => !was.includes(x)).join(', ')) })
+        continue
+      }
       const plain = PLAIN.includes(k)
       out.push({ label: say(FIELD[k]), before: plain ? short(c.before[k]) : null, after: plain ? short(c.after[k]) : null })
     }
