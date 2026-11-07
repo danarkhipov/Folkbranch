@@ -25,11 +25,13 @@ curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install
 
 Команда скачает приложение (23 МБ, вместе с Node около 48 МБ, на диске около 90 или 210 МБ), запустит его и напишет ссылку. Откройте её, назовите семью и, если хотите сначала осмотреться, загрузите демо-семью. Дальше приложение покажет, что настроено и что необязательно.
 
-На сервере с доменом, с Docker и автоматическим HTTPS (образ 115 МБ):
+На сервере, с автоматическим HTTPS и запуском вместе с сервером. Docker и домен не нужны:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh -s -- --domain family.example.com
+curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sudo sh -s -- --server
 ```
+
+Для своего домена добавьте `--domain family.example.com`.
 
 Если есть Node, то же самое делает `npx folkbranch`. Повторный запуск откроет приложение.
 

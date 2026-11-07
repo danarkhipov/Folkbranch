@@ -27,11 +27,13 @@ curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install
 
 It downloads the app (23 MB, or about 48 MB with Node, and about 90 or 210 MB on disk), starts it and prints a link. Open it, name your family, and load the demo family if you want to look around first. The app then shows what is set up and what is optional.
 
-On a server with a domain, with Docker and automatic HTTPS (a 115 MB image):
+On a server, with automatic HTTPS, starting with the server. It needs no Docker and no domain:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh -s -- --domain family.example.com
+curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sudo sh -s -- --server
 ```
+
+Add `--domain family.example.com` for your own domain.
 
 If you have Node, this does the same: `npx folkbranch`. Run it again to open the app.
 

@@ -32,6 +32,8 @@ Ask once: this computer, or a server? For a server you also need its SSH access 
 
 Open it later, signed in and started if it was stopped: `cd ~/folkbranch && ./folkbranch open`. Never paste that link anywhere: it signs in as the owner.
 
+On a server, use `... | sudo sh -s -- --server`, or over SSH when they name a machine: it needs no Docker, gets HTTPS by itself, and starts with the server. Add `--domain` if they have one, and give them the printed link. Ask them to open ports 80 and 443 in the hosting panel if HTTPS is not ready. Creating or paying for a server is their decision, not yours.
+
 Update: run the install command again. Everything else: `./folkbranch help`, and `docs/SELF_HOSTING.md` in the repository.
 
 ## The first minutes

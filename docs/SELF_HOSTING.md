@@ -30,15 +30,37 @@ A folder stays the kind of install it is, so an update cannot leave your data be
 
 **Windows, not proven yet.** In PowerShell: `irm https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.ps1 | iex`. It works the same way, with `.\\folkbranch` for the commands, except `share`. It is checked on a Windows machine only when a release is built, and has not been through one yet. Docker Desktop is the proven way on Windows.
 
-## On a server with a domain
+## On a server
 
-Point the domain's DNS at the server, open ports 80 and 443, then:
+Any Linux server you rent or already have, with systemd and 512 MB of memory: Ubuntu 22.04 or newer, Debian 12 or newer, AlmaLinux, Rocky or Red Hat 9, Fedora, or Amazon Linux 2023. Each is checked with a reboot, at that memory. Other Linux with systemd and glibc 2.29 or newer should work. It needs no Docker and no domain:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh -s -- --domain family.example.com
+curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sudo sh -s -- --server
 ```
 
-Caddy starts next to the app and obtains the certificate by itself. Do not expose the app over plain HTTP: passwords do not exist here, but sign-in links and sessions would travel in the open.
+It prints a link to name your family, for example `https://203.0.113.5/setup?code=...`. Open ports 80 and 443 in your hosting panel if it has its own firewall.
+
+What it sets up, all inside `/opt/folkbranch`. Without the `sudo` in front it goes to your own `~/folkbranch`, asks for sudo only for the services, and runs as you:
+
+- The app and [Caddy](https://caddyserver.com), each a service that starts with the server and restarts after a failure. Neither runs as root.
+- A certificate from Let's Encrypt that renews by itself. With no domain it is for the server's address and lasts six days at a time.
+- Ports 80 and 443 in ufw or firewalld, if one of them is on.
+
+**Your own domain.** Point its DNS at the server, then run the same command with `--domain family.example.com`, now or later. The archive stays, and links made earlier stop working when the address changes.
+
+**Already have nginx or another web server?** The command says so and changes nothing. Add `--no-caddy` with your domain, and proxy that domain to `127.0.0.1:3000`.
+
+**When you create the server.** Most hosting panels have a field called user data or cloud-init. This does the same install on first boot:
+
+```yaml
+#cloud-config
+runcmd:
+  - curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh -s -- --server
+```
+
+To get the link afterwards, sign in over SSH and run `sudo /opt/folkbranch/folkbranch open`, or read `/var/log/cloud-init-output.log`.
+
+**With Docker.** On a server that already has it, `--domain family.example.com` runs the image with Caddy next to it, in a 115 MB image. Do not expose the app over plain HTTP: passwords do not exist here, but sign-in links and sessions would travel in the open.
 
 Already have a reverse proxy? Run `./install.sh --port 3000`, set `BETTER_AUTH_URL=https://your.domain` in `.env`, run `docker compose up -d`, and proxy to `127.0.0.1:3000`.
 

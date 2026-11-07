@@ -5,6 +5,15 @@
 # An install without Docker also has start, stop, restart, status, logs and share.
 cd "$(dirname "$0")" || exit 1
 
+# On a server the app runs as its own user, and its files must stay that user's, whoever types the command.
+if [ -f .server ] && [ "$(id -u)" = 0 ] && [ "$(cat .server)" != root ]; then
+  case "${1:-}" in
+    start|stop|restart) ;;
+    *) HOME=$PWD exec runuser -u "$(cat .server)" -- "$PWD/folkbranch" "$@" ;;
+  esac
+fi
+ctl() { if [ "$(id -u)" = 0 ]; then systemctl "$@"; else sudo systemctl "$@"; fi; }
+
 if [ -f .local ]; then
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in ''|\#*) continue ;; *=*) ;; *) continue ;; esac
@@ -26,6 +35,7 @@ fi
 
 # Is this our process? A number in a file alone could by now belong to anything.
 running() {
+  if [ -f .server ]; then systemctl is-active --quiet folkbranch; return; fi
   [ -f folkbranch.pid ] || return 1
   pid=$(cat folkbranch.pid)
   [ -n "$pid" ] && ps -p "$pid" -o command= 2>/dev/null | grep -q 'folkbranch _run'
@@ -58,14 +68,20 @@ start() {
     echo "Port $PORT is in use by another program. Stop that program, or move this one with the install command and --port 8080."
     return 1
   fi
-  mkdir -p data logs
-  nohup "$PWD/folkbranch" _run </dev/null >> logs/folkbranch.log 2>&1 &
-  echo $! > folkbranch.pid
+  if [ -f .server ]; then
+    ctl start folkbranch || return 1
+    [ -f .no-caddy ] || ctl start folkbranch-caddy || return 1
+  else
+    mkdir -p data logs
+    nohup "$PWD/folkbranch" _run </dev/null >> logs/folkbranch.log 2>&1 &
+    echo $! > folkbranch.pid
+  fi
   printf "Waiting for the app"
   i=0
   until curl -fs -m 2 -o /dev/null "http://$host:$PORT/api/health"; do
     i=$((i + 1))
-    if ! running || [ "$i" -gt 60 ]; then
+    # A service between its restarts is not running for a moment, so there only the time decides.
+    if { [ ! -f .server ] && ! running; } || [ "$i" -gt 60 ]; then
       echo; echo "It did not start. The end of logs/folkbranch.log:"; tail -n 15 logs/folkbranch.log
       stop >/dev/null
       return 1
@@ -113,6 +129,7 @@ cloudflared_path() {
 # Lets a relative's phone reach this computer, while it stays on. Nothing here decides for the person: the archive
 # gets one more way in from the whole internet, so they say yes to that, in words, every time.
 share() {
+  if [ -f .server ]; then echo "This server already has an address: $BETTER_AUTH_URL"; return 0; fi
   case "${1:-}" in
     stop) unshare; echo "The outside address is closed."; return 0 ;;
     status) if sharing; then cat data/public-address; echo; else echo "Not shared."; return 1; fi; return 0 ;;
@@ -145,6 +162,7 @@ share() {
 }
 
 stop() {
+  if [ -f .server ]; then ctl stop folkbranch && echo "Stopped."; return; fi
   unshare
   if ! running; then rm -f folkbranch.pid; echo "Not running."; return 0; fi
   kill "$pid"
@@ -175,7 +193,7 @@ logs() {
 
 # Nothing to open on a server or in a test: there the address is printed instead.
 browse() {
-  [ -z "${FOLKBRANCH_NO_OPEN:-}${CI:-}${SSH_CONNECTION:-}" ] || return 1
+  [ -z "${FOLKBRANCH_NO_OPEN:-}${CI:-}${SSH_CONNECTION:-}" ] && [ ! -f .server ] || return 1
   case "$(uname -s)" in
     Darwin) command -v open >/dev/null 2>&1 && open "$1" ;;
     *) [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && command -v xdg-open >/dev/null 2>&1 && xdg-open "$1" >/dev/null 2>&1 ;;
@@ -251,7 +269,7 @@ if [ -f .local ]; then
       echo
       echo "  open               Open the app in the browser, signed in"
       echo "  start, stop, restart, status, logs"
-      echo "  share              Give the app an address on the internet, so a relative's link opens"
+      [ -f .server ] || echo "  share              Give the app an address on the internet, so a relative's link opens"
       echo "  connect            Connect Claude Code or Codex over MCP"
       echo
       ;;
