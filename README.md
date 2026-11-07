@@ -57,6 +57,7 @@ Backups, updates and hosting on Railway are in the [self-hosting guide](docs/SEL
 
 **For the whole family**
 - Invite relatives with a link: no password to remember.
+- Send relatives one file with the chart, cards and photos. It opens with no server or account, and the living stay hidden.
 - Owner, editor and reader roles. Readers can suggest corrections for you to accept.
 - Share a view-only link, with an optional password and an expiry date.
 - Works in a browser on a phone or a computer, in English or Russian.

@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link2, X } from 'lucide-react'
+import { Download, Link2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CopyField } from '@/components/ui/copy'
 import { Field } from '@/components/ui/field'
@@ -12,6 +12,43 @@ import { api, useApp } from '@/lib/client'
 import type { ChartView } from '@/lib/ops/views'
 
 interface Share { id: string; name: string; viewId: string | null; hasPassword: boolean; expiresAt: number | null; opens: number }
+
+/** One file to send to relatives: it opens anywhere, with no server, so a home install can share too. */
+function FamilyFile() {
+  const { t } = useApp()
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState('')
+  const [error, setError] = useState('')
+  const make = async () => {
+    setBusy(true)
+    setDone('')
+    setError('')
+    try {
+      const r = await fetch('/api/family-file')
+      if (!r.ok) throw new Error(t('Не удалось подготовить файл'))
+      const stats = JSON.parse(r.headers.get('X-Family-File') ?? '{}')
+      const name = decodeURIComponent(r.headers.get('Content-Disposition')?.split("''")[1] ?? 'family.html')
+      const url = URL.createObjectURL(await r.blob())
+      const a = document.createElement('a')
+      a.href = url
+      a.download = name
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 30_000)
+      setDone(`${t('Людей')}: ${stats.people}. ${t('Живых скрыто')}: ${stats.hidden}. ${t('Фотографий')}: ${stats.photos}${stats.photosLeftOut ? `, ${t('не поместилось')}: ${stats.photosLeftOut}` : ''}. ${stats.bytes < 1048576 ? `${Math.ceil(stats.bytes / 1024)} ${t('КБ')}` : `${(stats.bytes / 1048576).toFixed(1)} ${t('МБ')}`}.`)
+    } catch (x) {
+      setError(String((x as Error).message ?? x))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Section title={t('Файл для родных')} description={t('Один файл со схемой, карточками и фото. Отправьте его в мессенджере: родные откроют его без интернета и регистрации. Живые родственники скрыты, но текст биографий и подписи к фото попадают как написаны: проверьте, нет ли в них имён живых.')}>
+      <Button className="self-start" disabled={busy} onClick={make}><Download /> {busy ? t('Готовим файл…') : t('Скачать файл')}</Button>
+      {done && <p role="status" className="text-xs text-ink-soft">{done}</p>}
+      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+    </Section>
+  )
+}
 
 /** Viewing without an account: for a relative who will never sign up. */
 export function ShareLinks() {
@@ -30,6 +67,7 @@ export function ShareLinks() {
   const date = new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short', year: 'numeric' })
   return (
     <div className="flex min-w-0 flex-col gap-7 text-sm">
+      <FamilyFile />
       <Section title={t('Ссылка для просмотра')} description={t('Для тех, кому не нужен вход: только смотреть, без регистрации. Живые родственники скрыты, как у читателя.')}>
         <form className="flex flex-col gap-3" onSubmit={async (e) => {
           e.preventDefault()
