@@ -4,8 +4,8 @@ import type { NextConfig } from 'next'
 const dev = process.env.NODE_ENV !== 'production'
 const CSP = [
   "default-src 'self'", `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${dev ? " 'unsafe-eval'" : ''}`, "style-src 'self' 'unsafe-inline'", "img-src 'self' data: blob:", "font-src 'self' data:",
-  // The face model comes from Google's storage; only that one address is allowed.
-  `connect-src 'self' https://storage.googleapis.com${dev ? ' ws:' : ''}`, "media-src 'self' blob:", "worker-src 'self' blob:", "frame-ancestors 'none'", "base-uri 'self'", "object-src 'none'", "form-action 'self'",
+  // Model files, fetched only when someone turns a feature on: these addresses can send data in, and no code from them runs as a script.
+  `connect-src 'self' https://storage.googleapis.com https://cdn.jsdelivr.net https://huggingface.co https://*.hf.co${dev ? ' ws:' : ''}`, "media-src 'self' blob:", "worker-src 'self' blob:", "frame-ancestors 'none'", "base-uri 'self'", "object-src 'none'", "form-action 'self'",
 ].join('; ')
 
 const config: NextConfig = {
@@ -21,6 +21,9 @@ const config: NextConfig = {
       { key: 'X-Content-Type-Options', value: 'nosniff' },
       { key: 'Referrer-Policy', value: 'no-referrer' },
       { key: 'X-Frame-Options', value: 'DENY' },
+      // Lets a speech model use several cores. A browser without this simply runs it on one.
+      { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+      { key: 'Cross-Origin-Embedder-Policy', value: 'credentialless' },
       { key: 'Content-Security-Policy', value: CSP },
       { key: 'Permissions-Policy', value: 'camera=(), microphone=(self), geolocation=()' },
     ] }]

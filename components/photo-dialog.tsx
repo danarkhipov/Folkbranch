@@ -8,6 +8,8 @@ import 'yet-another-react-lightbox/styles.css'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { api, mediaUrl, useApp, useWrite } from '@/lib/client'
 import { findFaces, squareCrop } from '@/lib/faces'
+import { useSmart } from '@/lib/smart/settings'
+import type { FaceProgress, Guess } from '@/lib/smart/face-id'
 import { cn } from '@/lib/utils'
 import { personName, type Box, type Media } from '@/lib/types'
 import { Mini, PersonPopover } from './person-pickers'
@@ -37,6 +39,13 @@ function Photo({ id, list, index, setIndex, onClose }: { id: string; list?: stri
   const [pick, setPick] = useState<Box | null>(null)
   const [faces, setFaces] = useState<Box[]>([])
   const [scan, setScan] = useState<'' | 'busy' | 'none' | 'error'>('')
+  const [findOn] = useSmart('faces')
+  const [recognizeOn] = useSmart('recognize')
+  const [guesses, setGuesses] = useState<(Guess | null)[]>([])
+  const [learning, setLearning] = useState<FaceProgress | null>(null)
+  const [learnFailed, setLearnFailed] = useState(false)
+  const stopLearning = useRef<AbortController | null>(null)
+  useEffect(() => () => stopLearning.current?.abort(), [])
   const [full, setFull] = useState(false)
   const [hot, setHot] = useState<string | null>(null)
 
@@ -57,11 +66,30 @@ function Photo({ id, list, index, setIndex, onClose }: { id: string; list?: stri
     try {
       const found = (await findFaces(img.current!)).filter((f) => !m?.tags.some((tag) => tag.x !== null && overlap(f, tag as Box) > 0.3))
       setFaces(found)
+      setGuesses([])
       setScan(found.length ? '' : 'none')
+      if (found.length && recognizeOn) recognize(found)
     } catch (e) {
       console.error(e)
       setScan('error')
     }
+  }
+
+  /** Compares each face with the faces already tagged, only here in the browser. It suggests; a person decides. */
+  const recognize = async (found: Box[]) => {
+    const stop = (stopLearning.current = new AbortController())
+    setLearnFailed(false)
+    setLearning({ stage: 'model' })
+    try {
+      const { learnFaces, guessFaces } = await import('@/lib/smart/face-id')
+      const all = await api<Media[]>('media')
+      const known = await learnFaces(all.flatMap((x) => x.tags.map((tag) => ({ tag, mediaId: x.id, url: mediaUrl(x.id) }))), setLearning, stop.signal)
+      const here = new Set(m?.tags.flatMap((tag) => (tag.x !== null && tag.personId) || []))
+      setGuesses(await guessFaces(img.current!, found, known.filter((k) => !here.has(k.personId) && byId.has(k.personId)), stop.signal))
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') { console.error(e); setLearnFailed(true) }
+    }
+    setLearning(null)
   }
 
   if (!m) return <div className="h-96" />
@@ -101,7 +129,7 @@ function Photo({ id, list, index, setIndex, onClose }: { id: string; list?: stri
           })}
           {faces.map((f, i) => (
             <div key={i} className="tagbox suggest" style={pos(f)} onClick={() => setPick(f)}>
-              <span className="tagname">{t('Кто это?')}</span>
+              <span className="tagname">{guesses[i] && byId.has(guesses[i]!.personId) ? `${personName(byId.get(guesses[i]!.personId)!)}?` : t('Кто это?')}</span>
             </div>
           ))}
           {draft && <div className="tagbox show" style={pos(draft)} />}
@@ -152,6 +180,7 @@ function Photo({ id, list, index, setIndex, onClose }: { id: string; list?: stri
               exclude={m.tags.filter((tag) => tag.x !== null).flatMap((tag) => tag.personId ?? [])}
               onPick={(personId) => {
                 addTag.mutate({ personId, box: pick })
+                setGuesses((g) => g.filter((_, j) => faces[j] !== pick))
                 setFaces((f) => f.filter((x) => x !== pick))
                 setDraft(null)
                 setPick(null)
@@ -165,6 +194,7 @@ function Photo({ id, list, index, setIndex, onClose }: { id: string; list?: stri
                 const label = caption.trim()
                 if (!label) return
                 addTag.mutate({ label, box: pick })
+                setGuesses((g) => g.filter((_, j) => faces[j] !== pick))
                 setFaces((f) => f.filter((x) => x !== pick))
                 setDraft(null)
                 setPick(null)
@@ -174,7 +204,26 @@ function Photo({ id, list, index, setIndex, onClose }: { id: string; list?: stri
                 <button className="bar-btn border border-border" disabled={!caption.trim()}>{t('Подписать')}</button>
               </form>
             )}
-            <button className="bar-btn border border-border self-start" disabled={scan === 'busy'} onClick={scanFaces}><ScanFace size={14} /> {t('Найти лица')}{scan === 'busy' && '…'}</button>
+            {findOn && <button className="bar-btn border border-border self-start" disabled={scan === 'busy'} onClick={scanFaces}><ScanFace size={14} /> {t('Найти лица')}{scan === 'busy' && '…'}</button>}
+            {learning && (
+              <p role="status" className="flex flex-wrap items-center gap-2 text-xs text-ink-soft">
+                {learning.stage === 'model' ? t('Готовлю модель узнавания…') : `${t('Сравниваю с отмеченными лицами')}: ${learning.done} ${t('из')} ${learning.total}`}
+                <button className="underline underline-offset-2" onClick={() => stopLearning.current?.abort()}>{t('Остановить')}</button>
+              </p>
+            )}
+            {learnFailed && <p className="text-xs text-destructive">{t('Не удалось загрузить модель распознавания')}</p>}
+            {faces.map((f, i) => {
+              const g = guesses[i]
+              const p = g && byId.get(g.personId)
+              if (!p) return null
+              return (
+                <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg bg-muted px-2 py-1.5 text-xs">
+                  <Mini person={p} /> <span className="min-w-0 flex-1">{t('Похоже, это')} {personName(p)}</span>
+                  <button className="bar-btn !h-7 border border-border bg-white" onClick={() => { addTag.mutate({ personId: p.id, box: f }); setFaces((all) => all.filter((x) => x !== f)); setGuesses((all) => all.filter((_, j) => j !== i)) }}>{t('Да')}</button>
+                  <button className="bar-btn !h-7" onClick={() => setGuesses((all) => all.map((x, j) => (j === i ? null : x)))}>{t('Нет')}</button>
+                </div>
+              )
+            })}
             {scan === 'none' && <p className="text-xs text-ink-faint">{t('Лиц не найдено')}</p>}
             {scan === 'error' && <p className="text-xs text-destructive">{t('Не удалось загрузить модель распознавания')}</p>}
           </>

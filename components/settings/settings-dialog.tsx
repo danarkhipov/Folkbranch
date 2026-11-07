@@ -1,6 +1,6 @@
 'use client'
 import { useState, type ComponentType } from 'react'
-import { DatabaseBackup, KeyRound, ListChecks, SlidersHorizontal, UserRound, Users } from 'lucide-react'
+import { Cpu, DatabaseBackup, KeyRound, ListChecks, SlidersHorizontal, UserRound, Users } from 'lucide-react'
 import { AssistantIcon } from '../assistant-icon'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useApp } from '@/lib/client'
@@ -11,14 +11,16 @@ import { Files } from './files'
 import { AssistantSettings } from './assistant'
 import { SetupGuide } from './setup-guide'
 import { ShareLinks } from './share-links'
+import { SmartSettings } from './smart'
 import { TokensTab } from './tokens'
 
-type Section = 'setup' | 'account' | 'general' | 'people' | 'assistant' | 'agents' | 'data'
+type Section = 'setup' | 'account' | 'smart' | 'general' | 'people' | 'assistant' | 'agents' | 'data'
 
 /** Each screen says what it is for, so nobody has to work it out from the fields. */
 const SECTIONS: Record<Section, [string, string, ComponentType<{ size?: number }>]> = {
   setup: ['С чего начать', 'Что уже готово и что ещё можно подключить. Всё необязательное можно пропустить.', ListChecks],
   account: ['Мой аккаунт', 'Как вы связаны с архивом и как входите в него.', UserRound],
+  smart: ['Умные функции', 'Нейросети, которые работают прямо на этом устройстве. Включите то, что нужно: всё остальное приложение работает и без них.', Cpu],
   general: ['Общие параметры', 'Название архива и язык приложения. Меняются сразу для всех.', SlidersHorizontal],
   people: ['Пользователи и доступ', 'Кто входит в архив и что может в нём делать, а кому хватит ссылки для просмотра.', Users],
   assistant: ['ИИ-ассистент', 'Чат внутри приложения: отвечает на вопросы о семье и вносит правки с вашего подтверждения.', AssistantIcon],
@@ -31,8 +33,8 @@ export function SettingsDialog({ open, onOpenChange, familyName, providers, onTe
   const isOwner = me.role === 'owner'
   const [section, setSection] = useState<Section>(isOwner ? 'setup' : 'account')
   const groups: [string, Section[]][] = isOwner
-    ? [['', ['setup', 'account']], ['Основные настройки', ['general', 'people', 'data']], ['ИИ и интеграции', ['assistant', 'agents']]]
-    : [['', ['account', 'data']]]
+    ? [['', ['setup', 'account']], ['Основные настройки', ['general', 'people', 'data']], ['ИИ и интеграции', ['assistant', 'agents', 'smart']]]
+    : [['', ['account', 'smart', 'data']]]
   const [title, description] = SECTIONS[section]
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -57,6 +59,7 @@ export function SettingsDialog({ open, onOpenChange, familyName, providers, onTe
             </header>
             {section === 'setup' && isOwner && <SetupGuide onGo={setSection} />}
             {section === 'account' && <Account providers={providers} />}
+            {section === 'smart' && <SmartSettings />}
             {section === 'general' && isOwner && <Archive familyName={familyName} lang={lang} />}
             {section === 'people' && isOwner && <div className="flex min-w-0 flex-col gap-7"><Access /><ShareLinks /></div>}
             {section === 'assistant' && isOwner && <AssistantSettings />}

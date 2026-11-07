@@ -8,6 +8,7 @@ import { clock, useRecorder } from '@/lib/use-recorder'
 import { personName, type Person, type Story } from '@/lib/types'
 import { PersonPopover } from './person-pickers'
 import { Select } from '@/components/ui/select'
+import { TranscribeButton } from './transcribe-button'
 import { inputClass } from '@/components/ui/input'
 
 const input = inputClass
@@ -89,7 +90,7 @@ export function StoryDialog({ person, story, onClose }: { person: Person; story:
               )}
               {preview && !rec.recording && (
                 <div className="flex items-center gap-2">
-                  <audio controls className="h-9 min-w-0 flex-1" src={previewUrl} />
+                  <audio controls className="h-9 min-w-0 flex-1" src={previewUrl || undefined} />
                   <button type="button" className="text-ink-soft hover:text-ink" aria-label={t('Удалить запись')} title={t('Удалить запись')} onClick={() => { rec.reset(); setFile(null) }}><X size={15} /></button>
                 </div>
               )}
@@ -129,6 +130,7 @@ export function StoryDialog({ person, story, onClose }: { person: Person; story:
           <label className={label}>{t('Текст или расшифровка')}
             <textarea className="min-h-24 rounded-lg border border-input bg-white px-3 py-2 text-sm text-ink" maxLength={20000} value={body} onChange={(e) => setBody(e.target.value)} />
           </label>
+          {(preview || story?.hasAudio) && !rec.recording && <TranscribeButton current={body} onText={setBody} getAudio={async () => { if (preview) return preview; const r = await fetch(`/api/v1/stories/${story!.id}/audio`); if (!r.ok) throw new Error(r.statusText); return r.blob() }} />}
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <button className={primary} disabled={busy || rec.recording || (!story && !preview && !body.trim())}>{t('Сохранить')}</button>
         </form>

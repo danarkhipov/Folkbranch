@@ -62,6 +62,12 @@ Backups, updates and hosting on Railway are in the [self-hosting guide](docs/SEL
 - Share a view-only link, with an optional password and an expiry date.
 - Works in a browser on a phone or a computer, in English or Russian.
 
+**Smart features, on this device**
+- Off until you turn them on, one by one and separately on each device. The app works the same without them.
+- Find faces in a photo, and get a suggestion of who it is from faces you already tagged. A name appears only when you confirm it.
+- Turn a recorded story into text, in the browser. It uses Chrome's own recognition where the device has it, and a small speech model otherwise.
+- Photos and voice stay on the device. Only the models are downloaded, once, and the app does not slow down while they work.
+
 **Your data stays yours**
 - One SQLite file and a folder of photos on your server. No telemetry.
 - Living relatives are hidden from readers, guests and read-only agents, and this is enforced on the server.
@@ -118,7 +124,7 @@ Yes, if the service can export GEDCOM. Folkbranch reads the file and shows a pre
 Only people you invite. The site is closed to search engines, photos need a sign-in, and readers do not see living relatives.
 
 **Does anything leave my server?**
-Not by itself. Connecting an AI provider sends what the assistant reads to that provider, and the app warns you first. Pressing "Find faces" downloads a model from Google to the browser; the photos stay where they are.
+Not by itself. Connecting an AI provider sends what the assistant reads to that provider, and the app warns you first. Smart features download their models to the browser the first time you use them, from Google, jsDelivr and Hugging Face. Your photos and recordings are not sent there.
 
 **What does it need to run?**
 A Mac or Linux computer and about 200 MB of memory; nothing to install first. Docker is an option, and on Windows the only way for now. It runs on a home computer, a small server or Railway.
