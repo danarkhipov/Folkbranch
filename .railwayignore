@@ -4,3 +4,4 @@ data/
 .env*
 *.ged
 START_PROMPT.md
+dist/

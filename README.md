@@ -19,15 +19,15 @@ Build the tree together, give every relative a page with photos and stories, and
 
 ## Install
 
-You need [Docker](https://docs.docker.com/get-docker/). Run one command:
+Run one command. On a Mac or Linux it needs nothing else: no Docker, and no Node either, it brings its own if you have none.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh
 ```
 
-It downloads a ready image and prints a link. Open it, name your family, and load the demo family if you want to look around first. The app then shows what is set up and what is optional.
+It downloads the app (17 MB, or about 42 MB with Node, and about 90 or 210 MB on disk), starts it and prints a link. Open it, name your family, and load the demo family if you want to look around first. The app then shows what is set up and what is optional.
 
-On a server with a domain, with automatic HTTPS:
+On a server with a domain, with Docker and automatic HTTPS (a 115 MB image):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh -s -- --domain family.example.com
@@ -120,7 +120,7 @@ Only people you invite. The site is closed to search engines, photos need a sign
 Not by itself. Connecting an AI provider sends what the assistant reads to that provider, and the app warns you first. Pressing "Find faces" downloads a model from Google to the browser; the photos stay where they are.
 
 **What does it need to run?**
-Docker and about 200 MB of memory. It runs on a home computer, a small server or Railway.
+A Mac or Linux computer and about 200 MB of memory; nothing to install first. Docker is an option, and on Windows the only way for now. It runs on a home computer, a small server or Railway.
 
 **How do I back it up?**
 Download a full copy under **Settings → Import and export**, or run `./folkbranch backup`. The server also copies the database before each update that changes it.

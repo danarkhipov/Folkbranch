@@ -30,5 +30,26 @@ describe('the brand', () => {
     const execs = readFileSync('install.sh', 'utf8').split('\n').filter((l) => l.includes('compose exec'))
     expect(execs.length).toBeGreaterThan(0)
     for (const line of execs) expect(line).toContain('</dev/null')
+    const local = readFileSync('install.sh', 'utf8').split('\n').filter((l) => /\.\/folkbranch (start|stop|doctor)|runtime\/node -v/.test(l) && !l.startsWith('echo'))
+    expect(local.length).toBeGreaterThan(0)
+    for (const line of local) expect(line).toContain('</dev/null')
+  })
+
+  it('brings a Node the app accepts, and builds an archive for every platform the installer asks for', () => {
+    const pinned = Number(readFileSync('install.sh', 'utf8').match(/^NODE_VERSION=(\d+)\./m)?.[1])
+    expect(pinned).toBeGreaterThanOrEqual(Number(JSON.parse(readFileSync('package.json', 'utf8')).engines.node.replace('>=', '')))
+    const release = readFileSync('.github/workflows/release.yml', 'utf8')
+    for (const runner of ['macos-latest', 'macos-15-intel', 'ubuntu-latest', 'ubuntu-24.04-arm']) expect(release).toContain(runner)
+  })
+
+  it('keeps the two kinds of install apart, so an update never leaves the data behind', () => {
+    const script = readFileSync('install.sh', 'utf8')
+    expect(script).toContain('MODE=${WANT:-${HAVE:-local}}')
+    expect(script).toContain('elif [ -f "$DIR/docker-compose.yml" ]; then HAVE=docker')
+  })
+
+  it('never packs a family\'s files into the public archive', () => {
+    expect(readFileSync('scripts/make-bundle.mjs', 'utf8')).toContain('Refusing to pack')
+    for (const file of ['.gitignore', '.dockerignore']) expect(readFileSync(file, 'utf8')).toMatch(/^dist/m)
   })
 })

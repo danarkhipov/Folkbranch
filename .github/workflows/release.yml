@@ -44,3 +44,31 @@ jobs:
           awk -v v="## $version" 'index($0, v) == 1 { on = 1; next } /^## / { on = 0 } on' CHANGELOG.md > notes.md
           gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag \
             || gh release edit "$GITHUB_REF_NAME" --notes-file notes.md
+
+  # What the install command downloads when it does not use Docker. Each is built and tried on its own platform.
+  bundles:
+    needs: image
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-latest, macos-15-intel, ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: node scripts/make-bundle.mjs
+      - name: The archive installs and answers
+        run: |
+          FOLKBRANCH_BUNDLE="file://$(ls "$PWD"/dist/folkbranch-*.tar.gz)" sh install.sh --local --dir "$RUNNER_TEMP/folkbranch" --port 3000
+          curl -fs http://127.0.0.1:3000/api/health
+          "$RUNNER_TEMP/folkbranch/folkbranch" stop
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" dist/folkbranch-* --clobber

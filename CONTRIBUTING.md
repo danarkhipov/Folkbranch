@@ -20,7 +20,7 @@ The app opens on http://localhost:3417 with its data in `./data`, which Git igno
 | `pnpm lint` | Type checks |
 | `pnpm test` | Unit and integration tests |
 | `pnpm check` | Both, plus a check for import cycles |
-| `pnpm check:full` | Everything in throwaway Docker containers: browser scenarios, speed budgets, crash and restore scenarios. No paid model is called |
+| `pnpm check:full` | Everything in throwaway Docker containers and folders: browser scenarios, install without Docker, speed budgets, crash and restore scenarios. No paid model is called |
 
 CI runs the first two and builds the image on every pull request.
 

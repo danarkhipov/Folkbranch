@@ -8,7 +8,8 @@ import path from 'node:path'
 import Database from 'better-sqlite3'
 
 // A platform's shell opens as root, and a file made by root would lock the running app out of it.
-if (process.getuid?.() === 0) { process.setgid('node'); process.setuid('node') }
+// Outside a container there may be no such user, and root is simply who installed it.
+if (process.getuid?.() === 0) { try { process.setgid('node'); process.setuid('node') } catch {} }
 const DATA_DIR = path.resolve(process.env.RAILWAY_VOLUME_MOUNT_PATH || process.env.DATA_DIR || './data')
 const dbFile = path.join(DATA_DIR, 'family.db')
 const hash = (t) => createHash('sha256').update(t).digest('hex')

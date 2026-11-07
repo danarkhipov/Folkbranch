@@ -6,7 +6,25 @@
 curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh
 ```
 
-Settings and scripts go to `~/folkbranch` (`--dir` for another folder), the data to a Docker volume. Add `--port 8080` for another port: `... | sh -s -- --port 8080`. The app listens on this computer only. From a clone, `./install.sh` does the same in place.
+It needs nothing installed first, on macOS or Linux. The command picks the lightest way that works here:
+
+| What the computer has | What it does | Download | On disk |
+|---|---|---|---|
+| Node 24 or newer | Uses that Node | 17 MB | about 90 MB |
+| No suitable Node | Brings its own, checked against Node's published checksums and kept inside the folder | about 42 MB | about 210 MB |
+| Anything, with `--docker` | Runs the Docker image, as on a server | 115 MB | more, with Docker itself |
+
+Everything goes to `~/folkbranch` (`--dir` for another folder): the app in `app`, your archive in `data`, settings in `.env`, the log in `logs`. Add `--port 8080` for another port: `... | sh -s -- --port 8080`. If the port is taken the command says so, and running it again with `--port` moves the app. The app listens on this computer only.
+
+Without Docker it runs as your own user and keeps itself going through a crash and a restore, but it does not start when the computer does. After a reboot:
+
+```bash
+cd ~/folkbranch && ./folkbranch start
+```
+
+To remove it, `./folkbranch stop`, then delete the folder. That deletes the archive too, so download a copy first.
+
+A folder stays the kind of install it is, so an update cannot leave your data behind. To move between them, download a full copy in the app, install into another folder and restore it there. Native Windows, Alpine Linux and other systems with no ready build use `--docker`.
 
 ## On a server with a domain
 
@@ -58,6 +76,8 @@ An empty instance can be claimed only with a code, so a stranger who finds it fi
 
 | Command | What it does |
 |---|---|
+| `./folkbranch start`, `stop`, `restart`, `status`, `logs` | Without Docker: run the app and read its log |
+| `./folkbranch connect` | Connect Claude Code or Codex over MCP |
 | `./folkbranch token create --name NAME` | Connect an agent, see [AGENTS.md](AGENTS.md) |
 | `./folkbranch token list`, `./folkbranch token revoke ID` | See and cut off tokens |
 | `./folkbranch login-link` | One-time sign-in link for the owner, for when you are locked out |
@@ -68,25 +88,23 @@ An empty instance can be claimed only with a code, so a stranger who finds it fi
 
 **From the app.** Settings → Import and export → Download a full copy: one file with the database, photos and files, and a checksum for each. It leaves out sign-in sessions and can be restored on a clean install from the setup screen, or over an archive from the same place in settings. The previous archive stays in `backups/before-restore` on the volume. An assistant key set in the app has to be entered again unless the server keeps the same secret.
 
-Restoring restarts the process, so something must start it again: Docker Compose and Railway do. Under plain `pnpm dev` start it by hand.
+Restoring restarts the process, so something must start it again: the install without Docker, Docker Compose and Railway all do. Under plain `pnpm dev` start it by hand.
 
 **From the command line.**
 
-`./folkbranch backup` writes to `backups/` inside the data volume. To take a copy off the server:
+`./folkbranch backup` writes to `backups/` inside the data folder, or the data volume under Docker. To take a copy off a Docker server:
 
 ```bash
 docker compose cp family:/data/backups ./backups
 ```
 
-Restore by stopping the app and putting `family.db` and `media/` back into the volume. Also keep `.env`, or at least `BETTER_AUTH_SECRET`; losing it signs everyone out but loses no data.
+Restore by stopping the app and putting `family.db` and `media/` back into the data folder or volume. Also keep `.env`, or at least `BETTER_AUTH_SECRET`; losing it signs everyone out but loses no data.
 
 ## Updating
 
-```bash
-git pull && ./install.sh
-```
+Run the install command again, in any kind of install. From a clone with Docker: `git pull && ./install.sh`.
 
-Settings and data are kept, and the database migrates on start. Take a backup first.
+Settings and data are kept, and the database migrates on start. Take a backup first. If an update without Docker fails to start, the previous version stays next to it in `app.old`.
 
 ## Limits
 
@@ -104,7 +122,7 @@ Without internet the app and its data need none, only face detection in photos d
 
 ## Settings
 
-All of them are optional and explained in [.env.example](../.env.example). Change `.env`, then run `docker compose up -d`.
+All of them are optional and explained in [.env.example](../.env.example). Change `.env`, then run `./folkbranch restart`, or `docker compose up -d` under Docker.
 
 ## The copy before an update
 

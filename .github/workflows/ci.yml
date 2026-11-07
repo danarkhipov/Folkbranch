@@ -21,6 +21,24 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
 
+  local-install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: node scripts/make-bundle.mjs
+      - name: Installs without Docker and answers
+        run: |
+          FOLKBRANCH_BUNDLE="file://$(ls "$PWD"/dist/folkbranch-*.tar.gz)" sh install.sh --local --dir "$RUNNER_TEMP/folkbranch" --port 3000
+          curl -fs http://127.0.0.1:3000/api/health
+          "$RUNNER_TEMP/folkbranch/folkbranch" stop
+
   docker:
     runs-on: ubuntu-latest
     steps:

@@ -1,11 +1,117 @@
 #!/bin/sh
 # Runs a server command inside the running app, for example: ./folkbranch token create --name my-agent
 # ./folkbranch connect   makes a key and connects the agent programs found on this computer over MCP.
+# An install without Docker also has start, stop, restart, status and logs.
 cd "$(dirname "$0")" || exit 1
+
+if [ -f .local ]; then
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in ''|\#*) continue ;; *=*) ;; *) continue ;; esac
+    name=${line%%=*}
+    case "$name" in ''|*[!A-Za-z0-9_]*) continue ;; esac
+    val=${line#*=}
+    case "$val" in \"*\") val=${val#\"}; val=${val%\"} ;; \'*\') val=${val#\'}; val=${val%\'} ;; esac
+    export "$name=$val"
+  done < .env
+  PORT=${PORT:-3000}
+  BIND=${BIND:-127.0.0.1}
+  export DATA_DIR="$PWD/data" PORT NODE_ENV=production HOSTNAME="$BIND"
+  host=$BIND
+  [ "$host" = 0.0.0.0 ] && host=127.0.0.1
+
+  if [ -x runtime/node ]; then NODE=$PWD/runtime/node; else NODE=$(command -v node 2>/dev/null || true); fi
+  [ -n "$NODE" ] || { echo "Node is gone from this computer. Run the install command again: it brings its own."; exit 1; }
+fi
+
+# Is this our process? A number in a file alone could by now belong to anything.
+running() {
+  [ -f folkbranch.pid ] || return 1
+  pid=$(cat folkbranch.pid)
+  [ -n "$pid" ] && ps -p "$pid" -o command= 2>/dev/null | grep -q 'folkbranch _run'
+}
+
+# Restoring a copy ends the process and counts on something to start it again, as Docker does.
+# So does a crash, up to a point: one that keeps failing at once stops here, and the log says why.
+supervise() {
+  child=""
+  trap '[ -n "$child" ] && kill "$child" 2>/dev/null; wait "$child" 2>/dev/null; exit 0' TERM INT
+  fails=0
+  while :; do
+    began=$(date +%s)
+    (cd app && exec "$NODE" server.js) </dev/null &
+    child=$!
+    wait "$child"
+    code=$?
+    [ "$code" = 0 ] && exit 0
+    if [ $(($(date +%s) - began)) -lt 10 ]; then fails=$((fails + 1)); else fails=0; fi
+    [ "$fails" -ge 5 ] && { echo "Stopped restarting: the app failed $fails times in a row."; exit 1; }
+    sleep 1
+  done
+}
+
+start() {
+  if running; then echo "Running at $BETTER_AUTH_URL"; return 0; fi
+  # Whatever answers there is not us. Only "connection refused" means the port is free.
+  curl -s -m 2 -o /dev/null "http://$host:$PORT/"
+  if [ $? != 7 ]; then
+    echo "Port $PORT is in use by another program. Stop that program, or move this one with the install command and --port 8080."
+    return 1
+  fi
+  mkdir -p data logs
+  nohup "$PWD/folkbranch" _run </dev/null >> logs/folkbranch.log 2>&1 &
+  echo $! > folkbranch.pid
+  printf "Waiting for the app"
+  i=0
+  until curl -fs -m 2 -o /dev/null "http://$host:$PORT/api/health"; do
+    i=$((i + 1))
+    if ! running || [ "$i" -gt 60 ]; then
+      echo; echo "It did not start. The end of logs/folkbranch.log:"; tail -n 15 logs/folkbranch.log
+      stop >/dev/null
+      return 1
+    fi
+    printf "."
+    sleep 1
+  done
+  echo
+  echo "Running at $BETTER_AUTH_URL"
+}
+
+stop() {
+  if ! running; then rm -f folkbranch.pid; echo "Not running."; return 0; fi
+  kill "$pid"
+  i=0
+  while ps -p "$pid" >/dev/null 2>&1; do
+    i=$((i + 1))
+    [ "$i" -gt 30 ] && { echo "It did not stop. Process $pid is still running."; return 1; }
+    sleep 1
+  done
+  rm -f folkbranch.pid
+  echo "Stopped."
+}
+
+status() {
+  if running; then
+    echo "Running at $BETTER_AUTH_URL"
+    echo "Data: $DATA_DIR"
+  else
+    echo "Stopped. Start it with: ./folkbranch start"
+    return 1
+  fi
+}
+
+logs() {
+  [ -f logs/folkbranch.log ] || { echo "No log yet."; return 0; }
+  if [ -t 1 ]; then exec tail -n 100 -f logs/folkbranch.log; else tail -n 100 logs/folkbranch.log; fi
+}
 
 connect() {
   name="agent-$(hostname -s 2>/dev/null || echo here)"
-  out=$(docker compose exec -T folkbranch node folkbranch.mjs token create --name "$name" --role editor --json) || { echo "$out"; echo "Is the app running? Start it with: docker compose up -d"; exit 1; }
+  if [ -f .local ]; then
+    start >/dev/null || { echo "The app is not running, and it did not start: ./folkbranch start"; exit 1; }
+    out=$("$NODE" app/folkbranch.mjs token create --name "$name" --role editor --json) || { echo "$out"; exit 1; }
+  else
+    out=$(docker compose exec -T folkbranch node folkbranch.mjs token create --name "$name" --role editor --json) || { echo "$out"; echo "Is the app running? Start it with: docker compose up -d"; exit 1; }
+  fi
   token=$(printf '%s' "$out" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
   url=$(printf '%s' "$out" | sed -n 's/.*"url":"\([^"]*\)".*/\1/p')
   done=""
@@ -30,5 +136,23 @@ connect() {
 }
 
 [ "${1:-}" = connect ] && { connect; exit 0; }
+if [ -f .local ]; then
+  case "${1:-}" in
+    _run) supervise; exit $? ;;
+    start) start; exit $? ;;
+    stop) stop; exit $? ;;
+    restart) stop && start; exit $? ;;
+    status) status; exit $? ;;
+    logs) logs; exit $? ;;
+    ''|help|--help)
+      echo "Folkbranch, this computer"
+      echo
+      echo "  start, stop, restart, status, logs"
+      echo "  connect            Connect Claude Code or Codex over MCP"
+      echo
+      ;;
+  esac
+  exec "$NODE" app/folkbranch.mjs "$@"
+fi
 [ -t 0 ] && [ -t 1 ] && exec docker compose exec folkbranch node folkbranch.mjs "$@"
 exec docker compose exec -T folkbranch node folkbranch.mjs "$@"
