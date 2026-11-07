@@ -231,6 +231,9 @@ kbd { font: 14px var(--font-sans); color: var(--ink-faint); border: 1px solid va
 .photo-stage:hover .tagbox, .tagbox.show { opacity: 1; }
 .tagbox .tagname { position: absolute; left: -1px; top: calc(100% + 4px); background: var(--ink); color: #fffdf8; font-size: 14px; padding: 0 6px; border-radius: 4px; white-space: nowrap; }
 .tagbox.suggest { border-style: dashed; border-color: #ffd79c; opacity: 1; }
+/* In a big group the labels would cover the faces: each shows only when pointed at. */
+.tagbox.suggest.quiet .tagname { display: none; }
+.tagbox.suggest.quiet:hover .tagname { display: block; z-index: 2; }
 
 /* BlockNote: use the app's paper and fonts */
 .bn-container[data-color-scheme], .bn-editor { background: transparent !important; font-family: var(--font-sans) !important; --bn-colors-editor-background: transparent; --bn-colors-editor-text: var(--ink); }

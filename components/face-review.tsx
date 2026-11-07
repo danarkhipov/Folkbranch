@@ -5,7 +5,8 @@ import { Check, RotateCcw, ScanFace, Square, UserRound, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { api, mediaUrl, useApp } from '@/lib/client'
 import { squareCrop } from '@/lib/faces'
-import { readDevice } from '@/lib/smart/device'
+import { useModel } from '@/lib/smart/models'
+import { ModelPrompt } from './model-prompt'
 import type { FaceSuggestion } from '@/lib/smart/face-id'
 import { personName, type Box, type Media } from '@/lib/types'
 import { Mini } from './person-pickers'
@@ -22,6 +23,7 @@ export function FaceReview() {
   const [left, setLeft] = useState<number | null>(null)
   const [failed, setFailed] = useState(false)
   const stop = useRef<AbortController | null>(null)
+  const model = useModel('recognize')
   useEffect(() => () => stop.current?.abort(), [])
 
   // People with a framed face and no portrait: nothing to recognise, one press away.
@@ -50,7 +52,6 @@ export function FaceReview() {
       if (!known.length) { setProgress(null); return notify(t('Сначала отметьте лица хотя бы на нескольких фото: приложению не с чем сравнивать.')) }
       const result = await scanPhotos(photos.map((m) => ({ id: m.id, url: mediaUrl(m.id), tags: m.tags })), known, {
         limit: PER_RUN,
-        pause: readDevice().tier === 'weak' ? 400 : 60,
         signal: run.signal,
         onProgress: (done, total) => setProgress(`${t('Просматриваю фото')}: ${done} ${t('из')} ${total}`),
         onFound: (s) => setFound((all) => (all.some((x) => x.key === s.key) ? all : [...all, s])),
@@ -102,13 +103,14 @@ export function FaceReview() {
           })}
         </section>
       )}
-      <div className="flex flex-wrap items-center gap-2">
+      <ModelPrompt pack="recognize">{t('Чтобы приложение узнавало людей на фото, скачайте модель. Она работает в этом браузере, фото никуда не уходят.')}</ModelPrompt>
+      <div hidden={model.status !== 'ready'} className="flex flex-wrap items-center gap-2 [&[hidden]]:hidden">
         {progress
           ? <><span role="status" className="text-xs text-ink-soft">{progress}</span><Button variant="outline" size="sm" onClick={() => stop.current?.abort()}><Square /> {t('Остановить')}</Button></>
           : <Button variant="outline" onClick={scan}><ScanFace /> {t(left ? 'Просмотреть ещё' : 'Найти знакомых на фото')}</Button>}
         {!progress && left !== null && <Button variant="ghost" size="sm" onClick={again}><RotateCcw /> {t('Просмотреть всё заново')}</Button>}
       </div>
-      {failed && <p role="alert" className="text-xs text-destructive">{t('Не удалось загрузить модель распознавания')}</p>}
+      {failed && <p role="alert" className="text-xs text-destructive">{t('Не удалось запустить модель распознавания')}</p>}
       {!progress && left !== null && !found.length && <p className="text-xs text-ink-soft">{t(left ? 'Пока никого не узнали. Можно просмотреть ещё.' : 'Новых совпадений нет.')}</p>}
       {found.map((s) => {
         const p = byId.get(s.personId)

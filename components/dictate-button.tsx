@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Loader2, Mic, Square } from 'lucide-react'
 import { PromptInputButton } from '@/components/ai-elements/prompt-input'
 import { useApp } from '@/lib/client'
+import { downloadPack, packSize, useModel } from '@/lib/smart/models'
 import { useSmart } from '@/lib/smart/settings'
 import { clock, useRecorder } from '@/lib/use-recorder'
 
@@ -12,6 +13,7 @@ const NO_MIC = { insecure: 'Запись голоса работает толь�
 export function DictateButton() {
   const { t, lang, notify } = useApp()
   const [on] = useSmart('speech')
+  const model = useModel('speech')
   const rec = useRecorder()
   const [reading, setReading] = useState(false)
   const self = useRef<HTMLSpanElement>(null)
@@ -37,11 +39,15 @@ export function DictateButton() {
     import('@/lib/smart/speech')
       .then(({ transcribe }) => transcribe(blob, lang, () => {}, stop.signal))
       .then((text) => { if (text.trim()) write(text.trim()); else notify(t('В записи не удалось разобрать речь')) })
-      .catch((e) => { if (e.name !== 'AbortError') { console.error(e); notify(t('Не удалось расшифровать запись. Проверьте соединение: модель скачивается при первом запуске.')) } })
+      .catch((e) => { if (e.name !== 'AbortError') { console.error(e); notify(t('Не удалось расшифровать запись.')) } })
       .finally(() => setReading(false))
   }, [clip]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!on) return null
+  if (!on || model.status === 'unknown' || model.status === 'unavailable') return null
+  if (model.status !== 'ready') {
+    const busy = model.status === 'busy'
+    return <PromptInputButton aria-label={t('Сказать голосом')} title={t(busy ? 'Модель скачивается' : 'Сказать голосом')} data-hint={busy ? undefined : `${t('Сначала нужно скачать модель')}, ${packSize('speech')} ${t('МБ')}.`} onClick={() => { if (!busy) notify(`${t('Чтобы говорить голосом, скачайте модель')}, ${packSize('speech')} ${t('МБ')}.`, [{ label: t('Скачать модель'), run: () => downloadPack('speech') }]) }}>{busy ? <Loader2 size={15} className="animate-spin" /> : <Mic size={15} className="opacity-50" />}</PromptInputButton>
+  }
   return (
     <span ref={self} className="contents">
       {reading

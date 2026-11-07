@@ -2,7 +2,7 @@
 import { env, pipeline } from '@huggingface/transformers'
 import { RATE, splitAtQuiet } from './audio'
 
-interface Job { samples: Float32Array; language: 'russian' | 'english'; model: string; threads: number; ort: { mjs: string; wasm: string } }
+interface Job { samples: Float32Array | null; language: 'russian' | 'english'; model: string; threads: number; ort: { mjs: string; wasm: string } }
 
 const send = (m: unknown) => (self as unknown as Worker).postMessage(m)
 
@@ -22,11 +22,13 @@ self.onmessage = async ({ data: job }: MessageEvent<Job>) => {
     }
     // On the processor, always. Measured against WebGPU on a recent laptop it was faster here, with a far smaller model, and it runs anywhere.
     const read = await pipeline('automatic-speech-recognition', job.model, { device: 'wasm', dtype: 'q8', progress_callback })
-    const pieces = splitAtQuiet(job.samples)
+    if (!job.samples) return send({ type: 'done', text: '' })
+    const samples = job.samples
+    const pieces = splitAtQuiet(samples)
     let text = ''
     for (let i = 0; i < pieces.length; i++) {
       send({ type: 'reading', done: i, total: pieces.length })
-      const out = await read(job.samples.subarray(pieces[i][0], pieces[i][1]), { language: job.language, task: 'transcribe', sampling_rate: RATE } as never)
+      const out = await read(samples.subarray(pieces[i][0], pieces[i][1]), { language: job.language, task: 'transcribe', sampling_rate: RATE } as never)
       text = `${text} ${(Array.isArray(out) ? out[0] : out).text.trim()}`.trim()
       send({ type: 'text', text })
     }

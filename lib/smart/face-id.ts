@@ -1,71 +1,34 @@
 'use client'
+import { overlap } from '../faces'
 import type { Box, MediaTag } from '../types'
-import { bestMatch, type Guess } from './face-match'
+import { facePrint, findFaces } from './face-client'
+import { bestMatch, similarity, type Guess } from './face-match'
 
-// Everything here stays in this browser: the likeness of a face is not written to the server or sent anywhere.
+// Everything here stays in this browser: a face print is not written to the server or sent anywhere.
+export type { Guess } from './face-match'
 /** Several photos of a person are enough, and a device should not be asked to read the whole archive. */
 const PER_PERSON = 5
 const MAX_FACES = 150
 
-type Human = import('@vladmandic/human').Human
-let human: Promise<Human> | null = null
+type Shelf = 'prints' | 'seen' | 'refused'
 
-function getHuman() {
-  return (human ??= (async () => {
-    // Served as it is, so a library this large stays out of the app's own bundles.
-    const { Human } = await import(/* turbopackIgnore: true */ /* webpackIgnore: true */ '/human/human.esm.js' as string) as typeof import('@vladmandic/human')
-    const h = new Human({
-      modelBasePath: `${location.origin}/human/models/`, backend: 'webgl', debug: false, cacheSensitivity: 0, filter: { enabled: false },
-      face: { enabled: true, detector: { rotation: true, maxDetected: 1, return: false }, mesh: { enabled: true }, iris: { enabled: false }, description: { enabled: true }, emotion: { enabled: false }, antispoof: { enabled: false }, liveness: { enabled: false } },
-      body: { enabled: false }, hand: { enabled: false }, object: { enabled: false }, gesture: { enabled: false }, segmentation: { enabled: false },
-    })
-    // A device that cannot run this says so rather than leaving someone waiting.
-    await Promise.race([h.init().then(() => h.load()), new Promise((_, reject) => setTimeout(() => reject(new Error('the model did not load in time')), 120_000))])
-    return h
-  })().catch((e) => { human = null; throw e }))
-}
-
-type Shelf = 'faces' | 'seen' | 'refused'
-
-function store(mode: IDBTransactionMode, shelf: Shelf = 'faces') {
+function store(mode: IDBTransactionMode, shelf: Shelf = 'prints') {
   return new Promise<IDBObjectStore>((resolve, reject) => {
-    const q = indexedDB.open('folkbranch-faces', 2)
-    q.onupgradeneeded = () => { for (const s of ['faces', 'seen', 'refused']) if (!q.result.objectStoreNames.contains(s)) q.result.createObjectStore(s) }
+    const q = indexedDB.open('folkbranch-face-prints', 1)
+    q.onupgradeneeded = () => { for (const s of ['prints', 'seen', 'refused']) q.result.createObjectStore(s) }
     q.onerror = () => reject(q.error)
     q.onsuccess = () => resolve(q.result.transaction(shelf, mode).objectStore(shelf))
   })
 }
-const remembered = async <T = number[]>(key: string, shelf: Shelf = 'faces') => { const s = await store('readonly', shelf); return new Promise<T | undefined>((r) => { const q = s.get(key); q.onsuccess = () => r(q.result); q.onerror = () => r(undefined) }) }
-const remember = async (key: string, value: unknown, shelf: Shelf = 'faces') => { (await store('readwrite', shelf)).put(value, key) }
+const remembered = async (key: string) => { const s = await store('readonly'); return new Promise<number[] | undefined>((r) => { const q = s.get(key); q.onsuccess = () => r(q.result); q.onerror = () => r(undefined) }) }
+const remember = async (key: string, value: unknown, shelf: Shelf = 'prints') => { (await store('readwrite', shelf)).put(value, key) }
 const keysOf = async (shelf: Shelf) => { const s = await store('readonly', shelf); return new Promise<Set<string>>((r) => { const q = s.getAllKeys(); q.onsuccess = () => r(new Set(q.result as string[])); q.onerror = () => r(new Set()) }) }
 
-function crop(img: HTMLImageElement | ImageBitmap, box: Box, W: number, H: number) {
-  // The model finds the face itself, so it needs some of what is around it.
-  const air = 0.35
-  const x = Math.max(0, (box.x - box.w * air) * W), y = Math.max(0, (box.y - box.h * air) * H)
-  const w = Math.min(W - x, box.w * (1 + 2 * air) * W), h = Math.min(H - y, box.h * (1 + 2 * air) * H)
-  const scale = Math.min(1, 640 / Math.max(w, h))
-  const c = document.createElement('canvas')
-  c.width = Math.max(1, Math.round(w * scale))
-  c.height = Math.max(1, Math.round(h * scale))
-  c.getContext('2d')!.drawImage(img, x, y, w, h, 0, 0, c.width, c.height)
-  return c
-}
-
-async function likeness(h: Human, img: HTMLImageElement | ImageBitmap, box: Box, W: number, H: number) {
-  const { face } = await h.detect(crop(img, box, W, H))
-  return face[0]?.embedding?.length ? face[0].embedding : null
-}
-
-const breathe = () => new Promise((r) => setTimeout(r, 30))
-
-export type { Guess } from './face-match'
 export type FaceProgress = { stage: 'model' } | { stage: 'learning'; done: number; total: number }
 
-/** Tagged faces, at most a few of each person, the likeness of each kept so it is worked out only once. */
+/** Tagged faces, at most a few of each person, the print of each kept so it is worked out only once. */
 export async function learnFaces(tags: { tag: MediaTag; mediaId: string; url: string }[], onProgress: (p: FaceProgress) => void, signal: AbortSignal) {
   onProgress({ stage: 'model' })
-  const h = await getHuman()
   const taken = new Map<string, number>()
   const chosen = tags.filter(({ tag }) => {
     if (!tag.personId || tag.x === null) return false
@@ -78,30 +41,25 @@ export async function learnFaces(tags: { tag: MediaTag; mediaId: string; url: st
   for (const { tag, url } of chosen) {
     if (signal.aborted) throw new DOMException('Stopped', 'AbortError')
     onProgress({ stage: 'learning', done: done++, total: chosen.length })
-    let face: number[] | undefined = await remembered(tag.id)
+    let face = await remembered(tag.id)
     if (!face) {
-      const bitmap = await fetch(url).then((r) => r.blob()).then(createImageBitmap).catch(() => null)
-      if (!bitmap) continue
-      const found: number[] = (await likeness(h, bitmap, tag as Box, bitmap.width, bitmap.height)) ?? []
-      face = found
-      bitmap.close()
-      await remember(tag.id, found)
-      await breathe()
+      const blob = await fetch(url).then((r) => r.blob()).catch(() => null)
+      if (!blob) continue
+      face = (await facePrint(blob, tag as Box)) ?? []
+      await remember(tag.id, face)
     }
     if (face.length) known.push({ personId: tag.personId!, face })
   }
   return known
 }
 
-/** The best match for each face, among people not already on this photo. */
-export async function guessFaces(img: HTMLImageElement, boxes: Box[], known: { personId: string; face: number[] }[], signal: AbortSignal) {
-  const h = await getHuman()
+/** The best match for each face, among the people given. */
+export async function guessFaces(img: ImageBitmapSource, boxes: Box[], known: { personId: string; face: number[] }[], signal: AbortSignal) {
   const out: (Guess | null)[] = []
   for (const box of boxes) {
     if (signal.aborted) throw new DOMException('Stopped', 'AbortError')
-    const face = await likeness(h, img, box, img.naturalWidth, img.naturalHeight)
-    out.push(face ? bestMatch(known.map((k) => ({ personId: k.personId, score: h.match.similarity(face, k.face) }))) : null)
-    await breathe()
+    const face = await facePrint(img, box)
+    out.push(face ? bestMatch(known.map((k) => ({ personId: k.personId, score: similarity(face, k.face) }))) : null)
   }
   return out
 }
@@ -128,11 +86,11 @@ function loadImage(url: string) {
 }
 
 function thumbnail(img: HTMLImageElement, box: Box) {
-  const c = crop(img, { x: box.x + box.w * 0.1, y: box.y + box.h * 0.1, w: box.w * 0.8, h: box.h * 0.8 }, img.naturalWidth, img.naturalHeight)
+  const W = img.naturalWidth, H = img.naturalHeight
+  const side = Math.max(box.w * W, box.h * H)
   const small = document.createElement('canvas')
   small.width = small.height = 96
-  const side = Math.min(c.width, c.height)
-  small.getContext('2d')!.drawImage(c, (c.width - side) / 2, (c.height - side) / 2, side, side, 0, 0, 96, 96)
+  small.getContext('2d')!.drawImage(img, (box.x + box.w / 2) * W - side / 2, (box.y + box.h / 2) * H - side / 2, side, side, 0, 0, 96, 96)
   return small.toDataURL('image/jpeg', 0.8)
 }
 
@@ -140,9 +98,8 @@ function thumbnail(img: HTMLImageElement, box: Box) {
 export async function scanPhotos(
   photos: { id: string; url: string; tags: MediaTag[] }[],
   known: { personId: string; face: number[] }[],
-  { limit, pause, onProgress, onFound, signal }: { limit: number; pause: number; onProgress: (done: number, total: number) => void; onFound: (s: FaceSuggestion) => void; signal: AbortSignal },
+  { limit, onProgress, onFound, signal }: { limit: number; onProgress: (done: number, total: number) => void; onFound: (s: FaceSuggestion) => void; signal: AbortSignal },
 ) {
-  const { findFaces, overlap } = await import('../faces')
   const seen = await keysOf('seen')
   const refused = await keysOf('refused')
   const waiting = photos.filter((p) => !seen.has(p.id))
@@ -163,8 +120,6 @@ export async function scanPhotos(
       })
     }
     await remember(photo.id, 1, 'seen')
-    // Rests between photos, longer on a weak device, so the page keeps answering.
-    await new Promise((r) => setTimeout(r, pause))
   }
   return { left: waiting.length - now.length }
 }

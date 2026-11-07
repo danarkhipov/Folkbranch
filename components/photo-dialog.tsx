@@ -7,8 +7,10 @@ import Zoom from 'yet-another-react-lightbox/plugins/zoom'
 import 'yet-another-react-lightbox/styles.css'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { api, mediaUrl, useApp, useWrite } from '@/lib/client'
-import { findFaces, overlap, squareCrop } from '@/lib/faces'
+import { overlap, squareCrop } from '@/lib/faces'
+import { useModel } from '@/lib/smart/models'
 import { useSmart } from '@/lib/smart/settings'
+import { ModelPrompt } from './model-prompt'
 import type { FaceProgress, Guess } from '@/lib/smart/face-id'
 import { cn } from '@/lib/utils'
 import { personName, type Box, type Media } from '@/lib/types'
@@ -41,6 +43,8 @@ function Photo({ id, list, index, setIndex, onClose }: { id: string; list?: stri
   const [scan, setScan] = useState<'' | 'busy' | 'none' | 'error'>('')
   const [findOn] = useSmart('faces')
   const [recognizeOn] = useSmart('recognize')
+  const findModel = useModel('faces')
+  const recognizeModel = useModel('recognize')
   const [guesses, setGuesses] = useState<(Guess | null)[]>([])
   const [learning, setLearning] = useState<FaceProgress | null>(null)
   const [learnFailed, setLearnFailed] = useState(false)
@@ -64,11 +68,12 @@ function Photo({ id, list, index, setIndex, onClose }: { id: string; list?: stri
   const scanFaces = async () => {
     setScan('busy')
     try {
+      const { findFaces } = await import('@/lib/smart/face-client')
       const found = (await findFaces(img.current!)).filter((f) => !m?.tags.some((tag) => tag.x !== null && overlap(f, tag as Box) > 0.3))
       setFaces(found)
       setGuesses([])
       setScan(found.length ? '' : 'none')
-      if (found.length && recognizeOn) recognize(found)
+      if (found.length && recognizeOn && recognizeModel.status === 'ready') recognize(found)
     } catch (e) {
       console.error(e)
       setScan('error')
@@ -128,7 +133,7 @@ function Photo({ id, list, index, setIndex, onClose }: { id: string; list?: stri
             )
           })}
           {faces.map((f, i) => (
-            <div key={i} className="tagbox suggest" style={pos(f)} onClick={() => setPick(f)}>
+            <div key={i} className={cn('tagbox suggest', faces.length > 6 && !guesses[i] && 'quiet')} style={pos(f)} title={faces.length > 6 ? t('Кто это?') : undefined} onClick={() => setPick(f)}>
               <span className="tagname">{guesses[i] && byId.has(guesses[i]!.personId) ? `${personName(byId.get(guesses[i]!.personId)!)}?` : t('Кто это?')}</span>
             </div>
           ))}
@@ -204,14 +209,15 @@ function Photo({ id, list, index, setIndex, onClose }: { id: string; list?: stri
                 <button className="bar-btn border border-border" disabled={!caption.trim()}>{t('Подписать')}</button>
               </form>
             )}
-            {findOn && <button className="bar-btn border border-border self-start" disabled={scan === 'busy'} onClick={scanFaces}><ScanFace size={14} /> {t('Найти лица')}{scan === 'busy' && '…'}</button>}
+            {findOn && findModel.status === 'ready' && <button className="bar-btn border border-border self-start" disabled={scan === 'busy'} onClick={scanFaces}><ScanFace size={14} /> {t('Найти лица')}{scan === 'busy' && '…'}</button>}
+            {findOn && <ModelPrompt pack="faces">{t('Чтобы приложение само находило лица на фото, скачайте модель. Она работает в этом браузере, фото никуда не уходят.')}</ModelPrompt>}
             {learning && (
               <p role="status" className="flex flex-wrap items-center gap-2 text-xs text-ink-soft">
                 {learning.stage === 'model' ? t('Готовлю модель узнавания…') : `${t('Сравниваю с отмеченными лицами')}: ${learning.done} ${t('из')} ${learning.total}`}
                 <button className="underline underline-offset-2" onClick={() => stopLearning.current?.abort()}>{t('Остановить')}</button>
               </p>
             )}
-            {learnFailed && <p className="text-xs text-destructive">{t('Не удалось загрузить модель распознавания')}</p>}
+            {learnFailed && <p className="text-xs text-destructive">{t('Не удалось запустить модель распознавания')}</p>}
             {faces.map((f, i) => {
               const g = guesses[i]
               const p = g && byId.get(g.personId)
@@ -225,7 +231,7 @@ function Photo({ id, list, index, setIndex, onClose }: { id: string; list?: stri
               )
             })}
             {scan === 'none' && <p className="text-xs text-ink-faint">{t('Лиц не найдено')}</p>}
-            {scan === 'error' && <p className="text-xs text-destructive">{t('Не удалось загрузить модель распознавания')}</p>}
+            {scan === 'error' && <p className="text-xs text-destructive">{t('Не удалось запустить модель распознавания')}</p>}
           </>
         )}
       </div>

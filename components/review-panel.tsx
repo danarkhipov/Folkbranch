@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Check, X } from 'lucide-react'
 import { api, useApp, useProposals } from '@/lib/client'
-import { useSmart } from '@/lib/smart/settings'
 import { GapsList, SameList } from './check-lists'
 import { FaceReview } from './face-review'
 import { Segmented } from './person-fields'
@@ -16,7 +15,6 @@ export function ReviewPanel({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [view, setView] = useState<'edits' | 'gaps' | 'same' | 'faces'>(drafts.length ? 'edits' : 'gaps')
-  const [recognize] = useSmart('recognize')
   const act = async (fn: () => Promise<unknown>) => {
     setBusy(true)
     setError('')
@@ -27,7 +25,7 @@ export function ReviewPanel({ onClose }: { onClose: () => void }) {
   return (
     <aside aria-label={t('Проверка')} className="float side-sheet fixed left-3 top-[60px] bottom-3 w-96 max-w-[calc(100vw-24px)] flex flex-col z-10">
       <div className="flex items-center justify-between px-3 pt-3 pb-2"><h3 className="font-serif font-medium text-lg">{t('Проверка')}</h3><button className="text-ink-faint hover:text-ink" aria-label={t('Закрыть')} title={t('Закрыть')} onClick={onClose}><X size={15} /></button></div>
-      <div className="px-3 pb-2"><Segmented label={t('Что показать')} value={view} onChange={setView} options={[['edits', `${t('Правки')}${drafts.length ? ` ${drafts.length}` : ''}`], ['gaps', t('Что заполнить')], ['same', t('Похожие')], ...(recognize ? [['faces', t('Лица')] as ['faces', string]] : [])]} /></div>
+      <div className="px-3 pb-2"><Segmented label={t('Что показать')} value={view} onChange={setView} options={[['edits', `${t('Правки')}${drafts.length ? ` ${drafts.length}` : ''}`], ['gaps', t('Что заполнить')], ['same', t('Похожие')], ['faces', t('Лица')]]} /></div>
       {view === 'gaps' && <GapsList />}
       {view === 'same' && <SameList />}
       {view === 'faces' && <FaceReview />}

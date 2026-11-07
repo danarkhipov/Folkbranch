@@ -74,12 +74,12 @@ Backups, updates and hosting on Railway are in the [self-hosting guide](docs/SEL
 - Works in a browser on a phone or a computer, in English or Russian.
 
 **Smart features, on this device**
-- Off until you turn them on, one by one and separately on each device. The app works the same without them.
-- Find faces in a photo, and get a suggestion of who it is from faces you already tagged. A name appears only when you confirm it.
+- Nothing downloads until you press the button, one model at a time and separately on each device. The app works the same without them.
+- Find faces in a photo, even in old group photos, and get a suggestion of who it is from faces you already tagged. A name appears only when you confirm it.
 - Go through all your photos at once for familiar faces, and set portraits for people who have none.
 - Speak to the assistant instead of typing. The words are recognised on your device, and you send them.
 - Turn a recorded story into text, in the browser. It uses Chrome's own recognition where the device has it, and a small speech model otherwise.
-- Photos and voice stay on the device. Only the models are downloaded, once, and the app does not slow down while they work.
+- Photos and voice stay on the device, and the app does not slow down while the models work.
 
 **Your data stays yours**
 - One SQLite file and a folder of photos on your server. No telemetry.
@@ -137,7 +137,7 @@ Yes, if the service can export GEDCOM. Folkbranch reads the file and shows a pre
 Only people you invite. The site is closed to search engines, photos need a sign-in, and readers do not see living relatives.
 
 **Does anything leave my server?**
-Not by itself. Connecting an AI provider sends what the assistant reads to that provider, and the app warns you first. Smart features can download models to the browser the first time you use them: speech from jsDelivr and Hugging Face, face finding from Google. Face recognition comes from your own server. Your photos and recordings are not sent anywhere.
+Not by itself. Connecting an AI provider sends what the assistant reads to that provider, and the app warns you first. Only if you ask. Each smart feature has a button that downloads its model to the browser, from Hugging Face and unpkg or jsDelivr. Your photos and recordings are not sent anywhere.
 
 **What does it need to run?**
 A Mac or Linux computer and about 200 MB of memory; nothing to install first. Docker is an option, and the proven way on Windows. It runs on a home computer, a small server or Railway.

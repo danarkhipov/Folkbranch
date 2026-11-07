@@ -48,7 +48,7 @@ describe('naming a face', () => {
     expect(bestMatch([])).toBeNull()
   })
   it('stays silent when two people are about equally close', () => {
-    expect(bestMatch([{ personId: 'a', score: 0.8 }, { personId: 'b', score: 0.75 }])).toBeNull()
+    expect(bestMatch([{ personId: 'a', score: 0.8 }, { personId: 'b', score: 0.76 }])).toBeNull()
   })
   it('takes each person by their closest photo', () => {
     expect(bestMatch([{ personId: 'a', score: 0.6 }, { personId: 'a', score: 0.9 }, { personId: 'b', score: 0.7 }])).toEqual({ personId: 'a', score: 0.9 })
@@ -58,6 +58,6 @@ describe('naming a face', () => {
 describe('the speech runtime', () => {
   it('fetches the same version the package uses', () => {
     const lock = readFileSync('pnpm-lock.yaml', 'utf8').match(/onnxruntime-web@([^:\s'(]+)/)![1]
-    expect(readFileSync('lib/smart/speech.ts', 'utf8')).toContain(`const ORT = '${lock}'`)
+    expect(readFileSync('lib/smart/models.ts', 'utf8')).toContain(`const ORT_VERSION = '${lock}'`)
   })
 })

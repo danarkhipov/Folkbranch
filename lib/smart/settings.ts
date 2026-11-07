@@ -5,8 +5,8 @@ import { useCallback, useSyncExternalStore } from 'react'
 export type SmartFeature = 'faces' | 'recognize' | 'speech'
 
 const KEY = 'smart-features'
-/** Finding faces has always been there and is light. What downloads a large model waits to be asked for. */
-const DEFAULTS: Record<SmartFeature, boolean> = { faces: true, recognize: false, speech: false }
+/** A feature needs its model first. Once that is here, it can still be switched off without removing it. */
+const DEFAULTS: Record<SmartFeature, boolean> = { faces: true, recognize: true, speech: true }
 const listeners = new Set<() => void>()
 let cached: string | null | undefined
 

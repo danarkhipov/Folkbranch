@@ -4,8 +4,8 @@ import type { NextConfig } from 'next'
 const dev = process.env.NODE_ENV !== 'production'
 const CSP = [
   "default-src 'self'", `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${dev ? " 'unsafe-eval'" : ''}`, "style-src 'self' 'unsafe-inline'", "img-src 'self' data: blob:", "font-src 'self' data:",
-  // Model files, fetched only when someone turns a feature on: these addresses can send data in, and no code from them runs as a script.
-  `connect-src 'self' https://storage.googleapis.com https://cdn.jsdelivr.net https://huggingface.co https://*.hf.co${dev ? ' ws:' : ''}`, "media-src 'self' blob:", "worker-src 'self' blob:", "frame-ancestors 'none'", "base-uri 'self'", "object-src 'none'", "form-action 'self'",
+  // Model files, fetched only when someone asks for them: these addresses can send data in, and no code from them runs as a script.
+  `connect-src 'self' https://unpkg.com https://cdn.jsdelivr.net https://huggingface.co https://*.hf.co${dev ? ' ws:' : ''}`, "media-src 'self' blob:", "worker-src 'self' blob:", "frame-ancestors 'none'", "base-uri 'self'", "object-src 'none'", "form-action 'self'",
 ].join('; ')
 
 const config: NextConfig = {
