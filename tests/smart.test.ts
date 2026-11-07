@@ -76,6 +76,6 @@ describe('reading Russian speech', () => {
 describe('the speech runtime', () => {
   it('fetches the same version the package uses', () => {
     const lock = readFileSync('pnpm-lock.yaml', 'utf8').match(/onnxruntime-web@([^:\s'(]+)/)![1]
-    expect(readFileSync('lib/smart/models.ts', 'utf8')).toContain(`const ORT_VERSION = '${lock}'`)
+    expect(readFileSync('lib/smart/ort-version.ts', 'utf8')).toContain(`const ORT_VERSION = '${lock}'`)
   })
 })

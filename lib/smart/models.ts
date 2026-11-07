@@ -1,10 +1,10 @@
 'use client'
 import { useEffect, useSyncExternalStore } from 'react'
 import { readDevice } from './device'
+import { ORT_VERSION } from './ort-version'
 
 // Nothing downloads until someone presses the button. Files stay in this browser and can be removed again.
 const CACHE = 'folkbranch-models'
-export const ORT_VERSION = '1.31.0-dev.20260914-8d85527a0'
 const ort = (file: string) => [`https://unpkg.com/onnxruntime-web@${ORT_VERSION}/dist/${file}`, `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/${file}`]
 const hf = (repo: string, file: string) => [`https://huggingface.co/${repo}/resolve/main/${file}`]
 
@@ -144,7 +144,7 @@ export async function downloadVariant(id: string) {
   set(id, { status: 'busy', loaded: 0, total: 0, failed: false })
   try {
     if (v.whisper) {
-      const { prepareWhisper } = await import('./speech')
+      const { prepareWhisper } = await import('./speech-run')
       await prepareWhisper(v.whisper.repo, (loaded, total) => set(id, { loaded, total }), stop.signal)
       try { localStorage.setItem(whisperFlag(v.whisper.repo), '1') } catch {}
     } else {
