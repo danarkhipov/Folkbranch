@@ -4,6 +4,52 @@ All notable changes are listed here, newest first. Versions follow [Semantic Ver
 
 ## Unreleased
 
+## 1.2.0 - 2026-11-07
+
+Install on any computer without Docker, talk to the assistant, find familiar faces across all photos, and ask a relative for a story by a link.
+
+### Security
+- A restored copy can no longer point a file name outside the media folder.
+- Readers no longer see the names of deleted people in the history.
+- The assistant always asks before marking anyone as dead, since that shows them to readers.
+- A sign-in on this computer refuses what arrived through a tunnel or proxy.
+
+### Added
+- `--server` installs on any Linux server in one command, with no Docker and no domain: HTTPS by itself, a service that starts with the server, and nothing reachable from the internet running as root.
+- An installer for Windows, `install.ps1`, checked when a release is built. Not proven yet: Docker remains the sure way there.
+- `./folkbranch share` gives an install on your own computer an address on the internet for a while, so a relative can open a link. It asks first, and `./folkbranch share stop` closes it.
+- `npx folkbranch` installs the app on the first run and opens it after that.
+- Ask a relative for a story by a link: they open it on a phone, press one big button and talk, with no account and without seeing the archive. The recording waits for your review.
+- Bring in a research case from the ex-ussr-kinship-research skill: pick its folder under **Settings → Files**, or an agent uses `import_kinship_case`. Candidates stay separate cards, unproved relations stay notes off the chart, and every status and source stays with what it describes. Bringing in the same case again only adds what is new to its cards.
+- A plugin for Claude Code: `/plugin marketplace add danarkhipov/folkbranch`, then `/plugin install folkbranch@folkbranch`.
+- `./folkbranch open` opens the app in the browser, signed in, and starts it if it was stopped. The first install without Docker opens the browser by itself.
+- A file for relatives: one button under **Settings → Users and access** makes a single HTML file with the chart, cards and photos. It opens with no server, account or internet, and the living stay hidden.
+- **Smart features**, switched on separately on each device under **Settings → Smart features**, and off by default apart from finding faces: suggesting who is in a photo from faces already tagged, and turning a recorded story into text in the browser. Photos and voice stay on the device; only the models are downloaded.
+- Under **Check → Faces**: look through all photos for familiar faces, and set portraits for people who have none.
+- Speak to the assistant instead of typing, with the words recognised on the device.
+- Models download only when you press the button, in the settings or where a feature needs them, and can be removed again.
+- Choose between models under **Settings → Smart features**: light, accurate or maximum for finding faces, and GigaAM or Whisper for speech.
+- Faces are found with YuNet and compared with SFace, which handle old group photos far better than the earlier models. Finding and comparing runs away from the page.
+- Install without Docker, on macOS and Linux. One command picks the lightest way: 23 MB if the computer has Node 24, about 48 MB with Node inside the folder. `--docker` and `--domain` still use Docker.
+- `./folkbranch start`, `stop`, `restart`, `status` and `logs` for an install without Docker. It restarts itself after a crash and a restore.
+- Hide all the panels: the bar narrows to a square around its logo, with its edge showing behind.
+- The chart works from the keyboard: arrows through the family, + − 0 to zoom, a skip link, the list of keys under How to read the chart, and focus that returns when a panel closes. Screen readers hear the relation on each card.
+- A History tab in each person's card: who changed what and when, what it was before, and a button to roll it back. The card says so when someone else changed it lately.
+- Search looks through everything written about a person: dates in any form, places, facts, sources, biographies, stories and photo captions. It takes other word forms, nicknames, Latin letters, the wrong keyboard, typos and questions like "Ivan's wife", shows what it found in the results, and marks it in the card.
+
+### Changed
+- Settings are grouped and each screen says what it is for. View links have their own screen, the first screen links to the others instead of repeating their forms.
+- One kit for the whole interface in `components/ui`: a styled dropdown instead of the browser's, one text field, copy buttons, switches. A test stops new copies.
+- Every button with a `title` shows a designed hint, and the main ones say what they do.
+- The history says who changed what, with the old and new value, and has a visible Roll back button on each entry.
+- Review is its own panel: edits to approve, cards to fill in and similar people. The history shows only history.
+- The AI assistant comes first in the top bar, with a clearer icon.
+- Who to show on the chart: choose the person right in the menu, with one line on what each choice means.
+- A key's name is no longer cut to one letter. Revoking a key asks first, and a new key lasts a year unless you choose otherwise.
+
+### Removed
+- The Relationship panel in the top bar.
+
 ### Fixed
 - The install command run through `curl | sh` stopped before printing the setup link.
 
