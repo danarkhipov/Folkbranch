@@ -1,6 +1,6 @@
 'use client'
 import { useState, type ComponentType } from 'react'
-import { Archive as Archive_, ArrowLeftRight, KeyRound, Link2, ListChecks, UserRound, Users } from 'lucide-react'
+import { ArrowLeftRight, KeyRound, ListChecks, SlidersHorizontal, UserRound, Users } from 'lucide-react'
 import { AssistantIcon } from '../assistant-icon'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useApp } from '@/lib/client'
@@ -13,17 +13,16 @@ import { SetupGuide } from './setup-guide'
 import { ShareLinks } from './share-links'
 import { TokensTab } from './tokens'
 
-type Section = 'setup' | 'account' | 'general' | 'people' | 'links' | 'assistant' | 'agents' | 'data'
+type Section = 'setup' | 'account' | 'general' | 'people' | 'assistant' | 'agents' | 'data'
 
 /** Each screen says what it is for, so nobody has to work it out from the fields. */
 const SECTIONS: Record<Section, [string, string, ComponentType<{ size?: number }>]> = {
   setup: ['С чего начать', 'Что уже готово и что ещё можно подключить. Всё необязательное можно пропустить.', ListChecks],
   account: ['Мой аккаунт', 'Как вы связаны с архивом и как входите в него.', UserRound],
-  general: ['Основное', 'Название и язык архива. Меняются сразу для всех.', Archive_],
-  people: ['Люди и доступ', 'Кто входит в архив и что может в нём делать.', Users],
-  links: ['Ссылки для просмотра', 'Показать семью тому, кому не нужен вход: только смотреть, без регистрации. Живые родственники скрыты.', Link2],
-  assistant: ['ИИ-ассистент', 'Чат внутри приложения: отвечает на вопросы о семье и вносит правки с вашего подтверждения.', AssistantIcon],
-  agents: ['Агенты и MCP', 'Подключите Claude, Codex или другую программу: она сможет читать архив и предлагать правки.', KeyRound],
+  general: ['Название и язык', 'Как называется семья и на каком языке приложение. Меняется сразу для всех.', SlidersHorizontal],
+  people: ['Люди и доступ', 'Кто входит в архив и что может в нём делать, а кому хватит ссылки для просмотра.', Users],
+  assistant: ['Ассистент', 'Чат внутри приложения: отвечает на вопросы о семье и вносит правки с вашего подтверждения.', AssistantIcon],
+  agents: ['Внешние агенты', 'Подключите Claude, Codex или другую программу: она сможет читать архив и предлагать правки.', KeyRound],
   data: ['Файлы и копии', 'Добавить людей из файла, скачать данные, сделать копию архива.', ArrowLeftRight],
 }
 
@@ -32,7 +31,7 @@ export function SettingsDialog({ open, onOpenChange, familyName, providers, onTe
   const isOwner = me.role === 'owner'
   const [section, setSection] = useState<Section>(isOwner ? 'setup' : 'account')
   const groups: [string, Section[]][] = isOwner
-    ? [['', ['setup']], ['Вы', ['account']], ['Архив', ['general', 'people', 'links', 'data']], ['Подключения', ['assistant', 'agents']]]
+    ? [['', ['setup', 'account']], ['Семья', ['general', 'people', 'data']], ['ИИ', ['assistant', 'agents']]]
     : [['', ['account', 'data']]]
   const [title, description] = SECTIONS[section]
   return (
@@ -59,8 +58,7 @@ export function SettingsDialog({ open, onOpenChange, familyName, providers, onTe
             {section === 'setup' && isOwner && <SetupGuide onGo={setSection} />}
             {section === 'account' && <Account providers={providers} />}
             {section === 'general' && isOwner && <Archive familyName={familyName} lang={lang} />}
-            {section === 'people' && isOwner && <Access />}
-            {section === 'links' && isOwner && <ShareLinks />}
+            {section === 'people' && isOwner && <div className="flex min-w-0 flex-col gap-7"><Access /><ShareLinks /></div>}
             {section === 'assistant' && isOwner && <AssistantSettings />}
             {section === 'agents' && isOwner && <TokensTab />}
             {section === 'data' && <Files onText={() => { onOpenChange(false); onText() }} />}

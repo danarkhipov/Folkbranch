@@ -30,7 +30,7 @@ export function ShareLinks() {
   const date = new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short', year: 'numeric' })
   return (
     <div className="flex min-w-0 flex-col gap-7 text-sm">
-      <Section title={t('Новая ссылка')}>
+      <Section title={t('Ссылка для просмотра')} description={t('Для тех, кому не нужен вход: только смотреть, без регистрации. Живые родственники скрыты, как у читателя.')}>
         <form className="flex flex-col gap-3" onSubmit={async (e) => {
           e.preventDefault()
           setError('')
