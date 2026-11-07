@@ -24,11 +24,11 @@ const SYSTEM_PATH = '/usr/bin:/bin:/usr/sbin:/sbin'
 const bin = path.join(work, 'bin')
 fs.mkdirSync(bin)
 const seen = path.join(work, 'called.log')
-for (const a of ['claude', 'codex', 'docker']) fs.writeFileSync(path.join(bin, a), `#!/bin/sh\necho "${a} $*" >> "${seen}"\n`, { mode: 0o755 })
+for (const a of ['claude', 'codex', 'docker', 'open', 'xdg-open']) fs.writeFileSync(path.join(bin, a), `#!/bin/sh\necho "${a} $*" >> "${seen}"\n`, { mode: 0o755 })
 const called = () => (fs.existsSync(seen) ? fs.readFileSync(seen, 'utf8') : '')
 
 const nodeDir = path.dirname(process.execPath)
-const env = (extra = {}, withNode = true) => ({ HOME: work, TMPDIR: work, PATH: `${bin}:${withNode ? `${nodeDir}:` : ''}${SYSTEM_PATH}`, FOLKBRANCH_BUNDLE: bundle, ...extra })
+const env = (extra = {}, withNode = true) => ({ HOME: work, TMPDIR: work, DISPLAY: ':0', PATH: `${bin}:${withNode ? `${nodeDir}:` : ''}${SYSTEM_PATH}`, FOLKBRANCH_BUNDLE: bundle, ...extra })
 const run = (cmd, cwd, e = env()) => spawnSync('sh', ['-c', cmd], { cwd, env: e, encoding: 'utf8', timeout: 240000 })
 /** As in the README: the script arrives on stdin, so anything that reads stdin would swallow the rest of it. */
 const install = (dir, args = '', e) => run(`cat "${repo}install.sh" | sh -s -- --dir "${dir}" ${args}`, work, e)
@@ -68,6 +68,7 @@ try {
   ok('the data is private too', (fs.statSync(path.join(A, 'data')).mode & 0o077) === 0)
   ok('it listens only on this computer', /127\.0\.0\.1:3461/.test(sh(`lsof -nP -iTCP:${AP} -sTCP:LISTEN`)))
   ok('the setup page opens', (await fetch(linkOf(first.stdout, AP))).status === 200)
+  ok('the first install opens the browser on that page', called().includes(`open ${linkOf(first.stdout, AP)}`) || called().includes(`xdg-open ${linkOf(first.stdout, AP)}`), called())
 
   const cookie = await claim(AB, valueOf(A, 'SETUP_TOKEN'))
   const ged = sh(`python3 "${fileURLToPath(new URL('gen-family.py', import.meta.url))}" 40`)
@@ -83,6 +84,17 @@ try {
   ok('help names the local commands', cli(A, 'help').stdout.includes('start, stop, restart, status, logs'))
   ok('logs are there', cli(A, 'logs').status === 0)
 
+  // Opening it later, signed in, with nothing to type.
+  const opens = () => called().split('\n').filter((l) => /^(xdg-)?open /.test(l)).length
+  const openedBefore = opens()
+  const opened = cli(A, 'open')
+  const signIn = called().split('\n').filter((l) => /^(xdg-)?open /.test(l)).pop()?.split(' ')[1]
+  ok('open sends the browser to a sign-in link', opened.status === 0 && opened.stdout.includes('Opened') && !!signIn?.includes('/invite/') && signIn.includes('go=1'), opened.stdout)
+  ok('and does not print the link when a browser took it', !opened.stdout.includes('/invite/'))
+  ok('that link opens', (await fetch(signIn)).status === 200)
+  const printed = cli(A, 'open', env({ FOLKBRANCH_NO_OPEN: '1' }))
+  ok('with no browser it prints the link instead', printed.stdout.includes('/invite/') && opens() === openedBefore + 1, printed.stdout)
+
   // Agents.
   const conn = cli(A, 'connect')
   const token = called().match(/Bearer (fb_\S+)/)?.[1]
@@ -96,6 +108,7 @@ try {
   ok('running it again keeps the settings', again.status === 0 && envOf(A) === settings, again.stderr.slice(-200))
   ok('and does not restart the app', fs.readFileSync(path.join(A, 'folkbranch.pid'), 'utf8') === pid)
   ok('and says it runs, with no setup link', again.stdout.includes(`Running at ${AB}`) && !linkOf(again.stdout, AP))
+  ok('and does not open the browser again', opens() === openedBefore + 1)
 
   // An update.
   const next = path.join(work, 'next'), unpack = path.join(next, 'x')
@@ -117,6 +130,12 @@ try {
   ok('a damaged download is refused, and the app keeps running', damaged.status !== 0 && damaged.stdout.includes('damaged') && (await fetch(AB + '/api/health')).ok)
 
   // Stop and start.
+  const quiet = place('no-browser')
+  const silent = opens()
+  ok('--no-open leaves the browser alone', install(quiet, '--no-open --port 3469').status === 0 && opens() === silent)
+  cli(quiet, 'stop')
+  ok('open starts it first if it was stopped', cli(quiet, 'open', env({ FOLKBRANCH_NO_OPEN: '1' })).stdout.includes('/setup?code=') && !(await free(3469)))
+  cli(quiet, 'stop')
   ok('stop stops it', cli(A, 'stop').status === 0 && await free(AP) && cli(A, 'status').status !== 0)
   ok('start brings it back', cli(A, 'start').stdout.includes(`Running at ${AB}`))
   ok('with the family and the sign-in', (await graph(AB, cookie)).persons?.length === people.length)

@@ -15,7 +15,7 @@ if (!fs.existsSync(bundleFile)) { console.error(`No archive at ${bundleFile}. Ru
 const SHOTS = process.env.SHOTS
 const work = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'folkbranch-file-')))
 const dir = path.join(work, 'archive'), port = 3472, B = `http://localhost:${port}`
-const env = { ...process.env, HOME: work, FOLKBRANCH_BUNDLE: pathToFileURL(bundleFile).href }
+const env = { ...process.env, FOLKBRANCH_NO_OPEN: '1', HOME: work, FOLKBRANCH_BUNDLE: pathToFileURL(bundleFile).href }
 const installed = spawnSync('sh', [path.join(repo, 'install.sh'), '--local', '--dir', dir, '--port', String(port)], { cwd: work, env, encoding: 'utf8', timeout: 180000 })
 if (installed.status !== 0) { console.error(installed.stdout, installed.stderr); process.exit(1) }
 

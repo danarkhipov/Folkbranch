@@ -1,6 +1,7 @@
 #!/bin/sh
 # Runs a server command inside the running app, for example: ./folkbranch token create --name my-agent
 # ./folkbranch connect   makes a key and connects the agent programs found on this computer over MCP.
+# ./folkbranch open      opens the app in the browser, signed in, starting it first if needed.
 # An install without Docker also has start, stop, restart, status and logs.
 cd "$(dirname "$0")" || exit 1
 
@@ -104,6 +105,36 @@ logs() {
   if [ -t 1 ]; then exec tail -n 100 -f logs/folkbranch.log; else tail -n 100 logs/folkbranch.log; fi
 }
 
+# Nothing to open on a server or in a test: there the address is printed instead.
+browse() {
+  [ -z "${FOLKBRANCH_NO_OPEN:-}${CI:-}${SSH_CONNECTION:-}" ] || return 1
+  case "$(uname -s)" in
+    Darwin) command -v open >/dev/null 2>&1 && open "$1" ;;
+    *) [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && command -v xdg-open >/dev/null 2>&1 && xdg-open "$1" >/dev/null 2>&1 ;;
+  esac
+}
+
+open_app() {
+  if [ -f .local ]; then
+    start >/dev/null || { echo "The app did not start: ./folkbranch start"; exit 1; }
+    cli() { "$NODE" app/folkbranch.mjs "$@"; }
+  else
+    cli() { docker compose exec -T folkbranch node folkbranch.mjs "$@"; }
+    BETTER_AUTH_URL=$(sed -n 's/^BETTER_AUTH_URL=//p' .env | head -n 1)
+    SETUP_TOKEN=$(sed -n 's/^SETUP_TOKEN=//p' .env | head -n 1)
+  fi
+  info=$(cli doctor </dev/null) || { echo "$info"; echo "Is the app running? Start it with: docker compose up -d"; exit 1; }
+  if printf '%s\n' "$info" | grep -q '^Users:   0'; then
+    url="$BETTER_AUTH_URL/setup?code=$SETUP_TOKEN"
+  else
+    # Signing in on opening is for this computer: elsewhere the link could be opened by a messenger's preview.
+    case "$BETTER_AUTH_URL" in http://localhost:*|http://127.0.0.1:*) now=--now ;; *) now="" ;; esac
+    url=$(cli login-link $now </dev/null | sed -n 's/^ *\(http[^ ]*\)$/\1/p')
+  fi
+  [ -n "$url" ] || { echo "Could not make a sign-in link."; exit 1; }
+  if browse "$url"; then echo "Opened in your browser."; else echo "Open this address. A sign-in link works once:"; echo; echo "  $url"; fi
+}
+
 connect() {
   name="agent-$(hostname -s 2>/dev/null || echo here)"
   if [ -f .local ]; then
@@ -136,6 +167,8 @@ connect() {
 }
 
 [ "${1:-}" = connect ] && { connect; exit 0; }
+[ "${1:-}" = open ] && { open_app; exit 0; }
+[ "${1:-}" = _browse ] && { browse "$2"; exit $?; }
 if [ -f .local ]; then
   case "${1:-}" in
     _run) supervise; exit $? ;;
@@ -147,6 +180,7 @@ if [ -f .local ]; then
     ''|help|--help)
       echo "Folkbranch, this computer"
       echo
+      echo "  open               Open the app in the browser, signed in"
       echo "  start, stop, restart, status, logs"
       echo "  connect            Connect Claude Code or Codex over MCP"
       echo

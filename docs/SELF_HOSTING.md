@@ -10,16 +10,16 @@ It needs nothing installed first, on macOS or Linux. The command picks the light
 
 | What the computer has | What it does | Download | On disk |
 |---|---|---|---|
-| Node 24 or newer | Uses that Node | 17 MB | about 90 MB |
-| No suitable Node | Brings its own, checked against Node's published checksums and kept inside the folder | about 42 MB | about 210 MB |
+| Node 24 or newer | Uses that Node | 21 MB | about 120 MB |
+| No suitable Node | Brings its own, checked against Node's published checksums and kept inside the folder | about 46 MB | about 240 MB |
 | Anything, with `--docker` | Runs the Docker image, as on a server | 115 MB | more, with Docker itself |
 
 Everything goes to `~/folkbranch` (`--dir` for another folder): the app in `app`, your archive in `data`, settings in `.env`, the log in `logs`. Add `--port 8080` for another port: `... | sh -s -- --port 8080`. If the port is taken the command says so, and running it again with `--port` moves the app. The app listens on this computer only.
 
-Without Docker it runs as your own user and keeps itself going through a crash and a restore, but it does not start when the computer does. After a reboot:
+The first install opens the browser by itself; `--no-open` leaves that out. Without Docker it runs as your own user and keeps itself going through a crash and a restore, but it does not start when the computer does. After a reboot:
 
 ```bash
-cd ~/folkbranch && ./folkbranch start
+cd ~/folkbranch && ./folkbranch open
 ```
 
 To remove it, `./folkbranch stop`, then delete the folder. That deletes the archive too, so download a copy first.
@@ -76,6 +76,7 @@ An empty instance can be claimed only with a code, so a stranger who finds it fi
 
 | Command | What it does |
 |---|---|
+| `./folkbranch open` | Open the app in the browser, signed in as the owner, starting it first if needed |
 | `./folkbranch start`, `stop`, `restart`, `status`, `logs` | Without Docker: run the app and read its log |
 | `./folkbranch connect` | Connect Claude Code or Codex over MCP |
 | `./folkbranch token create --name NAME` | Connect an agent, see [AGENTS.md](AGENTS.md) |

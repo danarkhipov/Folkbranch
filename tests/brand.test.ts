@@ -48,6 +48,12 @@ describe('the brand', () => {
     expect(script).toContain('elif [ -f "$DIR/docker-compose.yml" ]; then HAVE=docker')
   })
 
+  it('gives the plugin the same instructions as the skill people install by address', () => {
+    expect(readFileSync('plugins/folkbranch/skills/folkbranch/SKILL.md', 'utf8')).toBe(readFileSync('skills/folkbranch/SKILL.md', 'utf8'))
+    const market = JSON.parse(readFileSync('.claude-plugin/marketplace.json', 'utf8'))
+    expect(existsSync(`${market.plugins[0].source}/.claude-plugin/plugin.json`)).toBe(true)
+  })
+
   it('never packs a family\'s files into the public archive', () => {
     expect(readFileSync('scripts/make-bundle.mjs', 'utf8')).toContain('Refusing to pack')
     for (const file of ['.gitignore', '.dockerignore']) expect(readFileSync(file, 'utf8')).toMatch(/^dist/m)

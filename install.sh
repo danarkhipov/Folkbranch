@@ -23,6 +23,7 @@ while [ $# -gt 0 ]; do
     --dir) DIR="${2:-}"; shift 2 ;;
     --docker) WANT=docker; shift ;;
     --local) WANT=local; shift ;;
+    --no-open) export FOLKBRANCH_NO_OPEN=1; shift ;;
     -h|--help) sed -n '2,7p' "$0" 2>/dev/null; exit 0 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
@@ -223,10 +224,13 @@ if printf '%s\n' "$USERS" | grep -q '^Users:   0'; then
   echo "Ready. Open this address and create your family:"
   echo
   echo "  $URL/setup?code=$(value SETUP_TOKEN)"
+  # The first time, the browser opens by itself. Docker keeps to printing: it is mostly for servers.
+  if [ "$MODE" = local ]; then ./folkbranch _browse "$URL/setup?code=$(value SETUP_TOKEN)" </dev/null || true; fi
 else
   echo
   echo "Running at $URL"
 fi
 echo
 echo "Connect Claude Code or Codex:  cd $DIR && ./folkbranch connect"
+echo "Open it again later:           cd $DIR && ./folkbranch open"
 echo "All commands:                  ./folkbranch help"

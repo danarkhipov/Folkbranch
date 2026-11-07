@@ -25,7 +25,7 @@ Run one command. On a Mac or Linux it needs nothing else: no Docker, and no Node
 curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh
 ```
 
-It downloads the app (17 MB, or about 42 MB with Node, and about 90 or 210 MB on disk), starts it and prints a link. Open it, name your family, and load the demo family if you want to look around first. The app then shows what is set up and what is optional.
+It downloads the app (21 MB, or about 46 MB with Node, and about 120 or 240 MB on disk), starts it and prints a link. Open it, name your family, and load the demo family if you want to look around first. The app then shows what is set up and what is optional.
 
 On a server with a domain, with Docker and automatic HTTPS (a 115 MB image):
 
@@ -33,7 +33,14 @@ On a server with a domain, with Docker and automatic HTTPS (a 115 MB image):
 curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh -s -- --domain family.example.com
 ```
 
-Or tell Codex, Claude Code or another agent:
+In Claude Code, install the plugin, then ask it to install Folkbranch:
+
+```
+/plugin marketplace add danarkhipov/folkbranch
+/plugin install folkbranch@folkbranch
+```
+
+Or tell Codex or another agent:
 
 > Install Folkbranch following https://raw.githubusercontent.com/danarkhipov/folkbranch/main/skills/folkbranch/SKILL.md
 

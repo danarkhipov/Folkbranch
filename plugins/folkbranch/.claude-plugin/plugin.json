@@ -1,0 +1,7 @@
+{
+  "name": "folkbranch",
+  "description": "Install Folkbranch, a family archive that stays on your own computer, open it, and connect this agent over MCP",
+  "author": { "name": "Daniel Arkhipov" },
+  "homepage": "https://github.com/danarkhipov/Folkbranch",
+  "license": "AGPL-3.0-only"
+}

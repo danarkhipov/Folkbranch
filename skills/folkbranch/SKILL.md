@@ -1,6 +1,6 @@
 ---
 name: folkbranch
-description: Install Folkbranch, a self-hosted family archive, on this computer or a server, and connect this agent to it over MCP. Use when asked to install, set up, update or connect Folkbranch.
+description: Install Folkbranch, a self-hosted family archive, on this computer or a server, open it, and connect this agent to it over MCP. Use when asked to install, set up, update, open or connect Folkbranch.
 ---
 
 # Install Folkbranch
@@ -20,7 +20,7 @@ Ask once: this computer, or a server? For a server you also need its SSH access 
    ```
 
    It is safe to run again. It keeps settings and data in `~/folkbranch`, and under Docker in a Docker volume. If it says the port is taken, run it again with `--port 8080`.
-3. Give the person the link it prints. They name the family in the browser, and the app walks them through the rest. Do not fill in that form for them: whoever opens it first becomes the owner.
+3. On this computer the browser opens by itself. Otherwise give the person the link it prints. They name the family in the browser, and the app walks them through the rest. Do not fill in that form for them: whoever opens it first becomes the owner.
 4. After they have done that, connect this agent:
 
    ```bash
@@ -29,6 +29,8 @@ Ask once: this computer, or a server? For a server you also need its SSH access 
 
    If you run elsewhere than the server, ask them to create a key in the app under Settings > Agents and MCP.
 5. Check it works: call `get_overview` over MCP. New tools may need a restart of the agent program.
+
+Open it later, signed in and started if it was stopped: `cd ~/folkbranch && ./folkbranch open`. Never paste that link anywhere: it signs in as the owner.
 
 Update: run the install command again. Everything else: `./folkbranch help`, and `docs/SELF_HOSTING.md` in the repository.
 

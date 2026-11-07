@@ -1,0 +1,12 @@
+{
+  "name": "folkbranch",
+  "description": "Folkbranch, a family archive that stays on your own computer",
+  "owner": { "name": "Daniel Arkhipov" },
+  "plugins": [
+    {
+      "name": "folkbranch",
+      "source": "./plugins/folkbranch",
+      "description": "Install Folkbranch on this computer or a server, open it, and connect this agent over MCP"
+    }
+  ]
+}

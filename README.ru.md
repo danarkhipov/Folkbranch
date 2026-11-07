@@ -23,7 +23,7 @@
 curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh
 ```
 
-Команда скачает приложение (17 МБ, вместе с Node около 42 МБ, на диске около 90 или 210 МБ), запустит его и напишет ссылку. Откройте её, назовите семью и, если хотите сначала осмотреться, загрузите демо-семью. Дальше приложение покажет, что настроено и что необязательно.
+Команда скачает приложение (21 МБ, вместе с Node около 46 МБ, на диске около 120 или 240 МБ), запустит его и напишет ссылку. Откройте её, назовите семью и, если хотите сначала осмотреться, загрузите демо-семью. Дальше приложение покажет, что настроено и что необязательно.
 
 На сервере с доменом, с Docker и автоматическим HTTPS (образ 115 МБ):
 
@@ -31,7 +31,14 @@ curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install
 curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh -s -- --domain family.example.com
 ```
 
-Или скажите Codex, Claude Code либо другому агенту:
+В Claude Code поставьте плагин и попросите установить Folkbranch:
+
+```
+/plugin marketplace add danarkhipov/folkbranch
+/plugin install folkbranch@folkbranch
+```
+
+Или скажите Codex либо другому агенту:
 
 > Установи Folkbranch по инструкции https://raw.githubusercontent.com/danarkhipov/folkbranch/main/skills/folkbranch/SKILL.md
 
