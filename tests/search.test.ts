@@ -135,6 +135,12 @@ describe('the search', () => {
     expect(searchPeople(searchOwner, 'Ленинградский').map((r) => nameOf(r.personId))).toContain('pavel')
   })
 
+  it('does not look inside web addresses', () => {
+    expect(searchPeople(searchOwner, 'zzqwerty')).toEqual([])
+    expect(searchPeople(searchOwner, 'S21LOG')).toEqual([])
+    expect(searchPeople(searchOwner, 'пасека')[0].matches.map((m) => m.text).join()).not.toContain('irbis')
+  })
+
   it('does not guess when something certain was found', () => {
     const found = searchPeople(searchOwner, 'Анна').map((r) => nameOf(r.personId))
     expect(found).toContain('anna')

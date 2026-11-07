@@ -239,18 +239,18 @@ export function Details({ person, patch: send }: { person: Person; patch: (p: Pa
         </p>
       )}
 
-      <dl className="grid grid-cols-[104px_minmax(0,1fr)_minmax(0,1fr)] @max-[440px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-3 @max-[440px]:gap-x-2 gap-y-2 items-baseline">
-        <dt className="text-ink-soft @max-[440px]:col-span-2 @max-[440px]:-mb-1">{t('Жив или нет')}</dt>
-        <dd className="col-span-2 @max-[440px]:col-span-2 flex flex-wrap items-center gap-2">
+      <div className="grid grid-cols-[104px_minmax(0,1fr)_minmax(0,1fr)] @max-[440px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-3 @max-[440px]:gap-x-2 gap-y-2 items-baseline">
+        <div className="text-ink-soft @max-[440px]:col-span-2 @max-[440px]:-mb-1">{t('Жив или нет')}</div>
+        <div className="col-span-2 @max-[440px]:col-span-2 flex flex-wrap items-center gap-2">
           <Segmented label={t('Жив или нет')} disabled={ro} value={alive ? 'alive' : 'dead'} onChange={(v) => { patch({ living: v === 'alive' }); if (v === 'dead') setTimeout(() => document.getElementById('f-death-date')?.focus(), 80) }} options={[['alive', t(u ? 'Жив(а)' : f ? 'Жива' : 'Жив')], ['dead', t(u ? 'Умер(ла)' : f ? 'Умерла' : 'Умер')]]} />
           {years !== null && years >= 0 && <span className="text-ink-soft">{alive ? ageWords(years, lang) : `${t('Возраст при смерти')}: ${ageWords(years, lang)}`}</span>}
-        </dd>
+        </div>
 
         <span className="@max-[440px]:hidden" />
         <span className="text-xs text-ink-soft @max-[440px]:hidden">{t('Дата')}</span>
         <span className="text-xs text-ink-soft @max-[440px]:hidden">{t('Место')}</span>
 
-        <dt className="text-ink-soft @max-[440px]:col-span-2 @max-[440px]:-mb-1">{t('Рождение')}</dt>
+        <div className="text-ink-soft @max-[440px]:col-span-2 @max-[440px]:-mb-1">{t('Рождение')}</div>
         <span className="text-xs text-ink-soft @min-[441px]:hidden -mb-1.5">{t('Дата')}</span>
         <span className="text-xs text-ink-soft @min-[441px]:hidden -mb-1.5">{t('Место')}</span>
         <DateField id="f-birth-date" readOnly={ro} value={person.birthDate} placeholder={t('например, 1890')} onSave={saveClaimField('birthDate')} />
@@ -261,7 +261,7 @@ export function Details({ person, patch: send }: { person: Person; patch: (p: Pa
 
         {!alive && (
           <>
-            <dt className="text-ink-soft @max-[440px]:col-span-2 @max-[440px]:-mb-1">{t('Смерть')}</dt>
+            <div className="text-ink-soft @max-[440px]:col-span-2 @max-[440px]:-mb-1">{t('Смерть')}</div>
         <span className="text-xs text-ink-soft @min-[441px]:hidden -mb-1.5">{t('Дата')}</span>
         <span className="text-xs text-ink-soft @min-[441px]:hidden -mb-1.5">{t('Место')}</span>
             <DateField id="f-death-date" readOnly={ro} value={person.deathDate} placeholder={t('например, 1950')} onSave={saveClaimField('deathDate')} />
@@ -274,14 +274,14 @@ export function Details({ person, patch: send }: { person: Person; patch: (p: Pa
 
         {(person.otherNames || !ro) && (
           <>
-            <dt className="text-ink-soft @max-[440px]:col-span-2 @max-[440px]:-mb-1">{t('Другие имена')}</dt>
-            <dd className="col-span-2 @max-[440px]:col-span-2"><Field readOnly={ro} value={person.otherNames} placeholder={t('прозвище, имя в крещении')} onSave={save('otherNames')} /></dd>
+            <div className="text-ink-soft @max-[440px]:col-span-2 @max-[440px]:-mb-1">{t('Другие имена')}</div>
+            <div className="col-span-2 @max-[440px]:col-span-2"><Field readOnly={ro} value={person.otherNames} placeholder={t('прозвище, имя в крещении')} onSave={save('otherNames')} /></div>
           </>
         )}
 
-        <dt className="text-ink-soft @max-[440px]:col-span-2 @max-[440px]:-mb-1">{t('Пол')}</dt>
-        <dd className="col-span-2 @max-[440px]:col-span-2"><Segmented id="f-sex" label={t('Пол')} disabled={ro} value={person.sex} onChange={(sex) => patch({ sex })} options={[['M', t('Мужской')], ['F', t('Женский')], ['U', t('Неизвестно')]]} /></dd>
-      </dl>
+        <div className="text-ink-soft @max-[440px]:col-span-2 @max-[440px]:-mb-1">{t('Пол')}</div>
+        <div className="col-span-2 @max-[440px]:col-span-2"><Segmented id="f-sex" label={t('Пол')} disabled={ro} value={person.sex} onChange={(sex) => patch({ sex })} options={[['M', t('Мужской')], ['F', t('Женский')], ['U', t('Неизвестно')]]} /></div>
+      </div>
 
       {(canEdit || person.claims.some((c) => NAME_LABELS[c.field])) && (
         <details open={NAME_FIELDS.some((f) => hasConflict(person, f))} className="text-sm">

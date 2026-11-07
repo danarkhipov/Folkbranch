@@ -58,7 +58,7 @@ export async function loadSearchFamily() {
   linkPeople(a, 'daughter', id('vasily'), id('tatiana'), id('aleksandra'))
   linkPeople(a, 'son', id('annaYoung'), id('sergey'))
   const para = (text: string) => [{ type: 'paragraph', content: [{ type: 'text', text, styles: {} }] }]
-  createPage(a, { personId: id('agafya'), title: 'Как жили в Белёве', content: para('Держала пасеку и славилась липовым мёдом на всю округу. Пекла ржаной хлеб для соседей.') })
+  createPage(a, { personId: id('agafya'), title: 'Как жили в Белёве', content: para('Держала пасеку и славилась липовым мёдом на всю округу. Пекла ржаной хлеб для соседей. https://irbis.example/cgi?C21COM=F&S21LOG=1&S21STN=7&S21STR=zzqwerty') })
   createPage(a, { personId: id('pavel'), title: 'Блокада', content: para('Всю блокаду оставался в городе, чинил станки на заводе и получил медаль за оборону Ленинграда.') })
   createStory(a, { title: 'Как бабушка пела', body: 'Евдокия пела в церковном хоре, и голос её слышали с другого берега реки.', about: [id('evdokia')], tellerName: 'Павел' } as never)
   const buf = await sharp({ create: { width: 32, height: 32, channels: 3, background: '#b08' } }).jpeg().toBuffer()

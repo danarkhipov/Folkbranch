@@ -11,10 +11,15 @@ import { readablePages } from './pages'
 import { getGraph } from './people'
 import { listStories } from './stories'
 
-const plain = (markdown: string) => markdown.replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[#*_`>]+/g, ' ').replace(/(^|\s)@/g, '$1').replace(/\s+/g, ' ').trim()
+/** A web address is full of letters and numbers nobody means: "1" would find every page with a link. */
+const noLinks = (text: string) => text.replace(/\b(?:https?:\/\/|www\.)\S+/gi, ' ').replace(/\s+/g, ' ').trim()
+const plain = (markdown: string) => noLinks(markdown.replace(/!?\[([^\]]*)\]\([^)]*\)/g, (_, label: string) => label).replace(/[#*_`>]+/g, ' ')).replace(/(^|\s)@/g, '$1').replace(/\s+/g, ' ').trim()
 
 function personFields(p: Person): SearchField[] {
-  const field = (key: string, label: string, text: string, weight: number, target?: string, refId?: string): SearchField[] => (text.trim() ? [{ key, label: say(label), text, tab: 'details', weight, target, refId }] : [])
+  const field = (key: string, label: string, raw: string, weight: number, target?: string, refId?: string): SearchField[] => {
+    const text = noLinks(raw)
+    return text ? [{ key, label: say(label), text, tab: 'details', weight, target, refId }] : []
+  }
   const shown = new Set([p.givenName, p.surname, p.patronymic, p.maidenName, p.birthDate, p.birthPlace, p.deathDate, p.deathPlace].map(normal))
   return [
     ...field('givenName', 'Имя', p.givenName, 1),
@@ -44,7 +49,7 @@ function buildDocs(actor: Actor): SearchDoc[] {
     if (text) doc.fields.push({ key: 'page', label: say('Биография'), text, tab: 'pages', weight: 0.5, refId: page.id })
   }
   for (const m of listAllMedia(actor, 100_000)) {
-    const text = [m.caption, m.date, m.place].filter(Boolean).join(', ')
+    const text = noLinks([m.caption, m.date, m.place].filter(Boolean).join(', '))
     if (!text) continue
     for (const t of m.tags) docs.get(t.personId ?? '')?.fields.push({ key: 'photo', label: say('Фото'), text, tab: 'photos', weight: 0.5, refId: m.id })
   }
@@ -56,7 +61,7 @@ function buildDocs(actor: Actor): SearchDoc[] {
       const doc = docs.get(id)
       if (!doc) continue
       for (const s of listStories(actor, id)) {
-        const text = [s.title, s.body, s.tellerName, s.toldOn].filter(Boolean).join('. ')
+        const text = noLinks([s.title, s.body, s.tellerName, s.toldOn].filter(Boolean).join('. '))
         if (text) doc.fields.push({ key: 'story', label: say('Рассказы'), text, tab: 'stories', weight: 0.5, refId: s.id })
       }
     }

@@ -36,14 +36,14 @@ export function MainBar({ onHide, guest, familyName, present, mode, navRef, side
 /** All that is left when the panels are hidden. */
 export function ShowBars({ onShow }: { onShow: () => void }) {
   const { t } = useApp()
-  return <button className="float show-bars fixed left-3 top-3 z-10 grid size-11 place-items-center" title={t('Показать панели')} aria-label={t('Показать панели')} onClick={onShow}><Logo size={24} /></button>
+  return <button className="show-bars fixed left-3 top-3 z-10" title={t('Показать панели')} data-hint={t('Вернуть панели управления.')} aria-label={t('Показать панели')} onClick={onShow}><span className="float show-bars-face"><Logo size={22} className="flex-none" /></span></button>
 }
 
 /** Only about how the chart looks; it steps aside for a panel on the left. */
 export function ViewBar({ onPrint, scope, canvas, rootsBelow, onFlip, groups, onGroups, allGroups, left, crowded }: { onPrint: () => void; scope: ChartScope; canvas: RefObject<CanvasHandle | null>; rootsBelow: boolean; onFlip: () => void; groups: string[]; onGroups: (next: string[]) => void; allGroups: [string, number][]; left: number; crowded: boolean }) {
   const { t } = useApp()
   return (
-      <div aria-label={t('Вид схемы')} role="group" className={cn('float view-bar fixed bottom-3 z-10 flex items-center gap-0.5 p-1', crowded && 'crowded')} style={{ left }}>
+      <div aria-label={t('Вид схемы')} role="toolbar" className={cn('float view-bar fixed bottom-3 z-10 flex items-center gap-0.5 p-1', crowded && 'crowded')} style={{ left }}>
         <button className="bar-btn" title={t('Отдалить')} data-hint={t('Показать больше людей на экране.')} aria-label={t('Отдалить')} onClick={() => canvas.current?.zoomBy(0.75)}><Minus size={15} /></button>
         <button className="bar-btn" title={t('Приблизить')} data-hint={t('Показать людей крупнее.')} aria-label={t('Приблизить')} onClick={() => canvas.current?.zoomBy(1.33)}><Plus size={15} /></button>
         <button className="bar-btn" title={t(rootsBelow ? 'Сейчас старшие снизу. Показать старших сверху' : 'Сейчас старшие сверху. Показать старших снизу')} aria-label={t('Перевернуть схему')} onClick={onFlip}><ArrowUpDown size={15} /></button>

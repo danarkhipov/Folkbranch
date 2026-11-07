@@ -33,7 +33,7 @@
   --accent-ui: #efe9dc;
   --destructive: #a4302e;
   --border: #e6dfd0;
-  --input: #e0d8c7;
+  --input: #8f8877;
   --ring: #7a7263;
 }
 
@@ -125,8 +125,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .linkbar-count { font-size: 14px; color: var(--ink-soft); padding: 0 4px; font-variant-numeric: tabular-nums; }
 .linkbar-del { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 6px; color: var(--ink-soft); }
 .linkbar-del:hover { color: var(--destructive); background: var(--muted); }
-.pcard:focus-visible { outline: none; }
-.pcard:focus-visible .ava { box-shadow: 0 0 0 3px var(--accent), 0 0 0 6px #fffdf8; }
+.card-main { display: flex; flex-direction: column; align-items: center; width: 100%; }
+.card-main:focus-visible { outline: none; }
+.card-main:focus-visible .ava { box-shadow: 0 0 0 3px var(--accent), 0 0 0 6px #fffdf8; }
 .world > svg.hits { z-index: 2; }
 .pcard:hover, .pcard:focus-within { z-index: 3; }
 .line-hit.own { cursor: pointer; }
@@ -159,17 +160,19 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .pcard.assumed .ava { outline: 1.5px dashed var(--ink-faint); outline-offset: 6px; }
 .pcard.focus .ava { box-shadow: 0 0 0 3px var(--accent), 0 0 0 6px #fffdf8, 0 6px 16px 4px rgb(60 45 20 / .25); }
 .pcard.isme .nm { color: var(--accent); }
-.focused .pcard.dim .ava, .focused .pcard.dim .cap > * { opacity: .42; }
+.focused .pcard.dim .ava { opacity: .42; }
+/* Faded, but still readable: names are how people find their way. */
+.focused .pcard.dim .cap > * { opacity: .7; }
 .pcard .cap { width: max-content; max-width: 162px; margin-top: 7px; padding: 2px 6px 1px; border-radius: 6px; background: var(--paper); display: flex; flex-direction: column; align-items: center; }
 
 /* Buttons belong to the card: a small fixed share of the avatar at any zoom. Only when very far
    out do they stop shrinking at 12px on screen, so they can still be hit. */
-.pcard .tools { position: absolute; inset: 0; opacity: 0; transition: opacity .12s; pointer-events: none; --s: var(--lbl, 1); --half: calc(9px * var(--s)); }
+.pcard .tools { position: absolute; inset: 0; opacity: 0; transition: opacity .12s; pointer-events: none; --s: var(--lbl, 1); --half: calc(12px * var(--s)); }
 .pcard:hover .tools, .pcard:focus-within .tools, .pcard .tools:has([data-state="open"]) { opacity: 1; }
 /* The layer covers the whole card, so only the buttons take the mouse: a click on the portrait opens the editor. */
 .pcard:hover .tool, .pcard:focus-within .tool, .pcard .tools:has([data-state="open"]) .tool { pointer-events: auto; }
 @media (hover: none) { .pcard.focus .tools { opacity: 1; } .pcard.focus .tool { pointer-events: auto; } }
-.tool { position: absolute; width: calc(18px * var(--s)); height: calc(18px * var(--s)); margin: calc(-1 * var(--half)) 0 0 calc(-1 * var(--half)); border-radius: 50%; background: #fffdf8; border: 1px solid var(--line); display: grid; place-items: center; color: var(--ink-soft); box-shadow: 0 1px 2px rgb(60 45 20 / .18); cursor: pointer; transform: scale(var(--s)); }
+.tool { position: absolute; width: calc(24px * var(--s)); height: calc(24px * var(--s)); margin: calc(-1 * var(--half)) 0 0 calc(-1 * var(--half)); border-radius: 50%; background: #fffdf8; border: 1px solid var(--line); display: grid; place-items: center; color: var(--ink-soft); box-shadow: 0 1px 2px rgb(60 45 20 / .18); cursor: pointer; transform: scale(var(--s)); }
 .tool svg { display: block; width: 11px; height: 11px; }
 .tool:hover { color: #fffdf8; background: var(--accent); border-color: var(--accent); }
 .tool.top { left: 50%; top: calc(2px - var(--half)); }
@@ -192,7 +195,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 kbd { font: 14px var(--font-sans); color: var(--ink-faint); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
 
 [cmdk-input]:focus-visible { outline: none; }
-.search-mark { background: #f6dfa6; color: inherit; border-radius: 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.search-mark { background: #f6dfa6; color: var(--ink); border-radius: 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 ::highlight(search) { background-color: #f6dfa6; }
 .grow-marks { position: absolute; inset: 0; color: transparent; white-space: pre-wrap; overflow-wrap: anywhere; pointer-events: none; user-select: none; }
 .inline-input { background: transparent; border-radius: 0; padding: 0; width: 100%; outline: none; }
@@ -294,6 +297,15 @@ textarea.inline-input:hover, textarea.inline-input:focus { box-shadow: 0 1px 0 v
 /* The main bar: words where there is room, icons with tooltips where not, and on phones a tab bar. */
 @media (min-width: 640px) { .settings-item.on { box-shadow: inset 3px 0 var(--accent); } }
 .family-name { font-variant-numeric: lining-nums; position: relative; top: -2px; }
+.skip-link { position: fixed; left: 12px; top: -60px; z-index: 60; }
+.skip-link:focus { top: 12px; }
+aside.panel:focus { outline: none; }
+.show-bars { display: block; padding: 0 14px 0 0; }
+/* The folded panel shows from behind the logo, so it is plain there is more to open. */
+.show-bars::before { content: ''; position: absolute; inset: 5px 0 5px 24px; background: #f3eee2; border: 1px solid var(--border); border-radius: 0 10px 10px 0; box-shadow: 0 1px 2px rgb(60 45 20 / .06); transition: transform .12s; }
+.show-bars:hover::before { transform: translateX(4px); }
+.show-bars-face { position: relative; display: flex; align-items: center; width: 46px; height: 46px; padding-left: 10px; }
+.panel header .grow-text { min-height: 24px; }
 .nav-label { display: none; }
 .main-bar:not(.compact) .nav-label { display: inline; }
 .main-bar.no-name .family-name, .main-bar.no-name .sep { display: none; }
@@ -353,4 +365,11 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+/* Whatever does something when pressed says so under the pointer. */
+@layer base {
+  button:not(:disabled), a[href], summary, select, label:has(> input[type=checkbox]), label:has(> input[type=radio]),
+  [role=button], [role=tab], [role=radio], [role=switch], [role=checkbox], [role=menuitem], [role=option], [role=combobox]:not(input), [cmdk-item] { cursor: pointer; }
+  button:disabled, [aria-disabled=true], [data-disabled] { cursor: default; }
 }

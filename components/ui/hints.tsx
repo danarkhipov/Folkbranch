@@ -21,6 +21,7 @@ export function Hints() {
     const hide = () => {
       clearTimeout(timer.current)
       if (held.current?.el.isConnected && !held.current.el.title) held.current.el.title = held.current.title
+      held.current?.el.removeAttribute('aria-describedby')
       held.current = null
       setShown(null)
     }
@@ -36,6 +37,7 @@ export function Hints() {
       held.current = { el, title }
       timer.current = setTimeout(() => {
         const r = el.getBoundingClientRect()
+        if (el.dataset.hint) el.setAttribute('aria-describedby', 'hint-box')
         const below = r.top < 90
         setShown({ text: title, more: el.dataset.hint ?? '', left: r.left + r.width / 2, top: below ? r.bottom + GAP : r.top - GAP, below })
       }, DELAY)
@@ -76,7 +78,7 @@ export function Hints() {
 
   if (!shown) return null
   return (
-    <div ref={box} role="tooltip" className="hint" style={{ left: shown.left, top: shown.top, visibility: 'hidden', transform: `translate(-50%, ${shown.below ? '0' : '-100%'})` }}>
+    <div ref={box} id="hint-box" role="tooltip" className="hint" style={{ left: shown.left, top: shown.top, visibility: 'hidden', transform: `translate(-50%, ${shown.below ? '0' : '-100%'})` }}>
       <div className="font-medium">{shown.text}</div>
       {shown.more && <div className="hint-more">{shown.more}</div>}
     </div>

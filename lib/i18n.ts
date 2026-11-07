@@ -365,6 +365,16 @@ const en: Record<string, string> = {
   'Последнее изменение': 'Last change',
   'История изменений': 'Change history',
   'Кто и что менял в этой карточке. Любое изменение можно откатить.': 'Who changed what in this card. Any change can be rolled back.',
+  'С клавиатуры': 'From the keyboard',
+  'к следующему человеку': 'to the next person',
+  'по родне: родители, дети, супруг, братья и сёстры': 'through the family: parents, children, spouse, siblings',
+  'открыть карточку': 'open the card',
+  'крупнее, мельче, вся схема': 'larger, smaller, whole chart',
+  'поиск': 'search',
+  'ассистент': 'assistant',
+  'отменить последнее изменение': 'undo the last change',
+  'Перейти к схеме': 'Skip to the chart',
+  'Вернуть панели управления.': 'Bring the control panels back.',
 }
 
 export const translate = (lang: Lang, key: string) => (lang === 'en' ? (en[key] ?? key) : key)

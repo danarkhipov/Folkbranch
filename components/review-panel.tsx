@@ -22,7 +22,7 @@ export function ReviewPanel({ onClose }: { onClose: () => void }) {
     setBusy(false)
   }
   return (
-    <div className="float side-sheet fixed left-3 top-[60px] bottom-3 w-96 max-w-[calc(100vw-24px)] flex flex-col z-10">
+    <aside aria-label={t('Проверка')} className="float side-sheet fixed left-3 top-[60px] bottom-3 w-96 max-w-[calc(100vw-24px)] flex flex-col z-10">
       <div className="flex items-center justify-between px-3 pt-3 pb-2"><h3 className="font-serif font-medium text-lg">{t('Проверка')}</h3><button className="text-ink-faint hover:text-ink" aria-label={t('Закрыть')} title={t('Закрыть')} onClick={onClose}><X size={15} /></button></div>
       <div className="px-3 pb-2"><Segmented label={t('Что показать')} value={view} onChange={setView} options={[['edits', `${t('Правки')}${drafts.length ? ` ${drafts.length}` : ''}`], ['gaps', t('Что заполнить')], ['same', t('Похожие')]]} /></div>
       {view === 'gaps' && <GapsList />}
@@ -53,6 +53,6 @@ export function ReviewPanel({ onClose }: { onClose: () => void }) {
         ))}
         {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
-    </div>
+    </aside>
   )
 }

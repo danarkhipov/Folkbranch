@@ -50,10 +50,10 @@ export function HistoryPanel({ onClose }: { onClose: () => void }) {
   const { t } = useApp()
   const { data: rows = [] } = useQuery({ queryKey: ['history'], queryFn: () => api<HistoryEntry[]>('history') })
   return (
-    <div className="float side-sheet fixed left-3 top-[60px] bottom-3 w-96 max-w-[calc(100vw-24px)] flex flex-col z-10">
+    <aside aria-label={t('История')} className="float side-sheet fixed left-3 top-[60px] bottom-3 w-96 max-w-[calc(100vw-24px)] flex flex-col z-10">
       <div className="flex items-center justify-between px-3 pt-3 pb-2"><h3 className="font-serif font-medium text-lg">{t('История')}</h3><button className="text-ink-faint hover:text-ink" aria-label={t('Закрыть')} title={t('Закрыть')} onClick={onClose}><X size={15} /></button></div>
       <div className="flex-1 overflow-auto px-3 pb-3"><HistoryList rows={rows} /></div>
-    </div>
+    </aside>
   )
 }
 

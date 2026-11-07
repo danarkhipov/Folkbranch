@@ -101,6 +101,8 @@ export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { pe
   const [tab, setTab] = useState<string | null>(hit?.matches.find((m) => !HEADER_KEYS.has(m.key))?.tab ?? (hit ? 'details' : null))
   const [pageId, setPageId] = useState<string | undefined>(hit?.matches.find((m) => m.tab === 'pages')?.refId)
   const box = useRef<HTMLElement>(null)
+  // From the keyboard, the card that just opened is where to go on from. A mouse stays where it is.
+  useEffect(() => { if (document.activeElement?.matches('.card-main:focus-visible')) box.current?.focus({ preventScroll: true }) }, [])
   useSearchMarks(box, hit?.terms ?? [], tab)
   /** Opens a tab and, when given, puts the cursor in that field. */
   const go = (next: string, fieldId?: string) => {
@@ -118,7 +120,7 @@ export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { pe
 
   return (
     <SearchTerms.Provider value={hit?.terms ?? NO_TERMS}>
-    <aside ref={box} className={cn('panel', full && 'full')} style={{ '--panel-w': `${width}px`, '--panel-h': `${height}px` } as React.CSSProperties}>
+    <aside ref={box} tabIndex={-1} aria-label={personName(person) || t('Без названия')} className={cn('panel', full && 'full')} style={{ '--panel-w': `${width}px`, '--panel-h': `${height}px` } as React.CSSProperties}>
       <PanelEdge edge="left" label="Ширина карточки" width={width} home={480} onWidth={setWidth} className="max-sm:hidden" />
       <PanelEdge edge="top" label="Высота карточки" width={height} home={Math.round((typeof window === 'undefined' ? 800 : window.innerHeight) * 0.7)} onWidth={setHeight} className="sm:hidden" />
       <header className={cn('flex flex-none items-start gap-3 pl-4 pr-2 pt-3 pb-2 max-h-[38%] overflow-y-auto', longName && 'flex-wrap')}>

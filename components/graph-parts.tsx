@@ -65,13 +65,9 @@ export const PersonCard = memo(function PersonCard({ p, left, top, className, se
   return (
     <div
       data-person={p.id}
-      role="button"
-      tabIndex={0}
-      aria-label={p.hidden ? t('Живой родственник') : `${personName(p)} ${lifeYears(p)}`}
       className={className}
       style={{ left, top }}
       onClick={open}
-      onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); open() } }}
       onMouseEnter={() => acts.current.hover(p.id)}
       onMouseLeave={() => acts.current.hover(null)}
       onPointerEnter={() => setHovered(true)}
@@ -79,10 +75,11 @@ export const PersonCard = memo(function PersonCard({ p, left, top, className, se
       onFocus={(e) => {
         setFocused(true)
         // Tabbing walks along the chart, bringing the next people into view.
-        if (e.target === e.currentTarget && e.target.matches(':focus-visible')) acts.current.center(p.id)
+        if (e.target.matches('.card-main:focus-visible')) acts.current.center(p.id)
       }}
-      onBlur={() => setFocused(false)}
+      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setFocused(false) }}
     >
+      <div className="card-main" role="button" tabIndex={0} aria-label={p.hidden ? t('Живой родственник') : [personName(p), lifeYears(p), label, mine].filter(Boolean).join(', ')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }}>
       <div className={cn('ava', canEdit && !p.hidden && 'link-start')} onPointerDown={canEdit && !p.hidden ? (e) => acts.current.drag(e, p.id) : undefined}><img src={avatarUrl(p)} alt="" decoding="async" draggable={false} /></div>
       {/* Opaque, so a line coming from below stops at the text however tall it wraps. */}
       <div className={cn('cap', canEdit && 'movable')} onPointerDown={canEdit ? (e) => acts.current.move(e, p.id) : undefined}>
@@ -90,8 +87,9 @@ export const PersonCard = memo(function PersonCard({ p, left, top, className, se
         {!p.hidden && <div className="yr">{lifeYears(p)}</div>}
         {label && <div className="rel kin">{label}</div>}
         {mine && <div className="rel me">{mine}</div>}
-        {folded !== undefined && <button className="folded" onClick={(e) => { e.stopPropagation(); acts.current.unfold(p.id) }}>{t('Показать потомков')}: {folded}</button>}
       </div>
+      </div>
+      {folded !== undefined && <button className="folded" onClick={(e) => { e.stopPropagation(); acts.current.unfold(p.id) }}>{t('Показать потомков')}: {folded}</button>}
       {canEdit && !p.hidden && (hovered || focused || selected) && <CardTools id={p.id} rootsBelow={rootsBelow} lang={lang} acts={acts} />}
     </div>
   )
@@ -198,6 +196,10 @@ export function Legend() {
         {fine && <li>{t('Чтобы удалить связь, нажмите на линию и клавишу Delete.')}</li>}
         {fine && <li>{(/Mac/.test(navigator.platform) ? (k: string) => k : (k: string) => k.replaceAll('⌘', 'Ctrl+'))(t('Клавиши: ⌘K поиск, ⌘J ассистент, ⌘Z отмена.'))}</li>}
       </ul>
+      <h3 className="text-base font-medium mt-3 mb-1">{t('С клавиатуры')}</h3>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+        {([['Tab', 'к следующему человеку'], ['← ↑ → ↓', 'по родне: родители, дети, супруг, братья и сёстры'], ['Enter', 'открыть карточку'], ['+ − 0', 'крупнее, мельче, вся схема'], ['⌘K', 'поиск'], ['⌘J', 'ассистент'], ['⌘Z', 'отменить последнее изменение']] as const).map(([k, what]) => <div key={k} className="contents"><dt><kbd>{k}</kbd></dt><dd className="text-ink-soft">{t(what)}</dd></div>)}
+      </dl>
     </div>
   )
 }

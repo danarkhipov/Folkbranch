@@ -40,6 +40,23 @@ const TextDialog = dynamic(() => import('./text-dialog').then((m) => m.TextDialo
 
 /** Below this, the chat and the card do not fit side by side. */
 const NARROW = 960
+/** Long enough to read and to reach the button in it from the keyboard; it stays while in use. */
+const TOAST_MS = 12_000
+
+/** Closing a panel puts the keyboard back where it was, not at the top of the page. */
+function useFocusReturn(open: boolean) {
+  const from = useRef<HTMLElement | null>(null)
+  const was = useRef(open)
+  useEffect(() => {
+    if (open === was.current) return
+    was.current = open
+    if (open) { from.current = document.activeElement as HTMLElement | null; return }
+    const back = from.current
+    requestAnimationFrame(() => {
+      if (back?.isConnected && (document.activeElement === document.body || !document.activeElement)) back.focus({ preventScroll: true })
+    })
+  }, [open])
+}
 
 export function FamilyApp({ me, lang, familyName, providers, assistant }: Props) {
   const t = useTr(lang)
@@ -144,9 +161,16 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
   const lookupsRef = useRef<{ family: Family } | null>(null)
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      const here = (e.target as HTMLElement).closest?.<HTMLElement>('.pcard[data-person]')
+      const target = e.target as HTMLElement
+      // Zoom works anywhere on the chart, for those who cannot pinch or scroll.
+      if (!e.metaKey && !e.ctrlKey && !e.altKey && !target.closest?.('input, textarea, select, [contenteditable=true], [role=dialog], [role=listbox], [role=menu], aside')) {
+        if (e.key === '+' || e.key === '=') { e.preventDefault(); return canvas.current?.zoomBy(1.33) }
+        if (e.key === '-' || e.key === '−') { e.preventDefault(); return canvas.current?.zoomBy(0.75) }
+        if (e.key === '0') { e.preventDefault(); return canvas.current?.fit() }
+      }
+      const here = target.closest?.<HTMLElement>('.pcard[data-person]')
       const family = lookupsRef.current?.family
-      if (!here || !family || !e.key.startsWith('Arrow') || (e.target as HTMLElement) !== here) return
+      if (!here || !family || !e.key.startsWith('Arrow') || !target.matches('.card-main')) return
       const id = here.dataset.person!
       const parents = family.parents.get(id) ?? []
       const children = family.children.get(id) ?? []
@@ -157,11 +181,14 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       if (!next) return
       e.preventDefault()
       canvas.current?.center(next)
-      requestAnimationFrame(() => requestAnimationFrame(() => document.querySelector<HTMLElement>(`.pcard[data-person="${next}"]`)?.focus({ preventScroll: true })))
+      requestAnimationFrame(() => requestAnimationFrame(() => document.querySelector<HTMLElement>(`.pcard[data-person="${next}"] .card-main`)?.focus({ preventScroll: true })))
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
   }, [])
+
+  useFocusReturn(!!focusId)
+  useFocusReturn(!!side)
 
   const qc = useQueryClient()
   const [toast, setToast] = useState<{ text: string; actions: { label: string; run: () => void }[] } | null>(null)
@@ -169,7 +196,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
   const notify = useCallback((text: string, actions: { label: string; run: () => void }[] = []) => {
     clearTimeout(toastTimer.current)
     setToast({ text, actions })
-    toastTimer.current = setTimeout(() => setToast(null), 8000)
+    toastTimer.current = setTimeout(() => setToast(null), TOAST_MS)
   }, [])
   const undoLast = useCallback(async () => {
     const rows = await api<HistoryEntry[]>('history?limit=20')
@@ -256,11 +283,14 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
     <App.Provider value={ctx}>
       <Presence.Provider value={present}>
       <ConnectionNotice t={t} />
-      <GraphCanvas ref={canvas} scope={scope} pathIds={path} groupIds={groupIds} panelOpen={panelOpen} leftInset={side === 'assistant' ? assistantWidth + 12 : 0}/>
-
+      <a href="#chart" className="skip-link bar-btn float" onClick={(e) => { e.preventDefault(); document.querySelector<HTMLElement>('.card-main')?.focus() }}>{t('Перейти к схеме')}</a>
       {barsHidden && <ShowBars onShow={() => hideBars(false)} />}
       {!barsHidden && <MainBar onHide={() => hideBars(true)} guest={!!me.guest} familyName={familyName} present={present} mode={barMode} navRef={nav} side={side} draftOps={draftOps} onSearch={() => setSearch(true)} onSide={(next) => { setSide(next); setPath(null) }} onAssistant={toggleAssistant} onSettings={() => setSettings(true)} />}
+      <main id="chart" aria-label={t('Схема семьи')}>
+      <GraphCanvas ref={canvas} scope={scope} pathIds={path} groupIds={groupIds} panelOpen={panelOpen} leftInset={side === 'assistant' ? assistantWidth + 12 : 0}/>
+
       {!barsHidden && <ViewBar onPrint={() => setPrinting(true)} scope={scope} canvas={canvas} rootsBelow={rootsBelow} onFlip={flipChart} groups={groups} onGroups={setGroups} allGroups={allGroups} left={side === 'assistant' ? assistantWidth + 24 : side === 'history' || side === 'review' ? 408 : 12} crowded={panelOpen || !!side} />}
+      </main>
 
       {!ctx.graph.persons.length && ctx.canEdit && (
         <div className="fixed inset-0 grid place-items-center pointer-events-none">
@@ -278,7 +308,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       <QuickAdd state={quick} onClose={(id) => { setQuick(null); if (id) focus(id) }} />
       {photo && <PhotoDialog state={photo} onClose={() => setPhoto(null)} />}
       {toast && (
-        <div role="status" className="float fixed left-1/2 -translate-x-1/2 bottom-3 max-lg:bottom-[68px] z-30 flex items-center gap-1 pl-3 pr-1 py-1 text-sm max-w-[calc(100vw-24px)]">
+        <div role="status" onMouseEnter={() => clearTimeout(toastTimer.current)} onFocus={() => clearTimeout(toastTimer.current)} onMouseLeave={() => { toastTimer.current = setTimeout(() => setToast(null), TOAST_MS) }} className="float fixed left-1/2 -translate-x-1/2 bottom-3 max-lg:bottom-[68px] z-30 flex items-center gap-1 pl-3 pr-1 py-1 text-sm max-w-[calc(100vw-24px)]">
           <span className="truncate mr-1">{toast.text}</span>
           {toast.actions.map((a) => <button key={a.label} className="bar-btn !h-7 whitespace-nowrap" onClick={() => { setToast(null); a.run() }}>{a.label}</button>)}
           <button className="bar-btn !h-7 !min-w-7 !p-0" aria-label={t('Закрыть')} title={t('Закрыть')} onClick={() => setToast(null)}><X size={13} /></button>
