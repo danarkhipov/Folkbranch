@@ -59,14 +59,14 @@ const place = (name) => { const d = path.join(work, name); dirs.push(d); return 
 
 try {
   // The first install, with a space in the path, where a careless script breaks.
-  const A = place('my archive'), AP = 3461, AB = `http://localhost:${AP}`
+  const A = place('my archive'), AP = 4461, AB = `http://localhost:${AP}`
   const first = install(A, `--port ${AP}`)
   ok('one command starts it and prints the link', !!linkOf(first.stdout, AP), first.stdout.slice(-300) + first.stderr.slice(-300))
   ok('it chose the install without Docker', fs.existsSync(path.join(A, '.local')) && !called().includes('docker'), called())
   ok('it used the Node already here', !fs.existsSync(path.join(A, 'runtime')))
   ok('settings are generated and private', /BETTER_AUTH_SECRET=\S{40}/.test(envOf(A)) && (fs.statSync(path.join(A, '.env')).mode & 0o077) === 0)
   ok('the data is private too', (fs.statSync(path.join(A, 'data')).mode & 0o077) === 0)
-  ok('it listens only on this computer', /127\.0\.0\.1:3461/.test(sh(`lsof -nP -iTCP:${AP} -sTCP:LISTEN`)))
+  ok('it listens only on this computer', /127\.0\.0\.1:4461/.test(sh(`lsof -nP -iTCP:${AP} -sTCP:LISTEN`)))
   ok('the setup page opens', (await fetch(linkOf(first.stdout, AP))).status === 200)
   ok('the first install opens the browser on that page', called().includes(`open ${linkOf(first.stdout, AP)}`) || called().includes(`xdg-open ${linkOf(first.stdout, AP)}`), called())
 
@@ -132,9 +132,9 @@ try {
   // Stop and start.
   const quiet = place('no-browser')
   const silent = opens()
-  ok('--no-open leaves the browser alone', install(quiet, '--no-open --port 3469').status === 0 && opens() === silent)
+  ok('--no-open leaves the browser alone', install(quiet, '--no-open --port 4469').status === 0 && opens() === silent)
   cli(quiet, 'stop')
-  ok('open starts it first if it was stopped', cli(quiet, 'open', env({ FOLKBRANCH_NO_OPEN: '1' })).stdout.includes('/setup?code=') && !(await free(3469)))
+  ok('open starts it first if it was stopped', cli(quiet, 'open', env({ FOLKBRANCH_NO_OPEN: '1' })).stdout.includes('/setup?code=') && !(await free(4469)))
   cli(quiet, 'stop')
   ok('stop stops it', cli(A, 'stop').status === 0 && await free(AP) && cli(A, 'status').status !== 0)
   ok('start brings it back', cli(A, 'start').stdout.includes(`Running at ${AB}`))
@@ -158,7 +158,7 @@ try {
   ok('--domain and --local together are refused', run(`sh "${repo}install.sh" --local --domain x.example.org`, work).status !== 0)
 
   // Port taken: a plain sentence, then the way out.
-  const B = place('second'), BP = 3462, BP2 = 3463
+  const B = place('second'), BP = 4462, BP2 = 4463
   const blocker = net.createServer().listen(BP, '127.0.0.1')
   await new Promise((r) => blocker.once('listening', r))
   const busy = install(B, `--port ${BP}`)
@@ -179,7 +179,7 @@ try {
   // Between the kinds, if an image is here to try it with.
   const hasImage = (() => { try { sh(`docker image inspect ${IMAGE}`); return true } catch { return false } })()
   if (hasImage) {
-    const DP = 3464, DB = `http://localhost:${DP}`
+    const DP = 4464, DB = `http://localhost:${DP}`
     try { sh('docker rm -fv fg-cross') } catch {}
     try { sh('docker volume rm fg-cross-data') } catch {}
     sh(`docker run -d --name fg-cross --restart=on-failure -p 127.0.0.1:${DP}:3000 -v fg-cross-data:/data -e BETTER_AUTH_URL=${DB} -e SETUP_TOKEN=cross ${IMAGE}`)
@@ -187,7 +187,7 @@ try {
     const toDocker = await restore(DB, zip, 'cross')
     ok('a copy from a local install restores in Docker', toDocker.status === 200 && JSON.stringify(await graph(DB, toDocker.cookie)) === JSON.stringify(await graph(AB, cookie)))
     const fromDocker = await download(DB, toDocker.cookie)
-    const C = place('from-docker'), CP = 3465, CB = `http://localhost:${CP}`
+    const C = place('from-docker'), CP = 4465, CB = `http://localhost:${CP}`
     ok('a third install starts', install(C, `--port ${CP}`).status === 0)
     const toLocal = await restore(CB, fromDocker, valueOf(C, 'SETUP_TOKEN'))
     ok('a copy from Docker restores in a local install', toLocal.status === 200 && JSON.stringify(await graph(CB, toLocal.cookie)) === JSON.stringify(await graph(DB, toDocker.cookie)))
@@ -198,7 +198,7 @@ try {
   // No Node on the computer: the real download, checked against Node's own list.
   const noNode = env({}, false)
   ok('this check really has no Node', run('command -v node', work, noNode).status !== 0)
-  const N = place('no-node'), NP = 3466, NB = `http://localhost:${NP}`
+  const N = place('no-node'), NP = 4466, NB = `http://localhost:${NP}`
   const t0 = Date.now()
   const nn = install(N, `--port ${NP}`, noNode)
   ok('with no Node it brings its own', nn.status === 0 && fs.existsSync(path.join(N, 'runtime/node')) && !!linkOf(nn.stdout, NP), nn.stdout.slice(-300) + nn.stderr.slice(-300))
@@ -217,7 +217,7 @@ try {
   const oldBin = path.join(work, 'old-node')
   fs.mkdirSync(oldBin)
   fs.writeFileSync(path.join(oldBin, 'node'), '#!/bin/sh\necho v20.0.0\nexit 1\n', { mode: 0o755 })
-  const O = place('old-node-install'), OP = 3467
+  const O = place('old-node-install'), OP = 4467
   const old = install(O, `--port ${OP}`, env({ PATH: `${oldBin}:${bin}:${SYSTEM_PATH}` }))
   ok('a Node that cannot run it is passed over', old.status === 0 && fs.existsSync(path.join(O, 'runtime/node')), old.stdout.slice(-200))
   cli(O, 'stop', env({ PATH: `${oldBin}:${bin}:${SYSTEM_PATH}` }))
@@ -229,7 +229,7 @@ try {
   fs.writeFileSync(path.join(mirror, nodeName), 'not node')
   fs.writeFileSync(path.join(mirror, 'SHASUMS256.txt'), `${'0'.repeat(64)}  ${nodeName}\n`)
   const R = place('bad-node')
-  const badNode = install(R, '--port 3468', env({ FOLKBRANCH_NODE_DIST: pathToFileURL(path.dirname(mirror)).href }, false))
+  const badNode = install(R, '--port 4468', env({ FOLKBRANCH_NODE_DIST: pathToFileURL(path.dirname(mirror)).href }, false))
   ok('a damaged Node is refused', badNode.status !== 0 && badNode.stdout.includes('damaged') && !fs.existsSync(path.join(R, 'runtime')))
 } finally {
   for (const d of dirs) if (fs.existsSync(path.join(d, 'folkbranch.pid'))) spawnSync('./folkbranch', ['stop'], { cwd: d, env: { ...env(), PATH: `${bin}:${nodeDir}:${SYSTEM_PATH}` } })

@@ -25,13 +25,15 @@ Run one command. On a Mac or Linux it needs nothing else: no Docker, and no Node
 curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh
 ```
 
-It downloads the app (21 MB, or about 46 MB with Node, and about 120 or 240 MB on disk), starts it and prints a link. Open it, name your family, and load the demo family if you want to look around first. The app then shows what is set up and what is optional.
+It downloads the app (15 MB, or about 40 MB with Node, and about 80 or 200 MB on disk), starts it and prints a link. Open it, name your family, and load the demo family if you want to look around first. The app then shows what is set up and what is optional.
 
 On a server with a domain, with Docker and automatic HTTPS (a 115 MB image):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh -s -- --domain family.example.com
 ```
+
+If you have Node, this does the same: `npx folkbranch`. Run it again to open the app.
 
 In Claude Code, install the plugin, then ask it to install Folkbranch:
 

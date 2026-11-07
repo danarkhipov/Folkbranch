@@ -1,0 +1,13 @@
+{
+  "name": "folkbranch",
+  "version": "1.1.0",
+  "description": "A family archive that stays on your own computer. npx folkbranch installs and opens it.",
+  "homepage": "https://github.com/danarkhipov/Folkbranch",
+  "repository": { "type": "git", "url": "git+https://github.com/danarkhipov/Folkbranch.git" },
+  "license": "AGPL-3.0-only",
+  "keywords": ["genealogy", "family-tree", "self-hosted", "local-first", "mcp", "gedcom"],
+  "type": "module",
+  "bin": { "folkbranch": "bin.mjs" },
+  "files": ["bin.mjs", "install.sh"],
+  "engines": { "node": ">=18" }
+}

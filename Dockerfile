@@ -16,6 +16,8 @@ ENV NODE_ENV=production DATA_DIR=/data PORT=3000 HOSTNAME=0.0.0.0
 ENV MALLOC_ARENA_MAX=2 MALLOC_TRIM_THRESHOLD_=65536 MALLOC_MMAP_THRESHOLD_=65536 NODE_OPTIONS="--max-semi-space-size=4 --max-old-space-size=256"
 COPY --chown=node:node --from=build /app/.next/standalone ./
 COPY --chown=node:node --from=build /app/.next/static ./.next/static
+# The speech runtime's large file comes from its CDN when someone turns speech on: this copy is only a leftover of the build.
+RUN rm -f .next/static/media/ort-wasm*.wasm
 COPY --chown=node:node --from=build /app/public ./public
 COPY --chown=node:node --from=build /app/drizzle ./drizzle
 COPY --chown=node:node scripts/folkbranch.mjs ./folkbranch.mjs

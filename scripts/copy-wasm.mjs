@@ -2,7 +2,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 const from = 'node_modules/@mediapipe/tasks-vision/wasm'
-if (fs.existsSync(from)) fs.cpSync(from, 'public/mediapipe', { recursive: true })
+// The app loads the plain build; the ES module build beside it is the same 14 MB again.
+if (fs.existsSync(from)) fs.cpSync(from, 'public/mediapipe', { recursive: true, filter: (f) => !f.includes('_module_') })
 
 // Only the small loader of the speech runtime: it must come from this address. Its large file is fetched when someone turns speech on.
 const speech = 'node_modules/@huggingface/transformers'

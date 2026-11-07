@@ -10,9 +10,11 @@ It needs nothing installed first, on macOS or Linux. The command picks the light
 
 | What the computer has | What it does | Download | On disk |
 |---|---|---|---|
-| Node 24 or newer | Uses that Node | 21 MB | about 120 MB |
-| No suitable Node | Brings its own, checked against Node's published checksums and kept inside the folder | about 46 MB | about 240 MB |
+| Node 24 or newer | Uses that Node | 15 MB | about 80 MB |
+| No suitable Node | Brings its own, checked against Node's published checksums and kept inside the folder | about 40 MB | about 200 MB |
 | Anything, with `--docker` | Runs the Docker image, as on a server | 115 MB | more, with Docker itself |
+
+With Node at hand, `npx folkbranch` runs the same installer, and later `npx folkbranch` opens the app and `npx folkbranch stop` stops it.
 
 Everything goes to `~/folkbranch` (`--dir` for another folder): the app in `app`, your archive in `data`, settings in `.env`, the log in `logs`. Add `--port 8080` for another port: `... | sh -s -- --port 8080`. If the port is taken the command says so, and running it again with `--port` moves the app. The app listens on this computer only.
 

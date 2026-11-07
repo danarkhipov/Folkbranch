@@ -23,6 +23,13 @@ copy('drizzle', 'drizzle')
 for (const f of ['folkbranch', 'LICENSE']) copy(f, f)
 copy('scripts/folkbranch.mjs', 'folkbranch.mjs')
 
+// Left over from the build. The speech runtime's large file comes from its CDN when someone turns speech on (lib/smart/speech.ts),
+// and the face detector loads the plain build, not the ES module one. A folder that had the module build keeps it in public.
+const media = path.join(stage, '.next/static/media')
+for (const f of fs.readdirSync(media)) if (/^ort-wasm.*\.wasm$/.test(f)) fs.rmSync(path.join(media, f))
+const faces = path.join(stage, 'public/mediapipe')
+if (fs.existsSync(faces)) for (const f of fs.readdirSync(faces)) if (f.includes('_module_')) fs.rmSync(path.join(faces, f))
+
 // The standalone build keeps the driver out of sight; the server commands need to find it.
 const pnpmDir = path.join(stage, 'node_modules/.pnpm')
 const driver = fs.readdirSync(pnpmDir).find((d) => d.startsWith('better-sqlite3@'))
