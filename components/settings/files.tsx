@@ -1,17 +1,20 @@
 'use client'
 import { ImportDialog } from '../import-dialog'
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Download, FileText, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Section } from '@/components/ui/section'
 import { SwitchRow } from '@/components/ui/switch'
-import { useApp } from '@/lib/client'
+import { api, useApp } from '@/lib/client'
 import { RestoreForm } from './restore-form'
 
 export function Files({ onText }: { onText: () => void }) {
   const { t, canEdit, me } = useApp()
   const [hide, setHide] = useState(true)
   const [importing, setImporting] = useState(false)
+  const { data: voices } = useQuery({ queryKey: ['stories', 'usage'], queryFn: () => api<{ used: number; limit: number }>('stories/usage'), enabled: me.role === 'owner' })
+  const mb = (n: number) => Math.ceil(n / 1024 / 1024)
   return (
     <div className="flex min-w-0 flex-col gap-7 text-sm">
       {canEdit && (
@@ -29,6 +32,12 @@ export function Files({ onText }: { onText: () => void }) {
       </Section>
       {me.role === 'owner' && (
         <>
+          {voices && (
+        <Section title={t('Место под записи голоса')}>
+          <div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-ink" style={{ width: `${Math.min(100, (voices.used / voices.limit) * 100)}%` }} /></div>
+          <p className="text-xs text-ink-soft">{t('Записи голоса занимают')} {mb(voices.used)} {t('МБ из')} {mb(voices.limit)}.</p>
+        </Section>
+          )}
           <Section title={t('Полная копия архива')} description={t('Все люди, биографии, фото и история в одном файле. Храните его как семейные документы: в нём есть данные живых родственников. Ключ ассистента в копию не входит.')}>
             <Button asChild variant="outline" className="self-start"><a href="/api/archive"><Download /> {t('Скачать полную копию')}</a></Button>
           </Section>

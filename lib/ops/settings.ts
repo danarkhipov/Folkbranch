@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { desc, eq, inArray, isNull } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, ne } from 'drizzle-orm'
 import { getDb, schema } from '../db'
 import { personName, type HistoryEntry, type Role } from '../types'
 import { Actor, newId, OpError, requireRole, seesOnlyPublic } from './core'
@@ -65,7 +65,8 @@ export function listInvites(actor: Actor) {
   requireRole(actor, 'owner')
   return getDb().select({
     id: schema.invites.id, name: schema.invites.name, role: schema.invites.role, expiresAt: schema.invites.expiresAt,
-  }).from(schema.invites).where(isNull(schema.invites.usedAt)).orderBy(desc(schema.invites.createdAt)).all()
+  // An owner's own sign-in link from the command line is not someone invited.
+  }).from(schema.invites).where(and(isNull(schema.invites.usedAt), ne(schema.invites.createdBy, 'cli'))).orderBy(desc(schema.invites.createdAt)).all()
     .filter((i) => i.expiresAt.getTime() > Date.now())
 }
 
