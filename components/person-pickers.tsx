@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { api, avatarUrl, useApp } from '@/lib/client'
 import type { SearchMatch, SearchResult } from '@/lib/search/engine'
 import { markParts } from '@/lib/search/mark'
-import { lifeYears, personName, type Person } from '@/lib/types'
+import { lifeYears, personName, shownTags, type Person } from '@/lib/types'
 
 export interface SearchHit { personId: string; query: string; matches: SearchMatch[]; terms: string[] }
 
@@ -36,7 +36,7 @@ function PeopleList({ onPick, exclude }: { onPick: (id: string) => void; exclude
       <CommandList>
         <CommandEmpty>{t('Никого не нашли. Проверьте написание или введите только фамилию')}</CommandEmpty>
         {people.map((p) => (
-          <CommandItem key={p.id} value={`${personName(p)} ${p.maidenName} ${p.birthYear ?? ''} ${p.tags.join(' ')} ${p.id}`} onSelect={() => onPick(p.id)}>
+          <CommandItem key={p.id} value={`${personName(p)} ${p.maidenName} ${p.birthYear ?? ''} ${shownTags(p.tags).join(' ')} ${p.id}`} onSelect={() => onPick(p.id)}>
             <Mini person={p} />
             <span className="truncate">{personName(p) || t('Без названия')}</span>
             <span className="ml-auto text-xs text-ink-faint whitespace-nowrap">{lifeYears(p)}</span>

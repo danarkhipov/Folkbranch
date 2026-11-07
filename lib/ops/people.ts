@@ -106,7 +106,7 @@ export interface PersonInput {
   claims?: Claim[]
 }
 
-function normalize(input: PersonInput) {
+export function normalize(input: PersonInput) {
   const { tags, facts, sources, claims, ...rest } = input
   const row: Record<string, unknown> = { ...rest, updatedAt: Date.now() }
   if (tags !== undefined) row.tags = JSON.stringify(tags)

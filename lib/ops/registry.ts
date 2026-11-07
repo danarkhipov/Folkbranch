@@ -8,7 +8,7 @@ import * as claims from '../claims'
 import { personName, type Certainty, type ParentKind, type UnionKind } from '../types'
 import { newId, OpError, undo } from './core'
 import { importGedcom } from './gedcom'
-import { importCase } from './kinship-case'
+import { caseFiles, importCase } from './kinship-case'
 import * as media from './media'
 import * as pages from './pages'
 import * as stories from './stories'
@@ -347,8 +347,8 @@ The answer lists each new person's id.`,
   }),
   import_kinship_case: def({
     risk: 'danger',
-    description: 'Bring in a research case made by the ex-USSR kinship skill: pass the text of its person-register.csv, relationship-register.csv, claims-register.csv and artifact-register.csv. Candidates stay separate cards, hypotheses stay notes and never become lines on the chart, and everyone not known to be dead counts as living. Importing again adds only what is new. Always goes to review for tokens.',
-    input: z.object({ persons: z.string().min(1), relationships: z.string().optional(), claims: z.string().optional(), artifacts: z.string().optional() }),
+    description: 'Bring in a research case made by the ex-USSR kinship skill: pass the case_id from its case-intake.yaml and the text of its person-register.csv, relationship-register.csv, claims-register.csv and artifact-register.csv. Candidates stay separate cards, hypotheses stay notes and never become lines on the chart, and everyone not known to be dead counts as living. Importing the same case again adds only what is new, and never replaces what a person wrote. Always goes to review for tokens.',
+    input: caseFiles,
     bulk: true,
     apply: (a, x) => importCase(a, x),
     describe: () => ({ text: say('Импорт дела') }),

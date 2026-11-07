@@ -3,7 +3,7 @@ import MiniSearch from 'minisearch'
 import { z } from 'zod'
 import { dataStamp } from '../db'
 import { blocksToMarkdown } from '../markdown'
-import { lifeYears, type Person } from '../types'
+import { lifeYears, shownTags, type Person } from '../types'
 import { seesOnlyPublic, type Actor } from './core'
 import { listAllMedia } from './media'
 import { readablePages } from './pages'
@@ -13,7 +13,7 @@ import { searchPeople } from './people-search'
 const normal = (s: string) => s.toLowerCase().replace(/ё/g, 'е')
 const fullName = (p: Person) => [p.givenName, p.patronymic, p.surname].filter(Boolean).join(' ')
 const personText = (p: Person) => [
-  fullName(p), p.maidenName, p.otherNames, p.birthPlace, p.deathPlace, p.tags.join(' '),
+  fullName(p), p.maidenName, p.otherNames, p.birthPlace, p.deathPlace, shownTags(p.tags).join(' '),
   p.facts.map((f) => `${f.kind} ${f.date} ${f.place} ${f.note}`).join(' '),
   p.sources.map((s) => `${s.title} ${s.ref}`).join(' '),
   p.claims.map((c) => `${c.value} ${c.reason}`).join(' '),

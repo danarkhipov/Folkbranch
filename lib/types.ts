@@ -198,3 +198,5 @@ export interface Story {
   updatedAt: number
 }
 
+/** Groups a person can see. A `case:` tag only remembers which research case a card came from. */
+export const shownTags = (tags: string[]) => tags.filter((t) => !t.startsWith('case:'))

@@ -1,6 +1,6 @@
 import { findGaps } from '@/lib/ops/gaps'
 import * as gedcom from '@/lib/ops/gedcom'
-import { previewCase } from '@/lib/ops/kinship-case'
+import { caseFiles, previewCase } from '@/lib/ops/kinship-case'
 import * as people from '@/lib/ops/people'
 import { dispatch } from '@/lib/ops/proposals'
 import { OPS } from '@/lib/ops/registry'
@@ -22,7 +22,7 @@ export const exchangeRoutes: Route[] = [
   } },
   op('POST', 'text/import', 'import_text'),
 
-  human('POST', 'case/preview', 'Count what a kinship research case holds', async ({ actor, req }) => previewCase(actor, await req.json())),
+  human('POST', 'case/preview', 'Count what a kinship research case holds', async ({ actor, req }) => previewCase(actor, caseFiles.parse(await req.json()))),
   op('POST', 'case/import', 'import_kinship_case'),
 
   human('POST', 'gedcom/preview', 'Count what a GEDCOM file holds', async ({ actor, req }) => gedcom.previewGedcom(actor, await req.text())),

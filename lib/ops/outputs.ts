@@ -85,7 +85,7 @@ export const OUTPUTS: Record<string, z.ZodType> = {
   reject_version: write(written),
   import_text: write(applied),
   import_gedcom: write(importCount),
-  import_kinship_case: write(z.object({ persons: z.number(), parents: z.number(), unions: z.number() })),
+  import_kinship_case: write(z.object({ persons: z.number(), updated: z.number(), parents: z.number(), unions: z.number() })),
   undo: write(ok),
 
   get_settings: z.object({ familyName: text, language: text }),

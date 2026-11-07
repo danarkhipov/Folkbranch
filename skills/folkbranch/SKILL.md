@@ -36,7 +36,7 @@ Update: run the install command again. Everything else: `./folkbranch help`, and
 
 ## A research case
 
-If the ex-ussr-kinship-research skill made a case folder, bring it in with the `import_kinship_case` tool: pass the text of `person-register.csv`, `relationship-register.csv`, `claims-register.csv` and `artifact-register.csv`, nothing else from the folder. The person can also pick the folder under Settings > Files. Candidates stay separate cards, unproved relations stay notes, and edits wait for review. Importing again adds only what is new. Do not merge a new card with an old one by name: that is the person's decision.
+If the ex-ussr-kinship-research skill made a case folder, bring it in with the `import_kinship_case` tool: pass `case_id` from `case-intake.yaml` as `caseId` and the text of `person-register.csv`, `relationship-register.csv`, `claims-register.csv` and `artifact-register.csv`, nothing else from the folder. The person can also pick the folder under Settings > Files. Candidates stay separate cards, unproved relations stay notes, and edits wait for review. Importing again adds only what is new. Do not merge a new card with an old one by name: that is the person's decision.
 
 ## Rules
 

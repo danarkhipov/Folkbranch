@@ -8,7 +8,7 @@ import { accept, addVersion, editValue, hasConflict, NAME_FIELDS, reject, RELIAB
 import { listWriter } from '@/lib/list-writes'
 import { ageWords } from '@/lib/names'
 import { cn } from '@/lib/utils'
-import { yearOf, type Fact, type ClaimField, type Person, type Reliability, type Source } from '@/lib/types'
+import { shownTags, yearOf, type Fact, type ClaimField, type Person, type Reliability, type Source } from '@/lib/types'
 import { PersonPopover } from './person-pickers'
 import { AddMenu, Field, GrowText, Hints, OpenAddress, ReadText, TagInput, DateField, Segmented } from './person-fields'
 import { Select } from '@/components/ui/select'
@@ -337,12 +337,12 @@ export function Details({ person, patch: send }: { person: Person; patch: (p: Pa
         </section>
       )}
 
-      {(person.tags.length > 0 || !ro) && (
+      {(shownTags(person.tags).length > 0 || !ro) && (
         <section className="flex flex-col gap-1.5">
           <h4 className="text-base font-medium">{t('Группы')}</h4>
           {!ro && <p className="text-xs text-ink-soft">{t('Например: родня по отцу. Помогает показывать людей вместе.')}</p>}
           <div className="flex flex-wrap gap-1.5 items-center">
-            {person.tags.map((tag) => (
+            {shownTags(person.tags).map((tag) => (
               <span key={tag} className="flex items-center gap-0.5 rounded-2xl bg-muted pl-2.5 pr-0.5 min-h-6 text-xs break-anywhere min-w-0">
                 {tag}
                 {!ro && <button aria-label={`${t('Удалить')}: ${tag}`} className="grid place-items-center size-6 flex-none text-ink-faint hover:text-destructive" onClick={() => edit('tags', (list) => list.filter((x) => x !== tag))}><X size={11} /></button>}

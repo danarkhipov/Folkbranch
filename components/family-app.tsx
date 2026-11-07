@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { UserPlus, X } from 'lucide-react'
 import { App, Presence, api, undoFailure, useProposals, useTr, useWrite, type AppCtx, type QuickType } from '@/lib/client'
 import { Family } from '@/lib/kinship'
-import { personName, type Graph, type HistoryEntry, type Lang, type Me } from '@/lib/types'
+import { personName, shownTags, type Graph, type HistoryEntry, type Lang, type Me } from '@/lib/types'
 import { GraphCanvas, type CanvasHandle } from './graph-canvas'
 import { ConnectionNotice, MainBar, ViewBar, type Side } from './chart-bars'
 import { useChartScope } from './chart-scope'
@@ -239,7 +239,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
 
   const allGroups = useMemo(() => {
     const counts = new Map<string, number>()
-    for (const p of graph?.persons ?? []) for (const tag of p.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1)
+    for (const p of graph?.persons ?? []) for (const tag of shownTags(p.tags)) counts.set(tag, (counts.get(tag) ?? 0) + 1)
     return [...counts].sort((a, b) => a[0].localeCompare(b[0]))
   }, [graph])
   const groupIds = useMemo(() => {

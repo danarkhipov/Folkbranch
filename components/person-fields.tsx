@@ -6,7 +6,7 @@ import { useApp } from '@/lib/client'
 import { isUrl, splitText } from '@/lib/linkify'
 import { markParts } from '@/lib/search/mark'
 import { cn } from '@/lib/utils'
-import { type Certainty } from '@/lib/types'
+import { shownTags, type Certainty } from '@/lib/types'
 import { Select } from '@/components/ui/select'
 
 /** The words a search found, while the card it led to is open. */
@@ -118,7 +118,7 @@ export const CERTAINTY: Record<Certainty, string> = { documented: 'по доку
 export function TagInput({ existing, onAdd }: { existing: string[]; onAdd: (tag: string) => void }) {
   const { t, graph } = useApp()
   const [v, setV] = useState('')
-  const known = useMemo(() => [...new Set(graph.persons.flatMap((p) => p.tags))].filter((x) => !existing.includes(x)), [graph, existing])
+  const known = useMemo(() => [...new Set(graph.persons.flatMap((p) => shownTags(p.tags)))].filter((x) => !existing.includes(x)), [graph, existing])
   const hint = known.filter((x) => v.trim() && x.toLowerCase().startsWith(v.trim().toLowerCase())).slice(0, 3)
   const add = (tag: string) => {
     const clean = tag.trim()

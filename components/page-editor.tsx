@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { api, useApp } from '@/lib/client'
 import { autosave, clearDraft, loadDraft, type SaveStatus } from '@/lib/autosave'
 import { decorateBlocks } from '@/lib/linkify'
-import { personName, type Media, type Page } from '@/lib/types'
+import { personName, shownTags, type Media, type Page } from '@/lib/types'
 import { GrowText, ReadText } from './person-fields'
 import { inputClass } from '@/components/ui/input'
 
@@ -222,7 +222,7 @@ function Editor({ page, personId, onChanged }: { page: Page; personId: string; o
         <SuggestionMenuController
           triggerCharacter="#"
           getItems={async (query) => {
-            const known = [...new Set(graph.persons.flatMap((p) => p.tags))].sort()
+            const known = [...new Set(graph.persons.flatMap((p) => shownTags(p.tags)))].sort()
             const fresh = query.trim() && !known.some((x) => x.toLowerCase() === query.trim().toLowerCase()) ? [query.trim()] : []
             return [...filterSuggestionItems(known.map((name) => ({ title: name, onItemClick: () => addTag(name) })), query), ...fresh.map((name) => ({ title: `${t('Новый тег')}: ${name}`, onItemClick: () => addTag(name) }))]
           }}
