@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
+import pkg from '../package.json'
 import { Actor, OpError } from './ops/core'
 import { toolsFor } from './ops/tools'
 
@@ -16,7 +17,7 @@ function fail(e: unknown) {
 const brief_ = (text: string) => ({ messages: [{ role: 'user' as const, content: { type: 'text' as const, text } }] })
 
 export function buildMcpServer(actor: Actor) {
-  const server = new McpServer({ name: 'folkbranch', version: '0.1.0' }, { instructions: INSTRUCTIONS })
+  const server = new McpServer({ name: 'folkbranch', version: pkg.version }, { instructions: INSTRUCTIONS })
   // A read-only token is not even shown the writing tools.
   for (const t of toolsFor(actor, 'mcp')) {
     server.registerTool(t.name, { description: t.description, inputSchema: t.input, annotations: { readOnlyHint: t.risk === 'read', ...(t.risk === 'read' ? {} : { destructiveHint: t.risk === 'danger', openWorldHint: t.name === 'upload_photo' }) } }, async (args: unknown) => {
