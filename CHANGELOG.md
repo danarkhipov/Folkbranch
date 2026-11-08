@@ -4,6 +4,32 @@ All notable changes are listed here, newest first. Versions follow [Semantic Ver
 
 ## Unreleased
 
+## 1.4.0 - 2026-11-08
+
+Sign in with Yandex ID, VK ID, Telegram, Google or a code by mail; assistant providers in Russia and China; load a tree together with its photos, by merging or replacing; a clearer chart with menus.
+
+### Added
+- The model list is read from the provider itself, newest first, with a mark for models that see pictures (OpenRouter, Anthropic and Moonshot say so). A model that cannot see is not offered the scan-reading tool, and the owner is told.
+- Assistant providers in Russia and China: Yandex AI Studio, Cloud.ru (GigaChat, Qwen and others), DeepSeek and Moonshot (Kimi), chosen in the same list by region.
+- Ways to sign in besides a link, each switched on by the owner under **Settings → Ways to sign in** with its steps, the return address and a check before saving: Yandex ID, VK ID (also Mail.ru and Odnoklassniki accounts), Telegram, Google, and a six-digit code by mail. Relatives link the ones they like under **My account** and add their own email there. Keys typed in the app are kept encrypted; server variables still win. See `docs/SIGN_IN.md`.
+- Load a tree file in one of three ways: add to the family, merge with the people already there (the same person is found by name and dates and nothing is doubled), or replace everything. The dialog says beforehand how many people would be added, matched and linked.
+- Load a tree together with its photos and files: drop them in one go, and each picture is attached to the people it belongs to, by the file's own links, by the person's id in its name, or by name.
+- A right-click menu on the chart. On a person: open, add a parent, a spouse or a child, delete. On an empty place: add a person there, load a file, search, show everyone, flip the chart, delete the whole chart. A person added from the menu stands where it was pressed.
+- An empty chart offers to load a tree file, beside the first person.
+- Hovering a person lights their whole line outward, ancestors and descendants. A press on the chart closes open menus.
+- A living person's dates read `1950 –`, open at the end, not as a finished life.
+- While a new version is put in place, the page waits and reopens by itself instead of showing an error.
+
+### Changed
+- The chart's rows follow birth years, so relatives of one age stand level. Lines keep clear of each other and each branch keeps to one stretch of its row.
+- The family overview, places, checks and search follow the part of the family chosen under **Who to show**, and say so.
+
+### Fixed
+- A GEDCOM event, source or page written over several lines is read whole.
+- A long name on the chart is cut after three lines, so it cannot run into the lines and rows below.
+- A small disk with room to spare is no longer reported as full.
+- Cloud.ru models are read from its own list, with what each can do: tools, pictures and prices in roubles.
+
 ## 1.3.0 - 2026-11-08
 
 The family's records: places, archives and the people at an event, a calendar of family days, a fan of ancestors, private people and stories, a printed page, and a safer sign-out.
