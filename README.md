@@ -119,17 +119,17 @@ Folkbranch is for a family keeping its history together on a server of its own. 
 | Faces in photos | ✓ Found and matched to tagged people on your device. You confirm each name | ✓ Found on the server, named by hand | Tagged by hand, with a module |
 | Speech to text | ✓ On your device: GigaAM for Russian, Whisper for others | ✗ | ✗ |
 | **Where they go further** | | | |
-| Charts | Whole family on one screen, ancestor fan, relationship path, PDF | ✓ Ancestors, descendants, hourglass, fan, relationships | ✓ Fan, hourglass, relationships and more |
-| Reports and books | The chart and a person's page in PDF | ✓ Many reports | ✓ Many reports |
+| Charts | Whole family on one screen, or a person's ancestors or descendants. Ancestor fan, relationship path, PDF | ✓ Ancestors, descendants, hourglass, fan, relationships | ✓ Fan, hourglass, relationships and more |
+| Reports and books | The chart and a person's page in PDF. The assistant drafts a life story from the sources, for you to review | ✓ Many reports | ✓ Many reports |
 | Maps and timelines | A life in order on each card. Places have a point that opens on OpenStreetMap, no map in the app | ✓ Maps and timelines | ✓ Maps and timelines |
-| Reading documents (OCR) | Only through the assistant's model | ✓ Tesseract on the server | ✗ |
+| Reading documents | ✓ The assistant reads scans, handwriting included, and proposes what they show with the document as the source. Needs a model that sees pictures | ✓ Tesseract on the server | ✗ |
 | DNA | ✗ | ✓ Matches, chromosome browser, Y-DNA | Stores DNA notes only |
 
 Checked on 8 November 2026 against the code and official documentation: Gramps Web 26.11.1 with its API 3.25.2, and webtrees 2.2.6. Third-party servers and modules are named as such. "—" means we have not checked, not that it is missing. Each project's own documentation is the authority.
 
 ¹ Our own measurement, under a 256 MB limit with 8 uploads, 40 page views and an import. We have not measured the others on the same work, so no figures are given for them.
 
-**Choose Gramps Web** if you use Gramps Desktop, need maps, DNA, reports or reading documents, or want someone to host it for you.
+**Choose Gramps Web** if you use Gramps Desktop, need maps, DNA or many kinds of reports, or want someone to host it for you.
 **Choose webtrees** if you publish your research for others, need fine access rules, several trees, modules or many languages.
 **Choose Folkbranch** if the archive is for the family: running on a small machine in one command, relatives joining from their phones without passwords, and AI that only proposes.
 
