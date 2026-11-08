@@ -11,8 +11,8 @@ describe('lines on the chart', () => {
     })
   }
 
-  // These fell from 4, 20, 248 and 809 when the search for the order was written; they must not creep back.
-  it.each([[3, 40, 4], [4, 150, 5], [6, 600, 48], [7, 1500, 254]])('keeps crossings down in a random family (seed %i, %i people)', (seed, size, most) => {
+  // These fell from 4, 20, 248 and 809 when the search for the order was written; they must not creep back. Seeds 4 and 6 gave up two and seven crossings when rows began to follow birth years.
+  it.each([[3, 40, 4], [4, 150, 7], [6, 600, 56], [7, 1500, 254]])('keeps crossings down in a random family (seed %i, %i people)', (seed, size, most) => {
     const g = randomFamily(seed, size)
     const q = quality(layoutFamily(g), g)
     expect(q.crossings).toBeLessThanOrEqual(most)

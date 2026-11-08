@@ -33,6 +33,8 @@ export interface AppCtx {
   openPhoto: (mediaId: string, list?: string[]) => void
   confirm: (text: string, action: string, note?: string) => Promise<boolean>
   quickAdd: (type: QuickType, to: string, otherParent?: string) => void
+  /** What the chart's own menu can start. */
+  commands: { addPerson: () => void; importFile: () => void; search: () => void; flip: () => void }
   notify: (text: string, actions?: { label: string; run: () => void }[], stay?: boolean) => void
   /** Rolls back the most recent change that is not already undone. */
   undoLast: () => Promise<void>

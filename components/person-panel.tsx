@@ -75,6 +75,9 @@ function useSearchMarks(box: RefObject<HTMLElement | null>, terms: string[], tab
 
 const SuggestDialog = dynamic(() => import('./suggest-dialog').then((m) => m.SuggestDialog), { ssr: false })
 
+/** When a panel last went away: the next one that opens straight after it does not slide in again. */
+let closedAt = 0
+
 export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { person: Person; hit: SearchHit | null; onClearHit: () => void; onClose: () => void; onDelete: (id: string) => void }) {
   const [width, setWidth] = useStoredSize('person-panel-width', 480, (w) => Math.round(Math.max(360, Math.min(w, window.innerWidth - 80))))
   const [height, setHeight] = useStoredSize('person-panel-height', 560, (h) => Math.round(Math.max(240, Math.min(h, window.innerHeight - 16))))
@@ -147,9 +150,12 @@ export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { pe
   // Beside the buttons a long name would break inside its words, so it takes a line of its own.
   const longName = personName(person).length > 28
 
+  // Sliding in is for opening the panel; going from one person to the next only changes what is inside.
+  const [entering] = useState(() => Date.now() - closedAt > 300)
+  useEffect(() => () => { closedAt = Date.now() }, [])
   return (
     <SearchTerms.Provider value={terms}>
-    <aside ref={box} tabIndex={-1} aria-label={personName(person) || t('Без названия')} className={cn('panel', full && 'full')} style={{ '--panel-w': `${width}px`, '--panel-h': `${height}px` } as React.CSSProperties}>
+    <aside ref={box} tabIndex={-1} aria-label={personName(person) || t('Без названия')} className={cn('panel', full && 'full', !entering && 'panel-still')} style={{ '--panel-w': `${width}px`, '--panel-h': `${height}px` } as React.CSSProperties}>
       <PanelEdge edge="left" label="Ширина карточки" width={width} home={480} onWidth={setWidth} className="max-sm:hidden" />
       <PanelEdge edge="top" label="Высота карточки" width={height} home={Math.round((typeof window === 'undefined' ? 800 : window.innerHeight) * 0.7)} onWidth={setHeight} className="sm:hidden" />
       <header className={cn('flex flex-none items-start gap-3 pl-4 pr-2 pt-3 pb-2 max-h-[38%] overflow-y-auto max-[360px]:flex-wrap', longName && 'flex-wrap')}>

@@ -87,7 +87,7 @@ export function QuickAdd({ state, onClose }: { state: State; onClose: (createdId
     <Dialog open={!!state} onOpenChange={(o) => !o && reset()}>
       <DialogContent className="max-w-sm gap-3" showCloseButton={false} onInteractOutside={(e) => { if (name.trim()) e.preventDefault() }}>
         <DialogTitle className="font-serif font-medium text-lg">
-          {type ? t(TITLE[type]) : t('Первый человек в архиве')}
+          {type ? t(TITLE[type]) : t(graph.persons.length ? 'Новый человек, пока без родства' : 'Первый человек в архиве')}
           {target && <span className="block font-sans font-normal text-xs text-ink-soft mt-0.5">{personName(target)}</span>}
         </DialogTitle>
         {choices && (
@@ -116,7 +116,7 @@ export function QuickAdd({ state, onClose }: { state: State; onClose: (createdId
             </label>
           )}
           {(create.error || linkExisting.error) && <p className="text-xs text-destructive">{t('Не удалось сохранить')}: {String((create.error ?? linkExisting.error)?.message)}</p>}
-          <Button size="lg" className="mt-1" disabled={!name.trim() || create.isPending}>
+          <Button size="lg" className="mt-1" disabled={!name.trim()} loading={create.isPending}>
             {t('Добавить')}
           </Button>
         </form>

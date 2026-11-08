@@ -23,7 +23,7 @@ export function PhotosTab({ person }: { person: Person }) {
     <div className="px-4 py-4">
       {canEdit && (
         <>
-          <button className="add-btn mb-3" disabled={upload.isPending} onClick={() => input.current?.click()}>{t('Загрузить фото')}</button>
+          <button className="add-btn mb-3" disabled={upload.isPending} aria-busy={upload.isPending} onClick={() => input.current?.click()}>{t('Загрузить фото')}</button>
           <input ref={input} type="file" accept="image/*" multiple hidden onChange={async (e) => {
             const last = await upload.mutateAsync([...(e.target.files ?? [])])
             e.target.value = ''

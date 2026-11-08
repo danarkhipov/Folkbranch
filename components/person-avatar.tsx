@@ -43,7 +43,7 @@ export function AvatarButton({ person }: { person: Person }) {
           <input type="range" min={1} max={4} step={0.01} value={zoom} onChange={(e) => setZoom(+e.target.value)} className="w-full accent-[var(--ink)]" />
           <div className="flex justify-end gap-2">
             <button className="bar-btn" onClick={() => setSrc(null)}>{t('Отмена')}</button>
-            <button className="bar-btn on" disabled={save.isPending} onClick={async () => { await save.mutateAsync(); setSrc(null) }}>{t('Сохранить')}</button>
+            <button className="bar-btn on" disabled={save.isPending} aria-busy={save.isPending} onClick={async () => { await save.mutateAsync(); setSrc(null) }}>{t('Сохранить')}</button>
           </div>
         </DialogContent>
       </Dialog>

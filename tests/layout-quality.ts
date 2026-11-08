@@ -67,7 +67,7 @@ export function buildGraph(p: [string, Person['sex'], number?][], parents: [stri
 
 /** The shape from the bug report, with invented names: a woman with two husbands, relatives standing far from each other. */
 export const TANGLE = buildGraph(
-  [['mother', 'F', 1830], ['loner', 'M', 1912], ['unknown', 'U'], ['father2', 'M', 1904], ['mother2', 'M', 1890], ['brother', 'M', 1860], ['army', 'M', 1934], ['ivan', 'M', 1859], ['olga', 'F', 1861], ['k1', 'F'], ['k1s', 'M'], ['k1t', 'M'], ['k2', 'F'], ['k3', 'F'], ['k4', 'F']],
+  [['mother', 'F', 1830], ['loner', 'M', 1912], ['unknown', 'U'], ['father2', 'M', 1832], ['mother2', 'M', 1834], ['brother', 'M', 1860], ['army', 'M', 1862], ['ivan', 'M', 1859], ['olga', 'F', 1861], ['k1', 'F'], ['k1s', 'M'], ['k1t', 'M'], ['k2', 'F'], ['k3', 'F'], ['k4', 'F']],
   [['mother', 'ivan'], ['unknown', 'brother'], ['unknown', 'olga'], ['father2', 'army'], ['mother2', 'army'], ['ivan', 'k1'], ['ivan', 'k1s'], ['ivan', 'k1t'], ['ivan', 'k2'], ['olga', 'k2'], ['ivan', 'k3'], ['olga', 'k3'], ['ivan', 'k4'], ['olga', 'k4']],
   [['father2', 'mother2'], ['army', 'ivan'], ['ivan', 'olga'], ['k1', 'k1s'], ['k1s', 'k1t']],
 )

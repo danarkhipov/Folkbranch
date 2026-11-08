@@ -105,6 +105,13 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
   const [welcome, setWelcome] = useState(() => typeof location !== 'undefined' && me.role === 'owner' && new URLSearchParams(location.search).has('welcome'))
   const endWelcome = () => { setWelcome(false); const url = new URL(location.href); url.searchParams.delete('welcome'); history.replaceState(null, '', url) }
   const [dropped, setDropped] = useState<File | null>(null)
+  // The windows a person is likely to open next are fetched while they look at the chart, so one replaces another with no empty moment between.
+  useEffect(() => {
+    const warm = () => { void import('./import-dialog'); void import('./onboarding'); void import('./quick-add'); void import('./settings/settings-dialog'); void import('./text-dialog'); void import('./person-panel'); void import('./person-pickers') }
+    if (welcome) warm()
+    const id = typeof requestIdleCallback === 'function' ? requestIdleCallback(warm, { timeout: 2500 }) : (setTimeout(warm, 800) as unknown as number)
+    return () => { if (typeof cancelIdleCallback === 'function') cancelIdleCallback(id); else clearTimeout(id) }
+  }, [])
   // A file dropped on the chart opens the import; inside the editor it stays a picture in the text.
   useEffect(() => {
     const isFile = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files') && !(e.target as HTMLElement).closest?.('.panel, .assistant, [role=dialog]')
@@ -233,6 +240,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       openPhoto: (id, list) => setPhoto({ id, list }),
       confirm: (text, action, note) => new Promise((resolve) => setConfirm({ text, action, note, resolve })),
       quickAdd: (type, to, otherParent) => setQuick({ type, to, otherParent }),
+      commands: { addPerson: () => setQuick({ type: null, to: null }), importFile: () => { setDropped(null); setImporting(true) }, search: () => setSearch(true), flip: flipChart },
       notify,
       undoLast,
     }
@@ -323,7 +331,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       {overview && <FamilyOverview onClose={() => setOverview(false)} />}
       {textOpen && <TextDialog open onOpenChange={setTextOpen} />}
       {importing && <ImportDialog open file={dropped} onOpenChange={setImporting} />}
-      {welcome && <Onboarding onClose={endWelcome} onImport={() => { endWelcome(); setDropped(null); setImporting(true) }} onFirstPerson={() => { endWelcome(); setQuick({ type: null, to: null }) }} />}
+      {welcome && <Onboarding onClose={endWelcome} onImport={() => { setDropped(null); setImporting(true) }} onFirstPerson={() => setQuick({ type: null, to: null })} />}
       {printing && <PrintDialog graph={scope.shown ?? ctx.graph} onClose={() => setPrinting(false)} />}
       <ConfirmDialog state={confirmState} onClose={() => setConfirm(null)} />
       {settings && <SettingsDialog open onOpenChange={setSettings} familyName={familyName} providers={providers} onText={() => setTextOpen(true)} />}

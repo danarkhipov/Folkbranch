@@ -26,7 +26,7 @@ export const exchangeRoutes: Route[] = [
   op('POST', 'case/import', 'import_kinship_case'),
 
   human('POST', 'gedcom/preview', 'Count what a GEDCOM file holds', async ({ actor, req }) => gedcom.previewGedcom(actor, await req.text())),
-  { method: 'POST', path: 'gedcom/import', summary: OPS.import_gedcom.description, op: 'import_gedcom', handler: async ({ actor, req }) => dispatch(actor, 'import_gedcom', { text: await req.text() }) },
+  { method: 'POST', path: 'gedcom/import', summary: OPS.import_gedcom.description, op: 'import_gedcom', handler: async ({ actor, req, query }) => dispatch(actor, 'import_gedcom', { text: await req.text(), mode: query.get('mode') ?? 'add' }) },
   get('gedcom/export', 'The graph as GEDCOM; living=hide hides the living', ({ actor, query }) =>
     new Response(gedcom.exportGedcom(actor, query.get('living') === 'hide'), { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Disposition': 'attachment; filename="family.ged"' } })),
 ]

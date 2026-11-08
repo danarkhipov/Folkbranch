@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { ArrowUpDown, FileUp, Maximize2, Search, Trash2, UserPlus } from 'lucide-react'
 import { layoutFamily, CARD_W } from '@/lib/graph/layout'
 import { useApp } from '@/lib/client'
 import { yourTerm } from '@/lib/kinship'
@@ -32,6 +32,17 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
     const light = useChartLight(layout, pathIds, groupIds, view.isFar)
     const { kin, near: hoverKin, fromMe, active, hotPairs, lightMode, childNote, hoverSoon, setHoverFamily } = light
     const { draft, startLink, startFromPerson } = useLinkDrawing(layout, view.toChart, () => light.setHoverId(null))
+    const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+    useEffect(() => {
+      if (!menu) return
+      const close = (e: Event) => { if (!(e.target as HTMLElement | null)?.closest?.('[data-canvas-menu]')) setMenu(null) }
+      const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenu(null) }
+      window.addEventListener('pointerdown', close, true)
+      window.addEventListener('wheel', close, { passive: true })
+      window.addEventListener('resize', close)
+      window.addEventListener('keydown', key)
+      return () => { window.removeEventListener('pointerdown', close, true); window.removeEventListener('wheel', close); window.removeEventListener('resize', close); window.removeEventListener('keydown', key) }
+    }, [menu])
     const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null)
     const { sel, setSel, selIds, selEdges, selUnion, hoverIds, setHoverIds, pick, removeSelected, patchSelected } = useLineSelection(layout, () => setTip(null))
 
@@ -77,7 +88,7 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
     }
 
     return (
-      <div ref={canvas} className="canvas" onClick={(e) => { if (e.target === canvas.current || e.target === world.current) { app.focus(null); setSel(null) } }}>
+      <div ref={canvas} className="canvas" onContextMenu={(e) => { if (e.target !== canvas.current && e.target !== world.current) return; e.preventDefault(); setTip(null); setMenu({ x: Math.min(e.clientX, window.innerWidth - 250), y: Math.min(e.clientY, window.innerHeight - 220) }) }} onClick={(e) => { if (e.target === canvas.current || e.target === world.current) { app.focus(null); setSel(null) } }}>
         <div ref={world} className={cn('world', active && 'focused')}>
           <svg className="links" width="1" height="1">
             <Lines families={shown.families} unions={shown.unions} active={active} hotPairs={hotPairs} lightMode={lightMode} selIds={selIds} hoverIds={hoverIds} />
@@ -134,6 +145,15 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
         {draft && <div className="fixed z-50 pointer-events-none float px-2 py-1 text-xs" style={{ left: draft.cx + 14, top: draft.cy + 14 }}>{t(draft.label)}</div>}
         {clipped && !hintSeen && !panelOpen && !leftInset && <div className="float chart-hint fixed left-1/2 -translate-x-1/2 bottom-[68px] z-10 px-3 py-1.5 text-xs text-ink-soft pointer-events-none whitespace-nowrap">{t('Схема шире экрана: тяните, чтобы сдвинуть')}</div>}
         {tip && <div className="fixed z-50 pointer-events-none float px-2 py-1 text-xs" style={{ left: tip.x + 12, top: tip.y + 12 }}>{tip.text}</div>}
+        {menu && (
+          <div data-canvas-menu role="menu" className="float fixed z-[60] min-w-56 p-1 text-sm" style={{ left: menu.x, top: menu.y }} onContextMenu={(e) => e.preventDefault()}>
+            {app.canEdit && <button role="menuitem" className="menu-item" onClick={() => { setMenu(null); app.commands.addPerson() }}><UserPlus size={15} /> {t('Добавить человека без родства')}</button>}
+            {app.canEdit && <button role="menuitem" className="menu-item" onClick={() => { setMenu(null); app.commands.importFile() }}><FileUp size={15} /> {t('Добавить людей из файла')}</button>}
+            <button role="menuitem" className="menu-item" onClick={() => { setMenu(null); app.commands.search() }}><Search size={15} /> {t('Найти человека')}</button>
+            <button role="menuitem" className="menu-item" onClick={() => { setMenu(null); view.refit() }}><Maximize2 size={15} /> {t('Показать всех')}</button>
+            <button role="menuitem" className="menu-item" onClick={() => { setMenu(null); app.commands.flip() }}><ArrowUpDown size={15} /> {t('Перевернуть схему')}</button>
+          </div>
+        )}
       </div>
     )
   },

@@ -202,7 +202,8 @@ export const personName = (p: Pick<Person, 'givenName' | 'surname'>) =>
 export function lifeYears(p: Person, unknown = '?'): string {
   const b = p.birthDate || (p.birthYear ? String(p.birthYear) : '')
   const d = p.deathDate || (p.deathYear ? String(p.deathYear) : '')
-  if (p.living) return b
+  // One date alone would not say whether it is a birth or a death, so a living person's range stays open.
+  if (p.living) return b ? `${b} – ${typeof document !== 'undefined' && document.documentElement.lang === 'en' ? 'now' : 'н. в.'}` : ''
   if (!b && !d) return ''
   return `${b || unknown} – ${d || unknown}`
 }

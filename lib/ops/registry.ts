@@ -363,9 +363,9 @@ The answer lists each new person's id.`,
   import_gedcom: def({
     risk: 'danger',
     description: 'Import a GEDCOM 5.5.1 or 7.0 file as text. Always goes to review for tokens.',
-    input: z.object({ text: z.string().min(1) }),
+    input: z.object({ text: z.string().min(1), mode: z.enum(['add', 'merge', 'replace']).default('add') }),
     bulk: true,
-    apply: (a, x) => importGedcom(a, x.text),
+    apply: (a, x) => importGedcom(a, x.text, x.mode),
     describe: (x) => {
       const n = (x.text.match(/^0 @[^@]+@ INDI/gm) ?? []).length
       return { text: `${say('Импорт GEDCOM')}: ${n} ${say('людей')}` }

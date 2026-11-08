@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Upload } from 'lucide-react'
+import { ArrowRight, Loader2, Upload } from 'lucide-react'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { api, useApp } from '@/lib/client'
 import { COLUMN_FIELDS, detectKind, guessMapping, jsonToTable, parseCsv, rowsToText, sheetCell, type ColumnField, type ImportKind, type Mapping } from '@/lib/import-formats'
@@ -13,7 +13,7 @@ import { Select } from '@/components/ui/select'
 const KIND_LABEL: Record<ImportKind, string> = { gedcom: 'GEDCOM', table: 'таблица CSV', xlsx: 'таблица Excel', json: 'JSON', text: 'текстовый формат' }
 
 type Loaded =
-  | { kind: 'gedcom'; name: string; text: string; preview: { version: string; persons: number; families: number; sample: string[]; existing: number; unread: { tag: string; count: number }[] } }
+  | { kind: 'gedcom'; name: string; text: string; preview: { version: string; persons: number; families: number; sample: string[]; existing: number; unread: { tag: string; count: number }[]; inArchive: number; matched: number; added: number; newLinks: number; knownLinks: number; pairs: { xref: string; file: string; fileYear: number | null; card: string; cardYear: number | null }[] } }
   | { kind: 'text'; name: string; text: string }
   | { kind: 'table' | 'xlsx' | 'json'; name: string; headers: string[]; rows: string[][] }
 
@@ -21,7 +21,7 @@ type Loaded =
 const TAG_WORDS: Record<string, string> = { OBJE: 'ссылки на файлы', ASSO: 'связи с другими людьми', ALIA: 'другие записи о человеке', SUBM: 'сведения об авторе' }
 
 export function ImportDialog({ open, file, onOpenChange }: { open: boolean; file?: File | null; onOpenChange: (v: boolean) => void }) {
-  const { t, graph, familyName, lang, notify, undoLast } = useApp()
+  const { t, graph, familyName, notify, undoLast } = useApp()
   const qc = useQueryClient()
   const input = useRef<HTMLInputElement>(null)
   const [loaded, setLoaded] = useState<Loaded | null>(null)
@@ -30,12 +30,15 @@ export function ImportDialog({ open, file, onOpenChange }: { open: boolean; file
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [over, setOver] = useState(false)
+  const [mode, setMode] = useState<'add' | 'merge' | 'replace'>('merge')
+  const [reading, setReading] = useState(false)
 
-  const reset = () => { setLoaded(null); setMapping([]); setChoices({}); setError('') }
+  const reset = () => { setLoaded(null); setMapping([]); setChoices({}); setError(''); setMode('merge') }
   useEffect(() => { if (open) reset() }, [open])
 
   const read = async (f: File) => {
     reset()
+    setReading(true)
     try {
       const head = detectKind(f.name, '') === 'xlsx' ? '' : await f.slice(0, 4000).text()
       const kind = detectKind(f.name, head)
@@ -55,6 +58,8 @@ export function ImportDialog({ open, file, onOpenChange }: { open: boolean; file
       setLoaded({ kind, name: f.name, ...table })
     } catch (e) {
       setError(`${t('Не удалось прочитать файл')}: ${(e as Error).message}`)
+    } finally {
+      setReading(false)
     }
   }
   useEffect(() => { if (open && file) void read(file) }, [open, file]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -70,7 +75,7 @@ export function ImportDialog({ open, file, onOpenChange }: { open: boolean; file
     setBusy(true)
     setError('')
     try {
-      if (loaded?.kind === 'gedcom') await api('gedcom/import', { method: 'POST', body: loaded.text })
+      if (loaded?.kind === 'gedcom') await api(`gedcom/import?mode=${loaded.preview.inArchive ? mode : 'add'}`, { method: 'POST', body: loaded.text })
       else await api('text/import', { json: { text, resolutions: choices } })
       await qc.invalidateQueries()
       onOpenChange(false)
@@ -88,7 +93,9 @@ export function ImportDialog({ open, file, onOpenChange }: { open: boolean; file
         <DialogTitle className="font-serif font-medium text-lg">{t('Добавить людей из файла')}</DialogTitle>
         <input ref={input} type="file" hidden accept=".ged,.gedcom,.csv,.tsv,.xlsx,.json,.txt,.md,text/plain" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void read(f) }} />
 
-        {!loaded && (
+        {reading && <p role="status" className="flex items-center gap-2 text-ink-soft py-6 justify-center"><Loader2 size={16} className="animate-spin" /> {t('Читаю файл…')}</p>}
+
+        {!loaded && !reading && (
           <button
             className={`rounded-xl border-2 border-dashed px-6 py-12 flex flex-col items-center gap-2 transition-colors ${over ? 'border-ink bg-muted' : 'border-border hover:border-ink-faint'}`}
             onClick={() => input.current?.click()}
@@ -131,14 +138,7 @@ export function ImportDialog({ open, file, onOpenChange }: { open: boolean; file
           </section>
         )}
 
-        {loaded?.kind === 'gedcom' && (
-          <div className="rounded-lg bg-muted p-3 flex flex-col gap-1">
-            <p>{t('Будет добавлено')}: <b>{peopleWords(loaded.preview.persons, lang)}</b>, <b>{familyWords(loaded.preview.families, lang)}</b> <span className="text-ink-faint">(GEDCOM {loaded.preview.version})</span></p>
-            <p className="text-xs text-ink-soft truncate">{loaded.preview.sample.join(', ')}</p>
-            {loaded.preview.unread.length > 0 && <p className="text-xs text-rust">⚠ {t('Не перенесётся')}: {loaded.preview.unread.map((u) => `${TAG_WORDS[u.tag] ? t(TAG_WORDS[u.tag]) : u.tag} (${u.count})`).join(', ')}</p>}
-            {loaded.preview.existing > 0 && <p className="text-xs text-rust">⚠ {t('Совпадают по имени с уже имеющимися, GEDCOM добавит их как новых')}: {loaded.preview.existing}</p>}
-          </div>
-        )}
+        {loaded?.kind === 'gedcom' && <GedcomPlan preview={loaded.preview} mode={mode} onMode={setMode} />}
 
         {plan && text && (
           <div className="grid md:grid-cols-2 gap-3">
@@ -152,10 +152,66 @@ export function ImportDialog({ open, file, onOpenChange }: { open: boolean; file
           <div className="flex items-center justify-end gap-2">
             <span className="mr-auto text-xs text-ink-faint">{t('Импорт можно отменить одним действием')}</span>
             <button className="bar-btn" onClick={() => onOpenChange(false)}>{t('Отмена')}</button>
-            <button className="bar-btn on disabled:opacity-40" disabled={!ready || busy} onClick={apply}>{t('Импортировать')}</button>
+            <button className="bar-btn on disabled:opacity-40" disabled={!ready || busy} aria-busy={busy} onClick={apply}>{busy ? t('Обрабатываю…') : loaded?.kind === 'gedcom' && loaded.preview.inArchive && mode === 'replace' ? t('Заменить дерево') : loaded?.kind === 'gedcom' && loaded.preview.inArchive && mode === 'merge' ? t('Объединить') : t('Импортировать')}</button>
           </div>
         )}
       </DialogContent>
     </Dialog>
+  )
+}
+
+type Preview = Extract<Loaded, { kind: 'gedcom' }>['preview']
+
+/** What loading the file does to a tree that is not empty, said before anything changes. */
+function GedcomPlan({ preview: p, mode, onMode }: { preview: Preview; mode: 'add' | 'merge' | 'replace'; onMode: (m: 'add' | 'merge' | 'replace') => void }) {
+  const { t, lang, me } = useApp()
+  const empty = p.inArchive === 0
+  type M = 'add' | 'merge' | 'replace'
+  const modes: [M, string, string][] = [
+    ['merge', 'Объединить', 'Те, кто уже есть, не повторятся: карточки сольются, недостающее дополнится.'],
+    ['add', 'Добавить как новых', 'Всё из файла станет отдельными карточками, возможны повторы.'],
+  ]
+  if (me.role === 'owner') modes.push(['replace', 'Заменить всё', 'Нынешнее дерево удалится, останется то, что в файле.'])
+  return (
+    <div className="rounded-lg bg-muted p-3 flex flex-col gap-2">
+      <p>{t('В файле')}: <b>{peopleWords(p.persons, lang)}</b>, <b>{familyWords(p.families, lang)}</b> <span className="text-ink-faint">(GEDCOM {p.version})</span>
+        {!empty && <> · {t('В архиве сейчас')}: <b>{peopleWords(p.inArchive, lang)}</b></>}</p>
+      <p className="text-xs text-ink-soft truncate">{p.sample.join(', ')}</p>
+      {!empty && (
+        <>
+          <div role="radiogroup" aria-label={t('Что сделать с деревом')} className="grid sm:grid-cols-3 gap-2">
+            {modes.map(([id, title, hint]) => (
+              <button key={id} role="radio" aria-checked={mode === id} onClick={() => onMode(id)} className={`text-left rounded-lg border p-2 transition-colors ${mode === id ? 'border-ink bg-paper' : 'border-border hover:border-ink-faint'} ${id === 'replace' ? 'text-destructive' : ''}`}>
+                <b className="font-medium block">{t(title)}</b>
+                <span className="text-xs text-ink-soft block">{t(hint)}</span>
+              </button>
+            ))}
+          </div>
+          {mode === 'merge' && (
+            <div className="flex flex-col gap-2" data-testid="merge-scheme">
+              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                <span className="rounded-md bg-paper border border-border p-1.5"><b className="block text-base">{p.matched}</b>{t('сольются с имеющимися')}</span>
+                <span className="rounded-md bg-paper border border-border p-1.5"><b className="block text-base">{p.added}</b>{t('добавятся новыми')}</span>
+                <span className="rounded-md bg-paper border border-border p-1.5"><b className="block text-base">{p.newLinks}</b>{t('новых связей')}</span>
+              </div>
+              {p.pairs.length > 0 && (
+                <ul className="max-h-40 overflow-auto rounded-md border border-border bg-paper text-xs divide-y divide-border">
+                  {p.pairs.map((x) => (
+                    <li key={x.xref} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-2 py-1">
+                      <span className="truncate">{x.file}{x.fileYear ? ` · ${x.fileYear}` : ''} <span className="text-ink-faint">{t('в файле')}</span></span>
+                      <ArrowRight size={12} className="text-ink-faint" />
+                      <span className="truncate">{x.card}{x.cardYear ? ` · ${x.cardYear}` : ''} <span className="text-ink-faint">{t('в архиве')}</span></span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="text-xs text-ink-soft">{t('Совпадение ищется по имени, фамилии, полу и году рождения. Неоднозначных не трогаем: они добавятся новыми.')}</p>
+            </div>
+          )}
+          {mode === 'replace' && <p className="text-xs text-destructive">{t('Все нынешние карточки, связи и тексты о людях удалятся. Фотографии останутся, но без отметок. Аккаунты отвяжутся от карточек. Отменить можно сразу после.')}</p>}
+        </>
+      )}
+      {p.unread.length > 0 && <p className="text-xs text-rust">⚠ {t('Не перенесётся')}: {p.unread.map((u) => `${TAG_WORDS[u.tag] ? t(TAG_WORDS[u.tag]) : u.tag} (${u.count})`).join(', ')}</p>}
+    </div>
   )
 }

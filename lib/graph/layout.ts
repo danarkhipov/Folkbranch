@@ -163,13 +163,15 @@ function arrangeRows(g: Graph, members: Map<string, Set<string>>, blockOf: Map<s
   }
   dagre.layout(d)
   const ys = [...new Set([...members.keys()].map((k) => (d.node(k) as { y: number }).y))].sort((a, b) => a - b)
+  const rankOfBlock = generations(g, members, blockOf, byId, (k) => ys.indexOf((d.node(k) as { y: number }).y))
+  const rowCount = Math.max(0, ...rankOfBlock.values()) + 1
 
   const birth = (ids: string[]) => Math.min(9999, ...ids.filter((m) => parentsOf.has(m)).map((m) => byId.get(m)?.birthYear ?? 9999))
-  const rows: Block[][] = ys.map(() => [])
+  const rows: Block[][] = Array.from({ length: rowCount }, () => [])
   const rankOf = new Map<string, number>()
   for (const [k, m] of members) {
     const n = d.node(k) as { x: number; y: number }
-    const rank = ys.indexOf(n.y)
+    const rank = rankOfBlock.get(k)!
     let slots = chainOrder([...m], adjacency)
     // The convention, until crossings say otherwise: the man on the left.
     if (slots.length === 2 && (byId.get(slots[0])?.sex === 'F' || byId.get(slots[1])?.sex === 'M')) slots = slots.toReversed()
@@ -200,6 +202,48 @@ function arrangeRows(g: Graph, members: Map<string, Set<string>>, blockOf: Map<s
   orderRows(rows, edges)
   lastOrder = { key, rows: rows.map((row) => row.map(({ key, slots, rank, x, width, birth }) => ({ key, slots, rank, x, width, birth }))), edges }
   return lastOrder
+}
+
+/** People born about a generation apart stand in the same row, as far as the links allow. */
+const GENERATION_YEARS = 28
+
+/**
+ * The row of every block. dagre knows only the shape of the tree, so a cousin whose line to the family is missing
+ * can land a generation off. Here a block with a known birth year is moved down to the row of its time, a parent
+ * is never left below a child, and a block without a year is drawn close above whoever it parents.
+ */
+function generations(g: Graph, members: Map<string, Set<string>>, blockOf: Map<string, string>, byId: Map<string, Person>, structural: (k: string) => number) {
+  const rank = new Map<string, number>([...members.keys()].map((k) => [k, structural(k)]))
+  const years = new Map<string, number>()
+  for (const [k, m] of members) {
+    const ys = [...m].map((id) => byId.get(id)?.birthYear).filter((y): y is number => !!y)
+    if (ys.length) years.set(k, Math.min(...ys))
+  }
+  if (!years.size) return rank
+  const first = Math.min(...years.values())
+  const parents = new Map<string, Set<string>>(), kids = new Map<string, Set<string>>()
+  for (const l of g.parentChild) {
+    const a = blockOf.get(l.parentId), b = blockOf.get(l.childId)
+    if (a === undefined || b === undefined || a === b) continue
+    ;(parents.get(b) ?? parents.set(b, new Set()).get(b)!).add(a)
+    ;(kids.get(a) ?? kids.set(a, new Set()).get(a)!).add(b)
+  }
+  const order = [...rank.keys()].sort((a, b) => rank.get(a)! - rank.get(b)!)
+  // Down: a block takes the row of its time, never above its parents' next row.
+  for (const k of order) {
+    const y = years.get(k)
+    const floor = Math.max(rank.get(k)!, ...[...(parents.get(k) ?? [])].map((p) => rank.get(p)! + 1))
+    rank.set(k, y === undefined ? floor : Math.max(floor, Math.round((y - first) / GENERATION_YEARS)))
+  }
+  // Up: someone with no known year sits just above their nearest child instead of far above.
+  for (const k of order.toReversed()) {
+    if (years.has(k) || !kids.get(k)?.size) continue
+    rank.set(k, Math.max(rank.get(k)!, Math.min(...[...kids.get(k)!].map((c) => rank.get(c)!)) - 1))
+  }
+  // Rows nobody stands in are taken out.
+  const used = [...new Set(rank.values())].sort((a, b) => a - b)
+  for (const [k, r] of rank) rank.set(k, used.indexOf(r))
+  return rank
 }
 
 /** `rootsBelow` draws the tree as it grows: elders at the bottom, the youngest at the top. */
