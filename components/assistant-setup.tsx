@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ExternalLink, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { PRESETS, type PresetId } from '@/lib/agent/presets'
+import { PRESETS, type Preset, type PresetId } from '@/lib/agent/presets'
 import { api, useApp } from '@/lib/client'
 import type { AssistantState } from '@/lib/types'
 import { Brand } from './brand-icons'
@@ -16,6 +16,7 @@ export interface ProviderStatus { connected: boolean; provider: PresetId | 'loca
 export const useProviderStatus = () => useQuery({ queryKey: ['provider'], queryFn: () => api<ProviderStatus>('assistant/provider') })
 
 const CUSTOM = '__custom'
+const REGIONS: [Preset['region'], string][] = [['world', 'Европа и Америка'], ['ru', 'Россия'], ['cn', 'Китай']]
 
 /** The provider's cheap models, cheapest good one first; any other can be typed in. */
 export function ModelSelect({ presetId, value, onChange }: { presetId: PresetId; value: string; onChange: (model: string) => void }) {
@@ -27,7 +28,7 @@ export function ModelSelect({ presetId, value, onChange }: { presetId: PresetId;
   return (
     <label className="flex flex-col gap-1 text-xs text-ink-soft">
       {t('Нейросеть')}
-      <Select aria-label={t('Нейросеть')} value={custom ? CUSTOM : value || models[0].id} onChange={(v) => { const c = v === CUSTOM; setCustom(c); onChange(c ? '' : v) }} options={[...models.map((m) => ({ value: m.id, label: `${m.label}, ${m.price}` })), { value: CUSTOM, label: t('Другая нейросеть…') }]} />
+      <Select aria-label={t('Нейросеть')} value={custom ? CUSTOM : value || models[0].id} onChange={(v) => { const c = v === CUSTOM; setCustom(c); onChange(c ? '' : v) }} options={[...models.map((m) => ({ value: m.id, label: m.price ? `${m.label}, ${m.price}` : m.label })), { value: CUSTOM, label: t('Другая нейросеть…') }]} />
       {custom && <input aria-label={t('Название нейросети')} placeholder={t('Название нейросети')} className={`${inputClass} font-mono`} value={value} onChange={(e) => onChange(e.target.value)} />}
       {!custom && current?.note && <span>{t(current.note)}</span>}
       <span className="text-ink-faint">{t('Цена примерно за тысячу страниц текста: ваш вопрос / ответ нейросети')}</span>
@@ -43,6 +44,7 @@ export function ProviderForm({ onDone }: { onDone?: () => void }) {
   const [id, setId] = useState<PresetId>('openrouter')
   const [key, setKey] = useState('')
   const [model, setModel] = useState('')
+  const [folder, setFolder] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const preset = PRESETS.find((p) => p.id === id)!
@@ -51,7 +53,7 @@ export function ProviderForm({ onDone }: { onDone?: () => void }) {
     setBusy(true)
     setError('')
     try {
-      await api('assistant/provider', { method: 'PUT', json: { provider: id, key, ...(model.trim() ? { model: model.trim() } : {}) } })
+      await api('assistant/provider', { method: 'PUT', json: { provider: id, key, ...(model.trim() ? { model: model.trim() } : {}), ...(preset.folder ? { folder } : {}) } })
       setKey('')
       await qc.invalidateQueries({ queryKey: ['provider'] })
       await qc.invalidateQueries({ queryKey: ['settings'] })
@@ -67,11 +69,16 @@ export function ProviderForm({ onDone }: { onDone?: () => void }) {
     <form className="flex flex-col gap-3 text-sm" onSubmit={connect}>
       <fieldset className="flex flex-col gap-1.5">
         <legend className="mb-1 text-xs text-ink-soft">{t('Выберите сервис')}</legend>
-        {PRESETS.map((p) => (
-          <label key={p.id} className={`flex cursor-pointer items-start gap-2 rounded-lg border px-2.5 py-2 ${p.id === id ? 'border-ink bg-white' : 'border-border'}`}>
-            <input type="radio" name="provider" className="mt-0.5 accent-[var(--ink)]" checked={p.id === id} onChange={() => { setId(p.id); setError(''); setModel('') }} />
-            <span className="min-w-0"><span className="flex items-center gap-1.5 font-medium"><Brand name={p.icon} />{p.label}</span>{p.pitch && <span className="block text-xs text-ink-soft">{t(p.pitch)}</span>}</span>
-          </label>
+        {REGIONS.map(([region, title]) => (
+          <div key={region} className="flex flex-col gap-1.5">
+            <p className="mt-1 text-xs text-ink-faint">{t(title)}</p>
+            {PRESETS.filter((p) => p.region === region).map((p) => (
+              <label key={p.id} className={`flex cursor-pointer items-start gap-2 rounded-lg border px-2.5 py-2 ${p.id === id ? 'border-ink bg-white' : 'border-border'}`}>
+                <input type="radio" name="provider" className="mt-0.5 accent-[var(--ink)]" checked={p.id === id} onChange={() => { setId(p.id); setError(''); setModel('') }} />
+                <span className="min-w-0"><span className="flex items-center gap-1.5 font-medium">{p.icon && <Brand name={p.icon} />}{p.label}</span>{p.pitch && <span className="block text-xs text-ink-soft">{t(p.pitch)}</span>}</span>
+              </label>
+            ))}
+          </div>
         ))}
       </fieldset>
       <ol className="flex flex-col gap-2">
@@ -80,13 +87,16 @@ export function ProviderForm({ onDone }: { onDone?: () => void }) {
         <li className="flex flex-col gap-1.5"><span><span className="text-ink-soft">3.</span> {t('Скопируйте ключ и вставьте его сюда')}</span>
           <input type="password" autoComplete="off" spellCheck={false} aria-label={t('Ключ')} placeholder={t('Ключ')} className={`${inputClass} font-mono`} value={key} onChange={(e) => { setKey(e.target.value); setError('') }} />
         </li>
+        {preset.folder && <li className="flex flex-col gap-1.5"><span><span className="text-ink-soft">4.</span> {t('Вставьте идентификатор каталога')}</span>
+          <input autoComplete="off" spellCheck={false} aria-label={t('Идентификатор каталога')} placeholder={t('Идентификатор каталога')} className={`${inputClass} font-mono`} value={folder} onChange={(e) => { setFolder(e.target.value); setError('') }} />
+        </li>}
       </ol>
       <details>
         <summary className="cursor-pointer text-ink-soft">{t('Выбрать другую нейросеть')}</summary>
         <div className="mt-2"><ModelSelect presetId={id} value={model} onChange={setModel} /></div>
       </details>
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
-      <Button disabled={busy || key.trim().length < 10}>{t(busy ? 'Проверяю ключ…' : 'Проверить и подключить')}</Button>
+      <Button disabled={busy || key.trim().length < 10 || (!!preset.folder && folder.trim().length < 10)}>{t(busy ? 'Проверяю ключ…' : 'Проверить и подключить')}</Button>
     </form>
   )
 }

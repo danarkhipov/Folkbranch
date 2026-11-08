@@ -168,7 +168,7 @@ cd ~/folkbranch && ./folkbranch connect
 
 This makes a key and connects the Claude Code or Codex it finds on your computer over MCP. For Cursor, Windsurf and others, the app gives the exact text to paste under **Settings → Outside programs**.
 
-Then ask your agent something like *"Find what is missing in the archive and suggest sources"*. Each proposed edit shows in words, and you accept or reject it. An optional assistant in the app uses your own key for OpenRouter, Anthropic, OpenAI or Google. Roles and tools are in the [agents guide](docs/AGENTS.md).
+Then ask your agent something like *"Find what is missing in the archive and suggest sources"*. Each proposed edit shows in words, and you accept or reject it. An optional assistant in the app uses your own key for OpenRouter, Anthropic, OpenAI, Google, Yandex AI Studio, Cloud.ru (GigaChat, Qwen), DeepSeek or Moonshot (Kimi). Roles and tools are in the [agents guide](docs/AGENTS.md).
 
 ## FAQ
 

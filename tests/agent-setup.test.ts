@@ -102,6 +102,25 @@ describe('connecting', () => {
       expect(currentProvider()?.id).toBe(provider)
     }
   })
+  it('services in Russia and China are asked the same way, and Yandex also names its folder', async () => {
+    const FOLDER = 'b1gabcdefghij12345'
+    const cases = [
+      ['cloudru', 'foundation-models.api.cloud.ru/v1/models', { data: [{ id: 'Qwen/Qwen3.6-35B-A3B' }] }],
+      ['deepseek', 'api.deepseek.com/models', { data: [{ id: 'deepseek-flash' }] }],
+      ['moonshot', 'api.moonshot.ai/v1/models', { data: [{ id: 'kimi-k2.6' }] }],
+      ['yandex', 'ai.api.cloud.yandex.net/v1/models', { data: [{ id: `gpt://${FOLDER}/yandexgpt/latest` }] }],
+    ] as const
+    for (const [provider, url, body] of cases) {
+      vi.restoreAllMocks()
+      stub(() => answer(200, body))
+      await connectProvider(owner, { provider, key: KEY, folder: FOLDER })
+      expect(sent()[0]).toContain(url)
+      expect(currentProvider()).toMatchObject({ id: provider, key: KEY })
+      expect(getSetting('agentFolder')).toBe(provider === 'yandex' ? FOLDER : null)
+    }
+    expect(currentProvider()!.folder).toBe(FOLDER)
+    await expect(connectProvider(owner, { provider: 'yandex', key: KEY })).rejects.toThrow(/каталога/)
+  })
   it('a chosen model is kept', async () => {
     stub(() => answer(200, { data: {} }))
     await connectProvider(owner, { provider: 'openrouter', key: KEY, model: 'qwen/qwen3.7-flash' })
@@ -157,7 +176,7 @@ describe('connecting', () => {
     expect(assistantState(owner)).toMatchObject({ reason: 'no-key' })
   })
   it('every preset says where to go and has a cheap model', () => {
-    expect(PRESETS.map((p) => p.id).sort()).toEqual(['anthropic', 'google', 'openai', 'openrouter'])
+    expect(PRESETS.map((p) => p.id).sort()).toEqual(['anthropic', 'cloudru', 'deepseek', 'google', 'moonshot', 'openai', 'openrouter', 'yandex'])
     for (const p of PRESETS) {
       expect(p.keysUrl).toMatch(/^https:\/\//)
       expect(p.howTo.length).toBeGreaterThan(5)

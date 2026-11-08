@@ -298,7 +298,6 @@ textarea.inline-input:hover, textarea.inline-input:focus { box-shadow: 0 1px 0 v
 .panel .bn-editor button, .panel .bn-side-menu button { min-height: 0; }
 
 /* The main bar: words where there is room, icons with tooltips where not, and on phones a tab bar. */
-@media (min-width: 640px) { .settings-item.on { box-shadow: inset 3px 0 var(--accent); } }
 .family-name { font-variant-numeric: lining-nums; position: relative; top: -2px; }
 .skip-link { position: fixed; left: 12px; top: -60px; z-index: 60; }
 .skip-link:focus { top: 12px; }

@@ -178,7 +178,7 @@ export function buildAgent(person: Actor, opts: { model?: LanguageModel; trustWr
     opts.focusId ? `They have this person open on the chart: id ${opts.focusId}.` : '',
   ].filter(Boolean).join(' ')
   return new ToolLoopAgent({
-    model: opts.model ?? provider!.create(provider!.key, provider!.model),
+    model: opts.model ?? provider!.create(provider!.key, provider!.model, provider!.folder),
     // The fixed part first, cached; what changes per request comes after it.
     instructions: [
       { role: 'system', content: process.env.AGENT_SELF_CHECK === 'off' ? INSTRUCTIONS : `${INSTRUCTIONS}\n\n${SELF_CHECK}`, providerOptions: (provider ? provider.cached : { anthropic: { cacheControl: { type: 'ephemeral' } } }) as never },

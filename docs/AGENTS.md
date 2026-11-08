@@ -4,7 +4,7 @@ Agents use the same operations as the app, through MCP at `/api/mcp` or REST at 
 
 ## The assistant inside the app
 
-A chat panel for people signed in to the app. The owner pastes a provider's key right in the panel, where it is checked and kept encrypted in the database, or sets one on the server (see `.env.example`: Anthropic, OpenRouter, OpenAI, Google, or a local model), then the owner turns it on under **Settings → Assistant**. It is off by default.
+A chat panel for people signed in to the app. The owner pastes a provider's key right in the panel, where it is checked and kept encrypted in the database, or sets one on the server (see `.env.example`: Anthropic, OpenRouter, OpenAI, Google, Yandex AI Studio, Cloud.ru, DeepSeek, Moonshot, or a local model), then the owner turns it on under **Settings → Assistant**. It is off by default.
 
 - What it reads in the archive is sent to the model's provider. It works as the person talking to it, with everything they can see, living relatives included. Photos in the archive are not sent.
 - It acts as the person talking to it, with their role. Ordinary edits ask first, or can be allowed for one conversation. Deleting, importing, undoing and settings always ask.

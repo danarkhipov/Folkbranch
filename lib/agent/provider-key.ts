@@ -16,7 +16,7 @@ function saved() {
   const id = getSetting('agentProvider') as PresetId | null
   const sealed = getSetting('agentKey')
   const key = sealed ? unseal(sealed) : null
-  return id && key ? { id, key, model: getSetting('agentModel') ?? undefined } : null
+  return id && key ? { id, key, model: getSetting('agentModel') ?? undefined, folder: getSetting('agentFolder') ?? undefined } : null
 }
 
 /** What answers now: the environment's provider, or the one set in the app. */
@@ -24,7 +24,7 @@ export function currentProvider() {
   const fromEnv = activeProvider(process.env)
   if (fromEnv) return fromEnv
   const s = saved()
-  return s ? activeProvider({ AGENT_PROVIDER: s.id, [keyEnvOf(s.id)]: s.key, AGENT_MODEL: s.model }) : null
+  return s ? activeProvider({ AGENT_PROVIDER: s.id, [keyEnvOf(s.id)]: s.key, AGENT_MODEL: s.model, AGENT_FOLDER: s.folder }) : null
 }
 
 export function providerStatus(actor: Actor) {
@@ -34,16 +34,20 @@ export function providerStatus(actor: Actor) {
   return { connected: !!p, provider: p?.id ?? null, label: p?.label ?? null, model: p?.model ?? null, source: !p ? null : fromEnv ? 'server' as const : 'app' as const, keyEnding: p && !fromEnv ? p.key.slice(-4) : null }
 }
 
-const CHECKS: Record<PresetId, (key: string) => { url: string; headers: Record<string, string>; ids?: (body: any) => string[] }> = {
+const CHECKS: Record<PresetId, (key: string, folder: string) => { url: string; headers: Record<string, string>; ids?: (body: any) => string[] }> = {
   // Reading the account or the list of models costs nothing, so a check never spends the person's money.
   openrouter: (key) => ({ url: 'https://openrouter.ai/api/v1/key', headers: { authorization: `Bearer ${key}` } }),
   anthropic: (key) => ({ url: 'https://api.anthropic.com/v1/models?limit=1000', headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' }, ids: (b) => b.data.map((m: { id: string }) => m.id) }),
   openai: (key) => ({ url: 'https://api.openai.com/v1/models', headers: { authorization: `Bearer ${key}` }, ids: (b) => b.data.map((m: { id: string }) => m.id) }),
+  yandex: (key, folder) => ({ url: 'https://ai.api.cloud.yandex.net/v1/models', headers: { authorization: `Api-Key ${key}`, 'openai-project': folder }, ids: (b) => b.data.map((m: { id: string }) => m.id.replace(`gpt://${folder}/`, '')) }),
+  cloudru: (key) => ({ url: 'https://foundation-models.api.cloud.ru/v1/models', headers: { authorization: `Bearer ${key}` }, ids: (b) => b.data.map((m: { id: string }) => m.id) }),
+  deepseek: (key) => ({ url: 'https://api.deepseek.com/models', headers: { authorization: `Bearer ${key}` }, ids: (b) => b.data.map((m: { id: string }) => m.id) }),
+  moonshot: (key) => ({ url: 'https://api.moonshot.ai/v1/models', headers: { authorization: `Bearer ${key}` }, ids: (b) => b.data.map((m: { id: string }) => m.id) }),
   google: (key) => ({ url: 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000', headers: { 'x-goog-api-key': key }, ids: (b) => b.models.map((m: { name: string }) => m.name.replace(/^models\//, '')) }),
 }
 
-async function check(id: PresetId, key: string, model: string) {
-  const { url, headers, ids } = CHECKS[id](key)
+async function check(id: PresetId, key: string, model: string, folder = '') {
+  const { url, headers, ids } = CHECKS[id](key, folder)
   const res = await fetch(url, { headers, signal: AbortSignal.timeout(15_000) }).catch(() => null)
   if (!res) throw new OpError(502, say('Не удалось связаться с провайдером. Проверьте интернет на сервере и попробуйте ещё раз'))
   if (res.status === 400 || res.status === 401 || res.status === 403) throw new OpError(400, say('Провайдер не принял этот ключ. Проверьте, что он скопирован целиком'))
@@ -69,15 +73,17 @@ export async function chooseModel(actor: Actor, raw: unknown) {
   if (activeProvider(process.env)) throw new OpError(409, say('Модель задана в настройках сервера'))
   const s = saved()
   if (!s) throw new OpError(409, say('Сначала подключите провайдера'))
-  await check(s.id, s.key, model)
+  await check(s.id, s.key, model, s.folder)
   setSetting('agentModel', model)
   return providerStatus(actor)
 }
 
 export const connectInput = z.object({
-  provider: z.enum(['openrouter', 'anthropic', 'openai', 'google']),
+  provider: z.enum(['openrouter', 'anthropic', 'openai', 'google', 'yandex', 'cloudru', 'deepseek', 'moonshot']),
   key: z.string().trim().min(10, 'the key is too short').max(500),
   model: z.string().trim().min(1).max(120).optional(),
+  /** Yandex only: the folder the key's service account belongs to. */
+  folder: z.string().trim().regex(/^[a-z0-9]{10,30}$/, 'the folder ID is letters and digits').optional(),
 })
 
 /** Nothing is stored until the provider has accepted the key. */
@@ -85,7 +91,11 @@ export async function connectProvider(actor: Actor, raw: unknown) {
   requireRole(actor, 'owner')
   const input = connectInput.parse(raw)
   const model = input.model || PRESETS.find((p) => p.id === input.provider)!.models[0].id
-  await check(input.provider, input.key, model)
+  const folder = input.provider === 'yandex' ? input.folder : undefined
+  if (input.provider === 'yandex' && !folder) throw new OpError(400, say('Укажите идентификатор каталога Яндекса'))
+  await check(input.provider, input.key, model, folder)
+  getDb().delete(schema.settings).where(eq(schema.settings.key, 'agentFolder')).run()
+  if (folder) setSetting('agentFolder', folder)
   setSetting('agentProvider', input.provider)
   setSetting('agentKey', seal(input.key))
   setSetting('agentModel', model)
@@ -95,7 +105,7 @@ export async function connectProvider(actor: Actor, raw: unknown) {
 
 export function disconnectProvider(actor: Actor) {
   requireRole(actor, 'owner')
-  for (const key of ['agentProvider', 'agentKey', 'agentModel']) getDb().delete(schema.settings).where(eq(schema.settings.key, key)).run()
+  for (const key of ['agentProvider', 'agentKey', 'agentModel', 'agentFolder']) getDb().delete(schema.settings).where(eq(schema.settings.key, key)).run()
   return providerStatus(actor)
 }
 
