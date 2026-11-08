@@ -10,10 +10,12 @@ import { lifeYears, personName, type Lang, type Person, type Role } from '../typ
 import { Actor, can, OpError } from './core'
 import { attachmentBytes, findAttachment, readAttachmentText } from '../agent/attachments'
 import { exportGedcom, importGedcom, previewGedcom } from './gedcom'
-import { listAllMedia, listPersonMedia, updateMedia, uploadMedia } from './media'
+import sharp from 'sharp'
+import { getMedia, listAllMedia, listPersonMedia, readMediaFile, updateMedia, uploadMedia } from './media'
 import { getPage, listPages } from './pages'
 import { findGaps } from './gaps'
 import { getGraph } from './people'
+import { listPlaces } from './places'
 import { OUTPUTS } from './outputs'
 import { describeOp, dispatch, myProposals } from './proposals'
 import { OPS } from './registry'
@@ -40,6 +42,8 @@ export interface ToolDef {
   output: z.ZodType
   /** What the model gets instead of the output, when the output holds a secret only the person may see. */
   forModel?: (output: any) => unknown
+  /** A picture or document the model looks at, fetched for it alone: the chat keeps only the answer. */
+  shown?: (actor: Actor, output: any) => Promise<{ file: Buffer; mediaType: string; name: string }>
 }
 
 const lang = (): Lang => archiveLang()
@@ -151,6 +155,11 @@ const READS: Record<string, { description: string; input: z.ZodObject; run: (a: 
     input: z.object({ personId: z.string().optional() }),
     run: (a, x) => (x.personId ? listPersonMedia(a, x.personId) : listAllMedia(a)),
   },
+  list_places: {
+    description: 'Places in the archive, with what each was part of, other and old names, and coordinates. Add a missing one with create_place.',
+    input: z.object({}),
+    run: (a) => listPlaces(a),
+  },
   export_text: {
     description: 'The whole graph in the text format: `family Title`, `Name id: x, b: 1880, d: 1950, sex: m`, `A + B m: 1905` with children indented below. Edit it and send it back with import_text.',
     input: z.object({}),
@@ -191,9 +200,10 @@ export const CORE_TOOLS = ['search_people', 'query_people', 'search_archive', 'g
 export const TOOL_GROUPS: Record<string, { about: string; tools: string[] }> = {
   people: { about: 'many at once, relatives, gaps, overview, link details, whole tree, tables', tools: ['update_people', 'get_relatives', 'find_gaps', 'get_overview', 'update_relation', 'remove_parent_links', 'export_text', 'preview_text', 'parse_table'] },
   sources: { about: 'removing sources, versions of values', tools: ['remove_source', 'add_version', 'choose_version', 'reject_version', 'restore_version'] },
-  files: { about: 'photos, avatars, attached files, GEDCOM, research cases', tools: ['import_kinship_case', 'list_photos', 'save_attachment', 'set_avatar', 'tag_photo', 'untag_photo', 'update_photo', 'delete_photo', 'upload_photo', 'read_attachment', 'import_gedcom_attachment', 'export_gedcom', 'preview_gedcom', 'import_gedcom'] },
+  files: { about: 'photos, scans, avatars, attached files, GEDCOM, research cases', tools: ['import_kinship_case', 'list_photos', 'view_photo', 'save_attachment', 'set_avatar', 'tag_photo', 'untag_photo', 'update_photo', 'delete_photo', 'upload_photo', 'read_attachment', 'import_gedcom_attachment', 'export_gedcom', 'preview_gedcom', 'import_gedcom'] },
   pages: { about: 'pages about people', tools: ['list_pages', 'get_page', 'create_page', 'update_page', 'move_page', 'delete_page'] },
-  screen: { about: 'show someone or a path on the chart', tools: ['focus_person', 'show_path', 'set_chart_direction'] },
+  places: { about: 'places, old names', tools: ['list_places', 'create_place', 'update_place'] },
+  screen: { about: 'show someone, a branch or a path', tools: ['focus_person', 'show_branch', 'show_path', 'set_chart_direction'] },
   admin: { about: 'archive name, language, people with access, invitations', tools: ['get_settings', 'update_settings', 'list_users', 'set_user_role', 'list_invites', 'create_invite', 'revoke_invite'] },
 }
 
@@ -238,6 +248,11 @@ const ASSISTANT_ONLY: Omit<ToolDef, 'output'>[] = [
       const { p } = visiblePerson(a, x.id)
       return { id: p.id, name: fullName(p) }
     } },
+  { name: 'show_branch', risk: 'ui', minRole: 'reader', surfaces: ['assistant'], description: "Show on the chart only a person's ancestors, descendants or close family, or everyone again with scope all.", input: z.object({ id: z.string(), scope: z.enum(['ancestors', 'descendants', 'near', 'all']) }),
+    run: (a, x) => {
+      const { p } = visiblePerson(a, x.id)
+      return { id: p.id, name: fullName(p), scope: x.scope }
+    } },
   { name: 'show_path', risk: 'ui', minRole: 'reader', surfaces: ['assistant'], description: 'Light up on the chart how two people are connected.', input: z.object({ from: z.string(), to: z.string() }),
     run: (a, x) => {
       const { g } = visiblePerson(a, x.from)
@@ -249,6 +264,29 @@ const ASSISTANT_ONLY: Omit<ToolDef, 'output'>[] = [
   { name: 'set_chart_direction', risk: 'ui', minRole: 'reader', surfaces: ['assistant'], description: 'Draw the chart with elders at the bottom (rootsBelow true) or at the top. Applies to this browser only.', input: z.object({ rootsBelow: z.boolean() }),
     run: (_a, x) => ({ rootsBelow: x.rootsBelow }) },
 ]
+
+/** Only these reach a model as files; anything else it would get as unreadable bytes. */
+const MODEL_FILE = 1568
+const isPdf = (m: { mime: string; originalName: string }) => m.mime === 'application/pdf' || /\.pdf$/i.test(m.originalName)
+
+/** A photo or scan from the archive, put in front of the model so it can read it. */
+const VIEW_PHOTO: Omit<ToolDef, 'output'> = {
+  name: 'view_photo', risk: 'read', minRole: 'reader', surfaces: ['assistant'],
+  description: 'Look at a photo or a scanned document already in the archive (a picture or a PDF), by its id from list_photos. Read what is written, word for word, and say what you could not read. Propose what it shows with add_source, add_version or a page, never as certain when the reading is not.',
+  input: z.object({ id: z.string() }),
+  run: (a, x) => {
+    const m = getMedia(a, x.id)
+    if (m.kind !== 'image' && !isPdf(m)) throw new OpError(400, 'only a picture or a PDF can be looked at')
+    return { id: m.id, name: m.originalName, caption: m.caption, date: m.date, place: m.place }
+  },
+  shown: async (a, out) => {
+    const m = getMedia(a, out.id)
+    const { data } = await readMediaFile(a, m.id, 'orig')
+    if (isPdf(m)) return { file: data, mediaType: 'application/pdf', name: m.originalName }
+    const file = await sharp(data, { failOn: 'none' }).rotate().resize({ width: MODEL_FILE, height: MODEL_FILE, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer()
+    return { file, mediaType: 'image/jpeg', name: m.originalName }
+  },
+}
 
 /** Files given to the assistant in the conversation. They belong to the person talking to it. */
 const ATTACHMENT_TOOLS: Omit<ToolDef, 'output'>[] = [
@@ -315,6 +353,7 @@ export const TOOLS: ToolDef[] = ([
     run: (a, x) => searchArchive(a, x.query, x.limit) },
   ...Object.entries(OPS).filter(([, d]) => !d.internal).map(([name, d]): Untyped => ({ name, description: d.description, input: (d.agentInput ?? d.input) as z.ZodObject, risk: d.risk, minRole: 'editor', surfaces: surfaces(name), run: (a, x) => dispatch(a, name, x), describe: (a, x) => describeOp(a, name, x) })),
   ...ASSISTANT_ONLY,
+  VIEW_PHOTO,
   ...ATTACHMENT_TOOLS,
 ] as Untyped[]).map(typed)
 

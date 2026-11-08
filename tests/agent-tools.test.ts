@@ -1,7 +1,9 @@
+import sharp from 'sharp'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { assistantActor, approvalFor } from '../lib/agent/agent'
 import { TOOL_NAMES, toolLabel } from '../lib/agent/labels'
 import { getDb, schema } from '../lib/db'
+import { uploadMedia } from '../lib/ops/media'
 import { getPage } from '../lib/ops/pages'
 import { getPersonRow } from '../lib/ops/people'
 import { getSetting,  } from '../lib/ops/settings'
@@ -170,6 +172,32 @@ describe('who may do what', () => {
   })
 })
 
+describe('looking at a photo or a scan', () => {
+  const view = TOOLS.find((t) => t.name === 'view_photo')!
+  it('puts the picture in front of the model, small enough to send', async () => {
+    const a = assistantActor(owner)
+    const out = await view.run(a, { id: f.photo.id })
+    expect(out).toMatchObject({ id: f.photo.id, name: 'свадьба.jpg' })
+    const seen = await view.shown!(a, out)
+    expect(seen.mediaType).toBe('image/jpeg')
+    expect((await sharp(seen.file).metadata()).width).toBeLessThanOrEqual(1568)
+  })
+  it('opens a PDF as it is', async () => {
+    const pdf = await uploadMedia(owner, Buffer.from('%PDF-1.4\n%%EOF\n'), 'метрика.pdf', f.ivan.id)
+    const a = assistantActor(owner)
+    expect((await view.shown!(a, await view.run(a, { id: pdf.id }))).mediaType).toBe('application/pdf')
+  })
+  it('refuses a file that is neither a picture nor a PDF', async () => {
+    const note = await uploadMedia(owner, Buffer.from('просто текст'), 'заметки.txt', f.ivan.id)
+    await expect(view.run(assistantActor(owner), { id: note.id })).rejects.toThrow('only a picture or a PDF')
+  })
+  it('never shows a reader a photo of a living relative', async () => {
+    const secret = await uploadMedia(owner, await sharp({ create: { width: 10, height: 10, channels: 3, background: '#111' } }).jpeg().toBuffer(), 'тайное.jpg', f.living.id)
+    await expect(Promise.resolve().then(() => view.run(assistantActor(reader), { id: secret.id }))).rejects.toThrow()
+    expect(await view.run(assistantActor(owner), { id: secret.id })).toMatchObject({ id: secret.id })
+  })
+})
+
 describe('labels in the chat', () => {
   it('every tool has one, and the ones that can be allowed at once are exactly the ordinary edits', () => {
     const all = [...TOOL_NAMES.read, ...TOOL_NAMES.write, ...TOOL_NAMES.careful].sort()
@@ -184,7 +212,7 @@ describe('a reader and living relatives', () => {
     ['get_overview', {}], ['find_gaps', { limit: 200 }], ['search_people', { query: '', limit: 500 }], ['search_people', { query: 'Живинская' }], ['get_person', { id: f.living.id }], ['get_person', { id: f.pyotr.id }],
     ['get_relatives', { id: f.pyotr.id }], ['how_related', { from: f.pyotr.id, to: f.living.id }], ['list_photos', {}],
     ['export_text', {}], ['get_history', { limit: 200 }], ['query_people', { limit: 500 }], ['query_people', { name: 'Живинская' }], ['query_people', { living: true }], ['query_people', { groupBy: 'surname', limit: 0 }], ['query_people', { groupBy: 'birthPlace', limit: 0 }],
-    ['search_archive', { query: 'Живинская' }], ['search_archive', { query: 'Тайнопись' }], ['search_archive', { query: 'Тайноград' }], ['search_archive', { query: 'родилась поздно' }], ['focus_person', { id: f.living.id }], ['show_path', { from: f.pyotr.id, to: f.living.id }],
+    ['search_archive', { query: 'Живинская' }], ['search_archive', { query: 'Тайнопись' }], ['search_archive', { query: 'Тайноград' }], ['search_archive', { query: 'родилась поздно' }], ['focus_person', { id: f.living.id }], ['show_branch', { id: f.living.id, scope: 'near' }], ['show_path', { from: f.pyotr.id, to: f.living.id }], ['list_places', {}], ['view_photo', { id: f.photo.id }],
   ]
   it.each([['a reader', reader]] as const)('no tool shows them to the model for %s', async (_n, person) => {
     for (const [name, args] of asks()) {

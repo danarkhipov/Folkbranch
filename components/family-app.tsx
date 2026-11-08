@@ -306,7 +306,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       {side === 'history' && <HistoryPanel onClose={() => setSide(null)} />}
       {side === 'review' && <ReviewPanel onClose={() => setSide(null)} />}
       {!assistant.ready && <AssistantSetup state={assistant} open={side === 'assistant'} width={assistantWidth} onWidth={setAssistantWidth} onClose={() => setSide(null)} />}
-      {assistant.ready && assistantUsed && <AssistantPanel open={side === 'assistant'} width={assistantWidth} onWidth={setAssistantWidth} onClose={() => setSide(null)} onPath={setPath} onDirection={directChart} />}
+      {assistant.ready && assistantUsed && <AssistantPanel open={side === 'assistant'} width={assistantWidth} onWidth={setAssistantWidth} onClose={() => setSide(null)} onPath={setPath} onDirection={directChart} onBranch={(id, s) => { scope.show({ scope: s, rootId: s === 'all' ? null : id }); focus(id) }} />}
       {panelOpen && <PersonPanel key={focused!.id} person={focused!} hit={searchHit?.personId === focused!.id ? searchHit : null} onClearHit={() => setSearchHit(null)} onClose={() => focus(null)} onDelete={onDelete} />}
 
       {search && <SearchDialog open onOpenChange={setSearch} onPick={(id, hit) => { setSearchHit(hit ?? null); focus(id) }} />}

@@ -18,9 +18,9 @@ claude mcp add --transport http folkbranch https://your.domain/api/mcp --header 
 
 Clients that need OAuth, such as claude.ai connectors, are not supported yet: the client has to be able to send a header.
 
-Reading: `search_people`, `get_person`, `get_relatives`, `how_related`, `list_pages`, `get_page`, `list_photos`, `export_text`, `preview_text`, `export_gedcom`, `preview_gedcom`, `get_history`, `my_proposals`.
+Reading: `search_people`, `get_person`, `get_relatives`, `how_related`, `list_pages`, `get_page`, `list_photos`, `list_places`, `export_text`, `preview_text`, `export_gedcom`, `preview_gedcom`, `get_history`, `my_proposals`.
 
-Writing (not listed for a read-only token): `create_person`, `update_person`, `delete_person`, `add_relation`, `update_relation`, `remove_relation`, `remove_parent_links`, `create_page`, `update_page`, `move_page`, `delete_page`, `upload_photo`, `update_photo`, `delete_photo`, `tag_photo`, `untag_photo`, `set_avatar`, `import_text`, `import_gedcom`, `undo`.
+Writing (not listed for a read-only token): `create_person`, `update_person`, `delete_person`, `add_relation`, `update_relation`, `remove_relation`, `remove_parent_links`, `create_page`, `update_page`, `move_page`, `delete_page`, `upload_photo`, `update_photo`, `delete_photo`, `tag_photo`, `untag_photo`, `set_avatar`, `create_place`, `update_place`, `import_text`, `import_gedcom`, `undo`.
 
 Agents read and write pages in Markdown: a mention is `[@Name](person:ID)`, a photo is `![caption](/api/v1/media/ID/file?size=medium)`. Blocks Markdown cannot express, such as tables, are visible only with `raw: true`, and new text replaces the whole page.
 

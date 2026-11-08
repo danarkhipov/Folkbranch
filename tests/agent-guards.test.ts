@@ -415,6 +415,16 @@ describe('tokens', () => {
     expect(seen).toContain('[Cut:')
     expect(seen.length).toBeLessThan(70_000)
   })
+  it('a photo from the archive reaches the model as a picture, and the chat keeps only its name', async () => {
+    process.env.AGENT_ALL_TOOLS = '1'
+    const m = model(calls(['view_photo', { id: f.photo.id }]), reply('Вижу.'))
+    const r = await send([user('Что на фото?')], m)
+    delete process.env.AGENT_ALL_TOOLS
+    expect(r.parts.find((p) => p.type === 'tool-view_photo').output).toMatchObject({ id: f.photo.id, name: 'свадьба.jpg' })
+    expect(JSON.stringify(r.parts)).not.toContain('base64')
+    const result = m.doStreamCalls[1].prompt.flatMap((x) => (x.role === 'tool' ? x.content : [])).find((p) => p.type === 'tool-result')!
+    expect(JSON.stringify(result.output)).toContain('image/jpeg')
+  })
   it('tool calls from older questions are dropped, the last two stay, and no call loses its answer', () => {
     const q = (text: string): ModelMessage => ({ role: 'user', content: text })
     const asked = (id: string): ModelMessage[] => [

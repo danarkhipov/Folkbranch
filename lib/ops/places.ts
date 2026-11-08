@@ -17,6 +17,17 @@ export const placeInput = z.object({
   note: z.string().trim().max(2000).default(''),
 })
 
+/** A change to a place: only the fields given, with none filled in by default. */
+export const placePatch = z.object({
+  name: z.string().trim().min(1).max(160),
+  kind: z.string().trim().max(40),
+  parentId: z.string().max(40).nullable(),
+  otherNames: z.array(z.object({ name: z.string().trim().min(1).max(160), years: z.string().trim().max(40).default('') })).max(30),
+  lat: z.number().min(-90).max(90).nullable(),
+  lon: z.number().min(-180).max(180).nullable(),
+  note: z.string().trim().max(2000),
+}).partial()
+
 export const repositoryInput = z.object({
   name: z.string().trim().min(1).max(200),
   address: z.string().trim().max(300).default(''),
@@ -29,6 +40,12 @@ const toPlace = (r: typeof schema.places.$inferSelect): Place => ({ id: r.id, na
 export function listPlaces(actor: Actor): Place[] {
   void actor
   return getDb().select().from(schema.places).all().map(toPlace).sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export function getPlace(id: string): Place {
+  const r = getDb().select().from(schema.places).where(eq(schema.places.id, id)).get()
+  if (!r) throw new OpError(404, `place ${id} not found`)
+  return toPlace(r)
 }
 
 /** A place cannot sit inside itself, however many steps around. */

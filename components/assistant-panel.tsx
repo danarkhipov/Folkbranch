@@ -13,6 +13,7 @@ import { PromptInput, PromptInputBody, PromptInputButton, PromptInputFooter, Pro
 import { PanelEdge } from './panel-size'
 import { changesData, isOrdinaryEdit, toolLabel } from '@/lib/agent/labels'
 import { api, undoFailure, useApp } from '@/lib/client'
+import type { Scope } from '@/lib/graph/select'
 
 /** Told to the model after a person takes an answer back, so it does not build on what is gone. */
 const TAKEN_BACK = '[The edits from this answer were undone]'
@@ -26,7 +27,7 @@ function plainError(e: Error, t: (k: string) => string) {
 
 const historyIds = (m: UIMessage) => [...new Set(m.parts.flatMap((p) => (isToolUIPart(p) && p.state === 'output-available' && (p.output as { historyId?: string } | null)?.historyId ? [(p.output as { historyId: string }).historyId] : [])))]
 
-export default function AssistantPanel({ open, width, onWidth, onClose, onPath, onDirection }: { open: boolean; width: number; onWidth: (w: number) => void; onClose: () => void; onPath: (path: string[]) => void; onDirection: (rootsBelow: boolean) => void }) {
+export default function AssistantPanel({ open, width, onWidth, onClose, onPath, onDirection, onBranch }: { open: boolean; width: number; onWidth: (w: number) => void; onClose: () => void; onPath: (path: string[]) => void; onDirection: (rootsBelow: boolean) => void; onBranch: (id: string, scope: Scope) => void }) {
   const { t, focusId, focus, notify } = useApp()
   const qc = useQueryClient()
   const router = useRouter()
@@ -51,6 +52,7 @@ export default function AssistantPanel({ open, width, onWidth, onClose, onPath, 
         if (changesData(name)) qc.invalidateQueries()
         if (name === 'update_settings') router.refresh()
         if (name === 'focus_person') focus(out.id)
+        if (name === 'show_branch') onBranch(out.id, out.scope)
         if (name === 'show_path') onPath(out.path)
         if (name === 'set_chart_direction') onDirection(out.rootsBelow)
       }

@@ -11,10 +11,19 @@ import { importGedcom } from './gedcom'
 import { caseFiles, importCase } from './kinship-case'
 import * as media from './media'
 import * as pages from './pages'
+import * as places from './places'
 import * as stories from './stories'
 import * as people from './people'
 import { say } from './settings'
 import { certainty, personInput, claimField, sourceInput, relationType, agentCreate, agentPatch, relationInput, box, blocks, markdown, type Def, def, personFor, isAgent, isTemp, assertLink, assertPlanSound, assertSpouses, checkNewPerson, checkPatch, withVersions, assertVersion, pageContent, FIELD, REL, nameOfReal, pageName } from './op-defs'
+
+/** What a place change says to the person accepting it. */
+const placeDetails = (p: { kind?: string; otherNames?: { name: string; years?: string }[]; lat?: number | null; lon?: number | null; note?: string }) => [
+  p.kind,
+  p.otherNames?.length ? `${say('Другие и старые названия')}: ${p.otherNames.map((n) => (n.years ? `${n.name} (${n.years})` : n.name)).join(', ')}` : '',
+  p.lat != null && p.lon != null ? `${p.lat}, ${p.lon}` : '',
+  p.note,
+].filter((x): x is string => !!x)
 
 export const OPS: Record<string, Def> = {
   create_person: def({
@@ -231,6 +240,23 @@ export const OPS: Record<string, Def> = {
     },
     apply: (a, x) => people.setAvatar(a, x.personId, x.mediaId, x.crop),
     describe: (x, c) => ({ text: `${c.name(x.personId)}: ${say('Сделать аватаркой')}` }),
+  }),
+  create_place: def({
+    risk: 'write',
+    description: 'Add a place: a village, town, parish or region, with what it was part of, its other and old names, and its point on a map. Look in list_places first. Give coordinates only for a place you are sure of, and say in the note where they come from.',
+    input: places.placeInput,
+    creates: true,
+    prepare: (_a, x) => { if (x.parentId && !isTemp(x.parentId)) places.getPlace(x.parentId); return x },
+    apply: (a, x) => places.savePlace(a, null, x),
+    describe: (x) => ({ text: `${say('Место')}: ${x.name}`, details: placeDetails(x) }),
+  }),
+  update_place: def({
+    risk: 'write',
+    description: 'Change a place. Only the given fields change; otherNames replaces the whole list.',
+    input: z.object({ id: z.string(), patch: places.placePatch }),
+    prepare: (_a, x) => { if (!isTemp(x.id)) places.getPlace(x.id); return x },
+    apply: (a, x) => places.savePlace(a, x.id, { ...places.getPlace(x.id), ...x.patch }),
+    describe: (x) => ({ text: `${say('Место')}: ${isTemp(x.id) ? x.patch.name ?? x.id : places.getPlace(x.id).name}`, details: placeDetails(x.patch) }),
   }),
   add_version: def({
     risk: 'write',
