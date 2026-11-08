@@ -72,6 +72,16 @@ describe('places', () => {
     places.deletePlace(owner, mid)
     expect(places.listPlaces(owner).find((p) => p.id === low)?.parentId).toBe(top)
   })
+  it('a reader sees only the places of people shown to them, with what those places belong to', () => {
+    people.updatePerson(owner, id.living, { birthPlace: 'Тайносёлок' })
+    const secret = places.savePlace(owner, null, { name: 'Тайносёлок', kind: 'Деревня' }).id
+    const lonely = places.savePlace(owner, null, { name: 'Пустошь', kind: 'Деревня' }).id
+    const seen = places.listPlaces(reader).map((p) => p.name)
+    expect(seen).toEqual(expect.arrayContaining(['Тверь', 'Тверская губерния']))
+    expect(seen).not.toContain('Тайносёлок')
+    expect(seen).not.toContain('Пустошь')
+    expect(places.listPlaces(owner).map((p) => p.id)).toEqual(expect.arrayContaining([secret, lonely]))
+  })
 })
 
 describe('archives', () => {

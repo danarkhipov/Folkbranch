@@ -3,8 +3,10 @@
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb, schema } from '../db'
+import { findPlace, placeChain, placesInUse } from '../places'
 import type { Place, Repository } from '../types'
-import { Actor, mutate, newId, OpError, requireRole } from './core'
+import { Actor, mutate, newId, OpError, requireRole, seesOnlyPublic } from './core'
+import { getGraph } from './people'
 import { say } from './settings'
 
 export const placeInput = z.object({
@@ -38,8 +40,18 @@ export const repositoryInput = z.object({
 const toPlace = (r: typeof schema.places.$inferSelect): Place => ({ id: r.id, name: r.name, kind: r.kind, parentId: r.parentId, otherNames: JSON.parse(r.otherNames), lat: r.lat, lon: r.lon, note: r.note })
 
 export function listPlaces(actor: Actor): Place[] {
-  void actor
-  return getDb().select().from(schema.places).all().map(toPlace).sort((a, b) => a.name.localeCompare(b.name))
+  const all = getDb().select().from(schema.places).all().map(toPlace).sort((a, b) => a.name.localeCompare(b.name))
+  if (!seesOnlyPublic(actor)) return all
+  // A place can be all that is left of a hidden relative, such as the town a living cousin was born in:
+  // a reader or a link sees only the places of people shown to them, and what those places were part of.
+  const g = getGraph(actor)
+  const hidden = new Set(g.persons.filter((p) => p.hidden).map((p) => p.id))
+  const shown = new Set<string>()
+  for (const use of placesInUse({ ...g, unions: g.unions.filter((u) => !hidden.has(u.aId) && !hidden.has(u.bId)) })) {
+    const place = findPlace(use.text, all)
+    if (place) for (const p of placeChain(place, all)) shown.add(p.id)
+  }
+  return all.filter((p) => shown.has(p.id))
 }
 
 export function getPlace(id: string): Place {
