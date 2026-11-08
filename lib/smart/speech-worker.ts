@@ -29,7 +29,9 @@ self.onmessage = async ({ data: job }: MessageEvent<Job>) => {
     let text = ''
     for (let i = 0; i < pieces.length; i++) {
       send({ type: 'reading', done: i, total: pieces.length })
-      const out = await read(samples.subarray(pieces[i][0], pieces[i][1]), { language: job.language, task: 'transcribe', sampling_rate: RATE, no_repeat_ngram_size: 3, repetition_penalty: 1.1, max_new_tokens: 200 } as never)
+      // A model made for English alone is not told the language or the task: it refuses them.
+      const choice = job.model.endsWith('.en') ? {} : { language: job.language, task: 'transcribe' }
+      const out = await read(samples.subarray(pieces[i][0], pieces[i][1]), { ...choice, sampling_rate: RATE, no_repeat_ngram_size: 3, repetition_penalty: 1.1, max_new_tokens: 200 } as never)
       text = `${text} ${(Array.isArray(out) ? out[0] : out).text.trim()}`.trim()
       send({ type: 'text', text })
     }

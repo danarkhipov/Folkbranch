@@ -38,7 +38,10 @@ export const VARIANTS: Variant[] = [
   { id: 'yolo11m', feature: 'faces', name: 'Максимальная', facts: 'Находит 99% лиц, около 4 секунд на снимок', files: [RUNTIME, YOLO_M], suits: [] },
   { id: 'sface', feature: 'recognize', name: 'SFace', facts: 'Точность 97%, на снимках одного человека в разном возрасте 92%. Более крупные модели в наших замерах не оказались лучше.', files: [RUNTIME, YUNET, SFACE], suits: ['weak', 'normal', 'strong'] },
   { id: 'gigaam', feature: 'speech', name: 'GigaAM, для русского', facts: 'Ошибается в 12% слов, расшифровывает в 10 раз быстрее записи, сама ставит знаки препинания', files: [RUNTIME, GIGAAM, GIGAAM_WORDS], languages: ['ru'], suits: ['normal', 'strong'] },
-  { id: 'whisper-base', feature: 'speech', name: 'Whisper, лёгкая', facts: 'На русском ошибается в 37% слов, в 5 раз быстрее записи. Подойдёт для слабого устройства и для других языков', files: [], whisper: { repo: 'onnx-community/whisper-base', mb: 85 }, suits: ['weak'] },
+  { id: 'whisper-small-en', feature: 'speech', name: 'Whisper, средняя, для английского', facts: 'Ошибается в 5% английских слов, лёгкая в 16%. Примерно втрое медленнее лёгкой. Только английский', files: [], whisper: { repo: 'onnx-community/whisper-small.en', mb: 250 }, languages: ['en'], suits: ['normal', 'strong'] },
+  { id: 'whisper-base', feature: 'speech', name: 'Whisper, лёгкая', facts: 'На английском ошибается в 16% слов, на русском в 39%, в 5 раз быстрее записи. Подойдёт для слабого устройства и для других языков', files: [], whisper: { repo: 'onnx-community/whisper-base', mb: 85 }, suits: ['weak'] },
+  { id: 'whisper-small', feature: 'speech', name: 'Whisper, средняя', facts: 'На английском ошибается в 6% слов, на русском в 24%. Любые языки. Примерно втрое медленнее лёгкой', files: [], whisper: { repo: 'onnx-community/whisper-small', mb: 250 }, suits: [] },
+  { id: 'whisper-turbo', feature: 'speech', name: 'Whisper, максимальная', facts: 'На английском ошибается в 5% слов, на русском в 15%, лучше других справляется с акцентом и шумом. Скачивать около 1,1 ГБ, в 5 раз медленнее лёгкой: нужен сильный компьютер', files: [], whisper: { repo: 'onnx-community/whisper-large-v3-turbo', mb: 1090 }, suits: [] },
 ]
 const byId = (id: string) => VARIANTS.find((v) => v.id === id)!
 const language = () => (typeof document === 'undefined' ? 'en' : document.documentElement.lang)

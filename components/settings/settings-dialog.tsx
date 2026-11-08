@@ -1,6 +1,6 @@
 'use client'
 import { useState, type ComponentType } from 'react'
-import { ChevronLeft, ChevronRight, Cpu, DatabaseBackup, DoorOpen, KeyRound, ListChecks, SlidersHorizontal, UserRound, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Cpu, DatabaseBackup, DoorOpen, KeyRound, Lightbulb, ListChecks, SlidersHorizontal, UserRound, Users } from 'lucide-react'
 import { AssistantIcon } from '../assistant-icon'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useApp } from '@/lib/client'
@@ -9,6 +9,7 @@ import { Account } from './account'
 import { Access } from './access'
 import { Archive } from './archive'
 import { Files } from './files'
+import { FeatureGuide } from '../feature-guide'
 import { AssistantSettings } from './assistant'
 import { SetupGuide } from './setup-guide'
 import { ShareLinks } from './share-links'
@@ -17,10 +18,11 @@ import { SmartSettings } from './smart'
 import type { SignInMethods as Methods } from '@/lib/sign-in-methods'
 import { TokensTab } from './tokens'
 
-type Section = 'setup' | 'account' | 'smart' | 'general' | 'people' | 'signin' | 'assistant' | 'agents' | 'data'
+export type Section = 'tips' | 'setup' | 'account' | 'smart' | 'general' | 'people' | 'signin' | 'assistant' | 'agents' | 'data'
 
 /** Each screen says what it is for, so nobody has to work it out from the fields. */
 const SECTIONS: Record<Section, [string, string, ComponentType<{ size?: number }>]> = {
+  tips: ['Возможности и советы', 'Всё, что умеет приложение, и то, что обычно остаётся незамеченным.', Lightbulb],
   setup: ['С чего начать', 'Что уже готово и что ещё можно подключить. Всё необязательное можно пропустить.', ListChecks],
   account: ['Мой аккаунт', 'Как вы связаны с архивом и как входите в него.', UserRound],
   smart: ['Лица и голос', 'Поиск лиц на фото и распознавание речи. Работает прямо на этом устройстве. Скачайте то, что нужно: остальное приложение работает и без этого.', Cpu],
@@ -32,16 +34,16 @@ const SECTIONS: Record<Section, [string, string, ComponentType<{ size?: number }
   data: ['Данные и резервные копии', 'Добавить людей из файла, скачать данные, сделать копию архива.', DatabaseBackup],
 }
 
-export function SettingsDialog({ open, onOpenChange, familyName, providers, onText }: { open: boolean; onOpenChange: (v: boolean) => void; familyName: string; providers: Methods; onText: () => void }) {
+export function SettingsDialog({ open, onOpenChange, familyName, providers, onText, initial }: { open: boolean; onOpenChange: (v: boolean) => void; familyName: string; providers: Methods; onText: () => void; initial?: Section }) {
   const { t, me, lang } = useApp()
   const isOwner = me.role === 'owner'
-  const [section, setSectionNow] = useState<Section>(isOwner ? 'setup' : 'account')
+  const [section, setSectionNow] = useState<Section>(initial ?? (isOwner ? 'setup' : 'account'))
   // On a phone the list and a section take turns on the screen; a row of tabs there hid most of the sections.
-  const [inside, setInside] = useState(false)
+  const [inside, setInside] = useState(!!initial)
   const setSection = (next: Section) => { setSectionNow(next); setInside(true) }
   const groups: [string, Section[]][] = isOwner
-    ? [['', ['setup', 'account']], ['Основные настройки', ['general', 'people', 'signin', 'data']], ['ИИ и интеграции', ['assistant', 'agents', 'smart']]]
-    : [['', ['account', 'smart', 'data']]]
+    ? [['', ['setup', 'tips', 'account']], ['Основные настройки', ['general', 'people', 'signin', 'data']], ['ИИ и интеграции', ['assistant', 'agents', 'smart']]]
+    : [['', ['account', 'tips', 'smart', 'data']]]
   const [title, description] = SECTIONS[section]
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -66,6 +68,7 @@ export function SettingsDialog({ open, onOpenChange, familyName, providers, onTe
               <DialogDescription className="mt-0.5 text-sm text-ink-soft">{t(description)}</DialogDescription>
             </header>
             {section === 'setup' && isOwner && <SetupGuide onGo={setSection} />}
+            {section === 'tips' && <FeatureGuide onGo={setSection} />}
             {section === 'account' && <Account providers={providers} />}
             {section === 'smart' && <SmartSettings />}
             {section === 'general' && isOwner && <Archive familyName={familyName} lang={lang} />}

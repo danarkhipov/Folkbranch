@@ -87,9 +87,23 @@ Folkbranch ships no model. A browser downloads one from its source only when som
 | YOLOv8n-face, YOLOv11m-face | Finding faces, accurate and maximum | [deepghs/yolo-face](https://huggingface.co/deepghs/yolo-face), exported from [akanametov/yolo-face](https://github.com/akanametov/yolo-face) | GPL-3.0, from the original repository |
 | SFace | Telling faces apart | [opencv/face_recognition_sface](https://huggingface.co/opencv/face_recognition_sface) | Apache-2.0 |
 | GigaAM v3 | Russian speech | [istupakov/gigaam-v3-onnx](https://huggingface.co/istupakov/gigaam-v3-onnx) | MIT |
-| Whisper base | Speech in other languages | [onnx-community/whisper-base](https://huggingface.co/onnx-community/whisper-base) | Apache-2.0 |
+| Whisper base | Speech in other languages, light | [onnx-community/whisper-base](https://huggingface.co/onnx-community/whisper-base) | Apache-2.0 |
+| Whisper small, small.en | Speech: medium, any language or English only | [onnx-community/whisper-small](https://huggingface.co/onnx-community/whisper-small), [whisper-small.en](https://huggingface.co/onnx-community/whisper-small.en) | Apache-2.0 (the OpenAI models they are converted from) |
+| Whisper large-v3-turbo | Speech: maximum, any language | [onnx-community/whisper-large-v3-turbo](https://huggingface.co/onnx-community/whisper-large-v3-turbo) | MIT (the OpenAI model it is converted from) |
 | ONNX Runtime Web | Running the models | [onnxruntime-web](https://www.npmjs.com/package/onnxruntime-web) | MIT |
 
 The face detectors, YuNet and the YOLO models alike, were trained on WIDER FACE, a dataset licensed for non-commercial use (CC BY-NC-ND 4.0). OpenCV releases YuNet under MIT all the same; whether the dataset's terms reach a trained model is not settled. For a family's own archive this does not matter. Anyone offering Folkbranch as a paid service should check it first.
+
+### How the speech models compare
+
+Measured with [`scripts/speech-eval.mjs`](../scripts/speech-eval.mjs) on 8 November 2026, with the models quantised to 8 bits as the app runs them, on a laptop processor. English: 40 clips of LibriSpeech test-other (noisy, 1,135 words). Russian: 40 clips of bond005/sova_rudevices (speech recorded on ordinary devices, 349 words). A small test, so differences of a point or two mean little.
+
+| Model | Download | Wrong words, English | Wrong words, Russian | Speed against Whisper base |
+|---|---|---|---|---|
+| Whisper base | 85 MB | 15.9% | 39% | 1 |
+| Whisper small.en | 250 MB | 4.9% | - | about 1/3 |
+| Whisper small | 250 MB | 6.0% | 23.5% | about 1/3 |
+| Whisper large-v3-turbo | 1.1 GB | 5.4% | 15.2% | about 1/5 |
+| Distil-Whisper small.en | 170 MB | 9.5% | - | about 1/2 (left out: worse than small.en at a similar size) |
 
 Checked on 8 November 2026. Each source's own licence file is the authority.

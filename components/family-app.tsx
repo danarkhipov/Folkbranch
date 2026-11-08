@@ -10,6 +10,7 @@ import { personName, shownTags, type Graph, type HistoryEntry, type Lang, type M
 import { GraphCanvas, type CanvasHandle } from './graph-canvas'
 import { ConnectionNotice, MainBar, ViewBar, type Side } from './chart-bars'
 import { useChartScope } from './chart-scope'
+import type { GuideSection } from './feature-guide'
 import { ConfirmDialog } from './confirm-dialog'
 import type { SearchHit } from './person-pickers'
 import type { AssistantState } from '@/lib/types'
@@ -39,6 +40,7 @@ const ReviewPanel = dynamic(() => import('./review-panel').then((m) => m.ReviewP
 const PrintDialog = dynamic(() => import('./print-dialog').then((m) => m.PrintDialog), { ssr: false })
 // The card opens on a press, so its tabs need not come with the first screen.
 const PersonPanel = dynamic(() => import('./person-panel').then((m) => m.PersonPanel), { ssr: false })
+const FeatureTour = dynamic(() => import('./feature-tour').then((m) => m.FeatureTour), { ssr: false })
 const Onboarding = dynamic(() => import('./onboarding').then((m) => m.Onboarding), { ssr: false })
 const TextDialog = dynamic(() => import('./text-dialog').then((m) => m.TextDialog), { ssr: false })
 
@@ -97,6 +99,17 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
   const { data: drafts = [] } = useProposals(me.role !== 'reader')
   const draftOps = drafts.reduce((n, d) => n + d.ops.length, 0)
   const [settings, setSettings] = useState(false)
+  const [settingsAt, setSettingsAt] = useState<GuideSection | undefined>(undefined)
+  const openSettings = (section?: GuideSection) => { setSettingsAt(section); setSettings(true) }
+  // Someone who has just come in is shown what the archive can do, once on this device.
+  const [tour, setTour] = useState(false)
+  useEffect(() => {
+    if (me.role === 'owner' || me.guest) return
+    try { if (localStorage.getItem('folkbranch-tour')) return } catch { return }
+    const timer = setTimeout(() => setTour(true), 1200)
+    return () => clearTimeout(timer)
+  }, [me.role, me.guest])
+  const endTour = () => { setTour(false); try { localStorage.setItem('folkbranch-tour', '1') } catch {} }
   const [path, setPath] = useState<string[] | null>(null)
   const [groups, setGroups] = useState<string[]>([])
   const [importing, setImporting] = useState(false)
@@ -318,7 +331,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       <Presence.Provider value={present}>
       <ConnectionNotice t={t} />
       <a href="#chart" className="skip-link bar-btn float" onClick={(e) => { e.preventDefault(); document.querySelector<HTMLElement>('.card-main')?.focus() }}>{t('Перейти к схеме')}</a>
-      <MainBar folded={barsHidden} onHide={() => hideBars(true)} onShow={() => hideBars(false)} guest={!!me.guest} familyName={familyName} present={present} mode={barMode} navRef={nav} side={side} draftOps={draftOps} onSearch={() => setSearch(true)} onSide={(next) => { setSide(next); setPath(null) }} onAssistant={toggleAssistant} onSettings={() => setSettings(true)} />
+      <MainBar folded={barsHidden} onHide={() => hideBars(true)} onShow={() => hideBars(false)} guest={!!me.guest} familyName={familyName} present={present} mode={barMode} navRef={nav} side={side} draftOps={draftOps} onSearch={() => setSearch(true)} onSide={(next) => { setSide(next); setPath(null) }} onAssistant={toggleAssistant} onSettings={() => openSettings()} />
       <main id="chart" aria-label={t('Схема семьи')}>
       <GraphCanvas ref={canvas} scope={scope} pathIds={path} groupIds={groupIds} panelOpen={panelOpen} leftInset={side === 'assistant' ? assistantWidth + 12 : 0}/>
 
@@ -361,10 +374,11 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       {overview && <FamilyOverview onClose={() => setOverview(false)} />}
       {textOpen && <TextDialog open onOpenChange={setTextOpen} />}
       {importing && <ImportDialog open files={dropped} onOpenChange={setImporting} />}
-      {welcome && <Onboarding onClose={endWelcome} onImport={() => { setDropped(null); setImporting(true) }} onFirstPerson={() => setQuick({ type: null, to: null })} />}
+      {tour && !welcome && <FeatureTour onClose={endTour} onGo={(s) => { endTour(); openSettings(s) }} />}
+      {welcome && <Onboarding onGo={(s) => { endWelcome(); openSettings(s) }} onClose={endWelcome} onImport={() => { setDropped(null); setImporting(true) }} onFirstPerson={() => setQuick({ type: null, to: null })} />}
       {printing && <PrintDialog graph={scope.shown ?? ctx.graph} onClose={() => setPrinting(false)} />}
       <ConfirmDialog state={confirmState} onClose={() => setConfirm(null)} />
-      {settings && <SettingsDialog open onOpenChange={setSettings} familyName={familyName} providers={providers} onText={() => setTextOpen(true)} />}
+      {settings && <SettingsDialog open initial={settingsAt} onOpenChange={setSettings} familyName={familyName} providers={providers} onText={() => setTextOpen(true)} />}
       </Presence.Provider>
     </App.Provider>
   )
