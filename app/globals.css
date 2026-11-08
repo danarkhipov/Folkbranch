@@ -394,3 +394,10 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
   .main-bar .bar-btn { font-size: 10.5px; }
   .panel-tabs [role=tab] { font-size: 12.5px; }
 }
+
+/* The map: what a mark says when pressed, and the numbers of one life's stops. */
+.map-card { display: flex; flex-direction: column; gap: 4px; max-width: 240px; font-size: 13px; line-height: 1.35; color: var(--ink); }
+.map-card div:last-child { display: flex; flex-wrap: wrap; gap: 2px 10px; }
+.map-card button { text-decoration: underline; text-underline-offset: 2px; text-align: left; }
+.leaflet-tooltip.map-number { background: transparent; border: 0; box-shadow: none; padding: 0; font-weight: 600; color: var(--ink); }
+.leaflet-tooltip.map-number::before { display: none; }

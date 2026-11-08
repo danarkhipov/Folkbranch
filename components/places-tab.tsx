@@ -1,19 +1,24 @@
 'use client'
 import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import dynamic from 'next/dynamic'
 import { ExternalLink, Plus, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { api, useApp } from '@/lib/client'
-import { findPlace, placeChain, placesInUse, PLACE_KINDS } from '@/lib/places'
+import { findPlace, mapSpots, placeChain, placesInUse, PLACE_KINDS } from '@/lib/places'
 import { personName, type Place, type PlaceName, type Repository } from '@/lib/types'
+import { Segmented } from './person-fields'
 
 export const usePlaces = () => useQuery({ queryKey: ['places'], queryFn: () => api<Place[]>('places') })
 export const useRepositories = () => useQuery({ queryKey: ['repositories'], queryFn: () => api<Repository[]>('repositories') })
 
-/** Coordinates open in a map the person chooses; the archive itself loads no map from anywhere. */
+/** The map and its library load only when someone opens it. */
+const PlaceMap = dynamic(() => import('./place-map').then((m) => m.PlaceMap), { ssr: false })
+
+/** Coordinates also open in a map the person chooses, outside the archive. */
 const mapLink = (p: { lat: number | null; lon: number | null }) => (p.lat !== null && p.lon !== null ? `https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lon}#map=12/${p.lat}/${p.lon}` : '')
 
 type Draft = Omit<Place, 'id'> & { id: string | null }
@@ -84,7 +89,13 @@ export function PlacesTab({ onOpen }: { onOpen: (id: string) => void }) {
   // Which row the form opened under: a place, or a place as written that has no record yet.
   const [at, setAt] = useState('')
   const [filter, setFilter] = useState('')
+  const [view, setView] = useState<'list' | 'map'>('list')
   const uses = useMemo(() => placesInUse(graph), [graph])
+  const marks = useMemo(() => mapSpots(graph, places).map((s) => ({
+    id: s.place.id, lat: s.place.lat, lon: s.place.lon, title: s.place.name,
+    note: [placeChain(s.place, places).slice(1).map((x) => x.name).join(' → '), s.place.otherNames.map((n) => n.name).join(', ')].filter(Boolean).join(' · '),
+    people: s.people.flatMap((id) => { const p = byId.get(id); return p && !p.hidden ? [{ id, name: personName(p) }] : [] }),
+  })), [graph, places, byId])
   // Written places grouped by the record they mean; a record with no mention still shows.
   const rows = useMemo(() => {
     const byPlace = new Map<string, { place: Place | null; texts: string[]; people: Set<string> }>()
@@ -110,6 +121,11 @@ export function PlacesTab({ onOpen }: { onOpen: (id: string) => void }) {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-ink-soft">{t('Места из карточек. Укажите, во что место входило, и его старые названия: тогда поиск найдёт людей и по прежнему имени.')}</p>
+      <Segmented label={t('Как показать')} value={view} onChange={setView} options={[['list', t('Списком')], ['map', t('На карте')]]} />
+      {view === 'map' && (marks.length
+        ? <PlaceMap marks={marks} onPerson={onOpen} className="h-80" />
+        : <p className="text-ink-soft">{t('На карте пока пусто: ни у одного места нет широты и долготы. Их можно добавить в сведениях о месте.')}</p>)}
+      {view === 'list' && <>
       <div className="flex gap-2">
         <Input aria-label={t('Найти место')} placeholder={t('Найти место')} value={filter} onChange={(e) => setFilter(e.target.value)} />
         {canEdit && <Button size="sm" variant="outline" className="flex-none" onClick={() => { setAt('new'); setEditing(blank('')) }}><Plus /> {t('Место')}</Button>}
@@ -151,6 +167,7 @@ export function PlacesTab({ onOpen }: { onOpen: (id: string) => void }) {
           )
         })}
       </ul>
+      </>}
     </div>
   )
 }

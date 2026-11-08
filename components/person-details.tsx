@@ -14,7 +14,10 @@ import { personName, shownTags, yearOf, type Fact, type FactPerson, type ClaimFi
 import { fieldsFor, firstRole, ROLES } from '@/lib/fact-kinds'
 import { PersonPopover } from './person-pickers'
 import { ContactsBlock, PlaceHint } from './person-extras'
-import { useRepositories } from './places-tab'
+import { usePlaces, useRepositories } from './places-tab'
+import { lifeStops } from '@/lib/places'
+
+const PlaceMap = dynamic(() => import('./place-map').then((m) => m.PlaceMap), { ssr: false })
 import { AddMenu, Field, GrowText, Hints, OpenAddress, ReadText, TagInput, DateField, Segmented } from './person-fields'
 import { Select } from '@/components/ui/select'
 import { inputClass } from '@/components/ui/input'
@@ -281,8 +284,14 @@ function Versions({ person, field, current, change, attach }: { person: Person; 
 
 /** A life in order, read from the card and the family, so nothing has to be written twice. */
 function LifeLine({ person }: { person: Person }) {
-  const { t, graph, focus } = useApp()
+  const { t, graph, byId, focus } = useApp()
+  const { data: places = [] } = usePlaces()
+  const [map, setMap] = useState(false)
   const events = useMemo(() => lifeEvents(person, graph), [person, graph])
+  const marks = useMemo(() => lifeStops(person, graph, places).map((s, i) => {
+    const other = s.withId ? byId.get(s.withId) : undefined
+    return { id: `${s.place.id}:${i}`, lat: s.place.lat, lon: s.place.lon, title: s.place.name, note: [t(s.what), s.date].filter(Boolean).join(', '), people: other ? [{ id: other.id, name: personName(other) }] : [] }
+  }), [person, graph, places, byId, t])
   if (events.length < 2) return null
   return (
     <details className="group">
@@ -295,6 +304,8 @@ function LifeLine({ person }: { person: Person }) {
           </li>
         ))}
       </ol>
+      {marks.length > 0 && <button type="button" className="pick mt-2 text-sm underline underline-offset-2 hover:text-ink" onClick={() => setMap(!map)}>{t(map ? 'Скрыть карту' : 'Места жизни на карте')}</button>}
+      {map && <PlaceMap marks={marks} path onPerson={(id) => focus(id, { center: true })} className="mt-2 h-64" />}
     </details>
   )
 }
