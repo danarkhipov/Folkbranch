@@ -7,6 +7,7 @@ import { getSetting, say, setSetting } from '../ops/settings'
 import { getDb, schema } from '../db'
 import { eq } from 'drizzle-orm'
 import { type LiveModel, newestFirst, PARSERS } from './models'
+import { lineOf, LINES, newestOfLine } from './lines'
 import { PRESETS, type PresetId } from './presets'
 import { activeProvider, keyEnvOf } from './provider'
 
@@ -25,6 +26,7 @@ export function currentProvider() {
   const fromEnv = activeProvider(process.env)
   if (fromEnv) return fromEnv
   const s = saved()
+  if (s && getSetting('agentAuto') === '1') void refreshAutoModel()
   return s ? activeProvider({ AGENT_PROVIDER: s.id, [keyEnvOf(s.id)]: s.key, AGENT_MODEL: s.model, AGENT_FOLDER: s.folder }) : null
 }
 
@@ -32,7 +34,31 @@ export function providerStatus(actor: Actor) {
   requireRole(actor, 'owner')
   const p = currentProvider()
   const fromEnv = !!activeProvider(process.env)
-  return { connected: !!p, provider: p?.id ?? null, label: p?.label ?? null, model: p?.model ?? null, source: !p ? null : fromEnv ? 'server' as const : 'app' as const, keyEnding: p && !fromEnv ? p.key.slice(-4) : null }
+  return { connected: !!p, autoPossible: !!(p && LINES[p.id as PresetId]?.length), auto: !fromEnv && getSetting('agentAuto') === '1', provider: p?.id ?? null, label: p?.label ?? null, model: p?.model ?? null, source: !p ? null : fromEnv ? 'server' as const : 'app' as const, keyEnding: p && !fromEnv ? p.key.slice(-4) : null }
+}
+
+// How often the newest model of the line is looked for: a release is picked up within hours, and the provider is not asked on every message.
+const REFRESH_EVERY = 6 * 3600_000
+let refreshedAt = 0
+
+/**
+ * Keeps the model on the newest of its line that the service lists, never older than the one we tested.
+ * Only for a model chosen by the app itself; one the owner picked by hand is left alone.
+ */
+export async function refreshAutoModel(force = false) {
+  if (!force && Date.now() - refreshedAt < REFRESH_EVERY) return
+  refreshedAt = Date.now()
+  const s = saved()
+  if (!s || getSetting('agentAuto') !== '1' || activeProvider(process.env)) return
+  const line = lineOf(s.model ?? '', LINES[s.id] ?? [])
+  if (!line) return
+  try {
+    const live = await liveModels({ id: s.id, key: s.key, folder: s.folder ?? '' }, undefined, true)
+    const best = newestOfLine(live.filter((m) => m.usable).map((m) => m.id), line)
+    if (best && best !== s.model) setSetting('agentModel', best)
+  } catch {
+    // The service could not be asked now: the model in use stays, and the next try is in a few hours.
+  }
 }
 
 const CHECKS: Record<PresetId, (key: string, folder: string) => { url: string; headers: Record<string, string>; lists?: boolean }> = {
@@ -76,10 +102,10 @@ async function checkOpenRouterModel(model: string) {
 // The provider's list is read again after ten minutes, so a model released today is offered today.
 const listed = new Map<string, { at: number; models: LiveModel[] }>()
 
-async function liveModels(p: { id: PresetId; key: string; folder: string }, timeout?: number): Promise<LiveModel[]> {
+async function liveModels(p: { id: PresetId; key: string; folder: string }, timeout?: number, fresh = false): Promise<LiveModel[]> {
   const name = `${p.id}:${p.key.slice(-6)}:${p.folder}`
   const hit = listed.get(name)
-  if (hit && Date.now() - hit.at < 10 * 60_000) return hit.models
+  if (hit && !fresh && Date.now() - hit.at < 10 * 60_000) return hit.models
   const { url, headers } = p.id === 'openrouter' ? { url: 'https://openrouter.ai/api/v1/models', headers: {} } : CHECKS[p.id](p.key, p.folder)
   const models = PARSERS[p.id](await (await get(url, headers, timeout)).json(), p.folder)
   listed.set(name, { at: Date.now(), models })
@@ -109,12 +135,23 @@ export async function modelSees(): Promise<boolean | null> {
 /** Another model for the key already saved. */
 export async function chooseModel(actor: Actor, raw: unknown) {
   requireRole(actor, 'owner')
-  const { model } = z.object({ model: z.string().trim().min(1).max(120) }).parse(raw)
+  const { model, auto } = z.object({ model: z.string().trim().min(1).max(120).optional(), auto: z.boolean().optional() }).parse(raw)
   if (activeProvider(process.env)) throw new OpError(409, say('Модель задана в настройках сервера'))
   const s = saved()
   if (!s) throw new OpError(409, say('Сначала подключите провайдера'))
+  if (auto) {
+    // Back to the tested default of the service; the newest of its line is then found by itself.
+    const first = PRESETS.find((p) => p.id === s.id)!.models[0].id
+    if (!LINES[s.id]?.length) throw new OpError(400, say('Для этого сервиса автоматический выбор не настроен'))
+    setSetting('agentModel', lineOf(s.model ?? '', LINES[s.id]!) ? s.model! : first)
+    setSetting('agentAuto', '1')
+    await refreshAutoModel(true)
+    return providerStatus(actor)
+  }
+  if (!model) throw new OpError(400, 'model or auto required')
   await check(s.id, s.key, model, s.folder)
   setSetting('agentModel', model)
+  setSetting('agentAuto', '0')
   return providerStatus(actor)
 }
 
@@ -139,13 +176,16 @@ export async function connectProvider(actor: Actor, raw: unknown) {
   setSetting('agentProvider', input.provider)
   setSetting('agentKey', seal(input.key))
   setSetting('agentModel', model)
+  // No model named: the tested one is the floor, and the newest of its line is taken from then on.
+  setSetting('agentAuto', !input.model && LINES[input.provider]?.length ? '1' : '0')
   setSetting('assistantEnabled', '1')
+  if (getSetting('agentAuto') === '1') await refreshAutoModel(true)
   return providerStatus(actor)
 }
 
 export function disconnectProvider(actor: Actor) {
   requireRole(actor, 'owner')
-  for (const key of ['agentProvider', 'agentKey', 'agentModel', 'agentFolder']) getDb().delete(schema.settings).where(eq(schema.settings.key, key)).run()
+  for (const key of ['agentProvider', 'agentKey', 'agentModel', 'agentFolder', 'agentAuto']) getDb().delete(schema.settings).where(eq(schema.settings.key, key)).run()
   return providerStatus(actor)
 }
 

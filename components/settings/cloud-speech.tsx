@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Section } from '@/components/ui/section'
 import { Select } from '@/components/ui/select'
 import { api, useApp } from '@/lib/client'
+import { PayChoice, PlanLines, type Pay } from '../plan-badge'
 import { STT_PRESETS, sttPreset, type SttId, type SttPreset } from '@/lib/transcribe/presets'
 
 interface Status {
@@ -29,6 +30,7 @@ export function CloudSpeech() {
   const [baseUrl, setBaseUrl] = useState('')
   const [same, setSame] = useState(false)
   const [limit, setLimit] = useState('600')
+  const [pay, setPay] = useState<Pay>('paid')
   const [busy, setBusy] = useState('')
   const [message, setMessage] = useState<{ text: string; bad: boolean } | null>(null)
   const cur = data?.current ?? null
@@ -57,21 +59,37 @@ export function CloudSpeech() {
         ) : <p className="text-xs text-ink-soft">{t('Пока не подключено: расшифровка работает только на устройствах, моделями из «Лица и голос».')}</p>}
         {!locked && (
           <>
+            <PayChoice value={pay} onChange={(v) => { setPay(v); if (v === 'free' && !preset.free) { const first = STT_PRESETS.find((p) => p.free); if (first) { setProvider(first.id); setModel('') } } }} />
             <div role="radiogroup" aria-label={t('Сервис')} className="grid gap-2 sm:grid-cols-2">
-              {STT_PRESETS.map((p) => (
+              {STT_PRESETS.filter((p) => pay !== 'free' || p.free).map((p) => (
                 <button key={p.id} role="radio" aria-checked={provider === p.id} type="button" onClick={() => { setProvider(p.id); setModel(''); setSame(false); setMessage(null) }} className={`rounded-lg border p-2.5 text-left transition-colors ${provider === p.id ? 'border-ink bg-white' : 'border-border hover:border-ink-faint'}`}>
                   <b className="block font-medium">{t(p.label)}</b>
                   <span className="block text-xs text-ink-soft">{t(p.pitch)}</span>
+                  <PlanLines free={p.free} show={pay} />
                 </button>
               ))}
             </div>
-            <label className="flex flex-col gap-1 text-xs text-ink-soft">
+            {preset.id === 'custom' ? (
+              <label className="flex flex-col gap-1 text-xs text-ink-soft">
               {t('Модель')}
               {preset.id === 'custom' ? <input className={`${input} font-mono`} aria-label={t('Модель')} value={model} placeholder="whisper-1" onChange={(e) => setModel(e.target.value)} /> : (
                 <Select aria-label={t('Модель')} value={model || preset.models[0].id} onChange={setModel} options={preset.models.map((m) => ({ value: m.id, label: `${t(m.label)}${hour(m) ? ` · ${t(hour(m)!)}` : ''}` }))} />
               )}
               {preset.models.find((m) => m.id === (model || preset.models[0].id))?.note && <span>{t(preset.models.find((m) => m.id === (model || preset.models[0].id))!.note!)}</span>}
             </label>
+            ) : (
+              <details>
+                <summary className="cursor-pointer text-xs text-ink-soft">{t('Для опытных: выбрать модель самому')}</summary>
+                <div className="mt-2 flex flex-col gap-1">
+                  <p className="text-xs text-ink-soft">{t('Если не выбирать, берётся проверенная модель сервиса, а когда сервис выпустит новее в той же линейке, приложение перейдёт на неё само.')}</p>
+                  <label className="flex flex-col gap-1 text-xs text-ink-soft">
+              {t('Модель')}
+              <Select aria-label={t('Модель')} value={model || preset.models[0].id} onChange={setModel} options={preset.models.map((m) => ({ value: m.id, label: `${t(m.label)}${hour(m) ? ` · ${t(hour(m)!)}` : ''}` }))} />
+              {preset.models.find((m) => m.id === (model || preset.models[0].id))?.note && <span>{t(preset.models.find((m) => m.id === (model || preset.models[0].id))!.note!)}</span>}
+            </label>
+                </div>
+              </details>
+            )}
             {preset.id === 'custom' && <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Адрес сервера')}<input className={input} aria-label={t('Адрес сервера')} value={baseUrl} placeholder="http://192.168.1.10:8000/v1" onChange={(e) => setBaseUrl(e.target.value)} /></label>}
             {canBorrow && <label className="flex items-center gap-2 text-xs"><input type="checkbox" className="accent-[var(--ink)]" checked={same} onChange={(e) => setSame(e.target.checked)} />{t('Использовать ключ ассистента: тот же сервис, ничего вставлять не надо')}</label>}
             {!same && (

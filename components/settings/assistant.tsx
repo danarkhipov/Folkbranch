@@ -37,7 +37,16 @@ function ProviderSettings() {
       {data.connected ? (
         <p className="text-xs text-ink-soft">{t('Сервис')}: {data.label}{data.keyEnding ? `, ${t('ключ')} …${data.keyEnding}` : ''}{data.source === 'server' ? `. ${t('Ключ уже настроен')}` : ''}</p>
       ) : <p className="text-xs text-ink-soft">{t('Сначала подключите ключ: без него ассистент не может отвечать.')}</p>}
-      {data.source === 'app' && !changing && <LiveModelSelect key={`${data.provider}:${data.model}`} value={data.model ?? ''} onChange={changeModel} />}
+      {data.source === 'app' && !changing && data.auto && <p className="text-xs text-ink-soft" role="status">{t('Нейросеть')}: <b className="font-medium text-ink">{data.model}</b>. {t('Выбрана сама: проверенная, а когда выйдет новее в той же линейке, приложение перейдёт на неё без вас.')}</p>}
+      {data.source === 'app' && !changing && (
+        <details>
+          <summary className="cursor-pointer text-xs text-ink-soft">{t('Для опытных: выбрать нейросеть самому')}</summary>
+          <div className="mt-2 flex flex-col gap-2">
+            <LiveModelSelect key={`${data.provider}:${data.model}`} value={data.model ?? ''} onChange={changeModel} />
+            {!data.auto && data.autoPossible && <Button type="button" variant="outline" size="sm" className="self-start" onClick={async () => { await api('assistant/provider', { method: 'PATCH', json: { auto: true } }); await qc.invalidateQueries({ queryKey: ['provider'] }) }}>{t('Снова выбирать автоматически')}</Button>}
+          </div>
+        </details>
+      )}
       {modelError && <p role="alert" className="text-xs text-destructive">{modelError}</p>}
       {data.source !== 'server' && (changing || !data.connected ? <ProviderForm onDone={() => setChanging(false)} /> : (
         <div className="flex flex-wrap gap-2">

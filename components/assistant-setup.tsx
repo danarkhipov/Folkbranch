@@ -3,7 +3,9 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ExternalLink, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { ASSISTANT_PLANS } from '@/lib/agent/plans'
 import { PRESETS, type Preset, type PresetId } from '@/lib/agent/presets'
+import { PayChoice, PlanLines, type Pay } from './plan-badge'
 import { api, useApp } from '@/lib/client'
 import type { AssistantState } from '@/lib/types'
 import { Brand } from './brand-icons'
@@ -12,7 +14,7 @@ import { Select } from '@/components/ui/select'
 import { inputClass } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
-export interface ProviderStatus { connected: boolean; provider: PresetId | 'local' | null; label: string | null; model: string | null; source: 'server' | 'app' | null; keyEnding: string | null }
+export interface ProviderStatus { auto?: boolean; autoPossible?: boolean; connected: boolean; provider: PresetId | 'local' | null; label: string | null; model: string | null; source: 'server' | 'app' | null; keyEnding: string | null }
 export const useProviderStatus = () => useQuery({ queryKey: ['provider'], queryFn: () => api<ProviderStatus>('assistant/provider') })
 
 const CUSTOM = '__custom'
@@ -71,7 +73,10 @@ export function ProviderForm({ onDone }: { onDone?: () => void }) {
   const [folder, setFolder] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [pay, setPay] = useState<Pay>('paid')
   const preset = PRESETS.find((p) => p.id === id)!
+  // Paid fits every service; free only those that have a free plan, and what it costs in data is said on each.
+  const shown = (p: Preset) => pay !== 'free' || !!ASSISTANT_PLANS[p.id]?.free
   const connect = async (e: React.FormEvent) => {
     e.preventDefault()
     setBusy(true)
@@ -91,15 +96,16 @@ export function ProviderForm({ onDone }: { onDone?: () => void }) {
   }
   return (
     <form className="flex flex-col gap-3 text-sm" onSubmit={connect}>
+      <PayChoice value={pay} onChange={(v) => { setPay(v); if (v === 'free' && !ASSISTANT_PLANS[id]?.free) { const first = PRESETS.find((p) => ASSISTANT_PLANS[p.id]?.free); if (first) { setId(first.id); setModel('') } } }} />
       <fieldset className="flex flex-col gap-1.5">
         <legend className="mb-1 text-xs text-ink-soft">{t('Выберите сервис')}</legend>
-        {REGIONS.map(([region, title]) => (
+        {REGIONS.map(([region, title]) => PRESETS.some((p) => p.region === region && shown(p)) && (
           <div key={region} className="flex flex-col gap-1.5">
             <p className="mt-1 text-xs text-ink-faint">{t(title)}</p>
-            {PRESETS.filter((p) => p.region === region).map((p) => (
+            {PRESETS.filter((p) => p.region === region && shown(p)).map((p) => (
               <label key={p.id} className={`flex cursor-pointer items-start gap-2 rounded-lg border px-2.5 py-2 ${p.id === id ? 'border-ink bg-white' : 'border-border'}`}>
                 <input type="radio" name="provider" className="mt-0.5 accent-[var(--ink)]" checked={p.id === id} onChange={() => { setId(p.id); setError(''); setModel('') }} />
-                <span className="min-w-0"><span className="flex items-center gap-1.5 font-medium">{p.icon && <Brand name={p.icon} />}{p.label}</span>{p.pitch && <span className="block text-xs text-ink-soft">{t(p.pitch)}</span>}</span>
+                <span className="min-w-0"><span className="flex items-center gap-1.5 font-medium">{p.icon && <Brand name={p.icon} />}{p.label}</span>{p.pitch && <span className="block text-xs text-ink-soft">{t(p.pitch)}</span>}<PlanLines free={ASSISTANT_PLANS[p.id]?.free} paid={ASSISTANT_PLANS[p.id]?.paid} show={pay} /></span>
               </label>
             ))}
           </div>
@@ -116,8 +122,8 @@ export function ProviderForm({ onDone }: { onDone?: () => void }) {
         </li>}
       </ol>
       <details>
-        <summary className="cursor-pointer text-ink-soft">{t('Выбрать другую нейросеть')}</summary>
-        <div className="mt-2"><ModelSelect presetId={id} value={model} onChange={setModel} /></div>
+        <summary className="cursor-pointer text-ink-soft">{t('Для опытных: выбрать нейросеть самому')}</summary>
+        <div className="mt-2"><p className="mb-1 text-xs text-ink-soft">{t('Если не выбирать, приложение берёт проверенную нейросеть и потом само переходит на самую новую в её линейке.')}</p><ModelSelect presetId={id} value={model} onChange={setModel} /></div>
       </details>
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
       <Button disabled={busy || key.trim().length < 10 || (!!preset.folder && folder.trim().length < 10)}>{t(busy ? 'Проверяю ключ…' : 'Проверить и подключить')}</Button>

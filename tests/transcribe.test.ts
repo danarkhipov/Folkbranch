@@ -25,7 +25,7 @@ describe('cloud transcription', () => {
     server(() => json({ data: [] }))
     const status = await saveTranscription(owner, { provider: 'groq', key: 'gsk_secretvalue1234', limitMinutes: 2 })
     expect(JSON.stringify(status)).not.toContain('gsk_secretvalue')
-    expect(status.current).toMatchObject({ provider: 'groq', model: 'whisper-large-v3-turbo', keyEnding: '1234', limitMinutes: 2 })
+    expect(status.current).toMatchObject({ provider: 'groq', model: 'auto', keyEnding: '1234', limitMinutes: 2 })
     expect(calls.at(-1)!.url).toBe('https://api.groq.com/openai/v1/models')
     expect(transcriptionInfo()).toMatchObject({ enabled: true, label: 'Groq' })
     // Only the owner sees or changes the setup.
@@ -34,14 +34,15 @@ describe('cloud transcription', () => {
   })
 
   it('sends a recording as a form to a service that works like OpenAI, and counts what it costs', async () => {
-    server(() => json({ text: ' Привет, это бабушка ' }))
+    // The service lists a newer model of the tested line: it is used, and an older one is not.
+    server((url) => (url.endsWith('/models') ? json({ data: [{ id: 'whisper-large-v2-turbo' }, { id: 'whisper-large-v3-turbo' }, { id: 'whisper-large-v4-turbo' }] }) : json({ text: ' Привет, это бабушка ' })))
     const r = await transcribe(editor, audio, { language: 'ru', seconds: 30 })
     expect(r.text).toBe('Привет, это бабушка')
-    const { url, init } = calls[0]
+    const { url, init } = calls.find((c) => c.url.endsWith('/audio/transcriptions'))!
     expect(url).toBe('https://api.groq.com/openai/v1/audio/transcriptions')
     expect((init.headers as Record<string, string>).authorization).toBe('Bearer gsk_secretvalue1234')
     const form = init.body as FormData
-    expect(form.get('model')).toBe('whisper-large-v3-turbo')
+    expect(form.get('model')).toBe('whisper-large-v4-turbo')
     expect(form.get('language')).toBe('ru')
     expect(form.get('file')).toBeInstanceOf(Blob)
     const s = transcriptionStatus(owner).usage

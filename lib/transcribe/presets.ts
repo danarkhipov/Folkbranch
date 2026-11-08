@@ -15,6 +15,8 @@ export interface SttPreset {
   models: { id: string; label: string; perMinute: number | null; note?: string }[]
   /** Billed at least this many seconds for each request. */
   minSeconds?: number
+  /** Free plan and what it costs in data, from the service's own terms on 8 November 2026; null when there is none or it is not known. */
+  free?: { data: 'private' | 'trains' | 'mixed' | 'unknown'; note: string }
   /** The key of the assistant, when that is the same service, can be reused. */
   assistantKey?: 'openrouter' | 'openai'
 }
@@ -31,6 +33,7 @@ export const STT_PRESETS: SttPreset[] = [
   },
   {
     id: 'groq', label: 'Groq', where: 'Groq (США)', base: 'https://api.groq.com/openai/v1', style: 'openai', keysUrl: 'https://console.groq.com/keys', minSeconds: 10,
+    free: { data: 'private', note: 'Бесплатно: до 2 часов записи в час и 8 часов в день. Groq по договору не учится на ваших данных и по умолчанию не хранит их, логи до 30 дней только при сбоях.' },
     pitch: 'Самый дешёвый: около 4 центов за час записи, и есть бесплатный лимит. Тот же Whisper, быстро',
     models: [
       { id: 'whisper-large-v3-turbo', label: 'Whisper large-v3 turbo', perMinute: 0.04 / 60, note: 'Около 4,6% ошибок на английском' },
@@ -44,11 +47,13 @@ export const STT_PRESETS: SttPreset[] = [
   },
   {
     id: 'mistral', label: 'Mistral (Voxtral)', where: 'Mistral AI (Франция)', base: 'https://api.mistral.ai/v1', style: 'openai', keysUrl: 'https://console.mistral.ai/api-keys',
+    free: { data: 'trains', note: 'Бесплатный план есть, но Mistral по умолчанию учится на запросах (отключается в панели). На платном плане не учится, логи 30 дней.' },
     pitch: 'Европейский сервис: около 21 цента за час, 13 языков с хорошим русским',
     models: [{ id: 'voxtral-mini-transcribe-latest', label: 'Voxtral Mini Transcribe', perMinute: 0.0035 }],
   },
   {
     id: 'siliconflow', label: 'SiliconFlow (Китай)', where: 'SiliconFlow (Китай, Сингапур)', base: 'https://api.siliconflow.com/v1', style: 'openai', keysUrl: 'https://cloud.siliconflow.com/account/ak',
+    free: { data: 'unknown', note: 'Бесплатные модели есть, с лимитами. Условия по обучению на данных я не нашёл: считайте, что данные могут использоваться.' },
     pitch: 'Китайский сервис с бесплатными моделями распознавания: Qwen3-ASR знает больше 30 языков, SenseVoice лучше всего для китайского. Бесплатные модели имеют лимиты',
     models: [
       { id: 'Qwen/Qwen3-ASR-1.7B', label: 'Qwen3-ASR 1.7B (Alibaba)', perMinute: 0, note: 'Много языков, бесплатно' },

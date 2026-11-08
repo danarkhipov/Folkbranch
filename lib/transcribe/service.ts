@@ -5,7 +5,29 @@ import { currentProvider } from '../agent/provider-key'
 import { type Actor, OpError, requireRole } from '../ops/core'
 import { getSetting, say, setSetting } from '../ops/settings'
 import { seal, unseal } from '../sealed'
+import { newestOfLine, type Line } from '../agent/lines'
 import { STT_PRESETS, sttPreset, type SttId } from './presets'
+
+/** The speech models we tested, by service: the newest of the line the service lists is used from then on, never an older one. */
+const STT_LINES: Partial<Record<SttId, Line>> = {
+  groq: { match: /^whisper-large-v(\d+)-turbo$/, floor: 'whisper-large-v3-turbo', status: 'provisional' },
+}
+const chosenModels = new Map<string, { at: number; id: string }>()
+
+/** `auto` means the tested default, or a newer model of its line when the service lists one. Any failure keeps the tested default. */
+async function modelFor(c: { cfg: Config; preset: NonNullable<ReturnType<typeof sttPreset>>; base: string; key: string }) {
+  if (c.cfg.model !== 'auto') return c.cfg.model
+  const fallback = c.preset.models[0].id
+  const line = STT_LINES[c.preset.id]
+  if (!line) return fallback
+  const hit = chosenModels.get(c.preset.id)
+  if (hit && Date.now() - hit.at < 6 * 3600_000) return hit.id
+  const res = await fetch(`${c.base}/models`, { headers: { authorization: `Bearer ${c.key}` }, signal: AbortSignal.timeout(8_000) }).catch(() => null)
+  const body = res?.ok ? await res.json().catch(() => null) : null
+  const id = newestOfLine(Array.isArray(body?.data) ? body.data.map((m: { id: string }) => m.id) : [], line) ?? fallback
+  chosenModels.set(c.preset.id, { at: Date.now(), id })
+  return id
+}
 
 const purpose = 'stt-key'
 const MAX_BYTES = 25 * 1024 * 1024
@@ -28,7 +50,7 @@ function fromEnv(): Config | null {
   const preset = provider && sttPreset(provider)
   const key = process.env.STT_API_KEY?.trim()
   if (!preset || !key) return null
-  return { provider: preset.id, model: process.env.STT_MODEL?.trim() || preset.models[0].id, baseUrl: process.env.STT_BASE_URL?.trim() || undefined, key, limitMinutes: Number(process.env.STT_LIMIT_MINUTES ?? DEFAULT_LIMIT_MINUTES) }
+  return { provider: preset.id, model: process.env.STT_MODEL?.trim() || 'auto', baseUrl: process.env.STT_BASE_URL?.trim() || undefined, key, limitMinutes: Number(process.env.STT_LIMIT_MINUTES ?? DEFAULT_LIMIT_MINUTES) }
 }
 
 /** The setup that answers now: the server's environment first, so an admin's choice always wins. */
@@ -102,7 +124,7 @@ export async function saveTranscription(actor: Actor, raw: unknown) {
   if (!b.sameKey && !key) throw new OpError(400, say('Вставьте ключ сервиса'))
   const base = (preset.id === 'custom' ? b.baseUrl! : preset.base).replace(/\/+$/, '')
   await checkKey(preset.style, base, b.sameKey ? currentProvider()!.key : key!)
-  const cfg: Config = { provider: preset.id, model: b.model ?? preset.models[0].id, baseUrl: preset.id === 'custom' ? b.baseUrl : undefined, key, sameKey: b.sameKey, limitMinutes: b.limitMinutes ?? old?.limitMinutes ?? DEFAULT_LIMIT_MINUTES }
+  const cfg: Config = { provider: preset.id, model: b.model ?? 'auto', baseUrl: preset.id === 'custom' ? b.baseUrl : undefined, key, sameKey: b.sameKey, limitMinutes: b.limitMinutes ?? old?.limitMinutes ?? DEFAULT_LIMIT_MINUTES }
   setSetting('sttConfig', seal(JSON.stringify(cfg), purpose))
   return transcriptionStatus(actor)
 }
@@ -121,20 +143,21 @@ const formatOf = (name: string, mime: string) => {
 
 /** One recording to the service, and the words back. The recording is not kept anywhere. */
 async function send(c: NonNullable<ReturnType<typeof config>>, audio: { bytes: Buffer; name: string; mime: string }, language: string | null) {
-  const { preset, base, key, cfg } = c
+  const { preset, base, key } = c
+  const model = await modelFor(c)
   let res: Response
   if (preset.style === 'openrouter') {
     res = await ask('https://openrouter.ai/api/v1/audio/transcriptions', {
       method: 'POST',
       headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ model: cfg.model, input_audio: { data: audio.bytes.toString('base64'), format: formatOf(audio.name, audio.mime) }, ...(language ? { language } : {}) }),
+      body: JSON.stringify({ model, input_audio: { data: audio.bytes.toString('base64'), format: formatOf(audio.name, audio.mime) }, ...(language ? { language } : {}) }),
     }, 120_000)
   } else {
     const form = new FormData()
     form.set('file', new Blob([new Uint8Array(audio.bytes)], { type: audio.mime || 'audio/webm' }), audio.name || 'recording.webm')
-    form.set('model', cfg.model)
+    form.set('model', model)
     // OpenAI's newest model finds the language itself and refuses the old field.
-    if (language && cfg.model !== 'gpt-transcribe') form.set('language', language)
+    if (language && model !== 'gpt-transcribe') form.set('language', language)
     res = await ask(`${base}/audio/transcriptions`, { method: 'POST', headers: { authorization: `Bearer ${key}` }, body: form }, 120_000)
   }
   if (res.status === 401 || res.status === 403) throw new OpError(502, say('Сервис не принял ключ владельца. Сообщите ему'))
@@ -144,7 +167,7 @@ async function send(c: NonNullable<ReturnType<typeof config>>, audio: { bytes: B
   if (!res.ok) throw new OpError(502, `${say('Сервис ответил ошибкой')}: ${res.status}`)
   const body = await res.json().catch(() => null)
   if (typeof body?.text !== 'string') throw new OpError(502, say('Сервис ответил непонятно'))
-  return { text: body.text.trim(), cost: typeof body.usage?.cost === 'number' ? (body.usage.cost as number) : null }
+  return { text: body.text.trim(), cost: typeof body.usage?.cost === 'number' ? (body.usage.cost as number) : null, model }
 }
 
 // A few recordings a minute from one person is plenty; more is a stuck button or someone testing the owner's wallet.
@@ -168,7 +191,7 @@ export async function transcribe(actor: Actor, audio: { bytes: Buffer; name: str
   if (cap > 0 && (usage.seconds + seconds) / 60 > cap) throw new OpError(429, say('В этом месяце исчерпан предел расшифровки, который поставил владелец'))
   slowDown(actor.userId)
   const out = await send(c, audio, opts.language ? opts.language.slice(0, 2).toLowerCase() : null)
-  const perMinute = c.preset.models.find((m) => m.id === c.cfg.model)?.perMinute ?? 0
+  const perMinute = c.preset.models.find((m) => m.id === out.model)?.perMinute ?? c.preset.models[0].perMinute ?? 0
   const billed = Math.max(seconds, c.preset.minSeconds ?? 0)
   const dollars = out.cost ?? (perMinute * billed) / 60
   setSetting(`sttUsage:${month()}`, JSON.stringify({ seconds: usage.seconds + seconds, dollars: usage.dollars + dollars, requests: usage.requests + 1 }))
