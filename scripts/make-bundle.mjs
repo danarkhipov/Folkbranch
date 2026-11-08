@@ -19,6 +19,8 @@ fs.mkdirSync(dist, { recursive: true })
 const windows = process.platform === 'win32'
 const copy = (from, to) => fs.cpSync(from, path.join(stage, to), { recursive: true, force: true, ...(windows ? { dereference: true } : { verbatimSymlinks: true }) })
 copy(standalone, '.')
+// A build made beside a family's archive must never carry any of it away.
+if (fs.existsSync(path.join(stage, 'data'))) { console.error('The build holds a data folder. Remove .next and build again.'); process.exit(1) }
 copy('.next/static', '.next/static')
 copy('public', 'public')
 copy('drizzle', 'drizzle')
