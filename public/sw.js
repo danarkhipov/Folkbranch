@@ -1,6 +1,6 @@
 // Only what holds no family data: the app's own hashed files, the fonts, and a page for when there is no connection.
 // Nothing from /api is ever stored here, so a shared computer keeps no one's archive.
-const CACHE = 'folkbranch-v1'
+const CACHE = 'folkbranch-v2'
 const OFFLINE = '/offline.html'
 
 self.addEventListener('install', (event) => {
@@ -18,7 +18,8 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url)
   if (url.origin !== self.location.origin) return
   if (request.mode === 'navigate') {
-    event.respondWith(fetch(request).catch(() => caches.match(OFFLINE)))
+    // A new version is being put in place: the address answers with a gateway error for a moment. The waiting page retries by itself.
+    event.respondWith(fetch(request).then((r) => (r.status === 502 || r.status === 503 || r.status === 504 ? caches.match(OFFLINE).then((o) => o ?? r) : r)).catch(() => caches.match(OFFLINE)))
     return
   }
   if (url.pathname.startsWith('/_next/static/') || url.pathname.startsWith('/fonts/')) {
