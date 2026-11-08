@@ -98,47 +98,71 @@ Backups, updates, servers and Railway: the [self-hosting guide](docs/SELF_HOSTIN
 
 ## How it compares
 
-Folkbranch is for a family building its history together. [Gramps Web](https://www.grampsweb.org/) and [webtrees](https://webtrees.net/) are mature projects with more genealogy tools: maps, reports and, in Gramps Web, DNA.
+Folkbranch is for a family keeping its history together on a server of its own. [Gramps Web](https://www.grampsweb.org/) and [webtrees](https://webtrees.net/) are mature open source projects with more tools for research. MyHeritage, Ancestry and FamilySearch are services you go to for their record collections, and they are compared [further down](#and-the-big-services).
 
 | | Folkbranch | Gramps Web | webtrees |
 |---|---|---|---|
-| What it takes to run | One command on Mac or Linux, no Docker. One process, SQLite built in | Docker Compose: web, Celery and Redis | PHP and a database: MySQL, MariaDB, PostgreSQL, SQLite or SQL Server |
-| Memory | About 70 MB at rest, 130 MB under load¹ | About 1.5 GB, or 800 MB with two workers¹ | About 250 MB¹ |
-| Relatives join | With a link, no password | — | — |
-| A relative tells a story | ✓ A link, one button, no account. You review it first | — | — |
-| A copy for relatives | ✓ One HTML file, no server or internet, the living hidden | — | — |
-| Privacy | The living, and anyone or any story you choose, hidden from readers, guests and agents, on the server | — | ✓ Access levels and privacy per person, moderated edits |
-| History and undo | ✓ Every change, rolled back from the card or the history | ✓ Revision history² | — |
-| Charts | Whole family on one screen, ancestor fan, relationship path, PDF | ✓ Ancestor, descendant, hourglass, relationship, fan | ✓ Charts and reports |
-| Reports | The chart, and a person's page, in PDF | ✓ | ✓ |
-| Maps | ✗ | ✓ OpenHistoricalMap | ✓ Interactive |
-| DNA | ✗ | ✓ Matches, chromosome browser | —³ |
-| Faces in photos | ✓ On your device, a model you choose to download | ✓ Tagging and face detection⁴ | — |
-| AI | MCP server and assistant built in; an agent's edits wait for review | Chat assistant built in; MCP from third parties | Not built in |
-| On a phone | Bottom bar, card as a sheet, offline page, about 314 KB on first load | — | Adapted for phones in 2.2 |
-| Languages | 2 | 40+ | 50+ |
-| Several trees | ✗ | — | ✓ |
-| Sync with a desktop program | ✗ | ✓ Gramps Desktop | — |
-| Hosting for you | ✗ | ✓ Paid, Grampshub | — |
+| **Running it** | | | |
+| What it takes | One command on Mac or Linux, no Docker. One process with SQLite, about 70 MB of memory¹ | Docker Compose: the app, Celery and Valkey | PHP and a web server, with SQLite or another database |
+| **The family** | | | |
+| Relatives join | ✓ With a link, no password or email | A password, or a sign-in service you set up | A user name and password |
+| Read without an account | ✓ A link, with a password and an expiry if you want | ✗ Every reader signs in | ✓ Public pages, open to anyone |
+| A relative tells a story | ✓ A link with your questions, one button to talk, no account. You review it first | Upload a recording made elsewhere | Upload a recording made elsewhere |
+| A page for each person | ✓ Block editor, photos in the text, links to relatives | ✓ Formatted notes with images, and a blog | Notes, and an HTML block |
+| Suggested edits wait for review | ✓ From readers and agents | ✗ Contributors add directly | ✓ Moderated edits, set per user |
+| History and undo | ✓ Any change, rolled back from the card | ✓ Changes compared and undone | Partly: history, and pending edits can be rejected |
+| The living kept private | ✓ On the server, along with anyone or any story you choose | ✓ Private marks on records | ✓ Privacy rules, per person and by relationship |
+| A copy that needs nothing | ✓ One HTML file with the chart, cards and photos, the living left out | Reports in PDF and HTML | Reports in PDF and HTML |
+| **AI, on your terms** | | | |
+| AI agents over MCP | ✓ Built in. An agent's edits wait for review | A third-party server, reads and writes | A third-party module, writes are moderated |
+| An assistant in the app | ✓ Reads and edits after you confirm. Your key or a local model | ✓ A chat that only reads. Your key or a local model | ✗ |
+| Faces in photos | ✓ Found and matched to tagged people on your device. You confirm each name | ✓ Found on the server, named by hand | Tagged by hand, with a module |
+| Speech to text | ✓ On your device: GigaAM for Russian, Whisper for others | ✗ | ✗ |
+| **Where they go further** | | | |
+| Charts | Whole family on one screen, ancestor fan, relationship path, PDF | ✓ Ancestors, descendants, hourglass, fan, relationships | ✓ Fan, hourglass, relationships and more |
+| Reports and books | The chart and a person's page in PDF | ✓ Many reports | ✓ Many reports |
+| Maps and timelines | A life in order on each card. Places have a point that opens on OpenStreetMap, no map in the app | ✓ Maps and timelines | ✓ Maps and timelines |
+| Reading documents (OCR) | Only through the assistant's model | ✓ Tesseract on the server | ✗ |
+| DNA | ✗ | ✓ Matches, chromosome browser, Y-DNA | Stores DNA notes only |
+| Languages | 2 | 48 | 73 |
+| Several trees | ✗ | ✓ | ✓ |
+| Desktop program | ✗ | ✓ Two-way sync with Gramps Desktop | — |
+| Add-ons | ✗ | — | ✓ Modules |
+| Hosted for you | ✗ | ✓ Paid, by Grampshub | — |
 
-"—" means we have not checked, not that it is missing. Each project's own documentation is the authority. Gramps Web as of docs 26.6 and release 26.4.0, webtrees as of 2.2.6.
+Checked on 8 November 2026 against the code and official documentation: Gramps Web 26.11.1 with its API 3.25.2, and webtrees 2.2.6. Third-party servers and modules are named as such. "—" means we have not checked, not that it is missing. Each project's own documentation is the authority.
 
-¹ Folkbranch: our own measurement under a 256 MB limit, with 8 uploads, 40 page views and an import. The others: [selfhosting.sh](https://selfhosting.sh/compare/webtrees-vs-gramps-web), February 2026.
-² Listed in the Gramps Web docs. Whether a change can be rolled back from the screen was not checked.
-³ Not checked for webtrees.
-⁴ A project issue reports up to 12 GB of memory with face recognition on, 4 GB without. Not verified.
+¹ Our own measurement, under a 256 MB limit with 8 uploads, 40 page views and an import. We have not measured the others on the same work, so no figures are given for them.
 
-**Choose Gramps Web** if you use Gramps Desktop, need maps, DNA or reports, or want someone to host it for you.
-**Choose webtrees** if you need access levels, several trees in one place, modules or more languages.
-**Choose Folkbranch** if you want it running on a small machine in one command, and relatives adding to it from their phones without passwords.
+**Choose Gramps Web** if you use Gramps Desktop, need maps, DNA, reports or reading documents, or want someone to host it for you.
+**Choose webtrees** if you publish your research for others, need fine access rules, several trees, modules or many languages.
+**Choose Folkbranch** if the archive is for the family: running on a small machine in one command, relatives joining from their phones without passwords, and AI that only proposes.
+
+### And the big services
+
+MyHeritage, Ancestry and FamilySearch hold billions of records, DNA tests and other people's trees. Folkbranch has none of that. They also do more for families than is often thought:
+
+- **Without an account.** Ancestry's *Ask someone for info* lets anyone send facts or photos by a link, for the owner to accept. A MyHeritage family site can be public to guests, with the living hidden.
+- **Voice.** MyHeritage MyStories records in the browser and writes the words down. FamilySearch records up to five minutes in the browser, Ancestry in its app.
+- **AI.** MyHeritage GAIA, out since 4 November 2026, finds records and lets you choose what goes into the tree. FamilySearch and Ancestry suggest relatives and records for you to accept, and MyHeritage and Ancestry read handwritten documents.
+
+What differs is where the archive lives and who decides. Here it is your server, your relatives join without accounts with a service, faces and speech are handled on the device, and any agent you connect only proposes. The two go together: research there, export GEDCOM, and keep the family's archive here.
 
 ## What it does not do
 
-- No DNA tools and no maps.
-- No reports beyond the chart and a person's page in PDF. A family book is on the [roadmap](docs/ROADMAP.md).
+On purpose, because it needs what a family server does not have:
+
+- **No record collections or hints.** They take billions of scanned records and licences. Search them on FamilySearch or Ancestry, or let an agent do it through third-party MCP servers for them.
+- **No DNA.** It needs a lab test and holds the most sensitive data there is. Gramps Web does it well.
+- **No world tree and no matching with strangers.** It needs millions of users, and this archive is closed to search engines and to strangers by design.
+- **No hosted version.** You run it yourself, at home or on a server.
+- **No photo animation.** It does not help a family keep its history, and it puts words in the mouths of the dead.
+
+Not yet, and maybe later:
+
+- No maps, no reports beyond the chart and a person's page in PDF. A family book is on the [roadmap](docs/ROADMAP.md).
 - One tree per install, in two languages.
 - No sync with desktop programs, and no plugins.
-- No hosted version: you run it yourself, at home or on a server.
 
 ## AI agents
 
