@@ -38,7 +38,7 @@ export interface AppCtx {
   inView: Set<string> | null
   viewInfo: { label: string; reset: () => void } | null
   /** What the chart's own menu can start. */
-  commands: { addPerson: () => void; importFile: () => void; search: () => void; flip: () => void; deletePerson: (id: string) => void; clearAll: () => void }
+  commands: { addPerson: (at?: { x: number; rank: number }) => void; importFile: () => void; search: () => void; flip: () => void; deletePerson: (id: string) => void; clearAll: () => void }
   notify: (text: string, actions?: { label: string; run: () => void }[], stay?: boolean) => void
   /** Rolls back the most recent change that is not already undone. */
   undoLast: () => Promise<void>

@@ -40,6 +40,19 @@ describe('lines on the chart', () => {
     expect(kinship(l, g).intrusions).toBeLessThanOrEqual(2)
   })
 
+  it('keeps someone added by hand, tied to no one, in the row and place they were put', () => {
+    const g = buildGraph([['gf', 'M', 1900], ['f', 'M', 1930], ['me', 'M', 1960], ['new', 'U']], [['gf', 'f'], ['f', 'me']], [])
+    const plain = layoutFamily(g)
+    const placed = layoutFamily(g, { pins: { new: 900, 'row:new': 2 } })
+    const rowOf = (l: ReturnType<typeof layoutFamily>, id: string) => [...new Set([...l.cards.values()].map((c) => c.y))].sort((a, b) => a - b).indexOf(l.cards.get(id)!.y)
+    expect(rowOf(plain, 'new')).toBe(0)
+    expect(rowOf(placed, 'new')).toBe(2)
+    expect(placed.cards.get('new')!.x).toBeGreaterThan(placed.cards.get('me')!.x)
+    // Once the person has a parent, the row follows the family, not the hint.
+    const tied = buildGraph([['gf', 'M', 1900], ['f', 'M', 1930], ['me', 'M', 1960], ['new', 'U']], [['gf', 'f'], ['f', 'me'], ['gf', 'new']], [])
+    expect(rowOf(layoutFamily(tied, { pins: { new: 900, 'row:new': 2 } }), 'new')).toBe(rowOf(layoutFamily(tied), 'new'))
+  })
+
   it('leaves a clear strip between partners for the line down', () => {
     const l = layoutFamily(TANGLE)
     for (const u of l.unions) expect(u.x2 - u.x1).toBe(PITCH)

@@ -32,7 +32,7 @@ const CHOICES: Partial<Record<QuickType, [Concrete, string][]>> = {
 }
 const TITLE: Record<Concrete, string> = { father: 'Добавить отца', mother: 'Добавить мать', son: 'Добавить сына', daughter: 'Добавить дочь', spouse: 'Добавить супруга' }
 
-type State = { type: QuickType; to: string; otherParent?: string } | { type: null; to: null } | null
+type State = { type: QuickType; to: string; otherParent?: string } | { type: null; to: null; at?: { x: number; rank: number } } | null
 
 /** One window for adding a relative: type a name, pick an existing person or press Enter. */
 export function QuickAdd({ state, onClose }: { state: State; onClose: (createdId?: string) => void }) {

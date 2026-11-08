@@ -146,12 +146,13 @@ function passKey(f: string, childRank: number, rank: number) {
   return `pass:${f}@${childRank}:${rank}`
 }
 
-function arrangeRows(g: Graph, members: Map<string, Set<string>>, blockOf: Map<string, string>, adjacency: Map<string, string[]>, parentsOf: Map<string, string[]>, byFamily: Map<string, Family>, byId: Map<string, Person>) {
+function arrangeRows(g: Graph, members: Map<string, Set<string>>, blockOf: Map<string, string>, adjacency: Map<string, string[]>, parentsOf: Map<string, string[]>, byFamily: Map<string, Family>, byId: Map<string, Person>, hints: Map<string, number>) {
   const key = JSON.stringify([
     [...members].map(([k, m]) => [k, [...m]]),
     g.parentChild.map((l) => [l.parentId, l.childId]),
     g.unions.map((u) => [u.aId, u.bId]),
     g.persons.map((p) => [p.sex, p.birthYear]),
+    [...hints],
   ])
   if (lastOrder?.key === key) return lastOrder
 
@@ -163,7 +164,7 @@ function arrangeRows(g: Graph, members: Map<string, Set<string>>, blockOf: Map<s
   }
   dagre.layout(d)
   const ys = [...new Set([...members.keys()].map((k) => (d.node(k) as { y: number }).y))].sort((a, b) => a - b)
-  const rankOfBlock = generations(g, members, blockOf, byId, (k) => ys.indexOf((d.node(k) as { y: number }).y))
+  const rankOfBlock = generations(g, members, blockOf, byId, (k) => ys.indexOf((d.node(k) as { y: number }).y), hints)
   const rowCount = Math.max(0, ...rankOfBlock.values()) + 1
 
   const birth = (ids: string[]) => Math.min(9999, ...ids.filter((m) => parentsOf.has(m)).map((m) => byId.get(m)?.birthYear ?? 9999))
@@ -263,7 +264,20 @@ const GENERATION_YEARS = 28
  * can land a generation off. Here a block with a known birth year is moved down to the row of its time, a parent
  * is never left below a child, and a block without a year is drawn close above whoever it parents.
  */
-function generations(g: Graph, members: Map<string, Set<string>>, blockOf: Map<string, string>, byId: Map<string, Person>, structural: (k: string) => number) {
+function generations(g: Graph, members: Map<string, Set<string>>, blockOf: Map<string, string>, byId: Map<string, Person>, structural: (k: string) => number, hints: Map<string, number>) {
+  const rank = generationsByTime(g, members, blockOf, byId, structural)
+  if (!hints.size) return rank
+  // Someone added where the chart was pressed, and tied to no one yet, stays in the row they were put in.
+  const linked = new Set(g.parentChild.flatMap((l) => [l.parentId, l.childId]))
+  const last = Math.max(0, ...rank.values())
+  for (const [k, m] of members) {
+    const hint = [...m].map((id) => hints.get(id)).find((h) => h !== undefined)
+    if (hint !== undefined && ![...m].some((id) => linked.has(id))) rank.set(k, Math.max(0, Math.min(last, Math.round(hint))))
+  }
+  return rank
+}
+
+function generationsByTime(g: Graph, members: Map<string, Set<string>>, blockOf: Map<string, string>, byId: Map<string, Person>, structural: (k: string) => number) {
   const rank = new Map<string, number>([...members.keys()].map((k) => [k, structural(k)]))
   const years = new Map<string, number>()
   for (const [k, m] of members) {
@@ -349,7 +363,9 @@ export function layoutFamily(g: Graph, { rootsBelow = false, pins = {}, print = 
 
   const pitch = print ? PRINT_PITCH : PITCH
   const gap = print ? PRINT_GAP : NODE_SEP
-  const arranged = arrangeRows(g, members, blockOf, adjacency, parentsOf, byFamily, byId)
+  // A person with a pin named "row:<id>" was put in that generation's row by hand.
+  const hints = new Map(Object.entries(pins).filter(([k]) => k.startsWith('row:')).map(([k, v]) => [k.slice(4), v]))
+  const arranged = arrangeRows(g, members, blockOf, adjacency, parentsOf, byFamily, byId, hints)
   const rows: Block[][] = arranged.rows.map((row) => row.map((b) => ({ ...b, width: b.key.startsWith('pass:') ? PASS_W : b.slots.length * pitch })))
 
   /** Where each person, or passing line, stands relative to the centre of its block. */

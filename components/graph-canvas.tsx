@@ -42,7 +42,7 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
     const light = useChartLight(layout, pathIds, groupIds, view.isFar)
     const { kin, near: hoverKin, wave, fromMe, active, hotPairs, lightMode, childNote, hoverSoon, setHoverFamily } = light
     const { draft, startLink, startFromPerson } = useLinkDrawing(layout, view.toChart, () => light.setHoverId(null))
-    const [menu, setMenu] = useState<{ x: number; y: number; id?: string } | null>(null)
+    const [menu, setMenu] = useState<{ x: number; y: number; id?: string; at?: { x: number; rank: number } } | null>(null)
     useEffect(() => {
       if (!menu) return
       const close = (e: Event) => { if (!(e.target as HTMLElement | null)?.closest?.('[data-canvas-menu]')) setMenu(null) }
@@ -104,7 +104,12 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
         if (!id && e.target !== canvas.current && e.target !== world.current) return
         if (id && byId.get(id)?.hidden) return
         e.preventDefault(); setTip(null)
-        setMenu({ x: Math.min(e.clientX, window.innerWidth - 250), y: Math.min(e.clientY, window.innerHeight - (id ? 320 : 260)), id })
+        // Where a person added from this menu should stand: the chart's x, and the generation row nearest to the press.
+        const point = view.toChart(e.clientX, e.clientY)
+        const tops = [...new Set([...layout.cards.values()].map((c) => c.y))].sort((a, b) => a - b)
+        const nearest = tops.length ? tops.reduce((best, y, i) => (Math.abs(y + 40 - point.y) < Math.abs(tops[best] + 40 - point.y) ? i : best), 0) : 0
+        const rank = app.rootsBelow ? tops.length - 1 - nearest : nearest
+        setMenu({ x: Math.min(e.clientX, window.innerWidth - 250), y: Math.min(e.clientY, window.innerHeight - (id ? 320 : 260)), id, at: id ? undefined : { x: point.x, rank } })
       }} onClick={(e) => { if (e.target === canvas.current || e.target === world.current) { app.focus(null); setSel(null) } }}>
         <div ref={world} className={cn('world', active && 'focused')}>
           <svg className="links" width="1" height="1">
@@ -181,7 +186,7 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
               </>
             ) : (
               <>
-                {app.canEdit && <button role="menuitem" className="menu-item" onClick={() => { setMenu(null); app.commands.addPerson() }}><UserPlus size={15} /> {t('Добавить человека без родства')}</button>}
+                {app.canEdit && <button role="menuitem" className="menu-item" onClick={() => { const at = menu.at; setMenu(null); app.commands.addPerson(at) }}><UserPlus size={15} /> {t('Добавить человека без родства')}</button>}
                 {app.canEdit && <button role="menuitem" className="menu-item" onClick={() => { setMenu(null); app.commands.importFile() }}><FileUp size={15} /> {t('Добавить людей из файла')}</button>}
                 <button role="menuitem" className="menu-item" onClick={() => { setMenu(null); app.commands.search() }}><Search size={15} /> {t('Найти человека')}</button>
                 <button role="menuitem" className="menu-item" onClick={() => { setMenu(null); view.refit() }}><Maximize2 size={15} /> {t('Показать всех')}</button>

@@ -139,7 +139,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
   }
   const flipChart = () => directChart(!rootsBelow)
   const [photo, setPhoto] = useState<{ id: string; list?: string[] } | null>(null)
-  const [quick, setQuick] = useState<{ type: QuickType; to: string; otherParent?: string } | { type: null; to: null } | null>(null)
+  const [quick, setQuick] = useState<{ type: QuickType; to: string; otherParent?: string } | { type: null; to: null; at?: { x: number; rank: number } } | null>(null)
   const [confirmState, setConfirm] = useState<{ text: string; action: string; note?: string; resolve: (v: boolean) => void } | null>(null)
 
   const focus = useCallback((id: string | null, opts?: { center?: boolean }) => {
@@ -248,7 +248,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       view: viewGraph!,
       inView,
       viewInfo: inView ? { label: viewLabel, reset: scope.showAll } : null,
-      commands: { addPerson: () => setQuick({ type: null, to: null }), importFile: () => { setDropped(null); setImporting(true) }, search: () => setSearch(true), flip: flipChart, deletePerson: (id) => void deleteAsked(id), clearAll: () => void clearAsked() },
+      commands: { addPerson: (at) => setQuick({ type: null, to: null, at }), importFile: () => { setDropped(null); setImporting(true) }, search: () => setSearch(true), flip: flipChart, deletePerson: (id) => void deleteAsked(id), clearAll: () => void clearAsked() },
       notify,
       undoLast,
     }
@@ -342,7 +342,14 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       {panelOpen && <PersonPanel key={focused!.id} person={focused!} hit={searchHit?.personId === focused!.id ? searchHit : null} onClearHit={() => setSearchHit(null)} onClose={() => focus(null)} onDelete={onDelete} />}
 
       {search && <SearchDialog open onOpenChange={setSearch} onPick={(id, hit) => { setSearchHit(hit ?? null); focus(id) }} />}
-      {quick && <QuickAdd state={quick} onClose={(id) => { setQuick(null); if (id) focus(id) }} />}
+      {quick && <QuickAdd state={quick} onClose={(id) => {
+        const at = quick.type === null ? quick.at : undefined
+        setQuick(null)
+        if (!id) return
+        // Stands where the chart was pressed: along the row by its x, and in the generation row that was nearest.
+        if (at) void scope.pin(id, at.x).then(() => scope.pin(`row:${id}`, at.rank)).catch(() => {})
+        focus(id)
+      }} />}
       {photo && <PhotoDialog state={photo} onClose={() => setPhoto(null)} />}
       {toast && (
         <div role={toast.stay ? 'alert' : 'status'} onMouseEnter={() => clearTimeout(toastTimer.current)} onFocus={() => clearTimeout(toastTimer.current)} onMouseLeave={() => { if (!toast.stay) toastTimer.current = setTimeout(() => setToast(null), TOAST_MS) }} className="float fixed left-1/2 -translate-x-1/2 bottom-3 max-lg:bottom-[68px] z-30 flex items-center gap-1 pl-3 pr-1 py-1 text-sm max-w-[calc(100vw-24px)]">
