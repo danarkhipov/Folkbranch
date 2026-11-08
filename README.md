@@ -124,11 +124,6 @@ Folkbranch is for a family keeping its history together on a server of its own. 
 | Maps and timelines | A life in order on each card. Places have a point that opens on OpenStreetMap, no map in the app | ✓ Maps and timelines | ✓ Maps and timelines |
 | Reading documents (OCR) | Only through the assistant's model | ✓ Tesseract on the server | ✗ |
 | DNA | ✗ | ✓ Matches, chromosome browser, Y-DNA | Stores DNA notes only |
-| Languages | 2 | 48 | 73 |
-| Several trees | ✗ | ✓ | ✓ |
-| Desktop program | ✗ | ✓ Two-way sync with Gramps Desktop | — |
-| Add-ons | ✗ | — | ✓ Modules |
-| Hosted for you | ✗ | ✓ Paid, by Grampshub | — |
 
 Checked on 8 November 2026 against the code and official documentation: Gramps Web 26.11.1 with its API 3.25.2, and webtrees 2.2.6. Third-party servers and modules are named as such. "—" means we have not checked, not that it is missing. Each project's own documentation is the authority.
 
