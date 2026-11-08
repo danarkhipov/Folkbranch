@@ -92,7 +92,7 @@ export async function modelChoices(actor: Actor) {
   const p = currentProvider()
   if (!p || p.id === 'local') return { current: p?.model ?? null, models: [] as LiveModel[] }
   const all = await liveModels({ id: p.id as PresetId, key: p.key, folder: p.folder })
-  return { current: p.model, models: newestFirst(all.filter((m) => m.usable || m.id === p.model)).slice(0, 120) }
+  return { current: p.model, models: newestFirst(all.filter((m) => m.usable || m.id === p.model)).slice(0, 500) }
 }
 
 /** Whether the model answering now takes pictures: null when the provider does not say or cannot be reached. */
