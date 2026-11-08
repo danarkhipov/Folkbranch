@@ -1,5 +1,6 @@
 // What is set up and what is missing, in terms a person can act on. The app says it, so nobody has to read a manual
 // to find out why sign-in fails or why the assistant is silent.
+import { lowOnRoom } from './disk'
 import fs from 'node:fs'
 import { signInMethods } from '../sign-in-methods'
 import { count, isNull } from 'drizzle-orm'
@@ -9,7 +10,6 @@ import { publicOrigins } from '../public-url'
 import { Actor, requireRole } from './core'
 import { getSetting } from './settings'
 
-const LOW_DISK = 1024 ** 3
 
 /** The address the request came to. */
 const reached = (h: Headers) => {
@@ -29,7 +29,8 @@ export function setupStatus(actor: Actor, h: Headers) {
   const db = getDb()
   const n = (t: typeof schema.persons | typeof schema.user) => db.select({ n: count() }).from(t as typeof schema.persons).get()!.n
   const here = reached(h) ?? ''
-  const free = (() => { try { const s = fs.statfsSync(DATA_DIR); return s.bavail * s.bsize } catch { return null } })()
+  const disk = (() => { try { return fs.statfsSync(DATA_DIR) } catch { return null } })()
+  const free = disk ? disk.bavail * disk.bsize : null
   const local = /^https?:\/\/(localhost|127\.)/.test(here)
   const provider = currentProvider()
   return {
@@ -38,7 +39,7 @@ export function setupStatus(actor: Actor, h: Headers) {
     insecure: !local && here.startsWith('http://'),
     dataDir: DATA_DIR,
     freeBytes: free,
-    lowDisk: free !== null && free < LOW_DISK,
+    lowDisk: disk !== null && lowOnRoom(disk),
     people: n(schema.persons),
     users: n(schema.user),
     agents: db.select({ n: count() }).from(schema.apiTokens).where(isNull(schema.apiTokens.revokedAt)).get()!.n,

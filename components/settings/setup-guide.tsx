@@ -80,7 +80,7 @@ export function SetupGuide({ onImport, onFirstPerson, onGo }: { onImport?: () =>
         {s.addressWrong && <p role="alert" className="text-destructive break-anywhere">{t('В настройках указан другой адрес, поэтому вход работать не будет')}: <b>{s.addressWrong}</b>. {t('Поменяйте BETTER_AUTH_URL и перезапустите приложение.')}</p>}
         {s.insecure && <p role="alert" className="text-destructive">{t('Адрес без https: ссылки для входа передаются в открытом виде. На сервере запускайте установку с --domain.')}</p>}
         <p><span className="text-ink-soft">{t('Данные лежат в')}:</span> <code className="break-all">{s.dataDir}</code>{gb && ` · ${t('свободно')} ${gb} ${t('ГБ')}`}</p>
-        {s.lowDisk && <p role="alert" className="text-destructive">{t('На диске осталось меньше гигабайта. Освободите место, иначе новые файлы не сохранятся.')}</p>}
+        {s.lowDisk && <p role="alert" className="text-destructive">{t('На диске почти не осталось места. Освободите место, иначе новые файлы не сохранятся.')}</p>}
       </Step>
     </div>
   )

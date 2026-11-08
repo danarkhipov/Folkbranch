@@ -24,7 +24,7 @@ function DailyCopies() {
   return (
     <Section title={t('Копии на сервере')} description={t('Сервер сам копирует базу раз в день и хранит последние копии. Это защита от ошибок и неудачных обновлений. От поломки диска защитит только полная копия, сохранённая у вас.')}>
       {!data.on && <p className="text-xs text-ink-soft">{t('Ежедневные копии выключены настройкой сервера.')}</p>}
-      {data.problem === 'disk' && <p role="alert" className="text-xs text-destructive">{t('Копия не сделана: на диске меньше гигабайта.')}</p>}
+      {data.problem === 'disk' && <p role="alert" className="text-xs text-destructive">{t('Копия не сделана: на диске почти не осталось места.')}</p>}
       {data.problem === 'failed' && <p role="alert" className="text-xs text-destructive">{t('Последняя копия не получилась. Подробности в журнале сервера.')}</p>}
       <p className="text-sm">{when ? `${t('Последняя копия')}: ${when}, ${mb} ${t('МБ')}. ${t('Хранится копий')}: ${data.count} ${t('из')} ${data.keep}.` : t('Копий ещё нет. Первая появится через несколько минут после запуска.')}</p>
       <Button variant="outline" className="self-start" disabled={busy} onClick={async () => { setBusy(true); try { qc.setQueryData(['backups'], await api<BackupStatus>('backups/now', { method: 'POST' })) } finally { setBusy(false) } }}><DatabaseBackup /> {t(busy ? 'Копирую…' : 'Сделать копию сейчас')}</Button>

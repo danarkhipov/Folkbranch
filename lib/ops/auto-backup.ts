@@ -1,6 +1,7 @@
 // A copy of the database each day, kept beside it, so a mistake or a broken update can be undone even without the
 // history. It lives on the same disk, so it does not replace a copy the family keeps elsewhere, and the page says so.
 // Photos are written once and never changed, so they are not copied again: the folder already keeps every one.
+import { lowOnRoom } from './disk'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { DATA_DIR, getDb } from '../db'
@@ -8,7 +9,6 @@ import { Actor, requireRole } from './core'
 
 const DAY = 24 * 3600 * 1000
 export const KEEP = 7
-const LOW_DISK = 1024 ** 3
 // The ignore mark keeps the build from copying the family's own backups into what it ships.
 const dir = () => path.join(/*turbopackIgnore: true*/ DATA_DIR, 'backups', 'daily')
 const NAME = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}$/
@@ -31,8 +31,8 @@ async function copies() {
 export async function runAutoBackup({ force = false, now = Date.now() } = {}) {
   const list = (await copies()).filter((c) => c.at)
   if (!force && list.length && now - list[list.length - 1].at < DAY) return null
-  const free = await fs.statfs(DATA_DIR).then((s) => s.bavail * s.bsize).catch(() => null)
-  if (free !== null && free < LOW_DISK) { problem = 'disk'; return null }
+  const disk = await fs.statfs(DATA_DIR).catch(() => null)
+  if (disk && lowOnRoom(disk)) { problem = 'disk'; return null }
   const name = new Date(now).toISOString().slice(0, 16).replace(':', '-')
   const target = path.join(/*turbopackIgnore: true*/ dir(), name)
   try {
