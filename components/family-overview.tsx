@@ -8,6 +8,7 @@ import { ArchivesTab, PlacesTab } from './places-tab'
 import { Button } from '@/components/ui/button'
 import { comingDays, familyCalendar, familyNumbers, type DayKind } from '@/lib/family-dates'
 import { personName } from '@/lib/types'
+import { ScopeNote } from './scope-note'
 
 const WORD: Record<DayKind, string> = {
   birthday: 'День рождения', 'birth-memory': 'Со дня рождения', 'death-memory': 'Со дня смерти', wedding: 'Годовщина свадьбы', 'wedding-memory': 'Со дня свадьбы',
@@ -15,7 +16,7 @@ const WORD: Record<DayKind, string> = {
 
 /** What is coming up in the family, and what it adds up to. Everything here is read from the cards. */
 export function FamilyOverview({ onClose }: { onClose: () => void }) {
-  const { t, graph, byId, focus, lang } = useApp()
+  const { t, view: graph, byId, focus, lang, viewInfo } = useApp()
   const [tab, setTab] = useState('dates')
   const days = useMemo(() => comingDays(graph), [graph])
   const numbers = useMemo(() => familyNumbers(graph), [graph])
@@ -39,6 +40,7 @@ export function FamilyOverview({ onClose }: { onClose: () => void }) {
           <DialogTitle className="font-serif text-lg font-medium">{t('Даты, места и архивы')}</DialogTitle>
           <DialogDescription className="text-ink-soft">{t('Памятные дни, семья в цифрах, места и архивы, о которых говорят карточки.')}</DialogDescription>
         </div>
+        <ScopeNote onAll={() => { viewInfo?.reset() }} />
         <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-col gap-3">
         <TabsList className="self-start bg-muted">
           <TabsTrigger value="dates">{t('Даты')}</TabsTrigger>

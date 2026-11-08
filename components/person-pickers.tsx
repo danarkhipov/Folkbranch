@@ -85,14 +85,17 @@ function SearchRow({ result, person, onPick }: { result: SearchResult; person: P
 
 /** Cmd+K: anything known about a person, with what was found shown right there. */
 export function SearchDialog({ open, onOpenChange, onPick }: { open: boolean; onOpenChange: (v: boolean) => void; onPick: (id: string, hit?: SearchHit) => void }) {
-  const { t, byId } = useApp()
-  const people = useVisible()
+  const { t, byId, inView, viewInfo } = useApp()
+  // Searching follows the part of the family on the chart, unless the person asks for everyone.
+  const [whole, setWhole] = useState(false)
+  const inside = (id: string) => whole || !inView || inView.has(id)
+  const people = useVisible().filter((p) => inside(p.id))
   const [typed, setTyped] = useState('')
   const [query, setQuery] = useState('')
   useEffect(() => { const timer = setTimeout(() => setQuery(typed.trim()), 120); return () => clearTimeout(timer) }, [typed])
-  useEffect(() => { if (!open) { setTyped(''); setQuery('') } }, [open])
+  useEffect(() => { if (!open) { setTyped(''); setQuery(''); setWhole(false) } }, [open])
   const { data, isFetching } = useQuery({ queryKey: ['search', query], queryFn: () => api<SearchResult[]>(`search?q=${encodeURIComponent(query)}`), enabled: !!query, placeholderData: keepPreviousData, staleTime: 0 })
-  const results = query ? (data ?? []).filter((r) => byId.has(r.personId)) : []
+  const results = query ? (data ?? []).filter((r) => byId.has(r.personId) && inside(r.personId)) : []
   const partial = results.some((r) => r.partial)
   // The list changes with each answer, so Enter is pointed at the first line again.
   const [active, setActive] = useState('')
@@ -105,6 +108,7 @@ export function SearchDialog({ open, onOpenChange, onPick }: { open: boolean; on
         <DialogTitle className="sr-only">{t('Поиск людей')}</DialogTitle>
         <Command shouldFilter={false} value={active} onValueChange={setActive}>
           <CommandInput value={typed} onValueChange={setTyped} placeholder={t('Имя, дата, место, профессия, «жена Ивана»…')} aria-label={t('Поиск людей')} />
+          {viewInfo && !whole && <p className="flex flex-wrap items-center gap-x-2 border-b border-border px-3 py-1.5 text-xs text-ink-soft"><span className="min-w-0 break-anywhere">{t('Только:')} {viewInfo.label}</span><button className="pick underline hover:text-ink" onClick={() => setWhole(true)}>{t('Искать по всей семье')}</button></p>}
           <CommandList className="max-h-[min(460px,60dvh)]">
             {!query && people.map((p) => (
               <CommandItem key={p.id} value={p.id} onSelect={() => { onOpenChange(false); onPick(p.id) }}>

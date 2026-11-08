@@ -15,6 +15,16 @@ import { useChartView } from './chart-view'
 import { type ChartActions, Lines, PersonCard, HitAreas, FamilyDots } from './graph-parts'
 import { Select } from '@/components/ui/select'
 
+/**
+ * A press on the empty chart closes every menu and list that is open over it. The chart takes the press for panning,
+ * and the menus' own way of noticing a press outside does not reach them from here.
+ */
+function closeOpenMenus() {
+  const open = document.querySelectorAll('[data-slot=popover-content][data-state=open]').length
+  // Each Escape closes the topmost one; a short gap lets it finish before the next.
+  for (let i = 0; i < open; i++) setTimeout(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })), i * 40)
+}
+
 export interface CanvasHandle {
   fit: () => void
   zoomBy: (k: number) => void
@@ -30,7 +40,7 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
     const view = useChartView(layout, panelOpen, leftInset)
     const { canvas, world, clipped, shown, center } = view
     const light = useChartLight(layout, pathIds, groupIds, view.isFar)
-    const { kin, near: hoverKin, fromMe, active, hotPairs, lightMode, childNote, hoverSoon, setHoverFamily } = light
+    const { kin, near: hoverKin, wave, fromMe, active, hotPairs, lightMode, childNote, hoverSoon, setHoverFamily } = light
     const { draft, startLink, startFromPerson } = useLinkDrawing(layout, view.toChart, () => light.setHoverId(null))
     const [menu, setMenu] = useState<{ x: number; y: number; id?: string } | null>(null)
     useEffect(() => {
@@ -88,7 +98,7 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
     }
 
     return (
-      <div ref={canvas} className="canvas" onContextMenu={(e) => {
+      <div ref={canvas} className="canvas" onPointerDownCapture={(e) => { if (e.button === 0 && (e.target === canvas.current || e.target === world.current || (e.target as HTMLElement).closest?.('.pcard,svg.links'))) closeOpenMenus() }} onContextMenu={(e) => {
         const card = (e.target as HTMLElement).closest?.('.pcard') as HTMLElement | null
         const id = card?.dataset.person
         if (!id && e.target !== canvas.current && e.target !== world.current) return
@@ -98,7 +108,7 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
       }} onClick={(e) => { if (e.target === canvas.current || e.target === world.current) { app.focus(null); setSel(null) } }}>
         <div ref={world} className={cn('world', active && 'focused')}>
           <svg className="links" width="1" height="1">
-            <Lines families={shown.families} unions={shown.unions} active={active} hotPairs={hotPairs} lightMode={lightMode} selIds={selIds} hoverIds={hoverIds} />
+            <Lines families={shown.families} unions={shown.unions} active={active} hotPairs={hotPairs} lightMode={lightMode} selIds={selIds} hoverIds={hoverIds} wave={wave} />
           </svg>
           {graph.persons.map((p) => {
             const c = layout.cards.get(p.id)
@@ -114,6 +124,7 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
                 p={p}
                 left={c.x - CARD_W / 2 + (moving?.id === p.id ? moving.dx : 0)}
                 top={c.y}
+                wait={wave?.depth.get(p.id)}
                 selected={p.id === focusId}
                 className={cn('pcard', `sex-${p.sex}`, !p.living && 'dead', p.certainty === 'assumed' && 'assumed', p.hidden && 'hidden-p', p.id === focusId && 'focus', p.id === me.personId && 'isme', active && !isActive && 'dim', draft?.target === p.id && 'drop-target', moving?.id === p.id && 'moving')}
                 folded={scope.folded.get(p.id)}

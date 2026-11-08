@@ -12,6 +12,39 @@ export function nearFamily(family: Family, id: string) {
   return [...new Set([...parents, ...(family.spouses.get(id) ?? []), ...(family.children.get(id) ?? []), ...siblings, ...grand])]
 }
 
+/**
+ * Everyone in a person's own line: ancestors above, descendants below, and the partners and siblings along the way.
+ * `depth` is how many steps from the person, which sets when each one lights as the glow runs outward;
+ * `pairs` are the lines it runs along, each with the direction it travels (up, towards parents).
+ */
+export function lineageOf(family: Family, id: string) {
+  const depth = new Map<string, number>([[id, 0]])
+  const pairs = new Map<string, { d: number; up: boolean }>()
+  const key = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`)
+  for (const [next, up] of [[family.parents, true], [family.children, false]] as const) {
+    let layer = [id]
+    for (let d = 1; layer.length && d < 60; d++) {
+      const after: string[] = []
+      for (const x of layer) for (const y of next.get(x) ?? []) {
+        if (!pairs.has(key(x, y))) pairs.set(key(x, y), { d, up })
+        if (!depth.has(y)) { depth.set(y, d); after.push(y) }
+      }
+      layer = after
+    }
+  }
+  // Brothers and sisters hang from the same parents' line.
+  for (const p of family.parents.get(id) ?? []) for (const s of family.children.get(p) ?? []) {
+    if (s === id) continue
+    if (!pairs.has(key(p, s))) pairs.set(key(p, s), { d: 2, up: false })
+    if (!depth.has(s)) depth.set(s, 2)
+  }
+  for (const [x, d] of [...depth]) for (const s of family.spouses.get(x) ?? []) {
+    if (!pairs.has(key(x, s))) pairs.set(key(x, s), { d, up: false })
+    if (!depth.has(s)) depth.set(s, d)
+  }
+  return { depth, pairs }
+}
+
 /** Follows one kind of link. A shared ancestor is met twice and counted once, and bad data with a loop cannot trap it. */
 function walk(start: string, next: (id: string) => string[] | undefined) {
   const seen = new Set<string>()

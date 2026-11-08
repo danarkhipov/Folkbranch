@@ -4,20 +4,23 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, useApp } from '@/lib/client'
 import { lifeYears, personName } from '@/lib/types'
+import { ScopeNote } from './scope-note'
 
 const MergeDialog = dynamic(() => import('./merge-dialog').then((m) => m.MergeDialog), { ssr: false })
 
 /** Cards that may be one person. Only a person decides: nothing here merges by itself. */
 export function SameList() {
-  const { t, byId } = useApp()
+  const { t, byId, inView } = useApp()
   const qc = useQueryClient()
-  const { data = [], isLoading } = useQuery({ queryKey: ['duplicates'], queryFn: () => api<{ a: string; b: string; why: string[] }[]>('duplicates') })
+  const { data: all = [], isLoading } = useQuery({ queryKey: ['duplicates'], queryFn: () => api<{ a: string; b: string; why: string[] }[]>('duplicates') })
+  const data = inView ? all.filter((d) => inView.has(d.a) || inView.has(d.b)) : all
   const [pair, setPair] = useState<{ a: string; b: string } | null>(null)
   const person = (id: string) => { const p = byId.get(id); return p ? [personName(p) || t('Без названия'), lifeYears(p)].join(', ') : '' }
   /** The fuller card stays by default. */
   const fuller = (a: string, b: string) => { const n = (id: string) => Object.values(byId.get(id) ?? {}).filter((v) => (Array.isArray(v) ? v.length : !!v)).length; return n(a) >= n(b) ? { a, b } : { a: b, b: a } }
   return (
     <div className="flex-1 overflow-auto px-1.5 pb-2">
+      <ScopeNote />
       {!isLoading && !data.length && <p className="px-2 text-sm text-ink-soft">{t('Похожих людей не нашлось')}</p>}
       {data.map((d) => (
         <div key={`${d.a}.${d.b}`} className="rounded-md px-2 py-1.5 text-sm flex flex-col gap-0.5">
@@ -39,10 +42,12 @@ const MISSING: Record<string, string> = { birthDate: 'дата рождения'
 
 /** People whose record is unfinished, those with conflicting versions first. */
 export function GapsList() {
-  const { t, byId, focus } = useApp()
-  const { data = [] } = useQuery({ queryKey: ['gaps'], queryFn: () => api<{ id: string; missing: string[]; unsourced: number; conflicts: string[] }[]>('gaps') })
+  const { t, byId, focus, inView } = useApp()
+  const { data: all = [] } = useQuery({ queryKey: ['gaps'], queryFn: () => api<{ id: string; missing: string[]; unsourced: number; conflicts: string[] }[]>('gaps') })
+  const data = inView ? all.filter((r) => inView.has(r.id)) : all
   return (
     <div className="flex-1 overflow-auto px-1.5 pb-2">
+      <ScopeNote />
       {!data.length && <p className="px-2 text-sm text-ink-soft">{t('Всё заполнено')}</p>}
       {data.map((r) => {
         const p = byId.get(r.id)

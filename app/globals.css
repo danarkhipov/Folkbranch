@@ -160,6 +160,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .pcard.assumed .ava { outline: 1.5px dashed var(--ink-faint); outline-offset: 6px; }
 .pcard.focus .ava { box-shadow: 0 0 0 3px var(--accent), 0 0 0 6px #fffdf8, 0 6px 16px 4px rgb(60 45 20 / .25); }
 .pcard.isme .nm { color: var(--accent); }
+/* The glow of a hovered family reaches each card in turn, a generation after the last. */
+.pcard .ava, .pcard .cap > * { transition: opacity .25s ease; }
+.focused .pcard:not(.dim) .ava, .focused .pcard:not(.dim) .cap > * { transition-delay: var(--wd, 0ms); }
 .focused .pcard.dim .ava { opacity: .42; }
 /* Faded, but still readable: names are how people find their way. */
 .focused .pcard.dim .cap > * { opacity: .7; }
@@ -408,3 +411,10 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
 button[aria-busy='true']:not([data-slot='button']) { cursor: progress; opacity: .75; }
 button[aria-busy='true']:not([data-slot='button'])::before { content: ''; width: 12px; height: 12px; margin-right: 6px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* A line the glow runs along: drawn over the quiet line from one end to the other. */
+.flow { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; stroke-dasharray: 1; animation: flow-draw .32s cubic-bezier(.3, .7, .3, 1) var(--wd, 0ms) backwards; }
+.flow.union-flow { stroke-width: 3; }
+.flow.rev { animation-name: flow-draw-rev; }
+@keyframes flow-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes flow-draw-rev { from { stroke-dashoffset: -1; } to { stroke-dashoffset: 0; } }

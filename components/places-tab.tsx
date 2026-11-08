@@ -82,7 +82,7 @@ function PlaceForm({ draft, places, onDone }: { draft: Draft; places: Place[]; o
 
 /** Every place the archive mentions, as written, and what is known of each: what it belonged to and its other names. */
 export function PlacesTab({ onOpen }: { onOpen: (id: string) => void }) {
-  const { t, graph, byId, canEdit, confirm } = useApp()
+  const { t, view: graph, byId, canEdit, confirm } = useApp()
   const qc = useQueryClient()
   const { data: places = [] } = usePlaces()
   const [editing, setEditing] = useState<Draft | null>(null)
@@ -174,7 +174,7 @@ export function PlacesTab({ onOpen }: { onOpen: (id: string) => void }) {
 
 /** Where sources are kept: the archive's address and site, and how many sources point to each. */
 export function ArchivesTab() {
-  const { t, graph, canEdit, confirm, notify } = useApp()
+  const { t, view: graph, canEdit, confirm, notify } = useApp()
   const qc = useQueryClient()
   const { data: list = [] } = useRepositories()
   const [editing, setEditing] = useState<(Omit<Repository, 'id'> & { id: string | null }) | null>(null)

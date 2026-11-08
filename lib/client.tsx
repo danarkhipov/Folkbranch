@@ -33,6 +33,10 @@ export interface AppCtx {
   openPhoto: (mediaId: string, list?: string[]) => void
   confirm: (text: string, action: string, note?: string) => Promise<boolean>
   quickAdd: (type: QuickType, to: string, otherParent?: string) => void
+  /** What the lists read from: the part of the family the chart shows, or all of it. `inView` is null when nothing is narrowed. */
+  view: Graph
+  inView: Set<string> | null
+  viewInfo: { label: string; reset: () => void } | null
   /** What the chart's own menu can start. */
   commands: { addPerson: () => void; importFile: () => void; search: () => void; flip: () => void; deletePerson: (id: string) => void; clearAll: () => void }
   notify: (text: string, actions?: { label: string; run: () => void }[], stay?: boolean) => void

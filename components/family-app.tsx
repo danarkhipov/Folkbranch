@@ -230,6 +230,11 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
   // Rebuilt when the family changes, not on each click.
   const lookups = useMemo(() => (graph ? { byId: new Map(graph.persons.map((p) => [p.id, p])), family: new Family(graph) } : null), [graph])
   lookupsRef.current = lookups
+  const scope = useChartScope(graph, lookups?.family, focusId, () => requestAnimationFrame(() => requestAnimationFrame(() => canvas.current?.fit())))
+  // What the other screens list: the part of the family the chart is showing, so a relative of one side is not buried in the other's.
+  const viewGraph = scope.shown ?? graph
+  const inView = useMemo(() => (graph && viewGraph && viewGraph !== graph ? new Set(viewGraph.persons.map((p) => p.id)) : null), [graph, viewGraph])
+  const viewLabel = scope.scope === 'all' ? t('Часть ветвей свёрнута') : `${t(({ ancestors: 'Предки', descendants: 'Потомки', near: 'Ближайшая семья' } as Record<string, string>)[scope.scope])}${scope.rootId && lookups?.byId.get(scope.rootId) ? `: ${personName(lookups.byId.get(scope.rootId)!) || t('Без названия')}` : ''}`
   const ctx = useMemo<AppCtx | null>(() => {
     if (!graph || !lookups) return null
     return {
@@ -240,11 +245,14 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       openPhoto: (id, list) => setPhoto({ id, list }),
       confirm: (text, action, note) => new Promise((resolve) => setConfirm({ text, action, note, resolve })),
       quickAdd: (type, to, otherParent) => setQuick({ type, to, otherParent }),
+      view: viewGraph!,
+      inView,
+      viewInfo: inView ? { label: viewLabel, reset: scope.showAll } : null,
       commands: { addPerson: () => setQuick({ type: null, to: null }), importFile: () => { setDropped(null); setImporting(true) }, search: () => setSearch(true), flip: flipChart, deletePerson: (id) => void deleteAsked(id), clearAll: () => void clearAsked() },
       notify,
       undoLast,
     }
-  }, [graph, lookups, me, lang, familyName, focusId, focus, rootsBelow]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [graph, lookups, me, lang, familyName, focusId, focus, rootsBelow, viewGraph, inView, viewLabel, scope.showAll]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const delPerson = useWrite((id: string) => api(`persons/${id}`, { method: 'DELETE' }))
   const onDeleteRef = useRef<(id: string) => Promise<void>>(async () => {})
@@ -259,7 +267,6 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
     } catch (e) { notify((e as Error).message, [], true) }
   }
 
-  const scope = useChartScope(graph, lookups?.family, focusId, () => requestAnimationFrame(() => requestAnimationFrame(() => canvas.current?.fit())))
 
   const allGroups = useMemo(() => {
     const counts = new Map<string, number>()

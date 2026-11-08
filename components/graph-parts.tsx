@@ -34,29 +34,47 @@ export interface ChartActions {
 
 type Acts = RefObject<ChartActions>
 
-export const Lines = memo(function Lines({ families, unions, active, hotPairs, lightMode, selIds, hoverIds }: { families: [string, EdgePos[]][]; unions: UnionItem[]; active: Set<string> | null; hotPairs: Set<string>; lightMode: LightMode; selIds: Set<string>; hoverIds: string[] }) {
+export type Wave = { depth: Map<string, number>; pairs: Map<string, { d: number; up: boolean }> }
+/** How long each step of the glow waits for the one before it. */
+export const WAVE_STEP = 70
+const waitFor = (d: number) => `${Math.min(d, 9) * WAVE_STEP}ms`
+
+export const Lines = memo(function Lines({ families, unions, active, hotPairs, lightMode, selIds, hoverIds, wave }: { families: [string, EdgePos[]][]; unions: UnionItem[]; active: Set<string> | null; hotPairs: Set<string>; lightMode: LightMode; selIds: Set<string>; hoverIds: string[]; wave: Wave | null }) {
   /** A line is lit when both ends are in the highlighted set; a path is lit pair by pair. */
   const hotEdge = (e: EdgePos) =>
     lightMode === 'pairs' ? e.parentIds.some((p) => hotPairs.has(pairKey(p, e.childId)))
       : lightMode === 'both-ends' && !!active && active.has(e.childId) && e.parentIds.some((p) => active.has(p))
+  /** The stretch of a line the glow is running along, drawn over it from one end. */
+  const flow = (e: EdgePos) => {
+    if (!wave) return null
+    const hit = e.parentIds.map((p) => wave.pairs.get(pairKey(p, e.childId))).find((x) => x)
+    return hit ? <path key={`f${e.id}`} d={e.path} pathLength={1} className={cn('flow', 'line-flow', hit.up && 'rev')} style={{ '--wd': waitFor(hit.d) } as React.CSSProperties} /> : null
+  }
   return (
     <>
       {/* Each family is drawn over a paper-coloured halo, so crossings read as one line passing over another. */}
       {families.map(([key, edges]) => (
         <g key={key}>
           <path d={edges.map((e) => e.path).join('')} className="line-halo" />
-          {edges.map((e) => <path key={e.id} d={e.path} className={cn('line', e.style !== 'solid' && e.style, hotEdge(e) && 'hot', selIds.has(e.id) && 'selected', hoverIds.includes(e.id) && 'hover')} />)}
+          {edges.map((e) => <path key={e.id} d={e.path} className={cn('line', e.style !== 'solid' && e.style, !wave && hotEdge(e) && 'hot', selIds.has(e.id) && 'selected', hoverIds.includes(e.id) && 'hover')} />)}
+          {edges.map(flow)}
         </g>
       ))}
       {unions.map((u) => {
         const hot = hotPairs.has(pairKey(u.union.aId, u.union.bId)) || (!!active && active.has(u.union.aId) && active.has(u.union.bId))
-        return <path key={u.id} d={u.path} className={cn('union', u.union.certainty === 'assumed' && 'assumed', hot && 'hot', selIds.has(u.id) && 'selected', hoverIds.includes(u.id) && 'hover')} />
+        const lit = wave?.pairs.get(pairKey(u.union.aId, u.union.bId))
+        return (
+          <g key={u.id}>
+            <path d={u.path} className={cn('union', u.union.certainty === 'assumed' && 'assumed', !wave && hot && 'hot', selIds.has(u.id) && 'selected', hoverIds.includes(u.id) && 'hover')} />
+            {lit && <path d={u.path} pathLength={1} className="flow union-flow" style={{ '--wd': waitFor(lit.d) } as React.CSSProperties} />}
+          </g>
+        )
       })}
     </>
   )
 })
 
-export const PersonCard = memo(function PersonCard({ p, left, top, className, selected, label, mine, folded, canEdit, rootsBelow, lang, acts }: { p: Person; left: number; top: number; className: string; selected: boolean; label?: string; mine?: string; folded?: number; canEdit: boolean; rootsBelow: boolean; lang: Lang; acts: Acts }) {
+export const PersonCard = memo(function PersonCard({ p, left, top, wait, className, selected, label, mine, folded, canEdit, rootsBelow, lang, acts }: { p: Person; left: number; top: number; /** Steps from the person under the cursor: when this card's glow starts. */ wait?: number; className: string; selected: boolean; label?: string; mine?: string; folded?: number; canEdit: boolean; rootsBelow: boolean; lang: Lang; acts: Acts }) {
   const t = (key: string) => translate(lang, key)
   const open = () => acts.current.open(p.id)
   // The plus buttons exist only on the card in use: on every card they would be most of the page.
@@ -66,7 +84,7 @@ export const PersonCard = memo(function PersonCard({ p, left, top, className, se
     <div
       data-person={p.id}
       className={className}
-      style={{ left, top }}
+      style={wait === undefined ? { left, top } : { left, top, '--wd': waitFor(wait) } as React.CSSProperties}
       onClick={open}
       onMouseEnter={() => acts.current.hover(p.id)}
       onMouseLeave={() => acts.current.hover(null)}

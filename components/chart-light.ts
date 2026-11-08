@@ -2,7 +2,7 @@
 import { useMemo, useRef, useState } from 'react'
 import type { Layout } from '@/lib/graph/layout'
 import { useApp } from '@/lib/client'
-import { nearFamily } from '@/lib/graph/select'
+import { lineageOf, nearFamily } from '@/lib/graph/select'
 import { pairKey, type LightMode } from './graph-parts'
 
 /** Who and which lines stand out: the open card's family, a path, a group, or whatever the cursor is on. */
@@ -26,6 +26,8 @@ export function useChartLight(layout: Layout, pathIds: string[] | null, groupIds
       return k ? [[id, k.label] as const] : []
     }))
   }, [hoverId, focusId, pathIds, family, lang, byId])
+  // The whole line of the person under the cursor glows outward from them, a generation at a time.
+  const lineage = useMemo(() => (hoverId && !focusId && !pathIds && byId.has(hoverId) ? lineageOf(family, hoverId) : null), [hoverId, focusId, pathIds, family, byId])
   const [hoverFamily, setHoverFamily] = useState<string | null>(null)
   const familyActive = useMemo(() => {
     if (!hoverFamily || focusId || pathIds) return null
@@ -37,12 +39,13 @@ export function useChartLight(layout: Layout, pathIds: string[] | null, groupIds
     const add = (path: string[]) => path.forEach((id, i) => i && out.add(pairKey(id, path[i - 1])))
     if (pathIds) add(pathIds)
     else if (kin) kin.forEach((k) => add(k.path))
+    else if (lineage) lineage.pairs.forEach((_, k) => out.add(k))
     else if (hoverKin) hoverKin.forEach((_, id) => out.add(pairKey(hoverId!, id)))
     else if (familyActive) layout.edges.filter((e) => e.familyKey === hoverFamily).forEach((e) => e.parentIds.forEach((p) => out.add(pairKey(p, e.childId))))
     return out
-  }, [kin, pathIds, hoverKin, hoverId, familyActive, hoverFamily, layout])
-  const lightMode: LightMode = pathIds || kin ? 'pairs' : hoverKin || familyActive || groupIds ? 'both-ends' : 'none'
-  const active = useMemo(() => (pathIds ? new Set(pathIds) : kin ? new Set([focusId!, ...kin.keys()]) : hoverKin ? new Set([hoverId!, ...hoverKin.keys()]) : familyActive ?? groupIds), [pathIds, kin, focusId, hoverKin, hoverId, familyActive, groupIds])
+  }, [kin, pathIds, lineage, hoverKin, hoverId, familyActive, hoverFamily, layout])
+  const lightMode: LightMode = pathIds || kin || lineage ? 'pairs' : hoverKin || familyActive || groupIds ? 'both-ends' : 'none'
+  const active = useMemo(() => (pathIds ? new Set(pathIds) : kin ? new Set([focusId!, ...kin.keys()]) : lineage ? new Set([...lineage.depth.keys(), ...(hoverKin?.keys() ?? [])]) : hoverKin ? new Set([hoverId!, ...hoverKin.keys()]) : familyActive ?? groupIds), [pathIds, kin, focusId, lineage, hoverKin, hoverId, familyActive, groupIds])
   /** With several marriages, say which one a child comes from. */
   const childNote = (parent: string, child: string) => {
     if ((family.spouses.get(parent) ?? []).length < 2) return ''
@@ -52,5 +55,5 @@ export function useChartLight(layout: Layout, pathIds: string[] | null, groupIds
   }
   const fromMe = useMemo(() => (me.personId && byId.has(me.personId) && !focusId && !pathIds ? family.relatives(me.personId, lang) : null), [me.personId, focusId, pathIds, family, lang, byId])
 
-  return { kin, near: hoverKin, fromMe, active, hotPairs, lightMode, childNote, hoverSoon, setHoverId, setHoverFamily }
+  return { kin, near: hoverKin, wave: lineage, fromMe, active, hotPairs, lightMode, childNote, hoverSoon, setHoverId, setHoverFamily }
 }
