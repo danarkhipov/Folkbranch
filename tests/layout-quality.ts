@@ -105,3 +105,69 @@ export function randomFamily(seed: number, size: number): Graph {
   }
   return buildGraph(p, parents, unions)
 }
+
+/** Lines of different families running side by side so close that the eye cannot follow either. */
+export function nearLines(l: Layout, gap = 12) {
+  const segs: Seg[] = []
+  const groups = new Set<string>()
+  for (const e of l.edges) {
+    if (!groups.has(e.group)) { groups.add(e.group); segs.push(...segments(e.shared, e.familyKey, new Set())) }
+    segs.push(...segments(e.own, e.familyKey, new Set()))
+  }
+  for (const u of l.unions) segs.push(...segments(u.path, u.id, new Set()))
+  let near = 0
+  for (const horiz of [true, false]) {
+    const list = segs.filter((s) => horizontal(s) === horiz)
+    const [a1, a2, c] = horiz ? (['x1', 'x2', 'y1'] as const) : (['y1', 'y2', 'x1'] as const)
+    const sorted = list.toSorted((p, q) => p[c] - q[c])
+    for (let i = 0; i < sorted.length; i++) for (let j = i + 1; j < sorted.length && sorted[j][c] - sorted[i][c] < gap; j++) {
+      const p = sorted[i], q = sorted[j]
+      const d = q[c] - p[c]
+      if (d < 1 || p.owner === q.owner) continue
+      if (Math.min(Math.max(p[a1], p[a2]), Math.max(q[a1], q[a2])) - Math.max(Math.min(p[a1], p[a2]), Math.min(q[a1], q[a2])) > 4) near++
+    }
+  }
+  return near
+}
+
+/**
+ * How well a chart keeps families apart and relatives together, from where the cards stand.
+ * intrusions: strangers standing inside the stretch a branch covers in a row (a branch is the descendants of one person with their partners).
+ * parentSpan: how far a child stands from its parents, in cards. cousinSpan: how far first cousins stand from each other, in cards.
+ */
+export function kinship(l: Layout, g: Graph, pitch = 162) {
+  const kids = new Map<string, string[]>(), parents = new Map<string, string[]>(), mates = new Map<string, string[]>()
+  for (const e of g.parentChild) { kids.set(e.parentId, [...(kids.get(e.parentId) ?? []), e.childId]); parents.set(e.childId, [...(parents.get(e.childId) ?? []), e.parentId]) }
+  for (const u of g.unions) { mates.set(u.aId, [...(mates.get(u.aId) ?? []), u.bId]); mates.set(u.bId, [...(mates.get(u.bId) ?? []), u.aId]) }
+  const at = (id: string) => l.cards.get(id)
+  let intrusions = 0, branches = 0
+  const detail: { id: string; n: number; who: string[] }[] = []
+  const up = (id: string) => parents.get(id) ?? []
+  const closure = (id: string, next: (x: string) => string[]) => { const seen = new Set<string>(); const st = [...next(id)]; while (st.length) { const x = st.pop()!; if (seen.has(x) || x === id) continue; seen.add(x); st.push(...next(x)) } return seen }
+  for (const p of g.persons) {
+    // Everyone below a person, and everyone above one, should each stand as one stretch of their row.
+    for (const kin of [closure(p.id, (x) => kids.get(x) ?? []), closure(p.id, up)]) {
+      if (kin.size < 3) continue
+      const branch = new Set([p.id, ...(mates.get(p.id) ?? []), ...kin, ...[...kin].flatMap((x) => mates.get(x) ?? [])])
+      const rows = Map.groupBy([...branch].map(at).filter((c) => !!c), (c) => c!.y)
+      for (const [y, cs] of rows) {
+        if (cs.length < 2) continue
+        const lo = Math.min(...cs.map((c) => c!.x)), hi = Math.max(...cs.map((c) => c!.x))
+        for (const c of l.cards.values()) if (c.y === y && c.x > lo && c.x < hi && !branch.has(c.id)) { intrusions++; const e = detail.find((x) => x.id === p.id) ?? (detail.push({ id: p.id, n: 0, who: [] }), detail.at(-1)!); e.n++; e.who.push(c.id) }
+      }
+      branches++
+    }
+  }
+  const dist: number[] = []
+  for (const [child, ps] of parents) { const c = at(child); const px = ps.map(at).filter((x) => !!x).map((x) => x!.x); if (c && px.length) dist.push(Math.abs(c.x - px.reduce((a, b) => a + b, 0) / px.length) / pitch) }
+  const cousins: number[] = []
+  const people = g.persons.map((p) => p.id)
+  const grand = new Map(people.map((id) => [id, new Set(up(id).flatMap(up))]))
+  for (let i = 0; i < people.length; i++) for (let j = i + 1; j < people.length; j++) {
+    const a = people[i], b = people[j]
+    if (up(a).some((x) => up(b).includes(x))) continue
+    if ([...grand.get(a)!].some((x) => grand.get(b)!.has(x))) { const ca = at(a), cb = at(b); if (ca && cb) cousins.push(Math.abs(ca.x - cb.x) / pitch) }
+  }
+  const mean = (xs: number[]) => (xs.length ? +(xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(2) : 0)
+  return { detail, intrusions, branches, parentSpan: mean(dist), cousinSpan: mean(cousins), cousinPairs: cousins.length }
+}

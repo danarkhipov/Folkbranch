@@ -14,8 +14,8 @@ export { AVATAR_CY, CARD_H, CARD_W, PITCH } from './metrics'
 const RANK_SEP = 76
 const NODE_SEP = 22
 /** A line passing through a row takes this little room, and stays clear of captions on both sides. */
-const PASS_W = 12
-const LANE = 10
+const PASS_W = 16
+const LANE = 16
 /** A card placed by hand stays put: everyone else in its row gives way. */
 const PIN_WEIGHT = 1e6
 /** Between a bar and the rows above and below it. */
@@ -180,6 +180,7 @@ function arrangeRows(g: Graph, members: Map<string, Set<string>>, blockOf: Map<s
   }
 
   const edges: OrderEdge[] = []
+  const passFrom = new Map<string, string>()
   for (const f of byFamily.values()) {
     const placed = f.parents.filter((p) => rankOf.has(p))
     if (!placed.length) continue
@@ -192,16 +193,66 @@ function arrangeRows(g: Graph, members: Map<string, Set<string>>, blockOf: Map<s
       for (let r = nearest + 1; r < rank; r++) {
         const pass = passKey(f.key, rank, r)
         rows[r].push({ key: pass, slots: [pass], birth: 9999, rank: r, x: sourceX, width: PASS_W })
+        passFrom.set(pass, sources[0])
         edges.push({ up, down: pass, rank: r })
         up = [pass]
       }
       for (const c of kids) edges.push({ up, down: c, rank })
     }
   }
-  for (const row of rows) row.sort((a, b) => a.x - b.x)
-  orderRows(rows, edges)
+  // Start from an order in which every branch is one stretch of its row, walking the family down or up; keep the tidier.
+  const slotsX = rows.map((row) => row.map((b) => b.x).sort((a, b) => a - b))
+  const attempt = (dir: 'dagre' | 'down' | 'up', pull = 0) => {
+    const pre = dir === 'dagre' ? new Map<string, number>() : branchOrder(g, members, blockOf, byId, dir)
+    for (const [pass, from] of passFrom) if (dir !== 'dagre') pre.set(pass, (pre.get(blockOf.get(from)!) ?? 1e9) + 0.5)
+    const copy = rows.map((row) => row.map((b) => ({ ...b })).sort((a, b) => (pre.get(a.key) ?? 1e9) - (pre.get(b.key) ?? 1e9) || a.x - b.x))
+    if (dir !== 'dagre') for (const row of copy) { let i = 0; for (const b of row) { (b as { prior?: number }).prior = i; i += b.slots.length } }
+    orderRows(copy, edges, pull)
+    return { copy, score: untidiness(g, copy, edges) }
+  }
+  // Each start can end somewhere different; the tidiest of them is kept. A big family gets only the plain starts, to stay quick.
+  const tries = [attempt('dagre'), attempt('down'), attempt('up')]
+  if (g.persons.length <= PULL_UP_TO) for (const pull of g.persons.length <= MANY_STARTS_UP_TO ? PULLS : PULLS.slice(0, 1)) tries.push(attempt('down', pull), attempt('up', pull))
+  const best = tries.reduce((a, c) => (c.score < a.score * 0.97 ? c : a))
+  rows.splice(0, rows.length, ...best.copy)
+  rows.forEach((row, r) => row.forEach((b, i) => { b.x = slotsX[r][i] ?? b.x }))
   lastOrder = { key, rows: rows.map((row) => row.map(({ key, slots, rank, x, width, birth }) => ({ key, slots, rank, x, width, birth }))), edges }
   return lastOrder
+}
+
+/**
+ * The order in which a walk meets each block, so that read off one row at a time every branch is one stretch.
+ * Walking down from the oldest people (eldest child first) suits a family that spreads out; walking up from the
+ * youngest (father's side first) suits one traced back from a person, where the ancestors are the branches.
+ */
+function branchOrder(g: Graph, members: Map<string, Set<string>>, blockOf: Map<string, string>, byId: Map<string, Person>, dir: 'down' | 'up') {
+  const year = (k: string) => Math.min(9999, ...[...members.get(k)!].map((id) => byId.get(id)?.birthYear ?? 9999))
+  const kids = new Map<string, Set<string>>(), parents = new Map<string, Set<string>>()
+  const sexRank = (id: string) => (byId.get(id)?.sex === 'M' ? 0 : byId.get(id)?.sex === 'F' ? 2 : 1)
+  const links = g.parentChild.toSorted((x, y) => sexRank(x.parentId) - sexRank(y.parentId))
+  for (const l of links) {
+    const a = blockOf.get(l.parentId), b = blockOf.get(l.childId)
+    if (a === undefined || b === undefined || a === b) continue
+    ;(kids.get(a) ?? kids.set(a, new Set()).get(a)!).add(b)
+    ;(parents.get(b) ?? parents.set(b, new Set()).get(b)!).add(a)
+  }
+  const next = dir === 'down' ? kids : parents
+  const order = new Map<string, number>()
+  const walk = (start: string) => {
+    const stack = [start]
+    while (stack.length) {
+      const k = stack.pop()!
+      if (order.has(k)) continue
+      order.set(k, order.size)
+      const more = [...(next.get(k) ?? [])].filter((c) => !order.has(c))
+      // Going down the eldest is taken first; going up the father's side. The stack takes the last pushed first.
+      stack.push(...(dir === 'down' ? more.sort((a, b) => year(b) - year(a) || (a < b ? 1 : -1)) : more.toReversed()))
+    }
+  }
+  const starts = [...members.keys()].filter((k) => !(dir === 'down' ? parents : kids).has(k)).sort((a, b) => (dir === 'down' ? year(a) - year(b) : year(b) - year(a)) || (a < b ? -1 : 1))
+  for (const r of starts) walk(r)
+  for (const k of members.keys()) walk(k)
+  return order
 }
 
 /** People born about a generation apart stand in the same row, as far as the links allow. */
@@ -244,6 +295,38 @@ function generations(g: Graph, members: Map<string, Set<string>>, blockOf: Map<s
   const used = [...new Set(rank.values())].sort((a, b) => a - b)
   for (const [k, r] of rank) rank.set(k, used.indexOf(r))
   return rank
+}
+
+/** How much the order a walk through the family gives counts against the crossing search, and up to how many people it is tried. */
+const PULLS = [0.3, 0.2, 0.4, 0.5, 0.6]
+/** Up to this many people every pull is tried; more get the first only. */
+const MANY_STARTS_UP_TO = 250
+const PULL_UP_TO = 800
+
+/** Crossings, and strangers standing inside the stretch a branch covers in its row: the lower the tidier. */
+function untidiness(g: Graph, rows: { slots: string[] }[][], edges: OrderEdge[]) {
+  const at = new Map<string, [number, number]>()
+  rows.forEach((row, r) => { let i = 0; for (const b of row) for (const s of b.slots) at.set(s, [r, i++]) })
+  let cross = 0
+  for (const list of Map.groupBy(edges, (e) => e.rank).values()) {
+    const pairs = list.map((e) => [mean(e.up.map((s) => at.get(s)![1])), at.get(e.down)![1]])
+    for (let i = 0; i < pairs.length; i++) for (let j = i + 1; j < pairs.length; j++) if ((pairs[i][0] - pairs[j][0]) * (pairs[i][1] - pairs[j][1]) < 0) cross++
+  }
+  const kids = new Map<string, string[]>(), mates = new Map<string, string[]>()
+  for (const l of g.parentChild) kids.set(l.parentId, [...(kids.get(l.parentId) ?? []), l.childId])
+  for (const u of g.unions) { mates.set(u.aId, [...(mates.get(u.aId) ?? []), u.bId]); mates.set(u.bId, [...(mates.get(u.bId) ?? []), u.aId]) }
+  let strangers = 0
+  for (const p of g.persons) {
+    if (!at.has(p.id)) continue
+    const seen = new Set<string>(), stack = [...(kids.get(p.id) ?? [])]
+    while (stack.length) { const x = stack.pop()!; if (seen.has(x)) continue; seen.add(x); stack.push(...(kids.get(x) ?? [])) }
+    if (seen.size < 3) continue
+    const branch = new Set([p.id, ...(mates.get(p.id) ?? []), ...seen, ...[...seen].flatMap((x) => mates.get(x) ?? [])])
+    const span = new Map<number, [number, number, number]>()
+    for (const id of branch) { const a = at.get(id); if (!a) continue; const s = span.get(a[0]); span.set(a[0], s ? [Math.min(s[0], a[1]), Math.max(s[1], a[1]), s[2] + 1] : [a[1], a[1], 1]) }
+    for (const [lo, hi, n] of span.values()) if (n > 1) strangers += hi - lo + 1 - n
+  }
+  return cross * 5 + strangers
 }
 
 /** `rootsBelow` draws the tree as it grows: elders at the bottom, the youngest at the top. */

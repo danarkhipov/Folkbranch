@@ -9,6 +9,8 @@ export interface OrderNode {
   slots: string[]
   /** Who goes first among equals: siblings stand eldest first. */
   birth: number
+  /** Its place in the row of a walk through the family (in slots): a gentle pull that keeps a branch in one stretch. */
+  prior?: number
 }
 
 /** A line from the row above to one slot below; several slots above when it starts between partners. */
@@ -54,7 +56,8 @@ function crossed(a: number[], b: number[]) {
 }
 
 /** Reorders the rows and the slots inside their nodes in place. */
-export function orderRows(rows: OrderNode[][], edges: OrderEdge[]) {
+/** `pull`, 0 to 1: how far a node's `prior` place counts against the middle of its lines. */
+export function orderRows(rows: OrderNode[][], edges: OrderEdge[], pull = 0) {
   const nodeOf = new Map<string, OrderNode>()
   for (const row of rows) for (const n of row) for (const s of n.slots) nodeOf.set(s, n)
   const coord = new Map<string, number>()
@@ -96,7 +99,8 @@ export function orderRows(rows: OrderNode[][], edges: OrderEdge[]) {
     const value = new Map(rows[r].map((n) => {
       const seen = down ? entering.get(n)?.map(top) : leaving.get(n)?.map(bottom)
       // Rows hold different numbers of people, so a node without lines keeps its share of the way along.
-      return [n, seen?.length ? mean(seen) : coord.get(n.slots[0])!] as const
+      const base = seen?.length ? mean(seen) : coord.get(n.slots[0])!
+      return [n, pull && n.prior !== undefined ? (1 - pull) * base + pull * n.prior : base] as const
     }))
     rows[r].sort((a, b) => value.get(a)! - value.get(b)! || a.birth - b.birth || place.get(a)! - place.get(b)!)
     number(rows[r])

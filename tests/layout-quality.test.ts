@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { CARD_W, layoutFamily, PITCH } from '../lib/graph/layout'
 import { orderRows, type OrderEdge, type OrderNode } from '../lib/graph/order'
 import { assignTracks, type Net } from '../lib/graph/tracks'
-import { buildGraph, quality, randomFamily, TANGLE } from './layout-quality'
+import { buildGraph, kinship, nearLines, quality, randomFamily, TANGLE } from './layout-quality'
 
 describe('lines on the chart', () => {
   for (const rootsBelow of [false, true]) {
@@ -11,12 +11,33 @@ describe('lines on the chart', () => {
     })
   }
 
-  // These fell from 4, 20, 248 and 809 when the search for the order was written; they must not creep back. Seeds 4 and 6 gave up two and seven crossings when rows began to follow birth years.
-  it.each([[3, 40, 4], [4, 150, 7], [6, 600, 56], [7, 1500, 254]])('keeps crossings down in a random family (seed %i, %i people)', (seed, size, most) => {
+  // These fell from 4, 20, 248 and 809 when the search for the order was written; they must not creep back. Seeds 4 and 6 gave up two and seven crossings when rows began to follow birth years, and seed 4 two more for keeping branches together.
+  it.each([[3, 40, 4], [4, 150, 9], [6, 600, 56], [7, 1500, 254]])('keeps crossings down in a random family (seed %i, %i people)', (seed, size, most) => {
     const g = randomFamily(seed, size)
     const q = quality(layoutFamily(g), g)
     expect(q.crossings).toBeLessThanOrEqual(most)
     expect(q.tight).toBe(0)
+  })
+
+  // Lines of different families kept apart enough to follow, and relatives kept in one stretch of their row.
+  it.each([[3, 40, 0, 4], [4, 150, 2, 30], [6, 600, 8, 1140]])('keeps lines apart and branches together (seed %i, %i people)', (seed, size, nearMost, intrusionsMost) => {
+    const g = randomFamily(seed, size)
+    const l = layoutFamily(g)
+    expect(nearLines(l)).toBeLessThanOrEqual(nearMost)
+    expect(kinship(l, g).intrusions).toBeLessThanOrEqual(intrusionsMost)
+  })
+
+  it('gathers the branches of a family traced back from one person', () => {
+    // Two grandparent couples on each side, so father's and mother's lines must each stay together.
+    const g = buildGraph(
+      [['gf1', 'M', 1900], ['gm1', 'F', 1902], ['gf2', 'M', 1901], ['gm2', 'F', 1903], ['gf3', 'M', 1899], ['gm3', 'F', 1904], ['gf4', 'M', 1898], ['gm4', 'F', 1905],
+        ['f', 'M', 1930], ['m', 'F', 1932], ['uncle', 'M', 1934], ['aunt', 'F', 1936], ['me', 'M', 1960], ['cousin', 'F', 1962]],
+      [['gf1', 'f'], ['gm1', 'f'], ['gf2', 'uncle'], ['gm2', 'uncle'], ['gf3', 'm'], ['gm3', 'm'], ['gf4', 'aunt'], ['gm4', 'aunt'], ['f', 'me'], ['m', 'me'], ['uncle', 'cousin'], ['aunt', 'cousin']],
+      [['gf1', 'gm1'], ['gf2', 'gm2'], ['gf3', 'gm3'], ['gf4', 'gm4'], ['f', 'm'], ['uncle', 'aunt']],
+    )
+    const l = layoutFamily(g)
+    expect(quality(l, g)).toMatchObject({ overlaps: 0, throughCards: 0 })
+    expect(kinship(l, g).intrusions).toBeLessThanOrEqual(2)
   })
 
   it('leaves a clear strip between partners for the line down', () => {
