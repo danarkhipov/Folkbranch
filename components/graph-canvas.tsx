@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { ArrowUpDown, FileUp, Maximize2, Search, Trash2, UserPlus } from 'lucide-react'
+import { ArrowUpDown, Baby, FileUp, Maximize2, Search, Trash2, UserPlus, UserRound, Users, Heart } from 'lucide-react'
 import { layoutFamily, CARD_W } from '@/lib/graph/layout'
 import { useApp } from '@/lib/client'
 import { yourTerm } from '@/lib/kinship'
@@ -32,7 +32,7 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
     const light = useChartLight(layout, pathIds, groupIds, view.isFar)
     const { kin, near: hoverKin, fromMe, active, hotPairs, lightMode, childNote, hoverSoon, setHoverFamily } = light
     const { draft, startLink, startFromPerson } = useLinkDrawing(layout, view.toChart, () => light.setHoverId(null))
-    const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+    const [menu, setMenu] = useState<{ x: number; y: number; id?: string } | null>(null)
     useEffect(() => {
       if (!menu) return
       const close = (e: Event) => { if (!(e.target as HTMLElement | null)?.closest?.('[data-canvas-menu]')) setMenu(null) }
@@ -88,7 +88,14 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
     }
 
     return (
-      <div ref={canvas} className="canvas" onContextMenu={(e) => { if (e.target !== canvas.current && e.target !== world.current) return; e.preventDefault(); setTip(null); setMenu({ x: Math.min(e.clientX, window.innerWidth - 250), y: Math.min(e.clientY, window.innerHeight - 220) }) }} onClick={(e) => { if (e.target === canvas.current || e.target === world.current) { app.focus(null); setSel(null) } }}>
+      <div ref={canvas} className="canvas" onContextMenu={(e) => {
+        const card = (e.target as HTMLElement).closest?.('.pcard') as HTMLElement | null
+        const id = card?.dataset.person
+        if (!id && e.target !== canvas.current && e.target !== world.current) return
+        if (id && byId.get(id)?.hidden) return
+        e.preventDefault(); setTip(null)
+        setMenu({ x: Math.min(e.clientX, window.innerWidth - 250), y: Math.min(e.clientY, window.innerHeight - (id ? 320 : 260)), id })
+      }} onClick={(e) => { if (e.target === canvas.current || e.target === world.current) { app.focus(null); setSel(null) } }}>
         <div ref={world} className={cn('world', active && 'focused')}>
           <svg className="links" width="1" height="1">
             <Lines families={shown.families} unions={shown.unions} active={active} hotPairs={hotPairs} lightMode={lightMode} selIds={selIds} hoverIds={hoverIds} />
@@ -147,11 +154,35 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
         {tip && <div className="fixed z-50 pointer-events-none float px-2 py-1 text-xs" style={{ left: tip.x + 12, top: tip.y + 12 }}>{tip.text}</div>}
         {menu && (
           <div data-canvas-menu role="menu" className="float fixed z-[60] min-w-56 p-1 text-sm" style={{ left: menu.x, top: menu.y }} onContextMenu={(e) => e.preventDefault()}>
-            {app.canEdit && <button role="menuitem" className="menu-item" onClick={() => { setMenu(null); app.commands.addPerson() }}><UserPlus size={15} /> {t('Добавить человека без родства')}</button>}
-            {app.canEdit && <button role="menuitem" className="menu-item" onClick={() => { setMenu(null); app.commands.importFile() }}><FileUp size={15} /> {t('Добавить людей из файла')}</button>}
-            <button role="menuitem" className="menu-item" onClick={() => { setMenu(null); app.commands.search() }}><Search size={15} /> {t('Найти человека')}</button>
-            <button role="menuitem" className="menu-item" onClick={() => { setMenu(null); view.refit() }}><Maximize2 size={15} /> {t('Показать всех')}</button>
-            <button role="menuitem" className="menu-item" onClick={() => { setMenu(null); app.commands.flip() }}><ArrowUpDown size={15} /> {t('Перевернуть схему')}</button>
+            {menu.id ? (
+              <>
+                <div className="px-2.5 py-1.5 text-xs text-ink-soft truncate max-w-64">{personName(byId.get(menu.id)!) || t('Без названия')}</div>
+                <button role="menuitem" className="menu-item" onClick={() => { const id = menu.id!; setMenu(null); app.focus(id, { center: true }) }}><UserRound size={15} /> {t('Открыть карточку')}</button>
+                {app.canEdit && (
+                  <>
+                    <button role="menuitem" className="menu-item" onClick={() => { const id = menu.id!; setMenu(null); acts.current.add('parent', id) }}><Users size={15} /> {t('Добавить родителя')}</button>
+                    <button role="menuitem" className="menu-item" onClick={() => { const id = menu.id!; setMenu(null); acts.current.add('spouse', id) }}><Heart size={15} /> {t('Добавить супруга')}</button>
+                    <button role="menuitem" className="menu-item" onClick={() => { const id = menu.id!; setMenu(null); acts.current.add('child', id) }}><Baby size={15} /> {t('Добавить ребёнка')}</button>
+                    <div className="my-1 h-px bg-border" />
+                    <button role="menuitem" className="menu-item !text-destructive" onClick={() => { const id = menu.id!; setMenu(null); app.commands.deletePerson(id) }}><Trash2 size={15} /> {t('Удалить человека')}</button>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                {app.canEdit && <button role="menuitem" className="menu-item" onClick={() => { setMenu(null); app.commands.addPerson() }}><UserPlus size={15} /> {t('Добавить человека без родства')}</button>}
+                {app.canEdit && <button role="menuitem" className="menu-item" onClick={() => { setMenu(null); app.commands.importFile() }}><FileUp size={15} /> {t('Добавить людей из файла')}</button>}
+                <button role="menuitem" className="menu-item" onClick={() => { setMenu(null); app.commands.search() }}><Search size={15} /> {t('Найти человека')}</button>
+                <button role="menuitem" className="menu-item" onClick={() => { setMenu(null); view.refit() }}><Maximize2 size={15} /> {t('Показать всех')}</button>
+                <button role="menuitem" className="menu-item" onClick={() => { setMenu(null); app.commands.flip() }}><ArrowUpDown size={15} /> {t('Перевернуть схему')}</button>
+                {me.role === 'owner' && graph.persons.length > 0 && (
+                  <>
+                    <div className="my-1 h-px bg-border" />
+                    <button role="menuitem" className="menu-item !text-destructive" onClick={() => { setMenu(null); app.commands.clearAll() }}><Trash2 size={15} /> {t('Удалить всю схему')}</button>
+                  </>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>

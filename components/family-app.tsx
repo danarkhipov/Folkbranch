@@ -240,13 +240,24 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       openPhoto: (id, list) => setPhoto({ id, list }),
       confirm: (text, action, note) => new Promise((resolve) => setConfirm({ text, action, note, resolve })),
       quickAdd: (type, to, otherParent) => setQuick({ type, to, otherParent }),
-      commands: { addPerson: () => setQuick({ type: null, to: null }), importFile: () => { setDropped(null); setImporting(true) }, search: () => setSearch(true), flip: flipChart },
+      commands: { addPerson: () => setQuick({ type: null, to: null }), importFile: () => { setDropped(null); setImporting(true) }, search: () => setSearch(true), flip: flipChart, deletePerson: (id) => void deleteAsked(id), clearAll: () => void clearAsked() },
       notify,
       undoLast,
     }
   }, [graph, lookups, me, lang, familyName, focusId, focus, rootsBelow]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const delPerson = useWrite((id: string) => api(`persons/${id}`, { method: 'DELETE' }))
+  const onDeleteRef = useRef<(id: string) => Promise<void>>(async () => {})
+  const deleteAsked = (id: string) => onDeleteRef.current(id)
+  const clearAsked = async () => {
+    if (!(await ctx?.confirm(t('Удалить всю схему?'), t('Удалить всё'), t('Все карточки и связи будут удалены. Фотографии останутся. Вернуть можно в разделе «История».')))) return
+    try {
+      await api('gedcom/import?mode=replace', { method: 'POST', body: '0 HEAD\n0 TRLR' })
+      await qc.invalidateQueries()
+      focus(null)
+      notify(t('Схема очищена'), [{ label: t('Отменить'), run: () => void undoLast() }])
+    } catch (e) { notify((e as Error).message, [], true) }
+  }
 
   const scope = useChartScope(graph, lookups?.family, focusId, () => requestAnimationFrame(() => requestAnimationFrame(() => canvas.current?.fit())))
 
@@ -294,6 +305,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
     }
   }
 
+  onDeleteRef.current = onDelete
   return (
     <App.Provider value={ctx}>
       <Presence.Provider value={present}>
