@@ -466,6 +466,7 @@ const en: Record<string, string> = {
   'Только те, что видят картинки': 'Only models that see pictures',
   'Эта нейросеть не видит картинки: ассистент не прочтёт сканы, письма и фотографии. Выберите другую, с пометкой «видит картинки».': 'This model cannot see pictures, so the assistant will not read scans, letters or photos. Choose another marked “sees pictures”.',
   'Сервис не сообщает, видит ли эта нейросеть картинки. Если ассистент не читает сканы, выберите другую.': 'The service does not say whether this model sees pictures. If the assistant cannot read scans, choose another.',
+  'Видит картинки': 'Sees pictures',
   'Европа и Америка': 'Europe and America',
   'Россия': 'Russia',
   'Китай': 'China',

@@ -35,7 +35,17 @@ describe('each provider\'s own list', () => {
   it('Anthropic and Moonshot say whether a model takes pictures; OpenAI, DeepSeek and Cloud.ru say nothing', () => {
     expect(PARSERS.anthropic({ data: [{ id: 'c-1', display_name: 'C One', created_at: '2026-07-24T00:00:00Z', capabilities: { image_input: { supported: true } } }, { id: 'c-0', capabilities: { image_input: { supported: false } } }] }, '').map((m) => m.vision)).toEqual([true, false])
     expect(PARSERS.moonshot({ data: [{ id: 'k', supports_image_in: true }, { id: 'j', supports_image_in: false }] }, '').map((m) => m.vision)).toEqual([true, false])
-    for (const id of ['openai', 'deepseek', 'cloudru'] as const) expect(PARSERS[id]({ data: [{ id: 'gpt-6-luna' }] }, '')[0].vision).toBeNull()
+    for (const id of ['openai', 'deepseek'] as const) expect(PARSERS[id]({ data: [{ id: 'gpt-6-luna' }] }, '')[0].vision).toBeNull()
+  })
+  it('Cloud.ru: inputs, tools and roubles come from its list, and speech or models without tools are not offered', () => {
+    const list = PARSERS.cloudru({ data: [
+      { id: 'Qwen/Q', function_calling: true, metadata: { type: 'llm', name: 'Q', input_modalities: ['text', 'image'], prompt_tokens_cost: 219.6, generated_tokens_cost: 329.4 } },
+      { id: 'ai-sage/G', metadata: { type: 'llm', input_modalities: ['text'] } },
+      { id: 'openai/whisper', metadata: { type: 'asr' }, function_calling: true },
+    ] }, '')
+    expect(list.filter((m) => m.usable).map((m) => m.id)).toEqual(['Qwen/Q'])
+    expect(list[0]).toMatchObject({ vision: true, price: '220 ₽ / 329 ₽' })
+    expect(list[1].vision).toBe(false)
   })
   it('OpenAI and Google keep chats and drop speech, images and embeddings', () => {
     expect(PARSERS.openai({ data: ['gpt-6-luna', 'gpt-6-luna-tts', 'text-embedding-4', 'o5', 'gpt-realtime'].map((id) => ({ id })) }, '').filter((m) => m.usable).map((m) => m.id)).toEqual(['gpt-6-luna', 'o5'])

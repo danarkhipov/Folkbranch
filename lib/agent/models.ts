@@ -47,7 +47,13 @@ export const PARSERS: Record<PresetId, (body: any, folder: string) => LiveModel[
   openai: (b) => rows(b).map((m) => ({ id: m.id, label: m.id, created: seconds(m.created), price: null, vision: null, usable: /^(gpt-|o\d|chatgpt)/.test(m.id) && !NOT_CHAT.test(m.id) && !/search|codex|instruct/.test(m.id) })),
   // These lists carry nothing but ids: every one is offered, and whether it sees pictures is not claimed.
   deepseek: (b) => rows(b).map((m) => ({ id: m.id, label: m.id, created: seconds(m.created), price: null, vision: null, usable: !NOT_CHAT.test(m.id) })),
-  cloudru: (b) => rows(b).map((m) => ({ id: m.id, label: m.id, created: seconds(m.created), price: null, vision: null, usable: !NOT_CHAT.test(m.id) })),
+  // Cloud.ru lists everything it hosts, speech and embeddings too, with each model's inputs, tools and price in roubles.
+  cloudru: (b) => rows(b).map((m) => ({
+    id: m.id, label: m.metadata?.name ?? m.id, created: seconds(m.created),
+    price: typeof m.metadata?.prompt_tokens_cost === 'number' ? `${Math.round(m.metadata.prompt_tokens_cost)} ₽ / ${Math.round(m.metadata.generated_tokens_cost)} ₽` : null,
+    vision: Array.isArray(m.metadata?.input_modalities) ? m.metadata.input_modalities.includes('image') : null,
+    usable: m.metadata?.type === 'llm' && (m.function_calling === true || !!m.capabilities?.includes('tools')),
+  })),
   yandex: (b, folder) => rows(b).filter((m) => String(m.id).startsWith('gpt://')).map((m) => {
     const id = String(m.id).replace(`gpt://${folder}/`, '')
     return { id, label: id.replace(/\/(latest|rc)$/, ''), created: 0, price: null, vision: null, usable: true }
