@@ -4,6 +4,45 @@ All notable changes are listed here, newest first. Versions follow [Semantic Ver
 
 ## Unreleased
 
+## 1.3.0 - 2026-11-08
+
+The family's records: places, archives and the people at an event, a calendar of family days, a fan of ancestors, private people and stories, a printed page, and a safer sign-out.
+
+### Security
+- Signing out empties the browser's cache of photos and removes text never sent and face prints, so the next person at a shared computer finds nothing. It asks first when there is unsent text. Photos are no longer kept for a year without asking the server: a copy left by someone else's session opens only for those allowed to see it.
+- Text kept in the browser while offline is offered back only to the account that typed it.
+
+### Added
+- A map of the family's places under **Dates, places and archives**, and each life's places in order under **Life in order**. The map comes from OpenStreetMap, so each device allows it once before the first picture is fetched; names and dates never go there.
+- The assistant looks at photos and scans already in the archive, a picture or a PDF, and reads them, handwriting included, then proposes what they show with the document as the source.
+- The assistant and agents add and change places: what a place was part of, its old names and its point on a map, each change waiting for review from a token.
+- The assistant shows a person's ancestors, descendants or close family on the chart when asked.
+- Places as records, under **Dates, places and archives**: what a place was part of, its old names and when they held, and where it is on a map. Search finds people by an old name too.
+- Archives as records with an address and a site, chosen for each source. A source also keeps its record number, the date of the document and a transcription.
+- People at an event, each with a role: godparent, witness, priest. Those with a card link to it, and readers see no one hidden.
+- Fields of their own for military service (unit, rank), looks, a wound, captivity, an award and a membership. New kinds of fact: estate, title, languages.
+- "No children" and "never married" on a person's family, so the check stops asking.
+- Addresses and phones of living relatives, seen only by editors: never by readers, guests, agents, the file for relatives or GEDCOM.
+- Keep a person who died, or a single story, from readers, guests and read-only agents, as the living are kept. GEDCOM carries the mark both ways.
+- Ask for a story with up to five questions, from a ready list or your own. The relative picks one before each recording, and it names what they send.
+- The server copies the database by itself each day and keeps the last seven. **Settings → Data and backups** says when it last did, and can copy now.
+- Print a person, or keep them as a PDF: life in order, family, facts, biography, stories and sources.
+- A calendar file of the family's days for a phone or computer, from **Dates and numbers**.
+- Moving from Gramps and webtrees, checked on files written their way: baptism and other events, the surname from birth, periods of residence, godparents, private marks and the archive a source is kept in now come across. See `docs/MOVING.md`.
+- **Dates and numbers** on the chart's toolbar: birthdays and anniversaries of the next two months, and the family in numbers.
+- An **ancestor fan** for any person: the whole line in one picture, under **Who to show**.
+- **Life in order** in a person's details: birth, marriage, children, facts and death, read from what is already written.
+- A page of its own when there is no connection, and a page for a link that leads nowhere, in place of the browser's own.
+
+### Changed
+- On a phone, settings open as a list, one section at a time; the bottom bar no longer runs its labels together.
+- A person's card: details come first, the bin and the history moved to a menu, and an empty field no longer offers a source.
+- Clearer words in the settings: no MCP or "smart functions" in the names, the full copy comes first, and a failed action says so and stays until read.
+- The first screen loads less: search and adding a relative come when first used.
+
+### Fixed
+- One fact changed on two devices at once: the second is now told, as for a single field, instead of one edit silently replacing the other. A fact one device changed is no longer removed by the other.
+
 ## 1.2.0 - 2026-11-07
 
 Install on any computer without Docker, talk to the assistant, find familiar faces across all photos, and ask a relative for a story by a link.

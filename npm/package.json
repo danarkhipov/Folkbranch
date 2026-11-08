@@ -1,6 +1,6 @@
 {
   "name": "folkbranch",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "A family archive that stays on your own computer. npx folkbranch installs and opens it.",
   "homepage": "https://github.com/danarkhipov/Folkbranch",
   "repository": { "type": "git", "url": "git+https://github.com/danarkhipov/Folkbranch.git" },
