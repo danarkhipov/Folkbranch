@@ -76,3 +76,20 @@ Identical names inside one file count as one person, and the window warns about 
 ## How an agent should work
 
 Start with `get_overview`, then `find_gaps`: that is the work queue. Record findings with `add_version` along with a source and its reliability: the old value stays, and a person sees the disagreement. `choose_version` and `reject_version` pick and reject versions. An agent converts a table with `parse_table`, checks it with `preview_text` and sends it with `import_text`. Ready MCP prompts: `research_person`, `fill_gaps`, `import_notes`. After making a token under **Settings → Agents and MCP**, you can copy the command for Claude Code, the config for other clients, or a task for the agent.
+
+## Models on the device and their licences
+
+Folkbranch ships no model. A browser downloads one from its source only when someone presses its button under **Settings → Smart features**, and checks it against a fixed SHA-256.
+
+| Model | Used for | Source | Licence |
+|---|---|---|---|
+| YuNet | Finding faces, light | [opencv/face_detection_yunet](https://huggingface.co/opencv/face_detection_yunet) | MIT |
+| YOLOv8n-face, YOLOv11m-face | Finding faces, accurate and maximum | [deepghs/yolo-face](https://huggingface.co/deepghs/yolo-face), exported from [akanametov/yolo-face](https://github.com/akanametov/yolo-face) | GPL-3.0, from the original repository |
+| SFace | Telling faces apart | [opencv/face_recognition_sface](https://huggingface.co/opencv/face_recognition_sface) | Apache-2.0 |
+| GigaAM v3 | Russian speech | [istupakov/gigaam-v3-onnx](https://huggingface.co/istupakov/gigaam-v3-onnx) | MIT |
+| Whisper base | Speech in other languages | [onnx-community/whisper-base](https://huggingface.co/onnx-community/whisper-base) | Apache-2.0 |
+| ONNX Runtime Web | Running the models | [onnxruntime-web](https://www.npmjs.com/package/onnxruntime-web) | MIT |
+
+The face detectors, YuNet and the YOLO models alike, were trained on WIDER FACE, a dataset licensed for non-commercial use (CC BY-NC-ND 4.0). OpenCV releases YuNet under MIT all the same; whether the dataset's terms reach a trained model is not settled. For a family's own archive this does not matter. Anyone offering Folkbranch as a paid service should check it first.
+
+Checked on 8 November 2026. Each source's own licence file is the authority.
