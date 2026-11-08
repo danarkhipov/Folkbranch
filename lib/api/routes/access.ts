@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { chooseModel, connectProvider, currentProvider, disconnectProvider, providerStatus } from '@/lib/agent/provider-key'
+import { chooseModel, connectProvider, modelChoices, currentProvider, disconnectProvider, providerStatus } from '@/lib/agent/provider-key'
 import { requireRole } from '@/lib/ops/core'
 import { acceptProposal, listProposals, myProposals, rejectProposal, removeProposalOp } from '@/lib/ops/proposals'
 import * as settings from '@/lib/ops/settings'
@@ -49,6 +49,7 @@ export const accessRoutes: Route[] = [
   human('DELETE', 'sign-in-methods/:id', 'Switch a way of signing in off', ({ actor, params }) => removeMethod(actor, method(params.id))),
   human('GET', 'assistant/provider', 'Which AI provider is connected', ({ actor }) => providerStatus(actor)),
   human('PUT', 'assistant/provider', 'Connect an AI provider with a key', async ({ actor, body }) => connectProvider(actor, await body())),
+  human('GET', 'assistant/provider/models', 'Models the connected key can use, newest first, with what each can do', ({ actor }) => modelChoices(actor)),
   human('PATCH', 'assistant/provider', 'Choose another model', async ({ actor, body }) => chooseModel(actor, await body())),
   human('DELETE', 'assistant/provider', 'Remove the key set in the app', ({ actor }) => disconnectProvider(actor)),
   human('PATCH', 'users/:id', 'Change a role', async ({ actor, params, body }) => settings.setUserRole(actor, params.id, z.object({ role }).parse(await body()).role)),

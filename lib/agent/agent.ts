@@ -165,16 +165,18 @@ export function approvalFor(risk: ToolDef['risk'] | undefined, trustWrites: bool
   return 'user-approval' as const
 }
 
-export function buildAgent(person: Actor, opts: { model?: LanguageModel; trustWrites?: boolean; focusId?: string | null; hasFiles?: boolean; since?: number } = {}) {
+export function buildAgent(person: Actor, opts: { model?: LanguageModel; trustWrites?: boolean; focusId?: string | null; hasFiles?: boolean; since?: number; sees?: boolean | null } = {}) {
   const actor = assistantActor(person, opts.since)
   const provider = opts.model ? null : currentProvider()
   if (!opts.model && !provider) throw new OpError(503, 'no AI provider is set up')
-  const defs = new Map(toolsFor(actor, 'assistant').map((d) => [d.name, d]))
+  // A model the provider says cannot take pictures is not offered the tool that shows it one.
+  const defs = new Map(toolsFor(actor, 'assistant').filter((d) => opts.sees !== false || d.name !== 'view_photo').map((d) => [d.name, d]))
   let unasked = 0
   const situation = [
     `The person is ${person.name}, with the role ${person.role}.`,
     actor.role === 'reader' ? 'As a reader they do not see living relatives, and neither do you.' : '',
     opts.hasFiles ? FILES : '',
+    opts.sees === false ? 'The model answering cannot see pictures. Say so when asked to read a scan or photo, and suggest the owner choose a model that can under Settings.' : '',
     opts.focusId ? `They have this person open on the chart: id ${opts.focusId}.` : '',
   ].filter(Boolean).join(' ')
   return new ToolLoopAgent({

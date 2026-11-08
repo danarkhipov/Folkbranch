@@ -6,8 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Section } from '@/components/ui/section'
 import { SwitchRow } from '@/components/ui/switch'
 import { api, useApp } from '@/lib/client'
-import { ModelSelect, ProviderForm, useProviderStatus } from '../assistant-setup'
-import type { PresetId } from '@/lib/agent/presets'
+import { LiveModelSelect, ProviderForm, useProviderStatus } from '../assistant-setup'
 
 /** Which provider answers, and changing it. */
 function ProviderSettings() {
@@ -38,7 +37,7 @@ function ProviderSettings() {
       {data.connected ? (
         <p className="text-xs text-ink-soft">{t('Сервис')}: {data.label}{data.keyEnding ? `, ${t('ключ')} …${data.keyEnding}` : ''}{data.source === 'server' ? `. ${t('Ключ уже настроен')}` : ''}</p>
       ) : <p className="text-xs text-ink-soft">{t('Сначала подключите ключ: без него ассистент не может отвечать.')}</p>}
-      {data.source === 'app' && !changing && <ModelSelect key={data.provider} presetId={data.provider as PresetId} value={data.model ?? ''} onChange={changeModel} />}
+      {data.source === 'app' && !changing && <LiveModelSelect key={`${data.provider}:${data.model}`} value={data.model ?? ''} onChange={changeModel} />}
       {modelError && <p role="alert" className="text-xs text-destructive">{modelError}</p>}
       {data.source !== 'server' && (changing || !data.connected ? <ProviderForm onDone={() => setChanging(false)} /> : (
         <div className="flex flex-wrap gap-2">

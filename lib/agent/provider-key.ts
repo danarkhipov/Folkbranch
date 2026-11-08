@@ -6,6 +6,7 @@ import { type Actor, OpError, requireRole } from '../ops/core'
 import { getSetting, say, setSetting } from '../ops/settings'
 import { getDb, schema } from '../db'
 import { eq } from 'drizzle-orm'
+import { type LiveModel, newestFirst, PARSERS } from './models'
 import { PRESETS, type PresetId } from './presets'
 import { activeProvider, keyEnvOf } from './provider'
 
@@ -34,26 +35,32 @@ export function providerStatus(actor: Actor) {
   return { connected: !!p, provider: p?.id ?? null, label: p?.label ?? null, model: p?.model ?? null, source: !p ? null : fromEnv ? 'server' as const : 'app' as const, keyEnding: p && !fromEnv ? p.key.slice(-4) : null }
 }
 
-const CHECKS: Record<PresetId, (key: string, folder: string) => { url: string; headers: Record<string, string>; ids?: (body: any) => string[] }> = {
+const CHECKS: Record<PresetId, (key: string, folder: string) => { url: string; headers: Record<string, string>; lists?: boolean }> = {
   // Reading the account or the list of models costs nothing, so a check never spends the person's money.
   openrouter: (key) => ({ url: 'https://openrouter.ai/api/v1/key', headers: { authorization: `Bearer ${key}` } }),
-  anthropic: (key) => ({ url: 'https://api.anthropic.com/v1/models?limit=1000', headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' }, ids: (b) => b.data.map((m: { id: string }) => m.id) }),
-  openai: (key) => ({ url: 'https://api.openai.com/v1/models', headers: { authorization: `Bearer ${key}` }, ids: (b) => b.data.map((m: { id: string }) => m.id) }),
-  yandex: (key, folder) => ({ url: 'https://ai.api.cloud.yandex.net/v1/models', headers: { authorization: `Api-Key ${key}`, 'openai-project': folder }, ids: (b) => b.data.map((m: { id: string }) => m.id.replace(`gpt://${folder}/`, '')) }),
-  cloudru: (key) => ({ url: 'https://foundation-models.api.cloud.ru/v1/models', headers: { authorization: `Bearer ${key}` }, ids: (b) => b.data.map((m: { id: string }) => m.id) }),
-  deepseek: (key) => ({ url: 'https://api.deepseek.com/models', headers: { authorization: `Bearer ${key}` }, ids: (b) => b.data.map((m: { id: string }) => m.id) }),
-  moonshot: (key) => ({ url: 'https://api.moonshot.ai/v1/models', headers: { authorization: `Bearer ${key}` }, ids: (b) => b.data.map((m: { id: string }) => m.id) }),
-  google: (key) => ({ url: 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000', headers: { 'x-goog-api-key': key }, ids: (b) => b.models.map((m: { name: string }) => m.name.replace(/^models\//, '')) }),
+  anthropic: (key) => ({ url: 'https://api.anthropic.com/v1/models?limit=1000', headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' }, lists: true }),
+  openai: (key) => ({ url: 'https://api.openai.com/v1/models', headers: { authorization: `Bearer ${key}` }, lists: true }),
+  yandex: (key, folder) => ({ url: 'https://ai.api.cloud.yandex.net/v1/models', headers: { authorization: `Api-Key ${key}`, 'openai-project': folder }, lists: true }),
+  cloudru: (key) => ({ url: 'https://foundation-models.api.cloud.ru/v1/models', headers: { authorization: `Bearer ${key}` }, lists: true }),
+  deepseek: (key) => ({ url: 'https://api.deepseek.com/models', headers: { authorization: `Bearer ${key}` }, lists: true }),
+  moonshot: (key) => ({ url: 'https://api.moonshot.ai/v1/models', headers: { authorization: `Bearer ${key}` }, lists: true }),
+  google: (key) => ({ url: 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000', headers: { 'x-goog-api-key': key }, lists: true }),
 }
 
-async function check(id: PresetId, key: string, model: string, folder = '') {
-  const { url, headers, ids } = CHECKS[id](key, folder)
-  const res = await fetch(url, { headers, signal: AbortSignal.timeout(15_000) }).catch(() => null)
+/** One free request to the provider, and the provider's refusals in words. */
+async function get(url: string, headers: Record<string, string>, timeout = 15_000) {
+  const res = await fetch(url, { headers, signal: AbortSignal.timeout(timeout) }).catch(() => null)
   if (!res) throw new OpError(502, say('Не удалось связаться с провайдером. Проверьте интернет на сервере и попробуйте ещё раз'))
   if (res.status === 400 || res.status === 401 || res.status === 403) throw new OpError(400, say('Провайдер не принял этот ключ. Проверьте, что он скопирован целиком'))
   if (res.status === 429) throw new OpError(429, say('Провайдер просит подождать. Попробуйте через минуту'))
   if (!res.ok) throw new OpError(502, `${say('Провайдер ответил ошибкой')}: ${res.status}`)
-  if (ids && !ids(await res.json()).includes(model)) throw new OpError(400, `${say('Этому ключу недоступна модель')} ${model}`)
+  return res
+}
+
+async function check(id: PresetId, key: string, model: string, folder = '') {
+  const { url, headers, lists } = CHECKS[id](key, folder)
+  const res = await get(url, headers)
+  if (lists && !PARSERS[id](await res.json(), folder).some((m) => m.id === model)) throw new OpError(400, `${say('Этому ключу недоступна модель')} ${model}`)
   if (id === 'openrouter') await checkOpenRouterModel(model)
 }
 
@@ -64,6 +71,39 @@ async function checkOpenRouterModel(model: string) {
   const found = list.data.find((m: { id: string }) => m.id === model)
   if (!found) throw new OpError(400, `${say('Этому ключу недоступна модель')} ${model}`)
   if (!found.supported_parameters?.includes('tools')) throw new OpError(400, `${say('Модель не умеет вызывать инструменты')}: ${model}`)
+}
+
+// The provider's list is read again after ten minutes, so a model released today is offered today.
+const listed = new Map<string, { at: number; models: LiveModel[] }>()
+
+async function liveModels(p: { id: PresetId; key: string; folder: string }, timeout?: number): Promise<LiveModel[]> {
+  const name = `${p.id}:${p.key.slice(-6)}:${p.folder}`
+  const hit = listed.get(name)
+  if (hit && Date.now() - hit.at < 10 * 60_000) return hit.models
+  const { url, headers } = p.id === 'openrouter' ? { url: 'https://openrouter.ai/api/v1/models', headers: {} } : CHECKS[p.id](p.key, p.folder)
+  const models = PARSERS[p.id](await (await get(url, headers, timeout)).json(), p.folder)
+  listed.set(name, { at: Date.now(), models })
+  return models
+}
+
+/** Every model the connected key can use for the assistant, newest first, with what the provider says it can do. */
+export async function modelChoices(actor: Actor) {
+  requireRole(actor, 'owner')
+  const p = currentProvider()
+  if (!p || p.id === 'local') return { current: p?.model ?? null, models: [] as LiveModel[] }
+  const all = await liveModels({ id: p.id as PresetId, key: p.key, folder: p.folder })
+  return { current: p.model, models: newestFirst(all.filter((m) => m.usable || m.id === p.model)).slice(0, 120) }
+}
+
+/** Whether the model answering now takes pictures: null when the provider does not say or cannot be reached. */
+export async function modelSees(): Promise<boolean | null> {
+  const p = currentProvider()
+  if (!p || p.id === 'local') return null
+  try {
+    return (await liveModels({ id: p.id as PresetId, key: p.key, folder: p.folder }, 4_000)).find((m) => m.id === p.model)?.vision ?? null
+  } catch {
+    return null
+  }
 }
 
 /** Another model for the key already saved. */

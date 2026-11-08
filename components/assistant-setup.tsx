@@ -36,6 +36,30 @@ export function ModelSelect({ presetId, value, onChange }: { presetId: PresetId;
   )
 }
 
+interface ModelChoices { current: string | null; models: { id: string; label: string; price: string | null; vision: boolean | null }[] }
+
+/** What the connected provider lists today, newest first; nothing is kept in the app. Models that take pictures can be asked for alone. */
+export function LiveModelSelect({ value, onChange }: { value: string; onChange: (model: string) => void }) {
+  const { t } = useApp()
+  const [sightOnly, setSightOnly] = useState(false)
+  const { data, isLoading, isError } = useQuery({ queryKey: ['provider-models'], queryFn: () => api<ModelChoices>('assistant/provider/models'), staleTime: 5 * 60_000 })
+  if (isLoading) return <p className="text-xs text-ink-soft">{t('Загружаю список нейросетей…')}</p>
+  if (isError || !data?.models.length) return null
+  const shown = data.models.filter((m) => !sightOnly || m.vision || m.id === value)
+  const current = data.models.find((m) => m.id === value)
+  return (
+    <div className="flex flex-col gap-1.5 text-xs text-ink-soft">
+      <label className="flex flex-col gap-1">
+        {t('Все нейросети вашего ключа, новые первыми')}
+        <Select aria-label={t('Нейросеть')} value={value} onChange={onChange} options={shown.map((m) => ({ value: m.id, label: `${m.label}${m.price ? `, ${m.price}` : ''}${m.vision ? ` · ${t('видит картинки')}` : ''}` }))} />
+      </label>
+      <label className="flex items-center gap-1.5"><input type="checkbox" className="accent-[var(--ink)]" checked={sightOnly} onChange={(e) => setSightOnly(e.target.checked)} />{t('Только те, что видят картинки')}</label>
+      {current?.vision === false && <p role="status" className="text-destructive">{t('Эта нейросеть не видит картинки: ассистент не прочтёт сканы, письма и фотографии. Выберите другую, с пометкой «видит картинки».')}</p>}
+      {current && current.vision === null && <p>{t('Сервис не сообщает, видит ли эта нейросеть картинки. Если ассистент не читает сканы, выберите другую.')}</p>}
+    </div>
+  )
+}
+
 /** Choose a provider, make a key there, paste it here. */
 export function ProviderForm({ onDone }: { onDone?: () => void }) {
   const { t } = useApp()
