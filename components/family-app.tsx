@@ -104,7 +104,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
   // Only straight after the archive is made: it says so in the address, once.
   const [welcome, setWelcome] = useState(() => typeof location !== 'undefined' && me.role === 'owner' && new URLSearchParams(location.search).has('welcome'))
   const endWelcome = () => { setWelcome(false); const url = new URL(location.href); url.searchParams.delete('welcome'); history.replaceState(null, '', url) }
-  const [dropped, setDropped] = useState<File | null>(null)
+  const [dropped, setDropped] = useState<File[] | null>(null)
   // The windows a person is likely to open next are fetched while they look at the chart, so one replaces another with no empty moment between.
   useEffect(() => {
     const warm = () => { void import('./import-dialog'); void import('./onboarding'); void import('./quick-add'); void import('./settings/settings-dialog'); void import('./text-dialog'); void import('./person-panel'); void import('./person-pickers') }
@@ -119,7 +119,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
     const drop = (e: DragEvent) => {
       if (!isFile(e) || me.role === 'reader') return
       e.preventDefault()
-      setDropped(e.dataTransfer!.files[0] ?? null)
+      setDropped([...e.dataTransfer!.files])
       setImporting(true)
     }
     window.addEventListener('dragover', over)
@@ -346,7 +346,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
       )}
       {overview && <FamilyOverview onClose={() => setOverview(false)} />}
       {textOpen && <TextDialog open onOpenChange={setTextOpen} />}
-      {importing && <ImportDialog open file={dropped} onOpenChange={setImporting} />}
+      {importing && <ImportDialog open files={dropped} onOpenChange={setImporting} />}
       {welcome && <Onboarding onClose={endWelcome} onImport={() => { setDropped(null); setImporting(true) }} onFirstPerson={() => setQuick({ type: null, to: null })} />}
       {printing && <PrintDialog graph={scope.shown ?? ctx.graph} onClose={() => setPrinting(false)} />}
       <ConfirmDialog state={confirmState} onClose={() => setConfirm(null)} />

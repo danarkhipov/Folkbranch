@@ -22,6 +22,8 @@ export function previewGedcom(actor: Actor, text: string) {
     sample: g.persons.slice(0, 6).map((p) => [p.givenName, p.surname].filter(Boolean).join(' ')),
     existing: g.persons.filter((p) => known.has(`${p.givenName} ${p.surname}`.toLowerCase())).length,
     unread: unreadTags(text),
+    people: g.persons.map((p) => ({ xref: p.xref, name: [p.givenName, p.patronymic, p.surname].filter(Boolean).join(' '), year: yearOf(p.birthDate) })),
+    media: g.persons.flatMap((p) => p.media.map((m) => ({ xref: p.xref, ...m }))),
     ...matchReport(g),
   }
 }
@@ -118,7 +120,7 @@ export function importGedcom(actor: Actor, text: string, mode: ImportMode = 'add
         if (b) safe(() => addParent(c, b, cid, ch.adopted ? 'adopted' : 'birth', 'family'))
       }
     }
-    return { persons: g.persons.length, families: g.families.length, merged: found.size }
+    return { persons: g.persons.length, families: g.families.length, merged: found.size, ids: Object.fromEntries(ids) }
   })
 }
 

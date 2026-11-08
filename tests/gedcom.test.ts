@@ -189,4 +189,24 @@ describe('what will not come across', () => {
     const [back] = parseGedcom(out).persons
     expect(back.facts[0]).toMatchObject({ note: 'раз\nдва', source: 'Книга\nвторая' })
   })
+
+  it('reads the files a person is linked to, inline or through a record of their own', () => {
+    const g = parseGedcom(`0 HEAD
+0 @O1@ OBJE
+1 FILE scans\\wedding.jpg
+2 TITL Свадьба
+0 @I1@ INDI
+1 NAME Иван /Петров/
+1 OBJE
+2 FILE portrait.jpg
+3 FORM jpg
+2 TITL Портрет
+1 OBJE @O1@
+0 @I2@ INDI
+1 NAME Анна /Петрова/
+1 OBJE @O1@
+0 TRLR`)
+    expect(g.persons[0].media).toEqual([{ file: 'portrait.jpg', title: 'Портрет' }, { file: 'scans\\wedding.jpg', title: 'Свадьба' }])
+    expect(g.persons[1].media).toEqual([{ file: 'scans\\wedding.jpg', title: 'Свадьба' }])
+  })
 })

@@ -22,7 +22,7 @@ const pageMeta = z.object({ id, personId: id, parentPageId: id.nullable(), title
 const photo = z.object({ id, kind: text, originalName: text, caption: text, date: text, place: text, tags: z.array(z.object({ id, personId: id.nullable(), label: text.nullable() })).optional() })
 const proposal = z.object({ id, status: text, error: text.nullable(), ops: z.array(z.object({ op: text, text })) })
 const applied = z.object({ applied: z.number(), ids: z.record(z.string(), z.string()), people: z.array(z.object({ name: text, id, parents: z.array(text).optional(), spouses: z.array(text).optional() })).optional(), check: z.object({ unlinked: z.array(text) }).optional() })
-const importCount = z.object({ persons: z.number() })
+const importCount = z.object({ persons: z.number(), ids: z.record(z.string(), z.string()).optional() })
 
 /** A token's write can wait for a person instead of running. */
 const pending = z.object({ status: z.literal('pending_review'), proposalId: id, tempId: id.optional(), id: id.optional(), tempIds: z.array(id).optional(), message: text })

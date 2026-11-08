@@ -66,4 +66,11 @@ describe('importing into a tree that already has people', () => {
     expect(all().every((p) => p.surname.startsWith('Нов') || p.surname === 'Слияева')).toBe(true)
     expect(before).toBeGreaterThan(3)
   })
+
+  it('hands back which card each person in the file became, so their files can be attached', () => {
+    const r = importGedcom(owner, ged().replace('Слияев', 'Файлов'), 'add') as { ids: Record<string, string> }
+    expect(Object.keys(r.ids).sort()).toEqual(['@I1@', '@I2@', '@I3@'])
+    expect(people.getPersonRow(r.ids['@I1@']).surname).toBe('Файлов')
+    expect(previewGedcom(owner, ged()).people.map((p) => p.xref)).toEqual(['@I1@', '@I2@', '@I3@'])
+  })
 })

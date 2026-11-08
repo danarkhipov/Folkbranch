@@ -109,6 +109,8 @@ export interface ImportedPerson {
   notes: string[]
   facts: Fact[]
   sources: Source[]
+  /** Files the person is linked to (OBJE): their path as written, which the files that come with the tree are matched to. */
+  media: { file: string; title: string }[]
 }
 
 export interface Imported {
@@ -163,6 +165,15 @@ export function parseGedcom(text: string, lang: 'ru' | 'en' = 'ru'): Imported {
     const repo = repos.get(val(r, 'REPO')) || ''
     return [r.xref!, repo && title && !title.includes(repo) ? `${title} (${repo})` : title || repo]
   }))
+  // A file is named inside the person (OBJE with FILE) or in a record of its own that the person points to.
+  const objects = new Map(roots.filter((r) => r.tag === 'OBJE' && r.xref).map((r) => [r.xref!, r]))
+  const mediaOf = (r: GedLine) => r.children.filter((c) => c.tag === 'OBJE').flatMap((c) => {
+    const o = c.value.startsWith('@') ? objects.get(c.value) : c
+    if (!o) return []
+    const files = o.children.filter((x) => x.tag === 'FILE')
+    const title = val(o, 'TITL') || files.map((f) => val(f, 'TITL')).find(Boolean) || ''
+    return files.map((f) => ({ file: longText(f), title })).filter((m) => m.file)
+  })
   const noteOf = (c: GedLine) => (c.value.startsWith('@') ? notes.get(c.value) ?? '' : longText(c))
 
   // Adoption is written on the child: 1 ADOP / 2 FAMC @F1@, or 1 FAMC / 2 PEDI adopted.
@@ -200,6 +211,7 @@ export function parseGedcom(text: string, lang: 'ru' | 'en' = 'ru'): Imported {
       noChildren: val(r, 'NCHI').trim() === '0',
       neverMarried: val(r, 'NMR').trim() === '0',
       quality: bestQuality(r),
+      media: mediaOf(r),
       notes: r.children.filter((c) => c.tag === 'NOTE' || c.tag === 'SNOTE').map(noteOf).filter(Boolean),
       facts: r.children
         .filter((c) => c.tag === 'EVEN' || c.tag in FACT_TAGS)
