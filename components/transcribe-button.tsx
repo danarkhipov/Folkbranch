@@ -6,6 +6,7 @@ import { useApp } from '@/lib/client'
 import { useModel } from '@/lib/smart/models'
 import { ModelPrompt } from './model-prompt'
 import { useSmart } from '@/lib/smart/settings'
+import { CloudError, useCloud } from '@/lib/smart/cloud'
 import type { SpeechProgress } from '@/lib/smart/speech'
 
 /** Turns a recording into text in this browser. The text lands in the field beside it, for a person to correct. */
@@ -13,11 +14,22 @@ export function TranscribeButton({ getAudio, current, onText }: { getAudio: () =
   const { t, lang } = useApp()
   const [on] = useSmart('speech')
   const model = useModel('speech')
+  const cloud = useCloud()
   const [progress, setProgress] = useState<SpeechProgress | null>(null)
   const [problem, setProblem] = useState('')
   const stop = useRef<AbortController | null>(null)
   if (!on) return null
-  if (model.status !== 'ready') return <ModelPrompt pack="speech">{t('Чтобы запись сама превращалась в текст, скачайте модель. Она работает в этом браузере, голос никуда не уходит.')}</ModelPrompt>
+  if (!cloud.use && model.status !== 'ready') return (
+    <div className="flex flex-col gap-2">
+      {cloud.enabled && (
+        <div className="flex flex-col gap-1.5 rounded-lg bg-muted px-3 py-2">
+          <p className="text-xs text-ink-soft">{t('Владелец архива подключил расшифровку в облаке. Запись уйдёт на сервер архива и дальше в')} {cloud.info?.where}. {t('Платит владелец, вам ничего скачивать не нужно.')}</p>
+          <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => cloud.set(true)}>{t('Расшифровывать в облаке')}</Button>
+        </div>
+      )}
+      <ModelPrompt pack="speech">{t('Чтобы запись сама превращалась в текст, скачайте модель. Она работает в этом браузере, голос никуда не уходит.')}</ModelPrompt>
+    </div>
+  )
   const start = async () => {
     setProblem('')
     stop.current = new AbortController()
@@ -30,7 +42,7 @@ export function TranscribeButton({ getAudio, current, onText }: { getAudio: () =
       onText(join(text))
       if (!text.trim()) setProblem(t('В записи не удалось разобрать речь'))
     } catch (e) {
-      if ((e as Error).name !== 'AbortError') { console.error(e); setProblem(t('Не удалось расшифровать запись.')) }
+      if ((e as Error).name !== 'AbortError') { console.error(e); setProblem(e instanceof CloudError ? e.message : t('Не удалось расшифровать запись.')) }
     }
     setProgress(null)
   }

@@ -5,6 +5,7 @@ import { PromptInputButton } from '@/components/ai-elements/prompt-input'
 import { useApp } from '@/lib/client'
 import { downloadPack, packSize, useModel } from '@/lib/smart/models'
 import { useSmart } from '@/lib/smart/settings'
+import { CloudError, useCloud } from '@/lib/smart/cloud'
 import { clock, useRecorder } from '@/lib/use-recorder'
 
 const NO_MIC = { insecure: 'Запись голоса работает только по защищённому адресу (https).', unsupported: 'Этот браузер не умеет записывать звук.', denied: 'Нет доступа к микрофону. Разрешите его в браузере.' }
@@ -14,6 +15,7 @@ export function DictateButton() {
   const { t, lang, notify } = useApp()
   const [on] = useSmart('speech')
   const model = useModel('speech')
+  const cloud = useCloud()
   const rec = useRecorder()
   const [reading, setReading] = useState(false)
   const self = useRef<HTMLSpanElement>(null)
@@ -39,12 +41,12 @@ export function DictateButton() {
     import('@/lib/smart/speech')
       .then(({ transcribe }) => transcribe(blob, lang, () => {}, stop.signal))
       .then((text) => { if (text.trim()) write(text.trim()); else notify(t('В записи не удалось разобрать речь')) })
-      .catch((e) => { if (e.name !== 'AbortError') { console.error(e); notify(t('Не удалось расшифровать запись.')) } })
+      .catch((e) => { if (e.name !== 'AbortError') { console.error(e); notify(e instanceof CloudError ? e.message : t('Не удалось расшифровать запись.')) } })
       .finally(() => setReading(false))
   }, [clip]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!on || model.status === 'unknown' || model.status === 'unavailable') return null
-  if (model.status !== 'ready') {
+  if (!on || (!cloud.use && (model.status === 'unknown' || model.status === 'unavailable'))) return null
+  if (!cloud.use && model.status !== 'ready') {
     const busy = model.status === 'busy'
     return <PromptInputButton aria-label={t('Сказать голосом')} title={t(busy ? 'Модель скачивается' : 'Сказать голосом')} data-hint={busy ? undefined : `${t('Сначала нужно скачать модель')}, ${packSize('speech')} ${t('МБ')}.`} onClick={() => { if (!busy) notify(`${t('Чтобы говорить голосом, скачайте модель')}, ${packSize('speech')} ${t('МБ')}.`, [{ label: t('Скачать модель'), run: () => downloadPack('speech') }]) }}>{busy ? <Loader2 size={15} className="animate-spin" /> : <Mic size={15} className="opacity-50" />}</PromptInputButton>
   }

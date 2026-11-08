@@ -5,13 +5,14 @@ import { getActor, guestActor, hasBearer } from '@/lib/api-auth'
 import { match, openApi } from '@/lib/api/router'
 import { accessRoutes } from '@/lib/api/routes/access'
 import { contentRoutes } from '@/lib/api/routes/content'
+import { speechRoutes } from '@/lib/api/routes/speech'
 import { exchangeRoutes } from '@/lib/api/routes/exchange'
 import { familyRoutes } from '@/lib/api/routes/family'
 import { OpError } from '@/lib/ops/core'
 
 export const dynamic = 'force-dynamic'
 
-const routes = [...familyRoutes, ...contentRoutes, ...exchangeRoutes, ...accessRoutes]
+const routes = [...familyRoutes, ...contentRoutes, ...exchangeRoutes, ...accessRoutes, ...speechRoutes]
 
 /** The largest upload, as base64, with room for its envelope. */
 const MAX_BODY = 60 * 1024 * 1024

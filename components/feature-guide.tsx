@@ -1,8 +1,8 @@
 'use client'
-import { Baby, CalendarDays, FileUp, GitMerge, History, Lightbulb, Link2, Map, Mic, MousePointer2, Printer, ScanFace, Share2, Smartphone, Sparkles, Terminal, UsersRound, type LucideIcon } from 'lucide-react'
+import { Baby, CalendarDays, Cloud, FileUp, GitMerge, History, Lightbulb, Link2, Map, Mic, MousePointer2, Printer, ScanFace, Share2, Smartphone, Sparkles, Terminal, UsersRound, type LucideIcon } from 'lucide-react'
 import { useApp } from '@/lib/client'
 
-export type GuideSection = 'setup' | 'account' | 'smart' | 'general' | 'people' | 'signin' | 'assistant' | 'agents' | 'data'
+export type GuideSection = 'speech' | 'setup' | 'account' | 'smart' | 'general' | 'people' | 'signin' | 'assistant' | 'agents' | 'data'
 
 interface Feature { icon: LucideIcon; title: string; text: string; go?: { section: GuideSection; label: string; owner?: boolean } }
 
@@ -11,7 +11,8 @@ const FEATURES: Feature[] = [
   { icon: Sparkles, title: 'ИИ-ассистент', text: 'Спросите «кто мои двоюродные?» или «где пробелы в роде Егоровых?». Он ищет по архиву и предлагает правки, а вы подтверждаете каждую. Нужен ваш ключ одного из сервисов.', go: { section: 'assistant', label: 'Подключить', owner: true } },
   { icon: Share2, title: 'Позвать родных', text: 'Ссылка-приглашение впускает человека в архив. Ссылка для просмотра показывает семью без входа, а можно отдать только одну ветку.', go: { section: 'people', label: 'Пригласить', owner: true } },
   { icon: ScanFace, title: 'Лица на фото', text: 'Назовите человека на одном снимке, и программа предложит его на остальных, даже в другом возрасте. Всё считается на вашем устройстве, фото никуда не уходят.', go: { section: 'smart', label: 'Включить' } },
-  { icon: Mic, title: 'Голос в текст', text: 'Запишите, как бабушка рассказывает историю: запись расшифруется на устройстве. Для русского есть точная модель, для английского и других языков более мощные.', go: { section: 'smart', label: 'Выбрать модель' } },
+  { icon: Mic, title: 'Голос в текст', text: 'Запишите, как бабушка рассказывает историю, и она станет текстом. Либо на устройстве, моделью, которую вы скачали, либо в облаке: владелец один раз подключает сервис и платит, остальным ничего ставить не нужно.', go: { section: 'smart', label: 'Выбрать способ' } },
+  { icon: Cloud, title: 'Расшифровка в облаке', text: 'Один сервис распознавания речи на всех: Groq, OpenAI, Mistral, OpenRouter, китайский SiliconFlow или ваш собственный сервер. Ключ вводится один раз, у месяца есть предел расхода.', go: { section: 'speech', label: 'Подключить', owner: true } },
   { icon: Baby, title: 'Попросить родных рассказать', text: 'Ссылка для одного человека, который не станет регистрироваться: открыть на телефоне, нажать большую кнопку и говорить. Рассказ придёт вам на проверку.', go: { section: 'people', label: 'Создать ссылку', owner: true } },
   { icon: FileUp, title: 'Дерево вместе с фото', text: 'Загрузите файл дерева (GEDCOM, таблицу или текст) и сразу все фотографии. Файлы сами найдут своих людей по тому, что написано в дереве и в названиях файлов.', go: { section: 'data', label: 'Загрузить' } },
   { icon: Map, title: 'Карта мест', text: 'Где жила семья и куда переезжала. На карточке человека места идут по порядку жизни.' },

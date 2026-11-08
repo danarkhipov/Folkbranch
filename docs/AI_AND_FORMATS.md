@@ -77,6 +77,21 @@ Identical names inside one file count as one person, and the window warns about 
 
 Start with `get_overview`, then `find_gaps`: that is the work queue. Record findings with `add_version` along with a source and its reliability: the old value stays, and a person sees the disagreement. `choose_version` and `reject_version` pick and reject versions. An agent converts a table with `parse_table`, checks it with `preview_text` and sends it with `import_text`. Ready MCP prompts: `research_person`, `fill_gaps`, `import_notes`. After making a token under **Settings → Agents and MCP**, you can copy the command for Claude Code, the config for other clients, or a task for the agent.
 
+## Cloud transcription
+
+The owner can connect one speech service for the whole archive under **Settings → Cloud transcription**. It is the owner's key and the owner's bill. Editors then turn recordings into text without keys or downloads: the recording goes to this server, which forwards it to the service and keeps nothing of it. A device uses it only if that device switches it on under **Settings → Faces and voice**; otherwise the voice stays on the device.
+
+| Service | Model (default) | About | Where the audio goes |
+|---|---|---|---|
+| OpenRouter | mistralai/voxtral-mini-transcribe | $0.003 a minute; the exact cost of each request comes back; the assistant's OpenRouter key can be reused | OpenRouter |
+| Groq | whisper-large-v3-turbo | about $0.04 an hour, free allowance; about 4.6% wrong words in English | USA |
+| OpenAI | gpt-transcribe | $0.0045 a minute; about 3.3% wrong words in English | USA |
+| Mistral | voxtral-mini-transcribe-latest | $0.0035 a minute | France |
+| SiliconFlow | Qwen/Qwen3-ASR-1.7B | free models with limits; a Chinese service | China, Singapore |
+| Your own server | any | anything that answers like OpenAI's `/audio/transcriptions`, such as faster-whisper | where you put it |
+
+Prices and word-error figures are the services' own and independent comparisons as of 8 November 2026, a guide that changes. A key is checked by reading the service's model list, which costs nothing; the test button sends two seconds of silence, a fraction of a cent. A monthly limit (600 minutes unless changed) and eight recordings a minute per person keep one stuck button from spending the owner's money. The same can be set in the server's environment (`STT_PROVIDER`, `STT_API_KEY`, `STT_MODEL`, `STT_BASE_URL`, `STT_LIMIT_MINUTES`), and then it wins over the app. Alibaba's own DashScope service takes audio only as a link, so it is not offered directly; its Qwen3-ASR models are reachable through SiliconFlow.
+
 ## Models on the device and their licences
 
 Folkbranch ships no model. A browser downloads one from its source only when someone presses its button under **Settings → Smart features**, and checks it against a fixed SHA-256.
