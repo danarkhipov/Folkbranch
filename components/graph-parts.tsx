@@ -83,7 +83,7 @@ export const PersonCard = memo(function PersonCard({ p, left, top, className, se
       <div className={cn('ava', canEdit && !p.hidden && 'link-start')} onPointerDown={canEdit && !p.hidden ? (e) => acts.current.drag(e, p.id) : undefined}><img src={avatarUrl(p)} alt="" decoding="async" draggable={false} /></div>
       {/* Opaque, so a line coming from below stops at the text however tall it wraps. */}
       <div className={cn('cap', canEdit && 'movable')} onPointerDown={canEdit ? (e) => acts.current.move(e, p.id) : undefined}>
-        <div className="nm">{p.hidden ? t('Живой родственник') : personName(p) || t('Без названия')}</div>
+        <div className="nm" title={p.hidden ? undefined : personName(p) || undefined}>{p.hidden ? t('Живой родственник') : personName(p) || t('Без названия')}</div>
         {!p.hidden && <div className="yr">{lifeYears(p)}</div>}
         {label && <div className="rel kin">{label}</div>}
         {mine && <div className="rel me">{mine}</div>}

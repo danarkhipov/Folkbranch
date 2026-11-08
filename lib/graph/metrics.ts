@@ -12,6 +12,8 @@ export const PITCH = 178
 /** Lines end here, behind the caption's opaque background, which cuts them off at the text. */
 export const UNDER_CAPTION = AVATAR_CY + AVATAR_R + 12
 const NAME_CHARS = 14
+/** A longer name is cut after this many lines on the chart (the whole name shows on hover and in the panel), so no caption can run into the lines and rows below it. */
+const NAME_LINES = 3
 const YEAR_CHARS = 17
 // All at the largest size captions reach when the chart is zoomed out.
 const TEXT_LINE = 24
@@ -40,5 +42,5 @@ const PRINT_YEAR_LINE = 18
 export function cardHeight(p: Person | undefined, print = false) {
   if (print) return AVATAR_CY + AVATAR_R + 13 + wrappedLines(p ? `${p.givenName ?? ''} ${p.surname ?? ''}` : '', PRINT_NAME_CHARS) * PRINT_NAME_LINE + wrappedLines(p ? lifeYears(p) : '', PRINT_NAME_CHARS) * PRINT_YEAR_LINE
   const years = p ? lifeYears(p) : ''
-  return AVATAR_CY + AVATAR_R + 13 + wrappedLines(p ? `${p.givenName ?? ''} ${p.surname ?? ''}` : '', NAME_CHARS) * TEXT_LINE + wrappedLines(years, YEAR_CHARS) * YEAR_LINE + LABEL_LINE
+  return AVATAR_CY + AVATAR_R + 13 + Math.min(NAME_LINES, wrappedLines(p ? `${p.givenName ?? ''} ${p.surname ?? ''}` : '', NAME_CHARS)) * TEXT_LINE + wrappedLines(years, YEAR_CHARS) * YEAR_LINE + LABEL_LINE
 }
