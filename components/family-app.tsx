@@ -3,7 +3,7 @@ import type { SignInMethods } from '@/lib/sign-in-methods'
 import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { UserPlus, X } from 'lucide-react'
+import { FileUp, UserPlus, X } from 'lucide-react'
 import { App, Presence, api, undoFailure, useProposals, useTr, useWrite, type AppCtx, type QuickType } from '@/lib/client'
 import { Family } from '@/lib/kinship'
 import { personName, shownTags, type Graph, type HistoryEntry, type Lang, type Me } from '@/lib/types'
@@ -320,7 +320,11 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
 
       {!ctx.graph.persons.length && ctx.canEdit && (
         <div className="fixed inset-0 grid place-items-center pointer-events-none">
-          <button className="float pointer-events-auto px-5 h-12 flex items-center gap-2 font-serif text-base hover:bg-muted" onClick={() => setQuick({ type: null, to: null })}><UserPlus size={17} /> {t('Первый человек в архиве')}</button>
+          <div className="flex flex-col items-stretch gap-2.5">
+            <button className="float pointer-events-auto px-5 h-12 flex items-center gap-2 font-serif text-base hover:bg-muted" onClick={() => setQuick({ type: null, to: null })}><UserPlus size={17} /> {t('Первый человек в архиве')}</button>
+            <button className="float pointer-events-auto px-5 h-12 flex items-center gap-2 font-serif text-base hover:bg-muted" onClick={() => { setDropped(null); setImporting(true) }}><FileUp size={17} /> {t('Загрузить файл с деревом')}</button>
+            <p className="text-center text-xs text-ink-faint">{t('GEDCOM, Excel, CSV или текст. Файл можно и перетащить сюда.')}</p>
+          </div>
         </div>
       )}
 
