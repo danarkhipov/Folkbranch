@@ -54,6 +54,11 @@ export function FamilyTab({ person }: { person: Person }) {
       </div>
     </section>
   ))
+  const save = useWrite((json: Partial<Person>) => api(`persons/${person.id}`, { method: 'PATCH', json }))
+  // "None" known is different from "none recorded": said here, and the review stops asking.
+  const none = (key: 'noChildren' | 'neverMarried', label: string, empty: boolean) => (!empty && !person[key] ? null : canEdit
+    ? <label className="mb-4 -mt-2 flex items-center gap-2 cursor-pointer min-h-7 text-ink-soft"><input type="checkbox" className="accent-[var(--ink)] size-4" checked={!!person[key]} onChange={(e) => save.mutate({ [key]: e.target.checked })} />{t(label)}</label>
+    : person[key] ? <p className="mb-4 -mt-2 text-ink-soft">{t(label)}</p> : null)
   return (
     <div className="px-4 py-4 text-sm">
       {group('Родители', parents.map((l) => chip(l.parentId, () => remove.mutate({ type: 'parent', id: l.id }), kindToggle(l, byId.get(l.parentId)?.sex === 'F'))), parents.length < 2 ? ['parent', 'Добавить родителя'] : undefined)}
@@ -63,7 +68,9 @@ export function FamilyTab({ person }: { person: Person }) {
           <UnionDetails union={u} />
         </div>
       )), ['spouse', 'Добавить супруга'])}
+      {none('neverMarried', person.sex === 'F' ? 'В браке не состояла' : 'В браке не состоял', !unions.length)}
       {group('Дети', children.map((l) => chip(l.childId, () => remove.mutate({ type: 'parent', id: l.id }), kindToggle(l, byId.get(l.childId)?.sex === 'F', 'пасынок или падчерица'))), ['child', 'Добавить ребёнка'])}
+      {none('noChildren', 'Детей не было', !children.length)}
       {siblings.length > 0 && group('Братья и сёстры', siblings.map((s) => chip(s, undefined, undefined, true)))}
     </div>
   )

@@ -88,7 +88,7 @@ export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { pe
   const patch = usePersonSave(person, (e) => {
     const { status } = e as Error & { status?: number }
     if (status === 409 || status === 404) {
-      notify(t(status === 409 ? 'Это поле только что изменил другой человек. Показано новое значение, проверьте его.' : 'Этого человека только что удалили.'))
+      notify(t(status === 409 ? 'Это только что изменили на другом устройстве или другой человек. Показано новое, проверьте его.' : 'Этого человека только что удалили.'))
       qc.invalidateQueries({ queryKey: ['graph'] })
       return
     }

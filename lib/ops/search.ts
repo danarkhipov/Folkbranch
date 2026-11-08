@@ -1,4 +1,5 @@
 // Finding things in the archive: by what is written anywhere, or by exact conditions on people.
+import { factWords } from '../fact-kinds'
 import MiniSearch from 'minisearch'
 import { z } from 'zod'
 import { dataStamp } from '../db'
@@ -14,7 +15,7 @@ const normal = (s: string) => s.toLowerCase().replace(/ё/g, 'е')
 const fullName = (p: Person) => [p.givenName, p.patronymic, p.surname].filter(Boolean).join(' ')
 const personText = (p: Person) => [
   fullName(p), p.maidenName, p.otherNames, p.birthPlace, p.deathPlace, shownTags(p.tags).join(' '),
-  p.facts.map((f) => `${f.kind} ${f.date} ${f.place} ${f.note}`).join(' '),
+  p.facts.map((f) => `${f.kind} ${f.date} ${f.place} ${factWords(f)}`).join(' '),
   p.sources.map((s) => `${s.title} ${s.ref}`).join(' '),
   p.claims.map((c) => `${c.value} ${c.reason}`).join(' '),
 ].join(' ')

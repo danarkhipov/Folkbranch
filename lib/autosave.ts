@@ -5,18 +5,29 @@
  * that fell behind is stopped rather than written over somebody else's text.
  */
 export interface PageText { title: string; content: unknown }
-export interface Draft extends PageText { base: number }
+/** `user` is who typed it: on a shared computer nobody else is offered it. Drafts kept before it was recorded have none. */
+export interface Draft extends PageText { base: number; user?: string }
 export type SaveStatus = '' | 'saved' | 'waiting' | 'failed' | 'conflict'
 type Store = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
 const draftKey = (id: string) => `page-draft:${id}`
 
-export function loadDraft(id: string, store: Store = localStorage): Draft | null {
+export function loadDraft(id: string, user?: string, store: Store = localStorage): Draft | null {
   try {
     const raw = store.getItem(draftKey(id))
-    return raw ? JSON.parse(raw) : null
+    const draft: Draft | null = raw ? JSON.parse(raw) : null
+    return draft && (!draft.user || !user || draft.user === user) ? draft : null
   } catch {
     return null
+  }
+}
+
+/** Text typed on this device that never reached the server, for any page. */
+export function draftsLeft(store: Pick<Storage, 'key' | 'length'> = localStorage) {
+  try {
+    return Array.from({ length: store.length }, (_, i) => store.key(i)).filter((k): k is string => !!k?.startsWith('page-draft:'))
+  } catch {
+    return []
   }
 }
 
@@ -26,6 +37,7 @@ export function clearDraft(id: string, store: Store = localStorage) {
 
 export function autosave(o: {
   id: string
+  user?: string
   base: number
   read: () => PageText
   /** Sends the text, on top of `base` or over whatever is there when null. Resolves to the new version. */
@@ -41,7 +53,7 @@ export function autosave(o: {
   let timer: ReturnType<typeof setTimeout> | undefined
 
   const keep = () => {
-    try { store.setItem(draftKey(id), JSON.stringify({ ...read(), base })) } catch {}
+    try { store.setItem(draftKey(id), JSON.stringify({ ...read(), base, user: o.user })) } catch {}
   }
   const later = (ms: number) => {
     clearTimeout(timer)

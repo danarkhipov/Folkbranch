@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { autosave, clearDraft, loadDraft, type SaveStatus } from '../lib/autosave'
+import { autosave, clearDraft, draftsLeft, loadDraft, type SaveStatus } from '../lib/autosave'
 
 function setup() {
   const data = new Map<string, string>()
@@ -20,7 +20,7 @@ describe('autosave', () => {
     expect(send).not.toHaveBeenCalled()
     await wait(30)
     expect(send).toHaveBeenCalledTimes(1)
-    expect(loadDraft('p', store)).toBeNull()
+    expect(loadDraft('p', undefined, store)).toBeNull()
     expect(statuses).toEqual(['saved'])
     s.close()
   })
@@ -31,11 +31,11 @@ describe('autosave', () => {
     type('offline')
     await wait(15)
     expect(statuses.at(-1)).toBe('waiting')
-    expect(loadDraft('p', store)?.content).toBe('offline')
+    expect(loadDraft('p', undefined, store)?.content).toBe('offline')
     expect(s.unsent()).toBe(true)
     await wait(40)
     expect(statuses.at(-1)).toBe('saved')
-    expect(loadDraft('p', store)).toBeNull()
+    expect(loadDraft('p', undefined, store)).toBeNull()
     type('next')
     await wait(30)
     expect(sent.at(-1)).toEqual({ text: 'next', base: 2 })
@@ -67,7 +67,7 @@ describe('autosave', () => {
     type('more')
     await wait(50)
     expect(send).toHaveBeenCalledTimes(1)
-    expect(loadDraft('p', store)?.content).toBe('mine')
+    expect(loadDraft('p', undefined, store)?.content).toBe('mine')
     s.overwrite()
     await wait(10)
     expect(sent.at(-1)).toEqual({ text: 'more', base: null })
@@ -81,7 +81,7 @@ describe('autosave', () => {
     type('mine')
     await wait(30)
     s.discard()
-    expect(loadDraft('p', store)).toBeNull()
+    expect(loadDraft('p', undefined, store)).toBeNull()
     expect(s.hide()).toBeNull()
     s.close()
   })
@@ -90,7 +90,7 @@ describe('autosave', () => {
     const { s, type, store } = setup()
     type('last words')
     expect(s.hide()).toMatchObject({ content: 'last words', base: 1 })
-    expect(loadDraft('p', store)?.content).toBe('last words')
+    expect(loadDraft('p', undefined, store)?.content).toBe('last words')
     s.close()
   })
 
@@ -102,5 +102,28 @@ describe('autosave', () => {
     expect(send).toHaveBeenCalled()
     clearDraft('p', store)
     s.close()
+  })
+})
+
+describe('a shared computer', () => {
+  const memory = () => {
+    const data = new Map<string, string>()
+    return { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v), removeItem: (k: string) => void data.delete(k), key: (i: number) => [...data.keys()][i] ?? null, get length() { return data.size } }
+  }
+  it('offers kept text only to the account that typed it', () => {
+    const store = memory()
+    store.setItem('page-draft:p', JSON.stringify({ title: 'T', content: 'секрет', base: 1, user: 'anna' }))
+    expect(loadDraft('p', 'anna', store)?.content).toBe('секрет')
+    expect(loadDraft('p', 'petr', store)).toBeNull()
+  })
+  it('still offers text kept before drafts named their author, after an update', () => {
+    const store = memory()
+    store.setItem('page-draft:p', JSON.stringify({ title: 'T', content: 'старое', base: 1 }))
+    expect(loadDraft('p', 'anna', store)?.content).toBe('старое')
+  })
+  it('names every page with text left, for signing out', () => {
+    const store = memory()
+    store.setItem('page-draft:a', '{}'); store.setItem('bars-hidden', '1'); store.setItem('page-draft:b', '{}')
+    expect(draftsLeft(store)).toEqual(['page-draft:a', 'page-draft:b'])
   })
 })

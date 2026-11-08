@@ -1,5 +1,6 @@
 // One person on paper: a page or two to print or keep as PDF, made from what the card already holds. Everything is
 // escaped here, since names, notes and stories are typed by people.
+import { factWords } from './fact-kinds'
 import { lifeEvents } from './family-dates'
 import { lifeYears, personName, type Graph, type Person, type Story } from './types'
 
@@ -60,10 +61,10 @@ footer { margin-top: 16px; font-size: 8.5pt; color: #6b604f; }
 <header>${avatar ? `<img src="${esc(avatar)}" alt="">` : ''}<div><h1>${esc(personName(person) || t('Без названия'))}</h1>${lifeYears(person) ? `<p class="soft">${esc(lifeYears(person))}${where.length ? ` · ${esc(where.join(' — '))}` : ''}</p>` : ''}</div></header>
 ${section('Хронология жизни', life.length ? `<ul>${life.map((e) => `<li><b>${esc(e.date)}</b>${e.age !== null ? ` <span class="soft">(${esc(t('возраст'))} ${e.age})</span>` : ''} ${esc(t(e.title))}${e.note ? `: ${esc(e.note)}` : ''}</li>`).join('')}</ul>` : '')}
 ${section('Семья', kin.map(([title, list]) => `<p><b>${esc(t(title))}:</b> ${list.map(named).join(', ')}</p>`).join(''))}
-${section('Факты', person.facts.filter((f) => f.kind || f.note).map((f) => `<p><b>${esc(f.kind)}</b>${f.date ? ` ${esc(f.date)}` : ''}${f.place ? `, ${esc(f.place)}` : ''}${f.note ? `. ${esc(f.note)}` : ''}</p>`).join(''))}
+${section('Факты', person.facts.filter((f) => f.kind || factWords(f, t)).map((f) => `<p><b>${esc(f.kind)}</b>${f.date ? ` ${esc(f.date)}` : ''}${f.place ? `, ${esc(f.place)}` : ''}${factWords(f, t) ? `. ${esc(factWords(f, t))}` : ''}</p>`).join(''))}
 ${pages.map((p) => section(p.title || 'Биография', blocks(p.content))).join('')}
 ${section('Рассказы', stories.map((s) => `<h3>${esc(s.title || t('Рассказ'))}</h3>${s.body ? `<p>${esc(s.body)}</p>` : `<p class="soft">${esc(t('Запись голоса, без текста'))}</p>`}`).join(''))}
-${section('Источники', person.sources.filter((s) => s.title).map((s) => `<p>${esc(s.title)}${s.ref ? `, ${esc(s.ref)}` : ''}${s.page ? `, ${esc(s.page)}` : ''}</p>`).join(''))}
+${section('Источники', person.sources.filter((s) => s.title).map((s) => `<p>${esc(s.title)}${s.ref ? `, ${esc(s.ref)}` : ''}${s.page ? `, ${esc(s.page)}` : ''}${s.record ? `, ${esc(t('запись'))} ${esc(s.record)}` : ''}${s.date ? `, ${esc(s.date)}` : ''}</p>${s.transcription ? `<blockquote>${esc(s.transcription)}</blockquote>` : ''}`).join(''))}
 <footer>${esc(t('Из семейного архива'))} · ${esc(new Date().toLocaleDateString(lang))}</footer>
 </body></html>`
 }

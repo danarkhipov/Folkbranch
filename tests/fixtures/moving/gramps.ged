@@ -1,0 +1,90 @@
+0 HEAD
+1 SOUR Gramps
+2 VERS 6.0.4
+2 NAME Gramps
+1 DATE 8 NOV 2026
+1 SUBM @SUBM@
+1 FILE family.ged
+1 COPR Copyright (c) 2026
+1 GEDC
+2 VERS 5.5.1
+2 FORM LINEAGE-LINKED
+1 CHAR UTF-8
+1 LANG Russian
+0 @SUBM@ SUBM
+1 NAME Тест Тестов
+0 @I0000@ INDI
+1 NAME Пётр Иванович /Миронов/
+2 GIVN Пётр Иванович
+2 SURN Миронов
+1 SEX M
+1 BIRT
+2 TYPE Рождение
+2 DATE 12 MAR 1890
+2 PLAC Тверь, Тверская губерния
+2 SOUR @S0000@
+3 PAGE ф. 160 оп. 1 д. 22 л. 15
+3 QUAY 3
+1 BAPM
+2 DATE 14 MAR 1890
+2 PLAC Тверь
+1 OCCU плотник
+2 DATE 1914
+1 DEAT
+2 DATE ABT 1950
+2 PLAC Москва
+1 BURI
+2 PLAC Москва, Введенское кладбище
+1 FAMS @F0000@
+1 NOTE @N0000@
+1 CHAN
+2 DATE 8 NOV 2026
+3 TIME 10:00:00
+0 @I0001@ INDI
+1 NAME Анна Сергеевна /Миронова/
+2 GIVN Анна Сергеевна
+2 SURN Миронова
+2 _MARNM Миронова
+1 NAME Анна /Котова/
+2 TYPE birth
+1 SEX F
+1 BIRT
+2 DATE BET 1892 AND 1894
+2 PLAC Ржев
+1 DEAT
+2 DATE 1971
+1 FAMS @F0000@
+0 @I0002@ INDI
+1 NAME Николай Петрович /Миронов/
+1 SEX M
+1 BIRT
+2 DATE 2 JAN 1920
+2 PLAC Москва
+1 DEAT
+2 DATE 1985
+1 FAMC @F0000@
+0 @I0003@ INDI
+1 NAME Ольга /Миронова/
+1 SEX F
+1 BIRT
+2 DATE 1955
+1 FAMC @F0001@
+0 @F0000@ FAM
+1 HUSB @I0000@
+1 WIFE @I0001@
+1 CHIL @I0002@
+1 MARR
+2 DATE 1915
+2 PLAC Тверь
+0 @F0001@ FAM
+1 HUSB @I0002@
+1 CHIL @I0003@
+0 @S0000@ SOUR
+1 TITL Метрическая книга Воскресенской церкви
+1 AUTH ГАТО
+1 REPO @R0000@
+0 @R0000@ REPO
+1 NAME Государственный архив Тверской области
+0 @N0000@ NOTE Служил в полку, вернулся в 1918 году.
+1 CONT Работал плотником до войны.
+0 TRLR

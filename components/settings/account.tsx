@@ -3,6 +3,8 @@ import { ChevronsUpDown, LogOut, MonitorX, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Section } from '@/components/ui/section'
 import { api, useApp } from '@/lib/client'
+import { draftsLeft } from '@/lib/autosave'
+import { signOut } from '@/lib/sign-out'
 import { personName } from '@/lib/types'
 import { Brand } from '../brand-icons'
 import { PersonPopover } from '../person-pickers'
@@ -10,7 +12,7 @@ import { roleHelp, roleName } from './roles'
 
 /** Who I am here: my card on the chart, how I get back in, where I am signed in. */
 export function Account({ providers }: { providers: { google: boolean; yandex: boolean } }) {
-  const { t, me, byId, notify } = useApp()
+  const { t, me, byId, notify, confirm } = useApp()
   const mine = me.personId ? byId.get(me.personId) : null
   const claim = async (personId: string | null) => {
     try {
@@ -44,7 +46,7 @@ export function Account({ providers }: { providers: { google: boolean; yandex: b
       <Section title={t('Устройства')} description={t('Если потеряли телефон или входили на чужом компьютере, выйдите на других устройствах. Вернуться можно по новой ссылке или через привязанный аккаунт.')}>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" onClick={async () => { await fetch('/api/auth/revoke-other-sessions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); notify(t('Другие устройства отключены')) }}><MonitorX /> {t('Выйти на других устройствах')}</Button>
-          <Button type="button" variant="outline" onClick={async () => { await fetch('/api/auth/sign-out', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); location.href = '/login' }}><LogOut /> {t('Выйти с этого устройства')}</Button>
+          <Button type="button" variant="outline" onClick={async () => { if (!draftsLeft().length || await confirm(t('На этом устройстве есть текст, который ещё не дошёл до сервера. После выхода его не будет.'), t('Выйти'))) await signOut() }}><LogOut /> {t('Выйти с этого устройства')}</Button>
         </div>
       </Section>
     </div>

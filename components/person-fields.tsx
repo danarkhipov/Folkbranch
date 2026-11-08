@@ -91,7 +91,7 @@ export function Field({ value, onSave, placeholder, className, readOnly, id, sug
           if (v === value) return
           // Someone changed it while this was being typed: theirs stands, and what was typed is not lost from view.
           if (started !== null && started !== value) {
-            notify(`${t('Это поле только что изменил другой человек. Показано новое значение, проверьте его.')} ${t('Ваш вариант')}: ${v}`)
+            notify(`${t('Это только что изменили на другом устройстве или другой человек. Показано новое, проверьте его.')} ${t('Ваш вариант')}: ${v}`)
             return setV(value)
           }
           onSave(v)

@@ -28,7 +28,7 @@ await A.locator('#f-death-place').fill('Москва'); await A.locator('#f-deat
 ok('typing is not wiped by an arriving edit', (await B.locator('#f-death-place').inputValue()) === 'Пишу медленно')
 await B.locator('#f-death-place').blur(); await sleep(1500)
 const notice = await B.locator('body').innerText()
-ok('conflict: told plainly', notice.includes('только что изменил другой человек'))
+ok('conflict: told plainly', notice.includes('только что изменили на другом устройстве или другой человек'))
 ok('conflict: shows the value that stands', (await B.locator('#f-death-place').inputValue()) === 'Москва', await B.locator('#f-death-place').inputValue())
 const server = await A.evaluate(async () => { const g = await (await fetch('/api/v1/graph')).json(); return g.persons.find((p) => p.givenName === 'Иван') })
 ok('conflict: first edit kept on the server', server.deathPlace === 'Москва')

@@ -22,6 +22,9 @@ export interface Person {
   living: boolean
   /** Hidden from readers like the living. */
   keepPrivate?: boolean
+  /** Known to have had no children, or never to have married: not the same as not knowing. */
+  noChildren?: boolean
+  neverMarried?: boolean
   certainty: Certainty
   avatarMediaId: string | null
   avatarCrop: string | null
@@ -58,14 +61,40 @@ export interface Source {
   /** Sheet or page. */
   page: string
   url: string
+  /** The entry within the source: its number in a church book, a line in a census. */
+  record?: string
+  /** When the document itself was written, not the event it records. */
+  date?: string
+  /** The words of the record as read, kept beside the image they come from. */
+  transcription?: string
+  /** Where the source is kept, among the archive's repositories. */
+  repositoryId?: string
 }
 
+export interface PlaceName { name: string; years: string }
+export interface Place { id: string; name: string; kind: string; parentId: string | null; otherNames: PlaceName[]; lat: number | null; lon: number | null; note: string }
+export interface Repository { id: string; name: string; address: string; url: string; note: string }
+export interface Contacts { phone: string; email: string; address: string; note: string }
+
 export interface Fact {
+  /** Set when the fact is added in the app, so two devices editing one fact can tell it apart. */
+  id?: string
   kind: string
   date: string
   place: string
   note: string
   source?: string
+  /** What the kind asks for besides: a unit and a rank, a height. Keys are those in lib/fact-kinds. */
+  fields?: Record<string, string>
+  /** Who else was there, and as whom: godparents, witnesses, the priest. */
+  people?: FactPerson[]
+}
+
+/** Someone at an event, with a card or only a name as the record gives it. */
+export interface FactPerson {
+  personId: string | null
+  name: string
+  role: string
 }
 
 export interface ParentLink {

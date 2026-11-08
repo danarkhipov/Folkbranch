@@ -14,12 +14,14 @@ Checked on files written the way Gramps 6 and webtrees 2.2 write them, in `tests
 - Notes, including shared ones, as a biography page.
 - Sources with their archive and sheet, and how sure each citation is.
 - Families, marriages, divorces and adoptions.
-- Godparents and witnesses (`ASSO`), as a fact naming the person.
+- Godparents and witnesses (`ASSO`), as a fact naming the person. On an event, such as a baptism, they become its participants with their role.
+- "No children" (`NCHI 0`) and "never married" (`NMR 0`).
 - Someone marked private (`RESN confidential` or `privacy`) stays hidden from readers.
 
 ## What does not
 
 - **Photos and other files.** A GEDCOM file only names them. Upload the photos to each person afterwards. The preview says how many links to files it found.
+- **Places as records** with their old names and coordinates, and archives with an address, live only in Folkbranch and its full copy. GEDCOM carries the place name.
 - **Research notes kept outside people and families,** such as Gramps tasks or webtrees' stories and news.
 
 The preview lists any other part of the file it will not read, by its GEDCOM name, before you decide.

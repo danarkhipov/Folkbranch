@@ -10,8 +10,11 @@ import { listWriter } from '@/lib/list-writes'
 import { SwitchRow } from '@/components/ui/switch'
 import { ageWords } from '@/lib/names'
 import { cn } from '@/lib/utils'
-import { shownTags, yearOf, type Fact, type ClaimField, type Person, type Reliability, type Source } from '@/lib/types'
+import { personName, shownTags, yearOf, type Fact, type FactPerson, type ClaimField, type Person, type Reliability, type Source } from '@/lib/types'
+import { fieldsFor, firstRole, ROLES } from '@/lib/fact-kinds'
 import { PersonPopover } from './person-pickers'
+import { ContactsBlock, PlaceHint } from './person-extras'
+import { useRepositories } from './places-tab'
 import { AddMenu, Field, GrowText, Hints, OpenAddress, ReadText, TagInput, DateField, Segmented } from './person-fields'
 import { Select } from '@/components/ui/select'
 import { inputClass } from '@/components/ui/input'
@@ -22,10 +25,11 @@ const MergeDialog = dynamic(() => import('./merge-dialog').then((m) => m.MergeDi
 function FactRow({ fact, readOnly, fresh, kinds, places, onChange, onRemove }: { fact: Fact; readOnly: boolean; fresh: boolean; kinds: string[]; places: string[]; onChange: (f: Fact) => void; onRemove: () => void }) {
   const { t } = useApp()
   const [f, setF] = useState(fact)
-  const [editing, setEditing] = useState<keyof Fact | null>(null)
+  const [editing, setEditing] = useState<TextKey | null>(null)
   useEffect(() => setF(fact), [fact])
+  const extra = fieldsFor(f.kind, t)
   const commit = (next = f) => { if (JSON.stringify(next) !== JSON.stringify(fact)) onChange(next) }
-  const field = (key: keyof Fact, placeholder: string, cls: string, known?: string[], auto?: boolean) => {
+  const field = (key: TextKey, placeholder: string, cls: string, known?: string[], auto?: boolean) => {
     const value = f[key] ?? ''
     if (readOnly) return <ReadText value={value} className={cls} />
     const typed = value.trim().toLowerCase()
@@ -44,11 +48,13 @@ function FactRow({ fact, readOnly, fresh, kinds, places, onChange, onRemove }: {
         <span className="break-anywhere font-medium">{[f.date, f.kind].filter(Boolean).join(' · ')}</span>
         {f.place && <ReadText value={f.place} className="text-ink-soft" />}
         {f.note && <ReadText value={f.note} />}
+        {Object.entries(f.fields ?? {}).filter(([, v]) => v).map(([k, v]) => <span key={k} className="break-anywhere"><span className="text-ink-soft">{t(k)}:</span> {v}</span>)}
+        {(f.people ?? []).filter((x) => x.name).map((x, i) => <Participant key={i} person={x} />)}
         {f.source && <span className="text-xs text-ink-soft break-anywhere">{t('Источник')}: <ReadText value={f.source} /></span>}
       </div>
     )
   }
-  const row = (label: string, key: keyof Fact, placeholder: string, known?: string[], auto?: boolean) => (!readOnly || f[key]) && (
+  const row = (label: string, key: TextKey, placeholder: string, known?: string[], auto?: boolean) => (!readOnly || f[key]) && (
     <>
       <span className="text-xs text-ink-faint">{t(label)}</span>
       {field(key, placeholder, 'text-ink', known, auto)}
@@ -60,10 +66,60 @@ function FactRow({ fact, readOnly, fresh, kinds, places, onChange, onRemove }: {
       <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-x-2 gap-y-0.5 items-baseline">
         {row('Когда', 'date', 'например, 1912', undefined, fresh && !!fact.kind)}
         {row('Где', 'place', 'например, Пермь', places)}
+        {extra.map((k) => (
+          <Fragment key={k}>
+            <span className="text-xs text-ink-faint">{t(k)}</span>
+            <GrowText value={f.fields?.[k] ?? ''} placeholder={t(k)} aria-label={t(k)} className="text-ink" onChange={(e) => setF({ ...f, fields: { ...f.fields, [k]: e.target.value } })} onBlur={() => commit()} />
+          </Fragment>
+        ))}
         {row('Заметка', 'note', 'подробности')}
         {row('Источник', 'source', 'документ, архив, чей рассказ')}
       </div>
+      <People fact={f} onChange={(people) => { const next = { ...f, people }; setF(next); commit(next) }} />
       {!readOnly && <RowRemove onRemove={onRemove} />}
+    </div>
+  )
+}
+
+type TextKey = 'kind' | 'date' | 'place' | 'note' | 'source'
+
+/** Someone at the event: a card to open when there is one, otherwise the name as the record gives it. */
+function Participant({ person }: { person: FactPerson }) {
+  const { t, byId, focus } = useApp()
+  const card = person.personId ? byId.get(person.personId) : null
+  const name = (card && !card.hidden && personName(card)) || person.name
+  return (
+    <span className="break-anywhere">
+      <span className="text-ink-soft">{t(person.role)}:</span>{' '}
+      {card ? <button className="pick underline underline-offset-2 hover:text-ink" onClick={() => focus(card.id, { center: true })}>{name}</button> : name}
+    </span>
+  )
+}
+
+/** Godparents, witnesses, the priest: each with a role, a card if they have one, or only a name. */
+function People({ fact, onChange }: { fact: Fact; onChange: (people: FactPerson[]) => void }) {
+  const { t, byId } = useApp()
+  const list = fact.people ?? []
+  const set = (i: number, patch: Partial<FactPerson>) => onChange(list.map((x, j) => (j === i ? { ...x, ...patch } : x)))
+  const roles = [...new Set([...ROLES.map((r) => t(r)), ...list.map((x) => x.role)])].map((r) => ({ value: r, label: r }))
+  return (
+    <div className="flex flex-col gap-1">
+      {list.map((x, i) => {
+        const card = x.personId ? byId.get(x.personId) : null
+        return (
+          <div key={i} className="flex flex-wrap items-center gap-1.5 min-w-0 text-sm">
+            <Select look="small" className="!w-auto" aria-label={t('Роль')} value={x.role} onChange={(role) => set(i, { role })} options={roles} />
+            {card
+              ? <span className="min-w-0 break-anywhere">{personName(card) || t('Без названия')}</span>
+              : <GrowText value={x.name} placeholder={t('Имя, как в записи')} aria-label={t('Имя, как в записи')} className="min-w-[8rem] flex-1" onChange={(e) => set(i, { name: e.target.value })} />}
+            <PersonPopover onPick={(id) => { const p = byId.get(id); set(i, { personId: id, name: p ? personName(p) : x.name }) }}>
+              <button type="button" className="text-xs text-ink-soft underline underline-offset-2 hover:text-ink">{t(card ? 'Другая карточка' : 'Выбрать карточку')}</button>
+            </PersonPopover>
+            <button type="button" aria-label={t('Убрать участника')} title={t('Убрать участника')} className="ml-auto grid size-6 place-items-center text-ink-faint hover:text-destructive" onClick={() => onChange(list.filter((_, j) => j !== i))}><X size={13} /></button>
+          </div>
+        )
+      })}
+      <button type="button" className="self-start text-xs text-ink-soft underline underline-offset-2 hover:text-ink" onClick={() => onChange([...list, { personId: null, name: '', role: firstRole(fact.kind, t) }])}>+ {t('участник')}</button>
     </div>
   )
 }
@@ -75,7 +131,7 @@ function RowRemove({ onRemove }: { onRemove: () => void }) {
 }
 
 /** Common kinds of fact, one click each, so the same wording is reused and GEDCOM gets its tags. */
-const FACT_KINDS = ['Профессия', 'Место жительства', 'Образование', 'Служба', 'Награда', 'Переезд', 'Крещение', 'Погребение', 'Причина смерти', 'Вероисповедание', 'Национальность']
+const FACT_KINDS = ['Профессия', 'Место жительства', 'Образование', 'Крещение', 'Воинская служба', 'Служба', 'Награда', 'Ранение', 'Плен', 'Переезд', 'Сословие', 'Титул', 'Членство', 'Языки', 'Внешность', 'Вероисповедание', 'Национальность', 'Погребение', 'Причина смерти']
 
 /** Where genealogical records usually come from; the kind fills the title in one click. */
 const SOURCE_RELIABILITY: Record<string, Reliability> = { 'Метрическая книга': 'original', 'Перепись': 'original', 'Архив ЗАГС': 'original', 'Военный архив': 'original', 'Семейный документ': 'original', 'Рассказ родных': 'witness' }
@@ -88,6 +144,8 @@ function SourceRow({ source, readOnly, fresh, onChange, onRemove }: { source: So
   const [s, setS] = useState(source)
   // A family account has no archive reference to ask for.
   const personal = [t('Рассказ родных'), t('Семейный документ')].includes(s.title)
+  const { data: repos = [] } = useRepositories()
+  const repoName = repos.find((r) => r.id === s.repositoryId)?.name ?? ''
   useEffect(() => setS(source), [source])
   const commit = () => { if (JSON.stringify(s) !== JSON.stringify(source)) onChange(s) }
   const field = (key: keyof Source, placeholder: string, cls: string, auto?: boolean) => (readOnly
@@ -115,7 +173,25 @@ function SourceRow({ source, readOnly, fresh, onChange, onRemove }: { source: So
         {row(personal ? 'Подробнее' : 'Шифр', 'ref', personal ? 'кто рассказал или где хранится' : 'фонд, опись, дело', fresh && !!source.title)}
         {!personal && row('Лист', 'page', 'например, 12')}
         {row('Ссылка', 'url', 'https://…')}
+        {!personal && row('Запись', 'record', 'номер записи, строка')}
+        {row('Дата документа', 'date', 'когда составлен')}
+        {!personal && (repoName || !readOnly) && (
+          <>
+            <span className="text-xs text-ink-faint">{t('Архив')}</span>
+            {readOnly
+              ? <span className="text-ink-soft break-anywhere">{repoName}</span>
+              : <Select look="quiet" aria-label={t('Архив')} value={s.repositoryId ?? ''} onChange={(v) => { const next = { ...s, repositoryId: v || undefined }; setS(next); onChange(next) }} options={[{ value: '', label: repos.length ? t('Не выбран') : t('Архивы добавляются в «Даты, места и архивы»') }, ...repos.map((r) => ({ value: r.id, label: r.name }))]} />}
+          </>
+        )}
       </div>
+      {(s.transcription || !readOnly) && (
+        <details className="text-sm" open={!!s.transcription && readOnly}>
+          <summary className="cursor-pointer text-xs text-ink-faint">{t('Расшифровка записи')}{s.transcription ? '' : ` (${t('пусто')})`}</summary>
+          {readOnly
+            ? <p className="mt-1 whitespace-pre-wrap break-anywhere">{s.transcription}</p>
+            : <GrowText value={s.transcription ?? ''} placeholder={t('Текст записи, как читается')} aria-label={t('Расшифровка записи')} className="mt-1 w-full text-ink" onChange={(e) => setS({ ...s, transcription: e.target.value })} onBlur={commit} />}
+        </details>
+      )}
       {!readOnly && <RowRemove onRemove={onRemove} />}
     </div>
   )
@@ -224,7 +300,7 @@ function LifeLine({ person }: { person: Person }) {
 }
 
 export function Details({ person, patch: send }: { person: Person; patch: (p: Partial<Person>) => Promise<unknown> }) {
-  const { t, canEdit, graph, lang } = useApp()
+  const { t, canEdit, graph, lang, me } = useApp()
   const ro = !canEdit
   // The card itself says when a save fails, with a way to try again.
   const writer = useRef(listWriter({ facts: person.facts, sources: person.sources, tags: person.tags, claims: person.claims }, send, () => {})).current
@@ -279,7 +355,7 @@ export function Details({ person, patch: send }: { person: Person; patch: (p: Pa
         <span className="text-xs text-ink-soft @min-[441px]:hidden -mb-1.5">{t('Дата')}</span>
         <span className="text-xs text-ink-soft @min-[441px]:hidden -mb-1.5">{t('Место')}</span>
         <DateField id="f-birth-date" readOnly={ro} value={person.birthDate} placeholder={t('например, 1890')} onSave={saveClaimField('birthDate')} />
-        <Field id="f-birth-place" suggestions={places} readOnly={ro} value={person.birthPlace} placeholder={t('например, Пермь')} onSave={saveClaimField('birthPlace')} />
+        <span className="flex min-w-0 flex-col"><Field id="f-birth-place" suggestions={places} readOnly={ro} value={person.birthPlace} placeholder={t('например, Пермь')} onSave={saveClaimField('birthPlace')} /><PlaceHint text={person.birthPlace} /></span>
         <span className="@max-[440px]:hidden" />
         <Versions person={person} field="birthDate" current={current} change={change} attach={attachSource} />
         <Versions person={person} field="birthPlace" current={current} change={change} attach={attachSource} />
@@ -290,7 +366,7 @@ export function Details({ person, patch: send }: { person: Person; patch: (p: Pa
         <span className="text-xs text-ink-soft @min-[441px]:hidden -mb-1.5">{t('Дата')}</span>
         <span className="text-xs text-ink-soft @min-[441px]:hidden -mb-1.5">{t('Место')}</span>
             <DateField id="f-death-date" readOnly={ro} value={person.deathDate} placeholder={t('например, 1950')} onSave={saveClaimField('deathDate')} />
-            <Field id="f-death-place" suggestions={places} readOnly={ro} value={person.deathPlace} placeholder={t('например, Пермь')} onSave={saveClaimField('deathPlace')} />
+            <span className="flex min-w-0 flex-col"><Field id="f-death-place" suggestions={places} readOnly={ro} value={person.deathPlace} placeholder={t('например, Пермь')} onSave={saveClaimField('deathPlace')} /><PlaceHint text={person.deathPlace} /></span>
             <span className="@max-[440px]:hidden" />
             <Versions person={person} field="deathDate" current={current} change={change} attach={attachSource} />
             <Versions person={person} field="deathPlace" current={current} change={change} attach={attachSource} />
@@ -343,7 +419,7 @@ export function Details({ person, patch: send }: { person: Person; patch: (p: Pa
               onRemove={() => edit('facts', (list) => list.filter((_, j) => j !== i))}
             />
           ))}
-          {!ro && <AddMenu label={t('Добавить факт')} items={[...FACT_KINDS.map((k): [string, string] => [k, t(k)]), ['', t('Другое')]]} onPick={(k) => { setFresh(writer.get('facts').length); edit('facts', (list) => [...list, { kind: k && t(k), date: '', place: '', note: '', source: '' }]) }} />}
+          {!ro && <AddMenu label={t('Добавить факт')} items={[...FACT_KINDS.map((k): [string, string] => [k, t(k)]), ['', t('Другое')]]} onPick={(k) => { setFresh(writer.get('facts').length); edit('facts', (list) => [...list, { id: Math.random().toString(36).slice(2, 10), kind: k && t(k), date: '', place: '', note: '', source: '' }]) }} />}
         </section>
       )}
 
@@ -364,6 +440,7 @@ export function Details({ person, patch: send }: { person: Person; patch: (p: Pa
         </section>
       )}
 
+      {!ro && alive && !me.guest && <ContactsBlock personId={person.id} />}
       {/* Who may see it, after what it says. */}
 
       {!ro && !alive && <SwitchRow title={t('Скрыть от читателей')} description={t('Карточку, страницы и рассказы увидят только редакторы, как у живых.')} checked={!!person.keepPrivate} onChange={(on) => patch({ keepPrivate: on })} />}

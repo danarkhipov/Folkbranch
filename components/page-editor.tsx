@@ -57,11 +57,11 @@ export default function PageEditor({ pageId, personId, onChanged }: { pageId: st
 }
 
 function Editor({ page, personId, onChanged }: { page: Page; personId: string; onChanged: () => void }) {
-  const { t, canEdit, lang, graph, focus, openPhoto, notify } = useApp()
+  const { t, canEdit, lang, graph, focus, openPhoto, notify, me } = useApp()
   const qc = useQueryClient()
   // Text that never reached the server comes back, whatever happened to the last tab.
   const [draft] = useState(() => {
-    const kept = canEdit ? loadDraft(page.id) : null
+    const kept = canEdit ? loadDraft(page.id, me.id) : null
     if (!kept) return null
     if (kept.title === page.title && JSON.stringify(kept.content) === JSON.stringify(JSON.parse(page.content))) {
       clearDraft(page.id)
@@ -95,6 +95,7 @@ function Editor({ page, personId, onChanged }: { page: Page; personId: string; o
   const saver = useRef<ReturnType<typeof autosave>>(null)
   saver.current ??= autosave({
     id: page.id,
+    user: me.id,
     base: draft?.base ?? page.updatedAt,
     read: () => ({ title: latestTitle.current, content: editor.document }),
     send: async (text, base) => {

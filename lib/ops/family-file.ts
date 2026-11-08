@@ -1,6 +1,7 @@
 // The family as one HTML file to send to relatives: it opens with no server, no account and no network.
 // Built with what a reader may see, so the living stay unnamed. Only fields written out below reach the file:
 // a new column on a person must be added here on purpose before it can travel.
+import { factWords } from '../fact-kinds'
 import { layoutFamily, AVATAR_CY } from '../graph/layout'
 import { translate } from '../i18n'
 import { blocksToMarkdown } from '../markdown'
@@ -186,7 +187,7 @@ export async function buildFamilyFile(actor: Actor): Promise<{ html: string; fil
 
   // One card a person: plain HTML shown by the address, so it works where a viewer runs no scripts.
   const cardsHtml = seen.map((p) => {
-    const facts = p.facts.map((f) => `<p>${esc([f.kind, f.date, f.place].filter(Boolean).join(', '))}${f.note ? `<br><span class="soft">${esc(f.note)}</span>` : ''}</p>`).join('')
+    const facts = p.facts.map((f) => `<p>${esc([f.kind, f.date, f.place].filter(Boolean).join(', '))}${factWords(f, t) ? `<br><span class="soft">${esc(factWords(f, t))}</span>` : ''}</p>`).join('')
     const sources = p.sources.map((s) => {
       const text = [s.title, s.ref, s.page].filter(Boolean).join(', ') || s.url
       const url = webLink(s.url)

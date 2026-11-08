@@ -100,7 +100,7 @@ export function ViewBar({ folded, onHide, onOverview, onPrint, scope, canvas, ro
             </PopoverContent>
           </Popover>
         )}
-        <button className="bar-btn" title={t('Даты и цифры')} data-hint={t('Ближайшие памятные дни и семья в цифрах.')} aria-label={t('Даты и цифры')} onClick={onOverview}><CalendarDays size={15} /></button>
+        <button className="bar-btn" title={t('Даты, места и архивы')} data-hint={t('Ближайшие памятные дни, семья в цифрах, места и архивы.')} aria-label={t('Даты, места и архивы')} onClick={onOverview}><CalendarDays size={15} /></button>
         <button className="bar-btn" title={t('Печать схемы')} data-hint={t('На одном листе или склеить из нескольких.')} aria-label={t('Печать схемы')} onClick={onPrint}><Printer size={15} /></button>
         <Popover>
           <PopoverTrigger asChild><button className="bar-btn" title={t('Как читать схему')} data-hint={t('Что значат линии, рамки и цвета.')} aria-label={t('Как читать схему')}><CircleHelp size={15} /></button></PopoverTrigger>

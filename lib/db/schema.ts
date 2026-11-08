@@ -89,6 +89,9 @@ export const persons = sqliteTable('persons', {
   living: integer('living', { mode: 'boolean' }).notNull().default(true),
   // Kept from readers, guests and read-only agents like the living, whatever the dates say.
   keepPrivate: integer('keep_private', { mode: 'boolean' }).notNull().default(false),
+  // Known, not merely unrecorded: the review stops asking, and GEDCOM says NCHI 0 or NMR 0.
+  noChildren: integer('no_children', { mode: 'boolean' }).notNull().default(false),
+  neverMarried: integer('never_married', { mode: 'boolean' }).notNull().default(false),
   certainty: text('certainty').notNull().default('family'),
   avatarMediaId: text('avatar_media_id'),
   avatarCrop: text('avatar_crop'),
@@ -278,3 +281,37 @@ export const storyPeople = sqliteTable('story_people', {
   role: text('role').notNull().default('about'),
 }, (t) => [index('story_people_story').on(t.storyId), index('story_people_person').on(t.personId)])
 
+// A place once, with what it belonged to and the names it went by: a village in a volost in a uyezd in a guberniya.
+// Cards keep their places as written; this says what those words mean.
+export const places = sqliteTable('places', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  kind: text('kind').notNull().default(''),
+  parentId: text('parent_id'),
+  // Other and older names, with the years they were used: [{ name, years }].
+  otherNames: text('other_names').notNull().default('[]'),
+  lat: real('lat'),
+  lon: real('lon'),
+  note: text('note').notNull().default(''),
+  updatedAt: integer('updated_at').notNull().default(0),
+}, (t) => [index('places_parent').on(t.parentId)])
+
+// Where sources are kept: an archive, a library, a family's own box.
+export const repositories = sqliteTable('repositories', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  address: text('address').notNull().default(''),
+  url: text('url').notNull().default(''),
+  note: text('note').notNull().default(''),
+  updatedAt: integer('updated_at').notNull().default(0),
+})
+
+// How to reach a living relative. Apart from the card, so no graph, export, file or agent ever carries it.
+export const contacts = sqliteTable('contacts', {
+  id: text('id').primaryKey(),
+  personId: text('person_id').notNull(),
+  phone: text('phone').notNull().default(''),
+  email: text('email').notNull().default(''),
+  address: text('address').notNull().default(''),
+  note: text('note').notNull().default(''),
+}, (t) => [uniqueIndex('contacts_person').on(t.personId)])

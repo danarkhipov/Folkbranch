@@ -14,7 +14,7 @@ const sourceFiles = (dir: string): string[] => readdirSync(dir, { withFileTypes:
 describe('references between tables', () => {
   it('every column that names a person or a photo is known to the cleanup', () => {
     const declared = new Set(REFERENCES.map((r) => `${r.table}.${r.column}`))
-    const allowed = new Set(['persons.avatarMediaId', 'media.uploadedBy', 'pages.parentPageId', 'stories.mediaId'])
+    const allowed = new Set(['persons.avatarMediaId', 'media.uploadedBy', 'pages.parentPageId', 'stories.mediaId', 'places.parentId'])
     for (const [table, def] of Object.entries(TRACKED)) {
       for (const column of Object.keys(getTableColumns(def))) {
         if (!/(person|media|parent|child)Id$|^[ab]Id$/i.test(column)) continue

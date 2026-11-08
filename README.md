@@ -62,6 +62,7 @@ Backups, updates, servers and Railway: the [self-hosting guide](docs/SELF_HOSTIN
 - Add a relative from any side of a card, or drag a line between two people.
 - See how two people are related, and the path between them.
 - An ancestor fan for anyone: the whole line in one picture.
+- Places with what they were part of, their old names and a point on a map, so a search for "Tsaritsyn" finds people from Volgograd.
 - Dates and numbers: birthdays and anniversaries of the coming two months, the family in figures, and a file for the calendar on a phone.
 - Save views of a branch. Print the chart to PDF on one sheet or across several.
 
@@ -69,6 +70,8 @@ Backups, updates, servers and Railway: the [self-hosting guide](docs/SELF_HOSTIN
 - A block editor with headings, photos in the text and links to other relatives.
 - A life in order, read from the card: birth, marriage, children, facts and death.
 - Disagreeing versions of a date or place, each with its source, so nothing is overwritten.
+- Facts with fields of their own (a unit and rank for military service), and the people at an event in their roles: godparents, witnesses, a priest.
+- Sources with the record number, the document's date, a transcription and the archive that keeps it.
 - Tag people on photos, record voice stories, or type what someone told you.
 - Print a person, or keep them as a PDF: life, family, facts, biography, stories and sources on a page or two.
 - Find and merge duplicate cards, with undo.
@@ -76,7 +79,7 @@ Backups, updates, servers and Railway: the [self-hosting guide](docs/SELF_HOSTIN
 **For the whole family**
 - Ask for a story with up to five questions. The relative picks one, answers, and goes on to the next.
 - Owner, editor and reader roles. Readers suggest corrections for you to accept.
-- Keep a person who died, or a single story, from readers.
+- Keep a person who died, or a single story, from readers. Addresses and phones of the living are for editors only.
 - A view-only link, with an optional password and an expiry date.
 - Works in a browser on a phone or a computer, in English or Russian.
 
@@ -112,7 +115,7 @@ Folkbranch is for a family building its history together. [Gramps Web](https://w
 | DNA | ✗ | ✓ Matches, chromosome browser | —³ |
 | Faces in photos | ✓ On your device, a model you choose to download | ✓ Tagging and face detection⁴ | — |
 | AI | MCP server and assistant built in; an agent's edits wait for review | Chat assistant built in; MCP from third parties | Not built in |
-| On a phone | Bottom bar, card as a sheet, offline page, about 311 KB on first load | — | Adapted for phones in 2.2 |
+| On a phone | Bottom bar, card as a sheet, offline page, about 314 KB on first load | — | Adapted for phones in 2.2 |
 | Languages | 2 | 40+ | 50+ |
 | Several trees | ✗ | — | ✓ |
 | Sync with a desktop program | ✗ | ✓ Gramps Desktop | — |

@@ -1,9 +1,12 @@
 // What the search looks through for each person, seen as this person is allowed to see it.
+import { factWords } from '../fact-kinds'
 import { dataStamp, getDb, schema } from '../db'
 import { blocksToMarkdown } from '../markdown'
 import { buildIndex, search, type SearchDoc, type SearchField, type SearchIndex, type SearchResult } from '../search/engine'
 import { normal } from '../search/words'
-import { personName, shownTags, type Person, type Sex } from '../types'
+import { placeWords } from '../places'
+import { personName, shownTags, type Person, type Place, type Sex } from '../types'
+import { listPlaces } from './places'
 import { say } from './app-config'
 import { seesOnlyPublic, type Actor } from './core'
 import { listAllMedia } from './media'
@@ -15,7 +18,7 @@ import { listStories } from './stories'
 const noLinks = (text: string) => text.replace(/\b(?:https?:\/\/|www\.)\S+/gi, ' ').replace(/\s+/g, ' ').trim()
 const plain = (markdown: string) => noLinks(markdown.replace(/!?\[([^\]]*)\]\([^)]*\)/g, (_, label: string) => label).replace(/[#*_`>]+/g, ' ')).replace(/(^|\s)@/g, '$1').replace(/\s+/g, ' ').trim()
 
-function personFields(p: Person): SearchField[] {
+function personFields(p: Person, places: Place[]): SearchField[] {
   const field = (key: string, label: string, raw: string, weight: number, target?: string, refId?: string): SearchField[] => {
     const text = noLinks(raw)
     return text ? [{ key, label: say(label), text, tab: 'details', weight, target, refId }] : []
@@ -32,7 +35,9 @@ function personFields(p: Person): SearchField[] {
     ...field('deathDate', 'Смерть', p.deathDate, 0.95, 'f-death-date'),
     ...field('deathPlace', 'Место смерти', p.deathPlace, 0.8, 'f-death-place'),
     ...field('tags', 'Группы', shownTags(p.tags).join(', '), 0.75),
-    ...p.facts.flatMap((f) => field('fact', 'Факты', [f.kind, f.date, f.place, f.note].filter(Boolean).join(', '), 0.7)),
+    // Older and other names of the places, and what they belonged to: "Тверь" finds someone born in "Калинин".
+    ...field('place', 'Место', [...new Set([p.birthPlace, p.deathPlace, ...p.facts.map((f) => f.place)].map((x) => placeWords(x, places)).join(' ').split(' '))].join(' '), 0.6, 'f-birth-place'),
+    ...p.facts.flatMap((f) => field('fact', 'Факты', [f.kind, f.date, f.place, factWords(f)].filter(Boolean).join(', '), 0.7)),
     ...p.sources.flatMap((s) => field('source', 'Источники', [s.title, s.ref, s.page].filter(Boolean).join(', '), 0.55, 'f-sources')),
     ...p.claims.flatMap((c) => field('claim', 'Другая версия', [shown.has(normal(c.value)) ? '' : c.value, c.reason].filter(Boolean).join(', '), 0.5)),
   ]
@@ -40,7 +45,8 @@ function personFields(p: Person): SearchField[] {
 
 function buildDocs(actor: Actor): SearchDoc[] {
   const people = getGraph(actor).persons.filter((p) => !p.hidden)
-  const docs = new Map(people.map((p): [string, SearchDoc] => [p.id, { id: p.id, fields: personFields(p) }]))
+  const places = listPlaces(actor)
+  const docs = new Map(people.map((p): [string, SearchDoc] => [p.id, { id: p.id, fields: personFields(p, places) }]))
   for (const page of readablePages(actor)) {
     const doc = docs.get(page.personId)
     if (!doc) continue

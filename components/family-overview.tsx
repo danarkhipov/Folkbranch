@@ -1,8 +1,10 @@
 'use client'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { CalendarPlus } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useApp } from '@/lib/client'
-import { CalendarPlus } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ArchivesTab, PlacesTab } from './places-tab'
 import { Button } from '@/components/ui/button'
 import { comingDays, familyCalendar, familyNumbers, type DayKind } from '@/lib/family-dates'
 import { personName } from '@/lib/types'
@@ -14,6 +16,7 @@ const WORD: Record<DayKind, string> = {
 /** What is coming up in the family, and what it adds up to. Everything here is read from the cards. */
 export function FamilyOverview({ onClose }: { onClose: () => void }) {
   const { t, graph, byId, focus, lang } = useApp()
+  const [tab, setTab] = useState('dates')
   const days = useMemo(() => comingDays(graph), [graph])
   const numbers = useMemo(() => familyNumbers(graph), [graph])
   const open = (id: string) => { onClose(); focus(id, { center: true }) }
@@ -31,11 +34,20 @@ export function FamilyOverview({ onClose }: { onClose: () => void }) {
   const person = (id: string) => <button className="pick underline underline-offset-2 hover:text-ink" onClick={() => open(id)}>{name(id)}</button>
   return (
     <Dialog open onOpenChange={(v) => { if (!v) onClose() }}>
-      <DialogContent className="flex max-h-[calc(100dvh-32px)] max-w-lg flex-col gap-4 overflow-y-auto text-sm sm:max-w-lg">
+      <DialogContent className="flex max-h-[calc(100dvh-32px)] max-w-xl flex-col gap-4 overflow-y-auto text-sm sm:max-w-xl">
         <div>
-          <DialogTitle className="font-serif text-lg font-medium">{t('Даты и цифры')}</DialogTitle>
-          <DialogDescription className="text-ink-soft">{t('Памятные дни на ближайшие два месяца и семья в цифрах.')}</DialogDescription>
+          <DialogTitle className="font-serif text-lg font-medium">{t('Даты, места и архивы')}</DialogTitle>
+          <DialogDescription className="text-ink-soft">{t('Памятные дни, семья в цифрах, места и архивы, о которых говорят карточки.')}</DialogDescription>
         </div>
+        <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-col gap-3">
+        <TabsList className="self-start bg-muted">
+          <TabsTrigger value="dates">{t('Даты')}</TabsTrigger>
+          <TabsTrigger value="places">{t('Места')}</TabsTrigger>
+          <TabsTrigger value="archives">{t('Архивы')}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="places"><PlacesTab onOpen={open} /></TabsContent>
+        <TabsContent value="archives"><ArchivesTab /></TabsContent>
+        <TabsContent value="dates" className="flex flex-col gap-4">
         <section className="flex flex-col gap-1">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-base font-medium">{t('Ближайшие даты')}</h3>
@@ -66,6 +78,8 @@ export function FamilyOverview({ onClose }: { onClose: () => void }) {
             {numbers.places.length > 0 && stat(t('Частые места'), numbers.places.map(([n, c]) => `${n} (${c})`).join(', '))}
           </dl>
         </section>
+        </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   )

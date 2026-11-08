@@ -52,10 +52,13 @@ export const contentRoutes: Route[] = [
   open('media/:id', 'A photo with its tags', ({ actor, params }) => media.getMedia(actor, params.id)),
   op('PATCH', 'media/:id', 'update_photo', ({ params }, b) => ({ ...b, id: params.id })),
   op('DELETE', 'media/:id', 'delete_photo', ({ params }) => ({ id: params.id })),
-  open('media/:id/file', 'The file itself; size=thumb, medium or orig', async ({ actor, params, query }) => {
+  open('media/:id/file', 'The file itself; size=thumb, medium or orig', async ({ actor, params, query, req }) => {
     const size = z.enum(['thumb', 'medium', 'orig']).catch('medium').parse(query.get('size'))
     const f = await media.readMediaFile(actor, params.id, size)
-    const headers: Record<string, string> = { 'Content-Type': f.mime, 'Cache-Control': 'private, max-age=31536000, immutable' }
+    // A file never changes, but the browser asks each time: a copy kept from someone else's session opens only for those allowed to see it.
+    const etag = `"${params.id}-${size}"`
+    if (req.headers.get('if-none-match') === etag) return new Response(null, { status: 304, headers: { ETag: etag, 'Cache-Control': 'private, no-cache' } })
+    const headers: Record<string, string> = { 'Content-Type': f.mime, 'Cache-Control': 'private, no-cache', ETag: etag }
     if (f.download) headers['Content-Disposition'] = `attachment; filename*=UTF-8''${encodeURIComponent(f.name)}`
     return new Response(new Uint8Array(f.data), { headers })
   }),

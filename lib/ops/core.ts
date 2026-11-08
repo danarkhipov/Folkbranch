@@ -45,6 +45,9 @@ export const TRACKED = {
   mediaTags: schema.mediaTags,
   stories: schema.stories,
   storyPeople: schema.storyPeople,
+  places: schema.places,
+  repositories: schema.repositories,
+  contacts: schema.contacts,
 } as const
 export type Tracked = keyof typeof TRACKED
 
@@ -222,6 +225,7 @@ export const REFERENCES: { table: Tracked; column: string; to: 'persons' | 'medi
   { table: 'mediaTags', column: 'personId', to: 'persons' },
   { table: 'mediaTags', column: 'mediaId', to: 'media' },
   { table: 'storyPeople', column: 'personId', to: 'persons' },
+  { table: 'contacts', column: 'personId', to: 'persons' },
 ]
 
 /** A story is reached through the people it is about. With none left it could never be read or removed. */

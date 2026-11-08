@@ -462,4 +462,5 @@ describe('tokens', () => {
   })
 })
 
-const BUDGET_OWNER = 11_000
+// Facts carry their people and extra fields: an agent that rewrites the list must see them, or it would drop them.
+const BUDGET_OWNER = 11_500

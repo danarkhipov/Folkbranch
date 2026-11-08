@@ -21,6 +21,9 @@ describe('merging lists', () => {
   it('does not bring back what the other removed', () => expect(mergeList(['a', 'b'], ['a', 'b', 'c'], ['a'])).toEqual(['a', 'c']))
   it('takes my edit of an item by its id', () => expect(mergeList([{ id: 1, v: 'x' }], [{ id: 1, v: 'mine' }], [{ id: 1, v: 'x' }, { id: 2, v: 'y' }])).toEqual([{ id: 1, v: 'mine' }, { id: 2, v: 'y' }]))
   it('adds nothing twice', () => expect(mergeList([], ['a'], ['a'])).toEqual(['a']))
+  it('refuses when both changed one item differently', () => expect(() => mergeList([{ id: 1, v: 'x' }], [{ id: 1, v: 'mine' }], [{ id: 1, v: 'theirs' }])).toThrow(/meanwhile/))
+  it('keeps an item I removed when the other changed it meanwhile', () => expect(mergeList([{ id: 1, v: 'x' }], [], [{ id: 1, v: 'theirs' }])).toEqual([{ id: 1, v: 'theirs' }]))
+  it('passes when both changed one item the same way', () => expect(mergeList([{ id: 1, v: 'x' }], [{ id: 1, v: 'y' }], [{ id: 1, v: 'y' }])).toEqual([{ id: 1, v: 'y' }]))
 })
 
 describe('a value changed meanwhile', () => {
@@ -45,6 +48,15 @@ describe('two people on one card', () => {
     await reg.dispatch(anna, 'update_person', { id, patch: { birthPlace: 'Рига' }, seen: { birthPlace: '' } })
     await expect(reg.dispatch(petr, 'update_person', { id, patch: { birthPlace: 'Пермь' }, seen: { birthPlace: '' } })).rejects.toMatchObject({ status: 409 })
     expect(people.getGraph(anna).persons.find((p) => p.id === id)!.birthPlace).toBe('Рига')
+  })
+  it('one fact changed on two devices: the second is told, the first stays', async () => {
+    const { id } = create('Факт')
+    await reg.dispatch(anna, 'update_person', { id, patch: { facts: [{ id: 'f-1', kind: 'Ранение', date: '', place: '', note: '', source: '' }] }, seen: { facts: [] } })
+    const base = people.getGraph(anna).persons.find((p) => p.id === id)!.facts
+    const edit = (note: string) => base.map((f) => ({ ...f, note }))
+    await reg.dispatch(anna, 'update_person', { id, patch: { facts: edit('в ногу') }, seen: { facts: base } })
+    await expect(reg.dispatch(petr, 'update_person', { id, patch: { facts: edit('в руку') }, seen: { facts: base } })).rejects.toMatchObject({ status: 409 })
+    expect(people.getGraph(anna).persons.find((p) => p.id === id)!.facts[0].note).toBe('в ногу')
   })
   it('different fields of one card do not collide', async () => {
     const { id } = create('Разные')

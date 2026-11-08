@@ -17,14 +17,19 @@ const key = (item: unknown) => (item && typeof item === 'object' && 'id' in item
 
 /**
  * Two people editing one list both keep their changes: what I added stays added, what I removed stays
- * removed, and everything the other person did since I looked is left alone. On the same item, the later edit wins.
+ * removed, and everything the other person did since I looked is left alone. One item changed by both
+ * in different ways is refused, as a single value is, so neither edit is lost without a word.
  */
 export function mergeList(base: unknown[], mine: unknown[], theirs: unknown[]) {
   const had = new Map(base.map((x) => [key(x), JSON.stringify(x)]))
   const kept = new Map(mine.map((x) => [key(x), x]))
-  const result = theirs.filter((x) => !had.has(key(x)) || kept.has(key(x))).map((x) => {
+  // What I removed goes, unless the other person changed it meanwhile: then their edit stays.
+  const result = theirs.filter((x) => !had.has(key(x)) || kept.has(key(x)) || JSON.stringify(x) !== had.get(key(x))).map((x) => {
     const m = kept.get(key(x))
-    return m !== undefined && JSON.stringify(m) !== had.get(key(x)) ? m : x
+    if (m === undefined || JSON.stringify(m) === had.get(key(x))) return x
+    const was = had.get(key(x))
+    if (was !== undefined && JSON.stringify(x) !== was && JSON.stringify(x) !== JSON.stringify(m)) throw new OpError(409, 'changed by someone else meanwhile: an item of the list')
+    return m
   })
   const present = new Set(result.map(key))
   return [...result, ...mine.filter((x) => !had.has(key(x)) && !present.has(key(x)))]

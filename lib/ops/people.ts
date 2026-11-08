@@ -53,7 +53,12 @@ function maskedGraph(actor: Actor): Graph {
   const { graph } = entry
   if (!seesOnlyPublic(actor)) return graph
   const hidden = maskedOf(entry)
-  return { ...graph, persons: graph.persons.map((p) => (hiddenFor(actor, p) ? hidden.get(p.id) ?? maskPerson(p) : p)) }
+  const unseen = new Set(graph.persons.filter((p) => hiddenFor(actor, p)).map((p) => p.id))
+  // Someone hidden may be named at another person's event, as a godparent or a witness: there they lose their name too.
+  const scrub = (p: Person): Person => (p.facts.some((f) => f.people?.some((x) => x.personId && unseen.has(x.personId)))
+    ? { ...p, facts: p.facts.map((f) => (f.people ? { ...f, people: f.people.map((x) => (x.personId && unseen.has(x.personId) ? { ...x, personId: null, name: '' } : x)) } : f)) }
+    : p)
+  return { ...graph, persons: graph.persons.map((p) => (unseen.has(p.id) ? hidden.get(p.id) ?? maskPerson(p) : scrub(p))) }
 }
 
 /** A link to one branch does not say the rest exists: those people are gone, not masked. */
@@ -100,6 +105,8 @@ export interface PersonInput {
   deathPlace?: string
   living?: boolean
   keepPrivate?: boolean
+  noChildren?: boolean
+  neverMarried?: boolean
   certainty?: Certainty
   tags?: string[]
   facts?: Fact[]
@@ -200,7 +207,7 @@ export function addUnion(c: Changes, aId: string, bId: string, kind: UnionKind =
 
 export const FIELD: Record<string, string> = {
   givenName: 'Имя', surname: 'Фамилия', maidenName: 'Девичья фамилия', patronymic: 'Отчество', otherNames: 'Другие имена', tags: 'Название группы', facts: 'Факты', sources: 'Источники', claims: 'Версии', sex: 'Пол', birthDate: 'Рождение', birthPlace: 'Место рождения',
-  deathDate: 'Смерть', deathPlace: 'Место смерти', living: 'Жив', keepPrivate: 'Скрыт от читателей', certainty: 'Уверенность',
+  deathDate: 'Смерть', deathPlace: 'Место смерти', living: 'Жив', keepPrivate: 'Скрыт от читателей', noChildren: 'Детей не было', neverMarried: 'В браке не состоял', certainty: 'Уверенность',
 }
 
 export function updatePerson(actor: Actor, id: string, input: PersonInput, seen?: Record<string, unknown>) {
@@ -224,6 +231,7 @@ export function deletePerson(actor: Actor, id: string) {
     for (const r of db.select().from(schema.mediaTags).where(eq(schema.mediaTags.personId, id)).all()) c.remove('mediaTags', r.id)
     for (const r of db.select().from(schema.pages).where(eq(schema.pages.personId, id)).all()) c.remove('pages', r.id)
     for (const r of db.select().from(schema.storyPeople).where(eq(schema.storyPeople.personId, id)).all()) c.remove('storyPeople', r.id)
+    for (const r of db.select().from(schema.contacts).where(eq(schema.contacts.personId, id)).all()) c.remove('contacts', r.id)
     dropStoriesAboutNobody(c)
     c.remove('persons', id)
   })
