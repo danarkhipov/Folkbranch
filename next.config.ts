@@ -1,10 +1,11 @@
 import type { NextConfig } from 'next'
 
 // Nothing on a page may load from or send to another site: not a picture written into a page, not a script.
-// The one exception is the map's pictures from OpenStreetMap, fetched only after a device allowed them.
+// The exceptions: the map's pictures from OpenStreetMap, fetched only after a device allowed them,
+// and Telegram's sign-in button, which Telegram draws itself in a frame of its own.
 const dev = process.env.NODE_ENV !== 'production'
 const CSP = [
-  "default-src 'self'", `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${dev ? " 'unsafe-eval'" : ''}`, "style-src 'self' 'unsafe-inline'", "img-src 'self' data: blob: https://tile.openstreetmap.org", "font-src 'self' data:",
+  "default-src 'self'", `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://telegram.org${dev ? " 'unsafe-eval'" : ''}`, "frame-src https://oauth.telegram.org", "style-src 'self' 'unsafe-inline'", "img-src 'self' data: blob: https://tile.openstreetmap.org", "font-src 'self' data:",
   // Model files, fetched only when someone asks for them: these addresses can send data in, and no code from them runs as a script.
   `connect-src 'self' https://unpkg.com https://cdn.jsdelivr.net https://huggingface.co https://*.hf.co${dev ? ' ws:' : ''}`, "media-src 'self' blob:", "worker-src 'self' blob:", "frame-ancestors 'none'", "base-uri 'self'", "object-src 'none'", "form-action 'self'",
 ].join('; ')

@@ -1,6 +1,7 @@
 // What is set up and what is missing, in terms a person can act on. The app says it, so nobody has to read a manual
 // to find out why sign-in fails or why the assistant is silent.
 import fs from 'node:fs'
+import { signInMethods } from '../sign-in-methods'
 import { count, isNull } from 'drizzle-orm'
 import { currentProvider } from '../agent/provider-key'
 import { DATA_DIR, getDb, schema } from '../db'
@@ -43,8 +44,7 @@ export function setupStatus(actor: Actor, h: Headers) {
     agents: db.select({ n: count() }).from(schema.apiTokens).where(isNull(schema.apiTokens.revokedAt)).get()!.n,
     assistant: provider ? provider.label : null,
     assistantOn: getSetting('assistantEnabled') === '1',
-    google: !!process.env.GOOGLE_CLIENT_ID,
-    yandex: !!process.env.YANDEX_CLIENT_ID,
+    signIn: Object.values(signInMethods()).some(Boolean),
     mcpUrl: `${here}/api/mcp`,
   }
 }

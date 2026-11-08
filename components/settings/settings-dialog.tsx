@@ -1,6 +1,6 @@
 'use client'
 import { useState, type ComponentType } from 'react'
-import { ChevronLeft, ChevronRight, Cpu, DatabaseBackup, KeyRound, ListChecks, SlidersHorizontal, UserRound, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Cpu, DatabaseBackup, DoorOpen, KeyRound, ListChecks, SlidersHorizontal, UserRound, Users } from 'lucide-react'
 import { AssistantIcon } from '../assistant-icon'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useApp } from '@/lib/client'
@@ -12,10 +12,12 @@ import { Files } from './files'
 import { AssistantSettings } from './assistant'
 import { SetupGuide } from './setup-guide'
 import { ShareLinks } from './share-links'
+import { SignInMethods } from './sign-in-methods'
 import { SmartSettings } from './smart'
+import type { SignInMethods as Methods } from '@/lib/sign-in-methods'
 import { TokensTab } from './tokens'
 
-type Section = 'setup' | 'account' | 'smart' | 'general' | 'people' | 'assistant' | 'agents' | 'data'
+type Section = 'setup' | 'account' | 'smart' | 'general' | 'people' | 'signin' | 'assistant' | 'agents' | 'data'
 
 /** Each screen says what it is for, so nobody has to work it out from the fields. */
 const SECTIONS: Record<Section, [string, string, ComponentType<{ size?: number }>]> = {
@@ -23,13 +25,14 @@ const SECTIONS: Record<Section, [string, string, ComponentType<{ size?: number }
   account: ['Мой аккаунт', 'Как вы связаны с архивом и как входите в него.', UserRound],
   smart: ['Лица и голос', 'Поиск лиц на фото и распознавание речи. Работает прямо на этом устройстве. Скачайте то, что нужно: остальное приложение работает и без этого.', Cpu],
   general: ['Общие параметры', 'Название архива и язык приложения. Меняются сразу для всех.', SlidersHorizontal],
+  signin: ['Способы входа', 'Чем родные входят в архив после первой ссылки: Яндекс ID, VK ID, Telegram, Google или код на почту.', DoorOpen],
   people: ['Пользователи и доступ', 'Кто входит в архив и что может в нём делать, а кому хватит ссылки для просмотра.', Users],
   assistant: ['ИИ-ассистент', 'Чат внутри приложения: отвечает на вопросы о семье и вносит правки с вашего подтверждения.', AssistantIcon],
   agents: ['Внешние программы', 'Подключите Claude, Codex или другую программу: она сможет читать архив и предлагать правки. Обычно это не нужно.', KeyRound],
   data: ['Данные и резервные копии', 'Добавить людей из файла, скачать данные, сделать копию архива.', DatabaseBackup],
 }
 
-export function SettingsDialog({ open, onOpenChange, familyName, providers, onText }: { open: boolean; onOpenChange: (v: boolean) => void; familyName: string; providers: { google: boolean; yandex: boolean }; onText: () => void }) {
+export function SettingsDialog({ open, onOpenChange, familyName, providers, onText }: { open: boolean; onOpenChange: (v: boolean) => void; familyName: string; providers: Methods; onText: () => void }) {
   const { t, me, lang } = useApp()
   const isOwner = me.role === 'owner'
   const [section, setSectionNow] = useState<Section>(isOwner ? 'setup' : 'account')
@@ -37,7 +40,7 @@ export function SettingsDialog({ open, onOpenChange, familyName, providers, onTe
   const [inside, setInside] = useState(false)
   const setSection = (next: Section) => { setSectionNow(next); setInside(true) }
   const groups: [string, Section[]][] = isOwner
-    ? [['', ['setup', 'account']], ['Основные настройки', ['general', 'people', 'data']], ['ИИ и интеграции', ['assistant', 'agents', 'smart']]]
+    ? [['', ['setup', 'account']], ['Основные настройки', ['general', 'people', 'signin', 'data']], ['ИИ и интеграции', ['assistant', 'agents', 'smart']]]
     : [['', ['account', 'smart', 'data']]]
   const [title, description] = SECTIONS[section]
   return (
@@ -67,6 +70,7 @@ export function SettingsDialog({ open, onOpenChange, familyName, providers, onTe
             {section === 'smart' && <SmartSettings />}
             {section === 'general' && isOwner && <Archive familyName={familyName} lang={lang} />}
             {section === 'people' && isOwner && <div className="flex min-w-0 flex-col gap-7"><Access /><ShareLinks /></div>}
+            {section === 'signin' && isOwner && <SignInMethods />}
             {section === 'assistant' && isOwner && <AssistantSettings />}
             {section === 'agents' && isOwner && <TokensTab />}
             {section === 'data' && <Files onText={() => { onOpenChange(false); onText() }} />}

@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { translate } from '@/lib/i18n'
 import type { Lang } from '@/lib/types'
-import { Brand } from './brand-icons'
+import { MailCode, OAuthButtons, TelegramButton, authPost } from './sign-in-buttons'
+import type { SignInMethods } from '@/lib/sign-in-methods'
 import { Logo } from './logo'
 import { RestoreForm } from './settings/restore-form'
 import { inputClass } from '@/components/ui/input'
@@ -60,22 +61,29 @@ export function SetupScreen({ needsCode, initialCode = '', initialLang, wrongAdd
   )
 }
 
-export function LoginScreen({ lang, familyName, providers }: { lang: Lang; familyName: string; providers: { google: boolean; yandex: boolean } }) {
+export function LoginScreen({ lang, familyName, providers, error }: { lang: Lang; familyName: string; providers: SignInMethods; error?: string }) {
   useHtmlLang(lang)
   const t = (k: string) => translate(lang, k)
-  const go = async (url: string, body: unknown) => {
-    const j = await (await post(url, body)).json()
-    if (j.url) location.href = j.url
+  const [telegramError, setTelegramError] = useState('')
+  const telegram = async (data: Record<string, unknown>) => {
+    const r = await authPost('/api/auth/family/telegram', data)
+    if (r.ok) location.href = '/'
+    else setTelegramError(r.status === 403 ? t('Этот Telegram ещё не привязан. Войдите по ссылке и привяжите его в «Моём аккаунте».') : t('Telegram не подтвердил вход. Попробуйте ещё раз.'))
   }
+  const any = providers.google || providers.yandex || providers.vk || providers.telegram || providers.email
   return (
     <main className={shell}>
       <div className={card}>
         <Logo size={40} />
         <h1 className="font-serif text-2xl font-medium">{familyName || t('Семейный архив')}</h1>
         <p className="font-medium">{t('Вход только по приглашению')}</p>
-        <p className="text-ink-soft text-sm -mt-2">{t('Попросите родственника, который уже в архиве, прислать вам ссылку.')}</p>
-        {providers.google && <button className="bar-btn border border-border !h-10" onClick={() => go('/api/auth/sign-in/social', { provider: 'google', callbackURL: '/' })}><Brand name="google" /> {t('Войти через Google')}</button>}
-        {providers.yandex && <button className="bar-btn border border-border !h-10" onClick={() => go('/api/auth/sign-in/oauth2', { providerId: 'yandex', callbackURL: '/' })}><Brand name="yandex" className="text-[#fc3f1d]" /> {t('Войти через Яндекс ID')}</button>}
+        <p className="text-ink-soft text-sm -mt-2">{any ? t('Первый раз войдите по ссылке от родственника. Потом можно входить так:') : t('Попросите родственника, который уже в архиве, прислать вам ссылку.')}</p>
+        {/* A provider that refused, or an account not linked yet, comes back here with ?error= */}
+        {error && <p role="alert" className="text-sm text-destructive">{t('Не получилось войти. Если вы входите так впервые, сначала откройте ссылку-приглашение и привяжите этот способ в «Моём аккаунте».')}</p>}
+        <OAuthButtons methods={providers} t={t} />
+        {providers.telegram && <TelegramButton bot={providers.telegram} onAuth={telegram} />}
+        {telegramError && <p role="alert" className="text-sm text-destructive">{telegramError}</p>}
+        {providers.email && <details className="text-sm"><summary className="cursor-pointer py-2">{t('Войти по коду на почту')}</summary><div className="pt-1"><MailCode t={t} mode="sign-in" onDone={() => { location.href = '/' }} /></div></details>}
       </div>
     </main>
   )

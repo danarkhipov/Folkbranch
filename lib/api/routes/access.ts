@@ -9,6 +9,9 @@ import { suggest } from '@/lib/ops/suggest'
 import * as tokens from '@/lib/ops/tokens'
 import { get, human, role, type Route } from '../router'
 import { backupNow, backupStatus } from '@/lib/ops/auto-backup'
+import { METHODS, methodsStatus, removeMethod, saveMethod } from '@/lib/sign-in-methods'
+
+const method = (id: string) => z.enum(METHODS).parse(id)
 
 export const accessRoutes: Route[] = [
   get('proposals', 'Drafts waiting for review (people only)', ({ actor }) => listProposals(actor)),
@@ -41,6 +44,9 @@ export const accessRoutes: Route[] = [
   human('POST', 'invites', 'Create an invitation', async ({ actor, body }) => settings.createInvite(actor, z.object({ name: z.string().min(1), role, personId: z.string().nullish(), userId: z.string().nullish() }).parse(await body()))),
   human('DELETE', 'invites/:id', 'Revoke an invitation', ({ actor, params }) => settings.revokeInvite(actor, params.id)),
   human('GET', 'users', 'People with access', ({ actor }) => settings.listUsers(actor)),
+  human('GET', 'sign-in-methods', 'Ways into the archive besides an invitation', ({ actor }) => methodsStatus(actor)),
+  human('PUT', 'sign-in-methods/:id', 'Switch a way of signing in on, with its keys', async ({ actor, params, body }) => saveMethod(actor, method(params.id), await body())),
+  human('DELETE', 'sign-in-methods/:id', 'Switch a way of signing in off', ({ actor, params }) => removeMethod(actor, method(params.id))),
   human('GET', 'assistant/provider', 'Which AI provider is connected', ({ actor }) => providerStatus(actor)),
   human('PUT', 'assistant/provider', 'Connect an AI provider with a key', async ({ actor, body }) => connectProvider(actor, await body())),
   human('PATCH', 'assistant/provider', 'Choose another model', async ({ actor, body }) => chooseModel(actor, await body())),

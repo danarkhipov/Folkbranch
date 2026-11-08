@@ -1,4 +1,5 @@
 'use client'
+import type { SignInMethods } from '@/lib/sign-in-methods'
 import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -19,7 +20,7 @@ interface Props {
   me: Me
   lang: Lang
   familyName: string
-  providers: { google: boolean; yandex: boolean }
+  providers: SignInMethods
   assistant: AssistantState
 }
 

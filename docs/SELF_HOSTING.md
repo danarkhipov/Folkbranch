@@ -84,7 +84,7 @@ The logs print the link that claims the empty archive. Open it and create the ow
 
 **Keys.** `BETTER_AUTH_SECRET` signs sessions and encrypts the assistant's provider key in the database. Keep it in Railway's variables, not in the volume, so that a copy of the volume alone cannot decrypt the key. Changing it signs everyone out and asks for the provider key again; no family data is lost. Without it, the app generates one on the volume. Sign-in has no passwords: the first person uses the claim link, relatives use one-time invitations.
 
-**Your own domain.** Add it in Railway, then set `BETTER_AUTH_URL=https://your.domain` and redeploy. The old Railway address keeps working. Google or Yandex sign-in also need `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `YANDEX_CLIENT_ID`, `YANDEX_CLIENT_SECRET`, with the callbacks `/api/auth/callback/google` and `/api/auth/oauth2/callback/yandex` at your address.
+**Your own domain.** Add it in Railway, then set `BETTER_AUTH_URL=https://your.domain` and redeploy. The old Railway address keeps working. Ways to sign in besides a link (Yandex ID, VK ID, Telegram, Google, a code by mail) are switched on under **Settings → Ways to sign in**, or with variables: see [ways to sign in](SIGN_IN.md).
 
 **Locked out or need a copy.** `railway ssh --service folkbranch`, then `node folkbranch.mjs login-link` or `node folkbranch.mjs backup`. Backups land in `/data/backups`, on the same volume, so also take one off the server or turn on volume backups in Railway.
 

@@ -1,9 +1,10 @@
 import { randomBytes } from 'node:crypto'
 import { betterAuth, type BetterAuthPlugin } from 'better-auth'
 import { drizzleAdapter } from '@better-auth/drizzle-adapter'
-import { APIError, createAuthEndpoint } from 'better-auth/api'
+import { APIError, createAuthEndpoint, sessionMiddleware } from 'better-auth/api'
 import { setSessionCookie } from 'better-auth/cookies'
-import { genericOAuth } from 'better-auth/plugins'
+import { emailOTP, genericOAuth } from 'better-auth/plugins'
+import { yandex as yandexProvider } from 'better-auth/plugins/generic-oauth'
 import { nextCookies } from 'better-auth/next-js'
 import { and, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
@@ -14,11 +15,19 @@ import { loadDemo } from './demo'
 import { publicOrigins, publicUrl } from './public-url'
 import { serverSecret } from './server-secret'
 import { setupCodeMatches } from './setup-code'
+import { methodConfig, methodsVersion, sendCode } from './sign-in-methods'
+import { checkTelegram } from './telegram-login'
 
-export const providers = () => ({
-  google: !!process.env.GOOGLE_CLIENT_ID,
-  yandex: !!process.env.YANDEX_CLIENT_ID,
-})
+export { signInMethods } from './sign-in-methods'
+
+/** The Telegram user behind what the sign-in button handed over, checked against the bot's token. */
+function telegramId(data: Record<string, unknown>) {
+  const bot = methodConfig('telegram')
+  const id = bot ? checkTelegram(data, bot.botToken) : null
+  if (!id) throw new APIError('BAD_REQUEST', { message: 'telegram check failed' })
+  return id
+}
+const telegramData = z.record(z.string(), z.union([z.string(), z.number()]))
 
 /** Passwordless entry: first-run setup and one-time invitation links. */
 const familyAccess = () =>
@@ -71,6 +80,22 @@ const familyAccess = () =>
         }
         return ctx.json({ ok: true })
       }),
+      // Telegram's button gives no code to exchange, only signed data, so it gets its own two doors.
+      telegram: createAuthEndpoint('/family/telegram', { method: 'POST', body: telegramData }, async (ctx) => {
+        const found = await ctx.context.internalAdapter.findAccountOwnerByKey({ providerId: 'telegram', accountId: telegramId(ctx.body) })
+        if (found?.kind !== 'owned') throw new APIError('FORBIDDEN', { message: 'not linked' })
+        const session = await ctx.context.internalAdapter.createSession(found.user.id)
+        await setSessionCookie(ctx, { session, user: found.user })
+        return ctx.json({ ok: true })
+      }),
+      telegramLink: createAuthEndpoint('/family/telegram/link', { method: 'POST', body: telegramData, use: [sessionMiddleware] }, async (ctx) => {
+        const accountId = telegramId(ctx.body)
+        const userId = ctx.context.session.user.id
+        const found = await ctx.context.internalAdapter.findAccountOwnerByKey({ providerId: 'telegram', accountId })
+        if (found?.kind === 'owned' && found.user.id !== userId) throw new APIError('CONFLICT', { message: 'linked to someone else' })
+        if (!found) await ctx.context.internalAdapter.linkAccount({ userId, providerId: 'telegram', accountId })
+        return ctx.json({ ok: true })
+      }),
       local: createAuthEndpoint('/family/local', { method: 'GET' }, async (ctx) => {
         if (!ctx.headers || !localLoginAllowed(ctx.headers)) throw new APIError('FORBIDDEN', { message: 'not on this computer' })
         const owner = await ctx.context.internalAdapter.findUserById(findOwnerId() ?? '')
@@ -92,18 +117,20 @@ async function createFamilyUser(ctx: any, name: string, role: string, personId: 
 }
 
 function build() {
-  const yandex = process.env.YANDEX_CLIENT_ID
-    ? [genericOAuth({
-        config: [{
-          providerId: 'yandex',
-          clientId: process.env.YANDEX_CLIENT_ID,
-          clientSecret: process.env.YANDEX_CLIENT_SECRET!,
-          authorizationUrl: 'https://oauth.yandex.ru/authorize',
-          tokenUrl: 'https://oauth.yandex.ru/token',
-          userInfoUrl: 'https://login.yandex.ru/info?format=json',
-          disableSignUp: true,
-          mapProfileToUser: (p: Record<string, any>) => ({ email: p.default_email, name: p.real_name || p.display_name, emailVerified: true }),
-        }],
+  const google = methodConfig('google'), yandex = methodConfig('yandex'), vk = methodConfig('vk'), mail = methodConfig('email')
+  // Yandex is served through the same doors as Google and VK: /sign-in/social and /callback/yandex.
+  const oauth = yandex
+    ? [genericOAuth({ config: [yandexProvider({ clientId: yandex.clientId, clientSecret: yandex.clientSecret, scopes: ['login:info', 'login:email'], disableSignUp: true })] })]
+    : []
+  // A code by mail signs in only someone whose address is already on their account; they add it themselves.
+  const byMail = mail
+    ? [emailOTP({
+        disableSignUp: true,
+        expiresIn: 600,
+        allowedAttempts: 5,
+        storeOTP: 'hashed',
+        changeEmail: { enabled: true },
+        sendVerificationOTP: ({ email, otp }) => sendCode(email, otp),
       })]
     : []
   return betterAuth({
@@ -115,7 +142,7 @@ function build() {
     database: drizzleAdapter(getDb(), { provider: 'sqlite', schema }),
     // Stays alive while in use; a lost phone stops working after three months without it.
     session: { expiresIn: 90 * 24 * 3600, updateAge: 24 * 3600 },
-    // Invited relatives have no real email, so Google or Yandex is linked from a signed-in session.
+    // Invited relatives have no real email, so Google, Yandex or VK is linked from a signed-in session.
     account: { accountLinking: { enabled: true, allowDifferentEmails: true } },
     user: {
       additionalFields: {
@@ -123,13 +150,29 @@ function build() {
         personId: { type: 'string', required: false, input: false },
       },
     },
-    // Accounts appear only through invitations. Google and Yandex sign in people who already have one.
-    socialProviders: process.env.GOOGLE_CLIENT_ID
-      ? { google: { clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET!, disableSignUp: true } }
-      : {},
-    plugins: [familyAccess(), ...yandex, nextCookies()],
+    // Accounts appear only through invitations. Every other way signs in people who already have one.
+    socialProviders: {
+      ...(google ? { google: { clientId: google.clientId, clientSecret: google.clientSecret, disableSignUp: true } } : {}),
+      // VK ID gives no email to many people; the account is found by its VK id, so a stand-in will do.
+      ...(vk ? { vk: { clientId: vk.clientId, clientSecret: vk.clientSecret, disableSignUp: true, mapProfileToUser: (p: any) => (p.user?.email ? {} : { email: `${p.user?.user_id}@vk.invalid` }) } } : {}),
+    },
+    // Codes by mail and Telegram are worth guessing at, so they are slowed down hard.
+    rateLimit: {
+      customRules: {
+        '/email-otp/send-verification-otp': { window: 60, max: 3 },
+        '/email-otp/request-email-change': { window: 60, max: 3 },
+        '/sign-in/email-otp': { window: 60, max: 5 },
+        '/email-otp/change-email': { window: 60, max: 5 },
+        '/family/telegram': { window: 60, max: 10 },
+      },
+    },
+    plugins: [familyAccess(), ...oauth, ...byMail, nextCookies()],
   })
 }
 
-const g = globalThis as unknown as { __familyAuth?: ReturnType<typeof build> }
-export const getAuth = () => (g.__familyAuth ??= build())
+// Built again when the owner switches a way of signing in on or off, with no restart.
+const g = globalThis as unknown as { __familyAuth?: { version: number; auth: ReturnType<typeof build> } }
+export function getAuth() {
+  if (g.__familyAuth?.version !== methodsVersion()) g.__familyAuth = { version: methodsVersion(), auth: build() }
+  return g.__familyAuth.auth
+}

@@ -1,8 +1,7 @@
 // A provider's key set from the app: checked with the provider, then kept encrypted in the database.
 // A key in the server's environment comes first, so an admin's setup always wins.
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
 import { z } from 'zod'
-import { serverSecret } from '../server-secret'
+import { seal as sealWith, unseal as unsealWith } from '../sealed'
 import { type Actor, OpError, requireRole } from '../ops/core'
 import { getSetting, say, setSetting } from '../ops/settings'
 import { getDb, schema } from '../db'
@@ -10,26 +9,8 @@ import { eq } from 'drizzle-orm'
 import { PRESETS, type PresetId } from './presets'
 import { activeProvider, keyEnvOf } from './provider'
 
-const box = () => createHash('sha256').update(`provider-key:${serverSecret()}`).digest()
-
-function seal(text: string) {
-  const iv = randomBytes(12)
-  const cipher = createCipheriv('aes-256-gcm', box(), iv)
-  const body = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()])
-  return [iv, cipher.getAuthTag(), body].map((b) => b.toString('base64')).join('.')
-}
-
-/** Null when the server's secret has changed since: the person is then asked for the key again. */
-function unseal(sealed: string) {
-  try {
-    const [iv, tag, body] = sealed.split('.').map((p) => Buffer.from(p, 'base64'))
-    const decipher = createDecipheriv('aes-256-gcm', box(), iv)
-    decipher.setAuthTag(tag)
-    return Buffer.concat([decipher.update(body), decipher.final()]).toString('utf8')
-  } catch {
-    return null
-  }
-}
+const seal = (text: string) => sealWith(text, 'provider-key')
+const unseal = (sealed: string) => unsealWith(sealed, 'provider-key')
 
 function saved() {
   const id = getSetting('agentProvider') as PresetId | null

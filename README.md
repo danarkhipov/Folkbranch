@@ -19,7 +19,7 @@ Free and open source. One command installs it, with no Docker, and it runs in ab
 
 ## Why families pick it
 
-- **Relatives join with a link.** No password to remember. They see the chart labelled from where they stand: "your grandfather", "your aunt".
+- **Relatives join with a link.** No password to remember. They see the chart labelled from where they stand: "your grandfather", "your aunt". After that they sign in with Yandex ID, VK ID, Telegram, Google or a code by mail, whichever you switch on.
 - **A grandmother can tell a story with one button.** Send her a link: no account, one big button, and her voice waits for your review before it joins the archive.
 - **Relatives get a copy that needs nothing.** One file with the chart, cards and photos opens in any browser, with no server and no internet, and the living stay hidden.
 - **The living stay private.** Readers, guests and read-only agents never see living relatives, or anyone and any story you choose to keep private. The server enforces it, not the page.
@@ -79,6 +79,7 @@ Backups, updates, servers and Railway: the [self-hosting guide](docs/SELF_HOSTIN
 **For the whole family**
 - Ask for a story with up to five questions. The relative picks one, answers, and goes on to the next.
 - Owner, editor and reader roles. Readers suggest corrections for you to accept.
+- Sign in with Yandex ID, VK ID, Telegram, Google or a code by mail, each switched on in the settings with its steps on the screen. See [ways to sign in](docs/SIGN_IN.md).
 - Keep a person who died, or a single story, from readers. Addresses and phones of the living are for editors only.
 - A view-only link, with an optional password and an expiry date.
 - Works in a browser on a phone or a computer, in English or Russian.
@@ -105,7 +106,7 @@ Folkbranch is for a family keeping its history together on a server of its own. 
 | **Running it** | | | |
 | What it takes | One command on Mac or Linux, no Docker. One process with SQLite, about 70 MB of memory¹ | Docker Compose: the app, Celery and Valkey | PHP and a web server, with SQLite or another database |
 | **The family** | | | |
-| Relatives join | ✓ With a link, no password or email | A password, or a sign-in service you set up | A user name and password |
+| Relatives join | ✓ With a link, no password or email. Then Yandex ID, VK ID, Telegram, Google or a code by mail, whichever you switch on | A password, or a sign-in service you set up | A user name and password |
 | Read without an account | ✓ A link, with a password and an expiry if you want | ✗ Every reader signs in | ✓ Public pages, open to anyone |
 | A relative tells a story | ✓ A link with your questions, one button to talk, no account. You review it first | Upload a recording made elsewhere | Upload a recording made elsewhere |
 | A page for each person | ✓ Block editor, photos in the text, links to relatives | ✓ Formatted notes with images, and a blog | Notes, and an HTML block |
@@ -192,6 +193,7 @@ The server copies the database by itself each day and keeps the last seven, and 
 ## Documentation
 
 - [Self-hosting](docs/SELF_HOSTING.md): install, servers, domains, Railway, backups, updates
+- [Ways to sign in](docs/SIGN_IN.md): Yandex ID, VK ID, Telegram, Google, a code by mail
 - [Agents](docs/AGENTS.md): keys, roles, the assistant
 - [AI and formats](docs/AI_AND_FORMATS.md): MCP tools, REST API, the text format, GEDCOM
 - [Architecture](docs/ARCHITECTURE.md): how it is built, and why

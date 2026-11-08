@@ -10,7 +10,7 @@ import { Brand, type BrandName } from '../brand-icons'
 import { Access } from './access'
 import { TokensTab } from './tokens'
 
-interface Status { address: string; addressWrong: string | null; insecure: boolean; dataDir: string; freeBytes: number | null; lowDisk: boolean; people: number; users: number; agents: number; assistant: string | null; assistantOn: boolean; google: boolean; yandex: boolean; mcpUrl: string }
+interface Status { address: string; addressWrong: string | null; insecure: boolean; dataDir: string; freeBytes: number | null; lowDisk: boolean; people: number; users: number; agents: number; assistant: string | null; assistantOn: boolean; signIn: boolean; mcpUrl: string }
 
 type State = 'done' | 'todo' | 'problem' | 'optional'
 const MARK: Record<State, [LucideIcon, string, string]> = { done: [Check, 'text-[#2f7d4f]', 'Готово'], problem: [AlertTriangle, 'text-destructive', 'Нужно исправить'], todo: [Circle, 'text-ink-faint', 'Ещё не сделано'], optional: [Circle, 'text-ink-faint', ''] }
@@ -35,7 +35,7 @@ function Step({ title, state, logos = [], open, onToggle, children }: { title: s
 }
 
 /** Everything the app needs, one step each, with what is missing saying so. Each step can be skipped and come back to. */
-export function SetupGuide({ onImport, onFirstPerson, onGo }: { onImport?: () => void; onFirstPerson?: () => void; onGo?: (section: 'people' | 'assistant' | 'agents' | 'data') => void }) {
+export function SetupGuide({ onImport, onFirstPerson, onGo }: { onImport?: () => void; onFirstPerson?: () => void; onGo?: (section: 'people' | 'signin' | 'assistant' | 'agents' | 'data') => void }) {
   const { t, lang } = useApp()
   const qc = useQueryClient()
   const { data: s } = useQuery({ queryKey: ['setup'], queryFn: () => api<Status>('setup/status') })
@@ -43,7 +43,7 @@ export function SetupGuide({ onImport, onFirstPerson, onGo }: { onImport?: () =>
   if (!s) return <div className="h-40" />
   const toggle = (id: string) => () => setOpen(open === id ? null : id)
   // In the settings a step leads to its own screen; the same form is not repeated here.
-  const go = (section: 'people' | 'assistant' | 'agents' | 'data', label: string) => <Button type="button" size="sm" variant="outline" className="self-start" onClick={() => onGo!(section)}>{t(label)} <ArrowRight /></Button>
+  const go = (section: 'people' | 'signin' | 'assistant' | 'agents' | 'data', label: string) => <Button type="button" size="sm" variant="outline" className="self-start" onClick={() => onGo!(section)}>{t(label)} <ArrowRight /></Button>
   const addressState: State = s.addressWrong || s.insecure || s.lowDisk ? 'problem' : 'done'
   const gb = s.freeBytes === null ? null : new Intl.NumberFormat(lang, { maximumFractionDigits: 1 }).format(s.freeBytes / 1024 ** 3)
   return (
@@ -62,12 +62,9 @@ export function SetupGuide({ onImport, onFirstPerson, onGo }: { onImport?: () =>
         <p className="text-ink-soft">{t('Один файл со всем архивом и фотографиями. Из него можно восстановиться на новой установке.')}</p>
         <Button asChild size="sm" variant="outline" className="self-start"><a href="/api/archive" download><Download /> {t('Скачать полный архив')}</a></Button>
       </Step>
-      <Step title="Вход: Google, Яндекс" state={s.google || s.yandex ? 'done' : 'optional'} logos={['google', 'yandex']} open={open === 'signin'} onToggle={toggle('signin')}>
-        <p className="text-ink-soft">{t('Без этого родственники входят по ссылке-приглашению. Чтобы они могли входить снова сами, создайте доступ у сервиса и добавьте его в настройки приложения.')}</p>
-        <ul className="flex flex-col gap-3">
-          <li className="flex flex-col gap-1"><span className="flex flex-wrap items-center gap-1.5"><Brand name="google" /> Google: <code>GOOGLE_CLIENT_ID</code>, <code>GOOGLE_CLIENT_SECRET</code></span><CopyField label={t('Адрес возврата')} value={`${s.address}/api/auth/callback/google`} /></li>
-          <li className="flex flex-col gap-1"><span className="flex flex-wrap items-center gap-1.5"><Brand name="yandex" className="text-[#fc3f1d]" /> {t('Яндекс')}: <code>YANDEX_CLIENT_ID</code>, <code>YANDEX_CLIENT_SECRET</code></span><CopyField label={t('Адрес возврата')} value={`${s.address}/api/auth/oauth2/callback/yandex`} /></li>
-        </ul>
+      <Step title="Способы входа" state={s.signIn ? 'done' : 'optional'} logos={['yandex', 'vk', 'telegram', 'google']} open={open === 'signin'} onToggle={toggle('signin')}>
+        <p className="text-ink-soft">{t('Без этого родственники входят по ссылке-приглашению. Включите Яндекс ID, VK ID, Telegram, Google или код на почту, и они смогут входить снова сами.')}</p>
+        {onGo ? go('signin', 'Выбрать способы входа') : <p>{t('Они включаются в «Настройки → Способы входа».')}</p>}
       </Step>
       <Step title="ИИ-ассистент" state={s.assistant ? (s.assistantOn ? 'done' : 'todo') : 'optional'} logos={['openrouter', 'anthropic', 'openai', 'gemini']} open={open === 'assistant'} onToggle={toggle('assistant')}>
         {onGo ? <><p className="text-ink-soft">{s.assistant ? `${t('Подключён')}: ${s.assistant}.` : t('Отвечает на вопросы об архиве и вносит правки. Нужен ключ одного из сервисов, платите вы сами этому сервису. Что ассистент читает, уходит туда.')}</p>{go('assistant', 'Открыть настройки ассистента')}</> : s.assistant
