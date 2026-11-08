@@ -22,7 +22,7 @@ Free and open source. One command installs it, with no Docker, and it runs in ab
 - **Relatives join with a link.** No password to remember. They see the chart labelled from where they stand: "your grandfather", "your aunt".
 - **A grandmother can tell a story with one button.** Send her a link: no account, one big button, and her voice waits for your review before it joins the archive.
 - **Relatives get a copy that needs nothing.** One file with the chart, cards and photos opens in any browser, with no server and no internet, and the living stay hidden.
-- **The living stay private.** Readers, guests and read-only agents never see living relatives. The server enforces it, not the page.
+- **The living stay private.** Readers, guests and read-only agents never see living relatives, or anyone and any story you choose to keep private. The server enforces it, not the page.
 - **Nothing is lost.** Every change is in the history and can be rolled back. Disagreeing dates keep their sources side by side.
 
 ## Install
@@ -62,7 +62,7 @@ Backups, updates, servers and Railway: the [self-hosting guide](docs/SELF_HOSTIN
 - Add a relative from any side of a card, or drag a line between two people.
 - See how two people are related, and the path between them.
 - An ancestor fan for anyone: the whole line in one picture.
-- Dates and numbers: birthdays and anniversaries of the coming two months, and the family in figures.
+- Dates and numbers: birthdays and anniversaries of the coming two months, the family in figures, and a file for the calendar on a phone.
 - Save views of a branch. Print the chart to PDF on one sheet or across several.
 
 **A page for every relative**
@@ -70,16 +70,20 @@ Backups, updates, servers and Railway: the [self-hosting guide](docs/SELF_HOSTIN
 - A life in order, read from the card: birth, marriage, children, facts and death.
 - Disagreeing versions of a date or place, each with its source, so nothing is overwritten.
 - Tag people on photos, record voice stories, or type what someone told you.
+- Print a person, or keep them as a PDF: life, family, facts, biography, stories and sources on a page or two.
 - Find and merge duplicate cards, with undo.
 
 **For the whole family**
+- Ask for a story with up to five questions. The relative picks one, answers, and goes on to the next.
 - Owner, editor and reader roles. Readers suggest corrections for you to accept.
+- Keep a person who died, or a single story, from readers.
 - A view-only link, with an optional password and an expiry date.
 - Works in a browser on a phone or a computer, in English or Russian.
 
 **Your data stays yours**
 - One SQLite file and a folder of photos on your server. No telemetry, and closed to search engines.
-- Import GEDCOM 5.5.1 and 7.0, Excel, CSV, JSON and plain text. Export GEDCOM or a full copy of the archive.
+- Import GEDCOM 5.5.1 and 7.0, Excel, CSV, JSON and plain text. Export GEDCOM or a full copy of the archive. [Moving from Gramps or webtrees](docs/MOVING.md) is checked on their own kind of files.
+- The server copies the database each day by itself, and the settings say when it last did.
 - Bring in a research case from the [ex-USSR kinship skill](https://github.com/DenisSergeevitch/ex-ussr-kinship-research): what was proved goes on the chart, the rest stays a note.
 
 **On this device, if you want it**
@@ -100,10 +104,10 @@ Folkbranch is for a family building its history together. [Gramps Web](https://w
 | Relatives join | With a link, no password | — | — |
 | A relative tells a story | ✓ A link, one button, no account. You review it first | — | — |
 | A copy for relatives | ✓ One HTML file, no server or internet, the living hidden | — | — |
-| Privacy | The living hidden from readers, guests and agents, on the server | — | ✓ Access levels and privacy per person, moderated edits |
+| Privacy | The living, and anyone or any story you choose, hidden from readers, guests and agents, on the server | — | ✓ Access levels and privacy per person, moderated edits |
 | History and undo | ✓ Every change, rolled back from the card or the history | ✓ Revision history² | — |
 | Charts | Whole family on one screen, ancestor fan, relationship path, PDF | ✓ Ancestor, descendant, hourglass, relationship, fan | ✓ Charts and reports |
-| Reports | PDF of the chart only | ✓ | ✓ |
+| Reports | The chart, and a person's page, in PDF | ✓ | ✓ |
 | Maps | ✗ | ✓ OpenHistoricalMap | ✓ Interactive |
 | DNA | ✗ | ✓ Matches, chromosome browser | —³ |
 | Faces in photos | ✓ On your device, a model you choose to download | ✓ Tagging and face detection⁴ | — |
@@ -122,16 +126,15 @@ Folkbranch is for a family building its history together. [Gramps Web](https://w
 ⁴ A project issue reports up to 12 GB of memory with face recognition on, 4 GB without. Not verified.
 
 **Choose Gramps Web** if you use Gramps Desktop, need maps, DNA or reports, or want someone to host it for you.
-**Choose webtrees** if you need privacy set per person, several trees in one place, modules or more languages.
+**Choose webtrees** if you need access levels, several trees in one place, modules or more languages.
 **Choose Folkbranch** if you want it running on a small machine in one command, and relatives adding to it from their phones without passwords.
 
 ## What it does not do
 
 - No DNA tools and no maps.
-- No reports beyond the chart in PDF. A family book is on the [roadmap](docs/ROADMAP.md).
+- No reports beyond the chart and a person's page in PDF. A family book is on the [roadmap](docs/ROADMAP.md).
 - One tree per install, in two languages.
 - No sync with desktop programs, and no plugins.
-- Privacy is for the living: a person who died, or one story, cannot yet be hidden from readers on its own.
 - No hosted version: you run it yourself, at home or on a server.
 
 ## AI agents
@@ -150,7 +153,7 @@ Then ask your agent something like *"Find what is missing in the archive and sug
 Yes, under AGPL-3.0. You pay only for your own server, if you use one. The optional assistant uses your own key with an AI provider, which you pay directly.
 
 **Can I move my tree from Ancestry, MyHeritage or Gramps?**
-Yes, if the service exports GEDCOM. Folkbranch shows what the file holds before anything changes. GEDCOM carries people, links and events. It does not carry pages and photos, though a full copy of a Folkbranch archive does.
+Yes, if the service exports GEDCOM. Folkbranch shows what the file holds before anything changes. GEDCOM carries people, links, events and sources, but not photos. See [moving from Gramps or webtrees](docs/MOVING.md).
 
 **Who can see my family's data?**
 Only people you invite. The site is closed to search engines, photos need a sign-in, and readers do not see living relatives.
@@ -162,7 +165,7 @@ Not by itself. Connecting an AI provider sends what the assistant reads to that 
 A Mac or Linux computer, or any Linux server with 512 MB of memory. The app itself stays near 130 MB with a family of a thousand and twenty people looking.
 
 **How do I back it up?**
-Download a full copy under **Settings → Data and backups**, or run `./folkbranch backup`. The server also copies the database before each update that changes it.
+The server copies the database by itself each day and keeps the last seven, and before each update that changes it. Those copies are on the same disk, so also download a full copy under **Settings → Data and backups**, or run `./folkbranch backup`, and keep it elsewhere.
 
 ## Documentation
 
