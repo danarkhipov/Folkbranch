@@ -7,6 +7,7 @@ import { useApp } from '@/lib/client'
 import { accept, addVersion, editValue, hasConflict, NAME_FIELDS, reject, RELIABILITY, restore, setSource, sourceOf, summary, versions, type ClaimPatch } from '@/lib/claims'
 import { lifeEvents } from '@/lib/family-dates'
 import { listWriter } from '@/lib/list-writes'
+import { SwitchRow } from '@/components/ui/switch'
 import { ageWords } from '@/lib/names'
 import { cn } from '@/lib/utils'
 import { shownTags, yearOf, type Fact, type ClaimField, type Person, type Reliability, type Source } from '@/lib/types'
@@ -362,6 +363,13 @@ export function Details({ person, patch: send }: { person: Person; patch: (p: Pa
           {!ro && <AddMenu label={t('Добавить источник')} items={SOURCE_KINDS.map((k): [string, string] => [k, k ? t(k) : t('Другой источник')])} onPick={(k) => { setFreshSource(writer.get('sources').length); edit('sources', (list) => [...list, { id: Math.random().toString(36).slice(2, 10), title: k && t(k), ref: '', page: '', url: '', reliability: SOURCE_RELIABILITY[k] ?? 'copy' }]) }} />}
         </section>
       )}
+
+      {/* Who may see it, after what it says. */}
+
+      {!ro && !alive && <SwitchRow title={t('Скрыть от читателей')} description={t('Карточку, страницы и рассказы увидят только редакторы, как у живых.')} checked={!!person.keepPrivate} onChange={(on) => patch({ keepPrivate: on })} />}
+
+      {ro && person.keepPrivate && <p className="text-xs text-ink-soft">{t('Скрыт от читателей')}</p>}
+
 
       {(shownTags(person.tags).length > 0 || !ro) && (
         <section className="flex flex-col gap-1.5">

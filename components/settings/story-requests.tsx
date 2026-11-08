@@ -6,10 +6,18 @@ import { Button } from '@/components/ui/button'
 import { CopyField } from '@/components/ui/copy'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { List, ListRow, Section } from '@/components/ui/section'
 import { api, useApp, useLinkOrigin } from '@/lib/client'
 import { personName } from '@/lib/types'
 import { PersonPopover } from '../person-pickers'
+
+/** What a family most often wants to hear. Picked with a press, kept in the person's own words otherwise. */
+const READY = ['Где вы родились и каким был дом?', 'Как вы познакомились?', 'Чем занимались ваши родители?', 'Что помните о войне и эвакуации?', 'Какую историю всегда рассказывали в семье?', 'Что вы хотите, чтобы помнили внуки?']
+const toggleLine = (text: string, line: string) => {
+  const lines = text.split('\n').map((x) => x.trim()).filter(Boolean)
+  return (lines.includes(line) ? lines.filter((x) => x !== line) : [...lines, line].slice(0, 5)).join('\n')
+}
 
 interface Request { id: string; about: string; tellerName: string; received: number }
 
@@ -48,7 +56,16 @@ export function StoryRequests() {
           </div>
           <Field label={t('Кого просите')}><Input maxLength={120} placeholder={t('Например, бабушка Нина')} value={tellerName} onChange={(e) => setTellerName(e.target.value)} /></Field>
         </div>
-        <Field label={t('Вопрос (необязательно)')}><Input maxLength={400} placeholder={t('Например, как вы познакомились с дедушкой?')} value={question} onChange={(e) => setQuestion(e.target.value)} /></Field>
+        <div className="flex min-w-0 flex-col gap-1.5 text-xs text-ink-soft">
+          <span>{t('Вопросы, до пяти (необязательно). Человек выберет, на какой ответить.')}</span>
+          <div className="flex flex-wrap gap-1.5">
+            {READY.map((q) => {
+              const on = question.split('\n').map((x) => x.trim()).includes(t(q))
+              return <button key={q} type="button" aria-pressed={on} className={`rounded-full border px-2.5 py-1 text-left text-xs ${on ? 'border-ink bg-ink text-white' : 'border-border bg-white text-ink hover:bg-muted'}`} onClick={() => setQuestion(toggleLine(question, t(q)))}>{t(q)}</button>
+            })}
+          </div>
+          <Textarea rows={3} maxLength={1200} aria-label={t('Вопросы')} placeholder={t('Свой вопрос, каждый с новой строки')} value={question} onChange={(e) => setQuestion(e.target.value)} />
+        </div>
         <Button className="self-start" disabled={!personId}><Mic /> {t('Создать ссылку для рассказа')}</Button>
       </form>
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}

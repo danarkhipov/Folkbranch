@@ -39,7 +39,7 @@ export function importGedcom(actor: Actor, text: string) {
       const living = !p.dead && !p.deathDate && !((yearOf(p.birthDate) ?? 9999) < new Date().getFullYear() - 110)
       const id = insertPerson(c, {
         givenName: p.givenName, surname: p.surname, maidenName: p.maidenName, patronymic: p.patronymic, otherNames: p.otherNames, sex: p.sex, facts: p.facts, sources: p.sources,
-        birthDate: p.birthDate, birthPlace: p.birthPlace, deathDate: p.deathDate, deathPlace: p.deathPlace,
+        birthDate: p.birthDate, birthPlace: p.birthPlace, deathDate: p.deathDate, deathPlace: p.deathPlace, keepPrivate: p.keepPrivate,
         living, certainty: certaintyOf(p.quality),
       })
       ids.set(p.xref, id)

@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Mic, Pencil, ScrollText, Trash2 } from 'lucide-react'
+import { EyeOff, Mic, Pencil, ScrollText, Trash2 } from 'lucide-react'
 import { api, useApp } from '@/lib/client'
 import { personName, type Person, type Story } from '@/lib/types'
 import { ReadText } from './person-fields'
@@ -45,6 +45,12 @@ export function StoriesTab({ person }: { person: Person }) {
     qc.invalidateQueries({ queryKey: ['stories'] })
     qc.invalidateQueries({ queryKey: ['history'] })
   }
+  // Only who may see it changes; everything else is sent as it was read.
+  const setPrivate = async (s: Story, keepPrivate: boolean) => {
+    await api(`stories/${s.id}`, { method: 'PATCH', json: { title: s.title, body: s.body, tellerId: s.tellerId, tellerName: s.tellerName, toldOn: s.toldOn, about: s.about, durationSec: s.durationSec, keepPrivate, baseUpdatedAt: s.updatedAt } }).catch((e) => notify(String(e.message)))
+    qc.invalidateQueries({ queryKey: ['stories'] })
+    qc.invalidateQueries({ queryKey: ['history'] })
+  }
   return (
     <div className="px-4 py-4 flex flex-col gap-3">
       {!me.guest && <button className="add-btn self-start" onClick={() => setEditing('new')}><Mic size={14} /> {t('Записать рассказ')}</button>}
@@ -57,11 +63,13 @@ export function StoriesTab({ person }: { person: Person }) {
           <article key={s.id} className="min-w-0 rounded-lg border border-border bg-white/60 px-3 py-2">
             {s.title && <h4 className="font-serif text-base font-medium leading-snug break-anywhere">{s.title}</h4>}
             {line && <p className="text-xs text-ink-soft break-anywhere">{line}</p>}
+            {s.keepPrivate && <p className="flex items-center gap-1 text-xs text-ink-soft"><EyeOff size={12} /> {t('Только для редакторов')}</p>}
             {s.hasAudio && <Voice id={s.id} />}
             {s.body && <p className="mt-1.5 text-sm leading-relaxed"><ReadText value={s.body} /></p>}
             {canEdit && (
               <div className="mt-1.5 flex flex-wrap gap-3 text-xs text-ink-soft">
                 <button className="flex items-center gap-1 hover:text-ink" onClick={() => setFact(s)}><ScrollText size={12} /> {t('Сделать фактом')}</button>
+                <button className="flex items-center gap-1 hover:text-ink" onClick={() => setPrivate(s, !s.keepPrivate)}><EyeOff size={12} /> {t(s.keepPrivate ? 'Показать читателям' : 'Скрыть от читателей')}</button>
                 <button aria-label={t('Изменить рассказ')} className="flex items-center gap-1 hover:text-ink" onClick={() => setEditing(s)}><Pencil size={12} /> {t('Изменить')}</button>
                 <button aria-label={t('Удалить рассказ')} className="ml-auto flex items-center gap-1 hover:text-destructive" onClick={() => remove(s)}><Trash2 size={12} /> {t('Удалить')}</button>
               </div>

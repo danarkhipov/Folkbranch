@@ -1,14 +1,36 @@
 'use client'
 import { ImportDialog } from '../import-dialog'
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Download, FileText, Upload } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { DatabaseBackup, Download, FileText, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Section } from '@/components/ui/section'
 import { SwitchRow } from '@/components/ui/switch'
 import { api, useApp } from '@/lib/client'
 import { KinshipCase } from './kinship-case'
 import { RestoreForm } from './restore-form'
+
+interface BackupStatus { on: boolean; last: number | null; count: number; bytes: number; keep: number; problem: 'disk' | 'failed' | null }
+
+/** The server's own daily copies: when the last one was made, and what they are good for. */
+function DailyCopies() {
+  const { t, lang } = useApp()
+  const qc = useQueryClient()
+  const { data } = useQuery({ queryKey: ['backups'], queryFn: () => api<BackupStatus>('backups/status') })
+  const [busy, setBusy] = useState(false)
+  if (!data) return null
+  const when = data.last ? new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(data.last) : null
+  const mb = new Intl.NumberFormat(lang, { maximumFractionDigits: 1 }).format(data.bytes / 1024 / 1024)
+  return (
+    <Section title={t('Копии на сервере')} description={t('Сервер сам копирует базу раз в день и хранит последние копии. Это защита от ошибок и неудачных обновлений. От поломки диска защитит только полная копия, сохранённая у вас.')}>
+      {!data.on && <p className="text-xs text-ink-soft">{t('Ежедневные копии выключены настройкой сервера.')}</p>}
+      {data.problem === 'disk' && <p role="alert" className="text-xs text-destructive">{t('Копия не сделана: на диске меньше гигабайта.')}</p>}
+      {data.problem === 'failed' && <p role="alert" className="text-xs text-destructive">{t('Последняя копия не получилась. Подробности в журнале сервера.')}</p>}
+      <p className="text-sm">{when ? `${t('Последняя копия')}: ${when}, ${mb} ${t('МБ')}. ${t('Хранится копий')}: ${data.count} ${t('из')} ${data.keep}.` : t('Копий ещё нет. Первая появится через несколько минут после запуска.')}</p>
+      <Button variant="outline" className="self-start" disabled={busy} onClick={async () => { setBusy(true); try { qc.setQueryData(['backups'], await api<BackupStatus>('backups/now', { method: 'POST' })) } finally { setBusy(false) } }}><DatabaseBackup /> {t(busy ? 'Копирую…' : 'Сделать копию сейчас')}</Button>
+    </Section>
+  )
+}
 
 export function Files({ onText }: { onText: () => void }) {
   const { t, canEdit, me } = useApp()
@@ -18,6 +40,7 @@ export function Files({ onText }: { onText: () => void }) {
   const mb = (n: number) => Math.ceil(n / 1024 / 1024)
   return (
     <div className="flex min-w-0 flex-col gap-7 text-sm">
+      {me.role === 'owner' && <DailyCopies />}
       {me.role === 'owner' && (
         <Section title={t('Полная копия архива')} description={t('Все люди, биографии, фото и история в одном файле. Храните его как семейные документы: в нём есть данные живых родственников. Ключ ассистента в копию не входит.')}>
             <Button asChild variant="outline" className="self-start"><a href="/api/archive"><Download /> {t('Скачать полную копию')}</a></Button>

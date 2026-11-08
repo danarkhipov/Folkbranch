@@ -8,6 +8,7 @@ import { setupStatus } from '@/lib/ops/setup-status'
 import { suggest } from '@/lib/ops/suggest'
 import * as tokens from '@/lib/ops/tokens'
 import { get, human, role, type Route } from '../router'
+import { backupNow, backupStatus } from '@/lib/ops/auto-backup'
 
 export const accessRoutes: Route[] = [
   get('proposals', 'Drafts waiting for review (people only)', ({ actor }) => listProposals(actor)),
@@ -22,6 +23,8 @@ export const accessRoutes: Route[] = [
   human('POST', 'shares', 'Make a link for viewing', async ({ actor, body }) => createShare(actor, await body())),
   human('DELETE', 'shares/:id', 'Close a link for viewing', ({ actor, params }) => revokeShare(actor, params.id)),
 
+  human('GET', 'backups/status', 'When the server last copied the database by itself', ({ actor }) => backupStatus(actor)),
+  human('POST', 'backups/now', 'Copy the database on the server now', ({ actor }) => backupNow(actor)),
   human('GET', 'setup/status', 'What is set up and what is missing', ({ actor, req }) => setupStatus(actor, req.headers)),
 
   human('GET', 'tokens', 'API tokens', ({ actor }) => tokens.listTokens(actor)),

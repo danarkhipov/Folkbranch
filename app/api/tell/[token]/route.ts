@@ -18,7 +18,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     const file = form.get('audio')
     if (!(file instanceof File)) return Response.json({ error: 'file required' }, { status: 400 })
     const seconds = Number(form.get('seconds'))
-    return Response.json(await submitRecording(token, { buf: Buffer.from(await file.arrayBuffer()), name: file.name }, Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds) : null))
+    const topic = Number(form.get('topic'))
+    return Response.json(await submitRecording(token, { buf: Buffer.from(await file.arrayBuffer()), name: file.name }, Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds) : null, Number.isInteger(topic) && topic >= 0 ? topic : null))
   } catch (e) {
     if (e instanceof OpError) return Response.json({ error: e.message }, { status: e.status })
     console.error(e)

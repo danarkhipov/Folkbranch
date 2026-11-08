@@ -15,6 +15,9 @@ const DAY = 24 * 3600 * 1000
 /** Enough for a long talk in many parts, not enough to fill the disk if a link goes astray. */
 const MAX_PER_LINK = 30
 
+/** Up to five, each on its own line, none empty. */
+export const questionsOf = (s: string) => s.split('\n').map((q) => q.trim()).filter(Boolean).slice(0, 5)
+
 const hash = (s: string) => createHash('sha256').update(s).digest('hex')
 type Row = typeof schema.storyRequests.$inferSelect
 const live = (r: Row | undefined): r is Row => !!r && !r.revokedAt && (!r.expiresAt || r.expiresAt > Date.now())
@@ -23,7 +26,8 @@ const byToken = (token: string) => getDb().select().from(schema.storyRequests).w
 const input = z.object({
   personId: z.string().max(40),
   tellerName: z.string().trim().max(120).default(''),
-  question: z.string().trim().max(400).default(''),
+  // One question a line: the teller picks one before each recording, and it names what they send.
+  question: z.string().trim().max(1200).default('').transform((s) => questionsOf(s).join('\n')),
   expiresInDays: z.number().int().min(1).max(365).default(60),
 })
 
@@ -61,7 +65,7 @@ export function requestInfo(token: string) {
   }
 }
 
-export async function submitRecording(token: string, file: { buf: Buffer; name: string }, seconds: number | null) {
+export async function submitRecording(token: string, file: { buf: Buffer; name: string }, seconds: number | null, topic: number | null = null) {
   const r = byToken(token)
   if (!live(r)) throw new OpError(404, say('Ссылка недействительна'))
   if (r.received >= MAX_PER_LINK) throw new OpError(429, say('По этой ссылке уже много записей. Попросите новую.'))
@@ -70,7 +74,10 @@ export async function submitRecording(token: string, file: { buf: Buffer; name: 
   const actor: Actor = { userId: `request:${r.id}`, name: r.tellerName || say('Запись по ссылке'), role: 'reader', personId: null }
   const audio = await media.storeAudio(file.buf, file.name || 'voice', actor.userId)
   try {
-    enqueue(actor, [{ op: 'create_story', args: { title: r.question, body: '', tellerName: r.tellerName, about: [person.id], toldOn: '', durationSec: seconds, audio, createdBy: actor.name }, details: [] }] as never)
+    // Only a question the link asks can name the story: anything else from the page is ignored.
+    const asked = questionsOf(r.question)
+    const title = (topic !== null && asked[topic]) || asked[0] || ''
+    enqueue(actor, [{ op: 'create_story', args: { title, body: '', tellerName: r.tellerName, about: [person.id], toldOn: '', durationSec: seconds, audio, createdBy: actor.name }, details: [] }] as never)
   } catch (e) {
     await media.discardUpload(audio.id)
     throw e

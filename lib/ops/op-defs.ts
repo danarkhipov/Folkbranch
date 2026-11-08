@@ -14,7 +14,7 @@ export const certainty = z.enum(['documented', 'family', 'assumed'])
 export const personInput = z.object({
   givenName: z.string().max(120), surname: z.string().max(120), maidenName: z.string().max(120), patronymic: z.string().max(120), otherNames: z.string().max(300).describe('Nicknames and other spellings'), sex: z.enum(['M', 'F', 'U']),
   birthDate: z.string().max(120).describe('Free text: "1890", "~1876", "12.03.1890", "1883 or 1886"'), birthPlace: z.string().max(200),
-  deathDate: z.string().max(120), deathPlace: z.string().max(200), living: z.boolean(), certainty,
+  deathDate: z.string().max(120), deathPlace: z.string().max(200), living: z.boolean(), keepPrivate: z.boolean().describe('Hide from readers like a living person, though dead'), certainty,
   tags: z.array(z.string().min(1).max(40)).max(30).describe('Groups or labels, e.g. "The Walkers", "Front line"'),
   facts: z.array(z.object({
     kind: z.string().max(80).describe('What happened: "Occupation", "Move", "Service"'),

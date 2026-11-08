@@ -21,7 +21,7 @@ export function PrintDialog({ graph, onClose }: { graph: Graph; onClose: () => v
   const [hideLiving, setHideLiving] = useState(true)
   const [busy, setBusy] = useState<number | null>(null)
 
-  const persons = useMemo(() => new Map(graph.persons.map((p) => (hideLiving && p.living ? hide(p) : p)).map((p) => [p.id, p])), [graph, hideLiving])
+  const persons = useMemo(() => new Map(graph.persons.map((p) => (hideLiving && (p.living || p.keepPrivate) ? hide(p) : p)).map((p) => [p.id, p])), [graph, hideLiving])
   const printed = useMemo(() => ({ ...graph, persons: [...persons.values()] }), [graph, persons])
   const layout = useMemo(() => layoutFamily(printed, { rootsBelow, print: true }), [printed, rootsBelow])
   const plan = useMemo(() => (mode === 'one' ? planOneSheet(layout, paper) : planSheets(layout, persons, sheet, namePt)), [mode, layout, persons, paper, sheet, namePt])

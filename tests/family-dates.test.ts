@@ -1,6 +1,6 @@
 // What the family's dates add up to. Invented people only.
 import { describe, expect, it } from 'vitest'
-import { comingDays, fanSlots, familyNumbers, lifeEvents } from '../lib/family-dates'
+import { comingDays, familyCalendar, fanSlots, familyNumbers, lifeEvents } from '../lib/family-dates'
 import type { Graph, Person } from '../lib/types'
 
 const person = (id: string, extra: Partial<Person> = {}): Person => ({ id, givenName: id, surname: 'Лис', maidenName: '', patronymic: '', otherNames: '', sex: 'U', birthDate: '', birthYear: null, birthPlace: '', deathDate: '', deathYear: null, deathPlace: '', living: false, certainty: 'documented', avatarMediaId: null, avatarCrop: null, updatedAt: 0, tags: [], facts: [], sources: [], claims: [], ...extra })
@@ -65,5 +65,21 @@ describe('the fan', () => {
   })
   it('has a place for a mother with no father known', () => {
     expect(fanSlots('x', { persons: [person('x'), person('m', { sex: 'F' })], parentChild: [link('m', 'x')], unions: [] }, 1)[1].map((p) => p?.id)).toEqual([undefined, 'm'])
+  })
+})
+
+describe('the calendar file', () => {
+  const ics = familyCalendar(graph, (k) => k, new Date(Date.UTC(2026, 10, 8)))
+  it('repeats each day every year, from the day itself', () => {
+    expect(ics).toContain('DTSTART;VALUE=DATE:18900312')
+    expect(ics).toContain('SUMMARY:Со дня рождения: дед Лис')
+    expect(ics).toContain('SUMMARY:День рождения: сын Лис')
+    expect(ics).toContain('SUMMARY:Годовщина свадьбы: дед Лис и бабка Лис')
+    expect(ics.match(/RRULE:FREQ=YEARLY/g)).toHaveLength(4)
+    expect(ics.startsWith('BEGIN:VCALENDAR\r\n')).toBe(true)
+  })
+  it('says nothing of someone hidden, and keeps names from breaking a line', () => {
+    expect(ics).not.toContain('скрытая')
+    expect(familyCalendar({ persons: [person('a,b;c', { birthDate: '01.02.1900', birthYear: 1900 })], parentChild: [], unions: [] }, (k) => k)).toContain('a\\,b\\;c')
   })
 })

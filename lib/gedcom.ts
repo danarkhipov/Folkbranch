@@ -7,6 +7,15 @@ export const FACT_TAGS: Record<string, [string, string]> = {
   OCCU: ['Профессия', 'Occupation'], RESI: ['Место жительства', 'Residence'], EDUC: ['Образование', 'Education'], RELI: ['Вероисповедание', 'Religion'],
   NATI: ['Национальность', 'Nationality'], TITL: ['Титул', 'Title'], CHR: ['Крещение', 'Christening'], BURI: ['Погребение', 'Burial'], CENS: ['Перепись', 'Census'],
   EMIG: ['Эмиграция', 'Emigration'], IMMI: ['Иммиграция', 'Immigration'], NATU: ['Подданство', 'Naturalization'],
+  // Gramps and webtrees write these too. Read only: on the way out the first tag above with the same name wins.
+  BAPM: ['Крещение', 'Baptism'], CONF: ['Конфирмация', 'Confirmation'], ORDN: ['Рукоположение', 'Ordination'], GRAD: ['Окончание учёбы', 'Graduation'],
+  RETI: ['Выход на пенсию', 'Retirement'], CREM: ['Кремация', 'Cremation'], WILL: ['Завещание', 'Will'], PROB: ['Наследство', 'Probate'],
+}
+
+/** What ASSO says one person was to another, in the archive's words. */
+const ASSOCIATES: Record<string, [string, string]> = {
+  godfather: ['Крёстный отец', 'Godfather'], godmother: ['Крёстная мать', 'Godmother'], godparent: ['Крёстный', 'Godparent'],
+  witness: ['Свидетель', 'Witness'], friend: ['Друг', 'Friend'], neighbor: ['Сосед', 'Neighbour'], neighbour: ['Сосед', 'Neighbour'],
 }
 
 export interface GedLine { level: number; xref?: string; tag: string; value: string; children: GedLine[] }
@@ -43,6 +52,9 @@ const MONTHS: Record<string, string> = { JAN: '01', FEB: '02', MAR: '03', APR: '
 
 /** "12 MAR 1890" → "12.03.1890", "ABT 1876" → "~1876", other values pass through. */
 export function fromGedDate(v: string): string {
+  // A period, as in a residence: FROM 1900 TO 1910.
+  const period = v.trim().match(/^FROM\s+(.+?)(?:\s+TO\s+(.+))?$/i) ?? v.trim().match(/^()TO\s+(.+)$/i)
+  if (period) return period[1] && period[2] ? `${fromGedDate(period[1])}–${fromGedDate(period[2])}` : period[1] ? `>${fromGedDate(period[1])}` : `<${fromGedDate(period[2])}`
   const range = v.trim().match(/^BET\s+(.+?)\s+AND\s+(.+)$/i)
   if (range) return `${fromGedDate(range[1])}–${fromGedDate(range[2])}`
   const bound = v.trim().match(/^(BEF|AFT)\s+(.+)$/i)
@@ -83,6 +95,8 @@ export interface ImportedPerson {
   deathDate: string
   deathPlace: string
   dead: boolean
+  /** RESN confidential or privacy: the family meant it kept from outsiders. */
+  keepPrivate: boolean
   /** Best QUAY among citations of the person's name, birth and death; null when none gives one. */
   quality: number | null
   notes: string[]
@@ -114,7 +128,7 @@ function uniqueSources(list: Source[]) {
 }
 
 /** What the importer reads; housekeeping tags say nothing about the family. */
-const READ_TAGS = new Set(['NAME', 'SEX', 'BIRT', 'DEAT', 'FAMC', 'FAMS', 'NOTE', 'SNOTE', 'SOUR', 'ADOP', 'EVEN', 'HUSB', 'WIFE', 'CHIL', 'MARR', 'DIV'])
+const READ_TAGS = new Set(['NAME', 'SEX', 'BIRT', 'DEAT', 'FAMC', 'FAMS', 'NOTE', 'SNOTE', 'SOUR', 'ADOP', 'EVEN', 'HUSB', 'WIFE', 'CHIL', 'MARR', 'DIV', 'RESN', 'ASSO'])
 const HOUSEKEEPING = new Set(['CHAN', 'RIN', 'REFN', 'UID', '_UID', 'CREA', 'RFN', 'AFN'])
 
 /** What a file holds that will not come across: said before importing, so nothing is lost silently. */
@@ -135,7 +149,13 @@ export function parseGedcom(text: string, lang: 'ru' | 'en' = 'ru'): Imported {
   const head = roots.find((r) => r.tag === 'HEAD')
   const version = (head && val(child(head, 'GEDC'), 'VERS')) || '?'
   const notes = new Map(roots.filter((r) => r.tag === 'SNOTE' || (r.tag === 'NOTE' && r.xref)).map((r) => [r.xref!, longText(r)]))
-  const sourceTitles = new Map(roots.filter((r) => r.tag === 'SOUR' && r.xref).map((r) => [r.xref!, val(r, 'TITL') || val(r, 'ABBR')]))
+  // The archive a source is kept in travels with its title: Gramps and webtrees put it in a REPO record.
+  const repos = new Map(roots.filter((r) => r.tag === 'REPO' && r.xref).map((r) => [r.xref!, val(r, 'NAME')]))
+  const sourceTitles = new Map(roots.filter((r) => r.tag === 'SOUR' && r.xref).map((r) => {
+    const title = val(r, 'TITL') || val(r, 'ABBR')
+    const repo = repos.get(val(r, 'REPO')) || ''
+    return [r.xref!, repo && title && !title.includes(repo) ? `${title} (${repo})` : title || repo]
+  }))
   const noteOf = (c: GedLine) => (c.value.startsWith('@') ? notes.get(c.value) ?? '' : longText(c))
 
   // Adoption is written on the child: 1 ADOP / 2 FAMC @F1@, or 1 FAMC / 2 PEDI adopted.
@@ -146,7 +166,11 @@ export function parseGedcom(text: string, lang: 'ru' | 'en' = 'ru'): Imported {
     const [given, patronymic] = splitPatronymic(val(name, 'GIVN') || (nm[1] ?? '').trim())
     const surn = val(name, 'SURN') || (nm[2] ?? '').trim()
     const birt = child(r, 'BIRT'), deat = child(r, 'DEAT')
-    const married = r.children.filter((c) => c.tag === 'NAME').map((c) => ({ type: val(c, 'TYPE').toLowerCase(), surn: val(c, 'SURN') || c.value.match(/\/([^/]*)\//)?.[1] || '' })).find((n) => n.type === 'married' || n.type === 'maiden')
+    const names = r.children.filter((c) => c.tag === 'NAME').map((c) => ({ line: c, type: val(c, 'TYPE').toLowerCase(), surn: val(c, 'SURN') || c.value.match(/\/([^/]*)\//)?.[1] || '' }))
+    const married = names.slice(1).find((n) => n.type === 'married' || n.type === 'maiden' || n.type === 'birth')
+    // Gramps writes the married surname as _MARNM under the main name, which then holds the one from birth.
+    const marnm = val(name, '_MARNM').trim()
+    const others = names.slice(1).filter((n) => n !== married).map((n) => n.line.value.replace(/\//g, '').replace(/\s+/g, ' ').trim()).filter(Boolean)
     for (const c of r.children) {
       if (c.tag === 'ADOP') { const f = val(c, 'FAMC'); if (f) adopted.add(`${r.xref}|${f}`) }
       if (c.tag === 'FAMC' && val(c, 'PEDI').toLowerCase() === 'adopted') adopted.add(`${r.xref}|${c.value}`)
@@ -155,16 +179,17 @@ export function parseGedcom(text: string, lang: 'ru' | 'en' = 'ru'): Imported {
     return {
       xref: r.xref ?? '',
       givenName: given,
-      surname: surn,
-      maidenName: married?.type === 'maiden' ? married.surn : '',
+      surname: marnm && marnm !== surn ? marnm : surn,
+      maidenName: marnm && marnm !== surn ? surn : married && married.type !== 'married' && married.surn !== surn ? married.surn : '',
       patronymic,
-      otherNames: val(name, 'NICK'),
+      otherNames: [val(name, 'NICK'), ...others].filter(Boolean).join(', '),
       sex: sex === 'M' ? 'M' : sex === 'F' ? 'F' : 'U',
       birthDate: fromGedDate(val(birt, 'DATE')),
       birthPlace: val(birt, 'PLAC'),
       deathDate: fromGedDate(val(deat, 'DATE')),
       deathPlace: val(deat, 'PLAC'),
       dead: !!deat,
+      keepPrivate: /^(confidential|privacy)$/i.test(val(r, 'RESN')),
       quality: bestQuality(r),
       notes: r.children.filter((c) => c.tag === 'NOTE' || c.tag === 'SNOTE').map(noteOf).filter(Boolean),
       facts: r.children
@@ -178,6 +203,18 @@ export function parseGedcom(text: string, lang: 'ru' | 'en' = 'ru'): Imported {
       sources: uniqueSources([...r.children, ...r.children.filter((c) => c.tag !== 'EVEN' && !(c.tag in FACT_TAGS)).flatMap((c) => c.children)].filter((c) => c.tag === 'SOUR').map((c) => ({ title: sourceTitles.get(c.value) ?? c.value, ...pageOf(val(c, 'PAGE')), url: val(c, 'WWW') || val(c, 'NOTE') })).filter((s) => s.title)),
     }
   })
+
+  // ASSO names someone else in the file: read once everyone has a name.
+  const named = new Map(persons.map((p) => [p.xref, [p.givenName, p.patronymic, p.surname].filter(Boolean).join(' ')]))
+  for (const r of roots.filter((x) => x.tag === 'INDI')) {
+    const person = persons.find((p) => p.xref === r.xref)!
+    for (const a of r.children.filter((c) => c.tag === 'ASSO')) {
+      const rela = val(a, 'RELA') || val(a, 'ROLE')
+      const kind = ASSOCIATES[rela.toLowerCase()]?.[lang === 'en' ? 1 : 0] || rela || (lang === 'en' ? 'Associate' : 'Связь')
+      const who = named.get(a.value)
+      if (who) person.facts.push({ kind, date: '', place: '', note: who })
+    }
+  }
 
   const families = roots.filter((r) => r.tag === 'FAM').map((r) => {
     const marr = child(r, 'MARR')
@@ -210,7 +247,7 @@ function factLines(f: Fact) {
 
 export function writeGedcom(graph: Graph, opts: { hideLiving: boolean; source: string; pageWord?: string }): string {
   const out = ['0 HEAD', `1 SOUR ${opts.source}`, '1 GEDC', '2 VERS 5.5.1', '2 FORM LINEAGE-LINKED', '1 CHAR UTF-8']
-  const hide = (p: Person) => opts.hideLiving && p.living
+  const hide = (p: Person) => opts.hideLiving && (p.living || !!p.keepPrivate)
   const xref = new Map(graph.persons.map((p, i) => [p.id, `@I${i + 1}@`]))
   const fams = new Map<string, { a?: string; b?: string; children: { id: string; adopted: boolean }[]; start: string; end?: string; place?: string; kind?: string }>()
   const famKey = (a: string, b?: string) => (b ? [a, b].sort().join('|') : a)
@@ -237,6 +274,8 @@ export function writeGedcom(graph: Graph, opts: { hideLiving: boolean; source: s
       if (p.otherNames) out.push(`2 NICK ${p.otherNames}`)
       if (p.maidenName) out.push(`1 NAME ${given} /${p.maidenName}/`, '2 TYPE maiden')
       out.push(`1 SEX ${p.sex}`)
+      // Read back by Folkbranch, Gramps and webtrees as kept from outsiders.
+      if (p.keepPrivate) out.push('1 RESN confidential')
       if (p.birthDate || p.birthPlace) {
         out.push('1 BIRT')
         if (p.birthDate) out.push(`2 DATE ${toGedDate(p.birthDate)}`)

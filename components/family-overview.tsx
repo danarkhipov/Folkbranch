@@ -2,7 +2,9 @@
 import { useMemo } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useApp } from '@/lib/client'
-import { comingDays, familyNumbers, type DayKind } from '@/lib/family-dates'
+import { CalendarPlus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { comingDays, familyCalendar, familyNumbers, type DayKind } from '@/lib/family-dates'
 import { personName } from '@/lib/types'
 
 const WORD: Record<DayKind, string> = {
@@ -15,6 +17,13 @@ export function FamilyOverview({ onClose }: { onClose: () => void }) {
   const days = useMemo(() => comingDays(graph), [graph])
   const numbers = useMemo(() => familyNumbers(graph), [graph])
   const open = (id: string) => { onClose(); focus(id, { center: true }) }
+  const calendarDays = useMemo(() => (familyCalendar(graph, t).match(/BEGIN:VEVENT/g) ?? []).length, [graph, t])
+  const saveCalendar = () => {
+    const url = URL.createObjectURL(new Blob([familyCalendar(graph, t)], { type: 'text/calendar' }))
+    const a = Object.assign(document.createElement('a'), { href: url, download: 'family-days.ics' })
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
   const name = (id: string) => { const p = byId.get(id); return p ? personName(p) || t('Без названия') : '' }
   const when = (month: number, day: number) => new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(Date.UTC(2024, month - 1, day))
   const soon = (n: number) => (n === 0 ? t('Сегодня') : n === 1 ? t('Завтра') : null)
@@ -28,7 +37,10 @@ export function FamilyOverview({ onClose }: { onClose: () => void }) {
           <DialogDescription className="text-ink-soft">{t('Памятные дни на ближайшие два месяца и семья в цифрах.')}</DialogDescription>
         </div>
         <section className="flex flex-col gap-1">
-          <h3 className="text-base font-medium">{t('Ближайшие даты')}</h3>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-base font-medium">{t('Ближайшие даты')}</h3>
+            <Button size="sm" variant="outline" disabled={!calendarDays} title={t(calendarDays ? 'Файл для календаря на телефоне или компьютере: дни рождения, годовщины и дни памяти каждый год.' : 'В календарь попадают даты с днём и месяцем, а таких пока нет.')} onClick={saveCalendar}><CalendarPlus /> {t('В календарь')}</Button>
+          </div>
           {!days.length && <p className="text-ink-soft">{t('В ближайшие два месяца дат нет. Сюда попадают даты, записанные с днём и месяцем, например 12.03.1890.')}</p>}
           <ul className="flex flex-col">
             {days.map((d, i) => (

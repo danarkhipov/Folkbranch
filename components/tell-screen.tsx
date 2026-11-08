@@ -20,6 +20,8 @@ export function TellScreen({ token, info, lang }: { token: string; info: { about
   const [error, setError] = useState('')
   const [url, setUrl] = useState('')
   const audio = rec.clip?.blob ?? file
+  const asked = info ? info.question.split('\n').map((q) => q.trim()).filter(Boolean) : []
+  const [topic, setTopic] = useState(0)
   useEffect(() => {
     document.documentElement.lang = lang
     if (!audio) return setUrl('')
@@ -36,6 +38,7 @@ export function TellScreen({ token, info, lang }: { token: string; info: { about
       const form = new FormData()
       form.set('audio', audio, file?.name ?? 'voice')
       if (rec.clip) form.set('seconds', String(rec.clip.seconds))
+      if (asked.length) form.set('topic', String(topic))
       const r = await fetch(`/api/tell/${token}`, { method: 'POST', body: form })
       if (!r.ok) throw new Error((await r.json().catch(() => null))?.error ?? String(r.status))
       setSent((n) => n + 1)
@@ -60,9 +63,20 @@ export function TellScreen({ token, info, lang }: { token: string; info: { about
         {sent > 0 && !audio && !rec.recording && <p role="status" className="rounded-2xl bg-muted p-4 font-medium">{t('Спасибо! Запись отправлена семье.')}</p>}
         <div>
           <h1 className="font-serif text-3xl font-medium break-anywhere">{info.tellerName ? `${info.tellerName}, ${t('расскажите, пожалуйста')}` : t('Расскажите, пожалуйста')}</h1>
-          <p className="mt-2 text-xl break-anywhere">{info.question || `${t('О ком')}: ${info.about}`}</p>
-          {info.question && <p className="mt-1 text-base text-ink-soft break-anywhere">{t('О ком')}: {info.about}</p>}
+          {asked.length === 1 && <p className="mt-2 text-xl break-anywhere">{asked[0]}</p>}
+          {asked.length === 0 && <p className="mt-2 text-xl break-anywhere">{t('О ком')}: {info.about}</p>}
+          {asked.length > 0 && <p className="mt-1 text-base text-ink-soft break-anywhere">{t('О ком')}: {info.about}</p>}
         </div>
+        {/* Several questions: one is chosen before each recording, so the family knows which answer this is. */}
+        {asked.length > 1 && !audio && !rec.recording && (
+          <div role="radiogroup" aria-label={t('О чём рассказать')} className="flex flex-col gap-2">
+            <p className="text-base text-ink-soft">{t('Выберите вопрос и запишите ответ. Потом можно ответить на следующий.')}</p>
+            {asked.map((q, i) => (
+              <button key={i} role="radio" aria-checked={topic === i} className={`min-h-14 rounded-2xl border px-4 py-2 text-left text-lg break-anywhere ${topic === i ? 'border-ink bg-white font-medium' : 'border-border bg-white/60'}`} onClick={() => setTopic(i)}>{q}</button>
+            ))}
+          </div>
+        )}
+        {asked.length > 1 && (audio || rec.recording) && <p className="text-lg font-medium break-anywhere">{asked[topic]}</p>}
 
         {rec.recording ? (
           <button className={`${big} bg-rust text-white`} onClick={rec.stop}><Square size={26} fill="currentColor" /> {t('Закончить')} · {clock(rec.seconds)}</button>
@@ -81,7 +95,7 @@ export function TellScreen({ token, info, lang }: { token: string; info: { about
         )}
         {rec.problem && !audio && <p role="alert" className="text-base">{t(rec.problem === 'denied' ? 'Браузер не дал доступ к микрофону. Можно записать голос в обычной программе на телефоне и выбрать файл.' : 'Здесь запись прямо в браузере не работает. Запишите голос в обычной программе на телефоне и выберите файл.')}</p>}
         {error && <p role="alert" className="text-base text-destructive">{error}</p>}
-        {!audio && !rec.recording && (
+        {!audio && !rec.recording && asked.length < 2 && (
           <div className="text-base text-ink-soft">
             <p className="font-medium">{t('Если не знаете, с чего начать:')}</p>
             <ul className="mt-1 list-disc pl-5">{TOPICS.map((k) => <li key={k}>{t(k)}</li>)}</ul>

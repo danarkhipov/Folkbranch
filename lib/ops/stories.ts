@@ -18,6 +18,7 @@ const fields = {
   toldOn: z.string().trim().max(60).default(''),
   about: z.array(z.string().max(40)).min(1).max(30),
   durationSec: z.number().int().min(0).max(86400).nullish(),
+  keepPrivate: z.boolean().optional(),
 }
 export const newStory = z.object(fields)
 const editStory = z.object({ ...fields, baseUpdatedAt: z.number() })
@@ -38,7 +39,7 @@ export function createStory(actor: Actor, x: z.infer<typeof newStory> & { audio?
   const now = Date.now()
   mutate(actor, { summary: `${personName(about[0])}: ${say('Рассказ')}${x.title ? ` «${x.title}»` : ''}`, personIds: about.map((p) => p.id) }, (c) => {
     if (x.audio) c.insert('media', x.audio as never)
-    c.insert('stories', { id, title: x.title, body: x.body, tellerName: x.tellerName, toldOn: x.toldOn, mediaId: x.audio?.id ?? null, durationSec: x.durationSec ?? null, createdBy: x.createdBy ?? actor.name, createdAt: now, updatedAt: now })
+    c.insert('stories', { id, keepPrivate: x.keepPrivate ?? false, title: x.title, body: x.body, tellerName: x.tellerName, toldOn: x.toldOn, mediaId: x.audio?.id ?? null, durationSec: x.durationSec ?? null, createdBy: x.createdBy ?? actor.name, createdAt: now, updatedAt: now })
     linkPeople(c, id, x.about, x.tellerId)
   })
   return { id }
@@ -84,7 +85,8 @@ function shape(actor: Actor, r: Row, links: { personId: string; role: string }[]
   const about = links.filter((l) => l.role === 'about').map((l) => l.personId)
   const tellerId = links.find((l) => l.role === 'teller')?.personId ?? null
   const base = { id: r.id, title: r.title, body: r.body, toldOn: r.toldOn, durationSec: r.durationSec, about, tellerId, createdAt: r.createdAt, updatedAt: r.updatedAt }
-  if (!seesOnlyPublic(actor)) return { ...base, tellerName: r.tellerName, createdBy: r.createdBy, hasAudio: !!r.mediaId }
+  if (!seesOnlyPublic(actor)) return { ...base, keepPrivate: r.keepPrivate, tellerName: r.tellerName, createdBy: r.createdBy, hasAudio: !!r.mediaId }
+  if (r.keepPrivate) return null
   const hidden = hiddenPeople(actor)
   if (links.some((l) => hidden.has(l.personId))) return null
   // A name with no card behind it may be a living person's, and so may a voice nobody can place.

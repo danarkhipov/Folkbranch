@@ -60,3 +60,16 @@ describe('asking for a story by a link', () => {
     await expect(requests.submitRecording(token, { buf: SOUND, name: 'v' }, null)).rejects.toThrow()
   })
 })
+
+describe('a link with several questions', () => {
+  it('keeps up to five, one a line, and names each recording by the one chosen', async () => {
+    const { token: many } = requests.createRequest(owner, { personId: aboutId, question: '  Где родились?\n\nКак жили?\nРаз\nДва\nТри\nЧетыре' })
+    expect(requests.requestInfo(many)!.question.split('\n')).toEqual(['Где родились?', 'Как жили?', 'Раз', 'Два', 'Три'])
+    await requests.submitRecording(many, { buf: SOUND, name: 'v' }, 5, 1)
+    await requests.submitRecording(many, { buf: SOUND, name: 'v' }, 5, 99)
+    for (const draft of proposals.listProposals(owner)) proposals.acceptProposal(owner, draft.id)
+    const titles = stories.listStories(owner, aboutId).map((s) => s.title)
+    expect(titles).toEqual(expect.arrayContaining(['Как жили?', 'Где родились?']))
+    expect(titles.filter((x) => x === 'Где родились?')).toHaveLength(1)
+  })
+})

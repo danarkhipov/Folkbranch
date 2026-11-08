@@ -128,3 +128,33 @@ export function fanSlots(rootId: string, graph: Graph, rings = 5): (Person | nul
   for (let g = 1; g <= rings; g++) levels.push(levels[g - 1].flatMap((p) => (p ? parentsOf(p.id) : [null, null])))
   return levels
 }
+
+const icsText = (s: string) => s.replace(/[\\;,]/g, (c) => `\\${c}`).replace(/\n/g, '\\n')
+const pad = (n: number) => String(n).padStart(2, '0')
+
+/**
+ * The family's days as a calendar file: each comes round every year. Built from what this person already sees, so a
+ * phone's calendar learns nothing the app would not show, and no link to the archive is left behind.
+ */
+export function familyCalendar(graph: Graph, t: (key: string) => string, stamp = new Date()): string {
+  const byId = new Map(graph.persons.map((p) => [p.id, p]))
+  const name = (p: Person) => personName(p) || t('Без названия')
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Folkbranch//Family days//EN', 'CALSCALE:GREGORIAN', `X-WR-CALNAME:${icsText(t('Семейные даты'))}`]
+  const now = `${stamp.getUTCFullYear()}${pad(stamp.getUTCMonth() + 1)}${pad(stamp.getUTCDate())}T000000Z`
+  const add = (uid: string, title: string, text: string) => {
+    const date = fullDate(text)
+    if (!date) return
+    const day = `${date.year}${pad(date.month)}${pad(date.day)}`
+    lines.push('BEGIN:VEVENT', `UID:${uid}@folkbranch`, `DTSTAMP:${now}`, `DTSTART;VALUE=DATE:${day}`, 'RRULE:FREQ=YEARLY', `SUMMARY:${icsText(title)}`, 'TRANSP:TRANSPARENT', 'END:VEVENT')
+  }
+  for (const p of graph.persons.filter(shown)) {
+    add(`b-${p.id}`, `${t(p.living ? 'День рождения' : 'Со дня рождения')}: ${name(p)}`, p.birthDate)
+    if (!p.living) add(`d-${p.id}`, `${t('День памяти')}: ${name(p)}`, p.deathDate)
+  }
+  for (const u of graph.unions) {
+    const a = byId.get(u.aId), b = byId.get(u.bId)
+    if (a && b && shown(a) && shown(b) && !u.endDate) add(`w-${u.id}`, `${t('Годовщина свадьбы')}: ${name(a)} ${t('и')} ${name(b)}`, u.startDate)
+  }
+  lines.push('END:VCALENDAR')
+  return lines.join('\r\n') + '\r\n'
+}

@@ -10,7 +10,7 @@ export function SwitchRow({ title, description, checked, disabled, onChange }: {
         <span className="text-sm text-ink">{title}</span>
         {description && <span className="text-xs leading-snug text-ink-soft">{description}</span>}
       </span>
-      <Primitive.Root checked={checked} disabled={disabled} onCheckedChange={onChange} className="relative mt-0.5 h-5 w-9 flex-none rounded-full bg-input outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40 data-[state=checked]:bg-ink">
+      <Primitive.Root aria-label={typeof title === 'string' ? title : undefined} checked={checked} disabled={disabled} onCheckedChange={onChange} className="relative mt-0.5 h-5 w-9 flex-none rounded-full bg-input outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40 data-[state=checked]:bg-ink">
         <Primitive.Thumb className="block size-4 translate-x-0.5 rounded-full bg-white shadow-sm transition-transform data-[state=checked]:translate-x-[18px]" />
       </Primitive.Root>
     </label>

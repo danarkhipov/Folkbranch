@@ -20,6 +20,8 @@ export interface Person {
   deathYear: number | null
   deathPlace: string
   living: boolean
+  /** Hidden from readers like the living. */
+  keepPrivate?: boolean
   certainty: Certainty
   avatarMediaId: string | null
   avatarCrop: string | null
@@ -193,6 +195,8 @@ export interface Story {
   about: string[]
   hasAudio: boolean
   durationSec: number | null
+  /** Seen by editors only; never sent to a reader. */
+  keepPrivate?: boolean
   createdBy: string
   createdAt: number
   updatedAt: number

@@ -2,16 +2,16 @@
 import { useContext, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import dynamic from 'next/dynamic'
-import { History, Maximize2, Minimize2, MoreHorizontal, PencilLine, Search, Trash2, X } from 'lucide-react'
+import { History, Maximize2, Minimize2, MoreHorizontal, PencilLine, Printer, Search, Trash2, X } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { api, Presence, useApp, usePersonSave } from '@/lib/client'
+import { api, avatarUrl, Presence, useApp, usePersonSave } from '@/lib/client'
 import { yourTerm } from '@/lib/kinship'
 import { editValue,  } from '@/lib/claims'
 import { patronymicFrom } from '@/lib/names'
 import { normal } from '@/lib/search/words'
 import { cn } from '@/lib/utils'
-import { personName, type ClaimField, type HistoryEntry, type PageMeta, type Person } from '@/lib/types'
+import { personName, type ClaimField, type HistoryEntry, type PageMeta, type Person, type Story } from '@/lib/types'
 import { PanelEdge, useStoredSize } from './panel-size'
 import { MatchLine, useEsc, type SearchHit } from './person-pickers'
 import { Field, SearchTerms } from './person-fields'
@@ -122,6 +122,28 @@ export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { pe
   const [addPatronymic, setAddPatronymic] = useState(false)
   const [suggesting, setSuggesting] = useState(false)
   const [menu, setMenu] = useState(false)
+  /** The card on paper: built from what this person may see, printed from a frame so the app stays as it is. */
+  const printSheet = async () => {
+    try {
+      const { personSheet } = await import('@/lib/person-sheet')
+      const list = await api<PageMeta[]>(`persons/${person.id}/pages`).catch(() => [] as PageMeta[])
+      const pages = await Promise.all(list.map(async (m) => { const p = await api<{ title: string; content: string }>(`pages/${m.id}`); return { title: p.title, content: JSON.parse(p.content || '[]') } }))
+      const stories = await api<Story[]>(`persons/${person.id}/stories`).catch(() => [] as Story[])
+      const html = personSheet({ person, graph, pages, stories, avatar: avatarUrl(person), t, lang })
+      const frame = document.createElement('iframe')
+      frame.style.cssText = 'position:fixed;width:0;height:0;border:0;right:0;bottom:0'
+      frame.srcdoc = html
+      frame.onload = async () => {
+        const doc = frame.contentDocument!
+        await Promise.all([...doc.images].map((i) => (i.complete ? null : new Promise((r) => { i.onload = i.onerror = r }))))
+        frame.contentWindow!.print()
+        setTimeout(() => frame.remove(), 60_000)
+      }
+      document.body.append(frame)
+    } catch {
+      notify(t('Не получилось подготовить лист. Попробуйте ещё раз.'))
+    }
+  }
   // Beside the buttons a long name would break inside its words, so it takes a line of its own.
   const longName = personName(person).length > 28
 
@@ -149,10 +171,11 @@ export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { pe
           </div>
         </div>
         <div className="sticky top-0 z-10 flex flex-none gap-0.5 -mt-1 ml-auto rounded-lg bg-[#fffdf8]">
-          {(canEdit || !me.guest) && (
+          {(
             <Popover open={menu} onOpenChange={setMenu}>
               <PopoverTrigger asChild><button className="bar-btn !p-0 w-7 !h-7" aria-label={t('Ещё')} title={t('Ещё')}><MoreHorizontal size={15} /></button></PopoverTrigger>
               <PopoverContent align="end" className="flex w-56 flex-col gap-0.5 p-1.5 text-sm">
+                <button className="flex min-h-9 items-center gap-2 rounded-md px-2 text-left hover:bg-muted" onClick={() => { setMenu(false); void printSheet() }}><Printer size={15} className="text-ink-soft" /> {t('Распечатать или сохранить в PDF')}</button>
                 {!me.guest && <button className="flex min-h-9 items-center gap-2 rounded-md px-2 text-left hover:bg-muted" onClick={() => { setMenu(false); setTab('history') }}><History size={15} className="text-ink-soft" /> {t('История изменений')}</button>}
                 {canEdit && <button className="flex min-h-9 items-center gap-2 rounded-md px-2 text-left text-destructive hover:bg-muted" onClick={() => { setMenu(false); onDelete(person.id) }}><Trash2 size={15} /> {t('Удалить человека')}</button>}
               </PopoverContent>

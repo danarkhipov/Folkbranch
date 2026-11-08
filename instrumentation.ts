@@ -11,6 +11,13 @@ export async function register() {
   sweepArchiveLeftovers().catch(console.error)
   const { tidyDatabase } = await import('./lib/db')
   setInterval(tidyDatabase, 6 * 60 * 60 * 1000).unref()
+  // A daily copy of the database, checked each hour; the first a few minutes after start, once things are quiet.
+  const { autoBackupOn, runAutoBackup } = await import('./lib/ops/auto-backup')
+  if (autoBackupOn()) {
+    const tick = () => runAutoBackup().catch((e) => console.error('Daily copy failed:', e))
+    setTimeout(tick, 5 * 60 * 1000).unref()
+    setInterval(tick, 60 * 60 * 1000).unref()
+  }
   if (hasUsers()) return
   const code = setupCode()
   const { publicOrigins, publicUrl } = await import('./lib/public-url')

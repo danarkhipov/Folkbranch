@@ -87,6 +87,8 @@ export const persons = sqliteTable('persons', {
   deathYear: integer('death_year'),
   deathPlace: text('death_place').notNull().default(''),
   living: integer('living', { mode: 'boolean' }).notNull().default(true),
+  // Kept from readers, guests and read-only agents like the living, whatever the dates say.
+  keepPrivate: integer('keep_private', { mode: 'boolean' }).notNull().default(false),
   certainty: text('certainty').notNull().default('family'),
   avatarMediaId: text('avatar_media_id'),
   avatarCrop: text('avatar_crop'),
@@ -261,6 +263,8 @@ export const stories = sqliteTable('stories', {
   toldOn: text('told_on').notNull().default(''),
   mediaId: text('media_id'),
   durationSec: integer('duration_sec'),
+  // For the editors only: a reader never learns it exists.
+  keepPrivate: integer('keep_private', { mode: 'boolean' }).notNull().default(false),
   createdBy: text('created_by').notNull().default(''),
   createdAt: integer('created_at').notNull().default(0),
   updatedAt: integer('updated_at').notNull().default(0),

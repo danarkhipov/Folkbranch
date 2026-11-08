@@ -6,7 +6,7 @@ import { Actor, Changes, can, mutate, newId, OpError, requireRole, seesOnlyPubli
 import { say } from './app-config'
 import { reconcile } from './merge'
 import { subgraph } from '../graph/select'
-import { hiddenFor, hiddenIn, maskPerson } from './privacy'
+import { hiddenFor, hiddenIn, isPrivate, maskPerson } from './privacy'
 
 export { hiddenFor }
 
@@ -46,7 +46,7 @@ function deepFreeze(o: unknown) {
 }
 
 /** One masked copy of each living person per change, however many readers ask. */
-const maskedOf = (entry: GraphEntry) => (entry.hidden ??= new Map(entry.graph.persons.filter((p) => p.living).map((p) => [p.id, maskPerson(p)])))
+const maskedOf = (entry: GraphEntry) => (entry.hidden ??= new Map(entry.graph.persons.filter(isPrivate).map((p) => [p.id, maskPerson(p)])))
 
 function maskedGraph(actor: Actor): Graph {
   const entry = wholeGraph()
@@ -99,6 +99,7 @@ export interface PersonInput {
   deathDate?: string
   deathPlace?: string
   living?: boolean
+  keepPrivate?: boolean
   certainty?: Certainty
   tags?: string[]
   facts?: Fact[]
@@ -199,7 +200,7 @@ export function addUnion(c: Changes, aId: string, bId: string, kind: UnionKind =
 
 export const FIELD: Record<string, string> = {
   givenName: 'Имя', surname: 'Фамилия', maidenName: 'Девичья фамилия', patronymic: 'Отчество', otherNames: 'Другие имена', tags: 'Название группы', facts: 'Факты', sources: 'Источники', claims: 'Версии', sex: 'Пол', birthDate: 'Рождение', birthPlace: 'Место рождения',
-  deathDate: 'Смерть', deathPlace: 'Место смерти', living: 'Жив', certainty: 'Уверенность',
+  deathDate: 'Смерть', deathPlace: 'Место смерти', living: 'Жив', keepPrivate: 'Скрыт от читателей', certainty: 'Уверенность',
 }
 
 export function updatePerson(actor: Actor, id: string, input: PersonInput, seen?: Record<string, unknown>) {
