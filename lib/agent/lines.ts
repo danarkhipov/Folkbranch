@@ -48,16 +48,17 @@ export function lineOf(id: string, lines: Line[]) {
 
 /** The lines we have tested, by service. The first of each is the default. Services without a line keep the model chosen at connection. */
 export const LINES: Partial<Record<PresetId, Line[]>> = {
+  // Through OpenRouter, 9 November 2026, 97 scenarios each (docs/MODEL_BENCHMARK.md). Qwen 3.7 Flash passed 72 and is not offered.
   openrouter: [
-    { match: /^z-ai\/glm-(\d+(?:\.\d+)*)-flash$/, floor: 'z-ai/glm-5.3-flash', status: 'provisional' },
-    { match: /^deepseek\/deepseek-v(\d+(?:\.\d+)*)-flash(?:-\d+)?$/, floor: 'deepseek/deepseek-v4.1-flash-1017', status: 'provisional' },
-    { match: /^qwen\/qwen(\d+(?:\.\d+)*)-flash$/, floor: 'qwen/qwen3.7-flash', status: 'provisional' },
-    { match: /^minimax\/minimax-m(\d+(?:\.\d+)*)-flash$/, floor: 'minimax/minimax-m3.1-flash', status: 'provisional' },
-    { match: /^openai\/gpt-(\d+(?:\.\d+)*)-luna$/, floor: 'openai/gpt-6-luna', status: 'provisional' },
-    { match: /^anthropic\/claude-haiku-(\d+(?:\.\d+)*)$/, floor: 'anthropic/claude-haiku-5.5', status: 'provisional' },
+    { match: /^openai\/gpt-(\d+(?:\.\d+)*)-luna$/, floor: 'openai/gpt-6-luna', status: 'tested' },
+    { match: /^deepseek\/deepseek-v(\d+(?:\.\d+)*)-flash(?:-\d+)?$/, floor: 'deepseek/deepseek-v4.1-flash-1017', status: 'tested' },
+    { match: /^minimax\/minimax-m(\d+(?:\.\d+)*)-flash$/, floor: 'minimax/minimax-m3.1-flash', status: 'tested' },
+    { match: /^z-ai\/glm-(\d+(?:\.\d+)*)-flash$/, floor: 'z-ai/glm-5.3-flash', status: 'tested' },
+    { match: /^anthropic\/claude-haiku-(\d+(?:\.\d+)*)$/, floor: 'anthropic/claude-haiku-5.5', status: 'tested' },
   ],
-  anthropic: [{ match: /^claude-haiku-(\d+(?:-\d+)*)$/, floor: 'claude-haiku-5-5', status: 'provisional' }],
-  openai: [{ match: /^gpt-(\d+(?:[.-]\d+)*)-luna$/, floor: 'gpt-6-luna', status: 'provisional' }],
+  // The same models as above, reached directly: the test ran through OpenRouter.
+  anthropic: [{ match: /^claude-haiku-(\d+(?:-\d+)*)$/, floor: 'claude-haiku-5-5', status: 'tested' }],
+  openai: [{ match: /^gpt-(\d+(?:[.-]\d+)*)-luna$/, floor: 'gpt-6-luna', status: 'tested' }],
   google: [{ match: /^gemini-(\d+(?:\.\d+)*)-flash-lite$/, floor: 'gemini-3.1-flash-lite', status: 'provisional' }],
 }
 

@@ -25,14 +25,31 @@ the service lists one.
 
 ## Status
 
-The lines in `lib/agent/lines.ts` are marked `provisional` until their run is recorded below. A `provisional` line is the
+The lines in `lib/agent/lines.ts` are marked `tested` once their run is recorded below, `provisional` before. A `provisional` line is the
 service's cheap default as chosen by hand, not a tested recommendation.
 
-| Line | Floor | Status | Passes | Cost of the run | Date |
-|---|---|---|---|---|---|
-| (no full run recorded yet) | | | | | |
+Run of 9 November 2026: all 97 scenarios of `scripts/agent-check.sh`, each model on a fresh instance with the invented family, through
+OpenRouter, a stop at $0.40 each (counted from tokens). Raw logs are in `docs/benchmarks/2026-11-09/`.
 
-Pilot, 9 November 2026: `qwen/qwen3.7-flash` through OpenRouter on three scenarios (a kinship question, an add with confirmation, a prompt-injection trap): 3 of 3 passed. About 23,700 input tokens and 700 to 2,100 output tokens per scenario, 74% of the input served from cache; $0.0013 counted from tokens, $0.0003 on the provider's own counter. It measures cost, not quality: three scenarios do not rank a model.
+| Line (floor) | Passed | Cost of all 97 | Notes |
+|---|---|---|---|
+| `deepseek/deepseek-v4.1-flash-1017` | 95 of 97 | about $0.05 | The cheapest of the best. OpenRouter marks DeepSeek's host as one that may train on prompts |
+| `minimax/minimax-m3.1-flash` | 95 of 97 | about $0.16 | |
+| `z-ai/glm-5.3-flash` | 94 of 97 | about $0.09 | Two scenarios took over 90 seconds (about 16,000 words of thinking each) |
+| `openai/gpt-6-luna` | 93 of 97 | about $0.06 | Default: tested, cheap, and OpenAI does not learn from API requests. First pass: 58 scenarios were refused by the app's own limit of 30 requests a minute, which a fast model hits; those were run again with the limit lifted (`AGENT_PER_MINUTE`) |
+| `anthropic/claude-haiku-5.5` | 93 of 97 | about $0.17 | |
+| `qwen/qwen3.7-flash` | 72 of 97 | about $0.05 | **Not offered.** Many answers came back empty after the tools had run, and three runs ended in a server error |
+
+Costs add up to about $0.58 by tokens; the provider's own counter showed under $0.65 for the whole day, including the pilot.
+
+What failed, for the four models that passed 93 to 95: asking again before a bulk change (Haiku: only one of four people was rolled back), saying that hidden
+people exist when asked for someone hidden (Haiku, DeepSeek), recording a marriage date, importing a text with an impossible parent (Haiku), refusing
+a deletion (MiniMax), and several import chains (Luna). The checks look for the words and the final state of the archive, so a few of these are
+wording the check did not expect: read the logs before drawing a conclusion about any single scenario.
+
+Limits of this run: one pass per model, so a difference of one or two scenarios is noise; the scenarios are Russian; the models were
+reached through OpenRouter, so the direct Anthropic and OpenAI lines in the app use the same models but were not run directly. The Google line and the
+free plans (Groq, Gemini) have not been run: they stay `provisional`.
 
 ## Free plans
 

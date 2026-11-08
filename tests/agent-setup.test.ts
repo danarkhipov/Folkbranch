@@ -54,7 +54,7 @@ describe('connecting', () => {
   it('a good key is stored encrypted, turns the assistant on, and is used', async () => {
     stub(() => answer(200, { data: {} }))
     const status = await connectProvider(owner, { provider: 'openrouter', key: `  ${KEY}\n` })
-    expect(status).toEqual({ connected: true, autoPossible: true, auto: true, provider: 'openrouter', label: 'OpenRouter', model: 'z-ai/glm-5.3-flash', source: 'app', keyEnding: '1234' })
+    expect(status).toEqual({ connected: true, autoPossible: true, auto: true, provider: 'openrouter', label: 'OpenRouter', model: 'openai/gpt-6-luna', source: 'app', keyEnding: '1234' })
     expect(JSON.stringify(getDb().select().from(schema.settings).all())).not.toContain(KEY)
     expect(getSetting('assistantEnabled')).toBe('1')
     expect(currentProvider()).toMatchObject({ id: 'openrouter', key: KEY })
@@ -62,22 +62,22 @@ describe('connecting', () => {
   })
   it('moves to the newest model of the tested line by itself, never to an older one, and leaves a hand-picked model alone', async () => {
     const list = (ids: string[]) => answer(200, { data: ids.map((id) => ({ id, name: id, created: 1, supported_parameters: ['tools'], architecture: { input_modalities: ['text'], output_modalities: ['text'] }, pricing: { prompt: '0', completion: '0' } })) })
-    stub(() => list(['z-ai/glm-5.3-flash', 'z-ai/glm-5.2-flash', 'z-ai/glm-6.0-flash', 'z-ai/glm-6.0-flash-air']))
+    stub(() => list(['openai/gpt-6-luna', 'openai/gpt-5-luna', 'openai/gpt-6.5-luna', 'openai/gpt-6.5-luna-pro']))
     const status = await connectProvider(owner, { provider: 'openrouter', key: KEY })
-    expect(status.model).toBe('z-ai/glm-6.0-flash')
+    expect(status.model).toBe('openai/gpt-6.5-luna')
     // Next year: the service lists a newer one, and the app moves to it when it next looks.
-    stub(() => list(['z-ai/glm-6.0-flash', 'z-ai/glm-7.1-flash']))
+    stub(() => list(['openai/gpt-6.5-luna', 'openai/gpt-7-luna']))
     const { refreshAutoModel } = await import('../lib/agent/provider-key')
     await refreshAutoModel(true)
-    expect(providerStatus(owner).model).toBe('z-ai/glm-7.1-flash')
+    expect(providerStatus(owner).model).toBe('openai/gpt-7-luna')
     // A model chosen by hand stays, whatever comes out.
-    await chooseModel(owner, { model: 'z-ai/glm-6.0-flash' })
-    stub(() => list(['z-ai/glm-9.0-flash']))
+    await chooseModel(owner, { model: 'openai/gpt-6.5-luna' })
+    stub(() => list(['openai/gpt-9-luna']))
     await refreshAutoModel(true)
-    expect(providerStatus(owner)).toMatchObject({ model: 'z-ai/glm-6.0-flash', auto: false })
+    expect(providerStatus(owner)).toMatchObject({ model: 'openai/gpt-6.5-luna', auto: false })
     // And back to automatic on request.
-    stub(() => list(['z-ai/glm-9.0-flash']))
-    expect((await chooseModel(owner, { auto: true })).model).toBe('z-ai/glm-9.0-flash')
+    stub(() => list(['openai/gpt-9-luna']))
+    expect((await chooseModel(owner, { auto: true })).model).toBe('openai/gpt-9-luna')
   })
   it('the key is never given back', async () => {
     stub(() => answer(200, { data: {} }))

@@ -4,8 +4,9 @@ import { compare, lineOf, LINES, newestOfLine, versionOf } from '../lib/agent/li
 
 const flashLite = LINES.google![0]
 const haiku = LINES.anthropic![0]
-const glm = LINES.openrouter![0]
-const deepseek = LINES.openrouter![1]
+const lineOfFloor = (floor: string) => LINES.openrouter!.find((l) => l.floor === floor)!
+const glm = lineOfFloor('z-ai/glm-5.3-flash')
+const deepseek = lineOfFloor('deepseek/deepseek-v4.1-flash-1017')
 
 describe('model lines', () => {
   it('reads the version out of an id, written with dots or dashes', () => {

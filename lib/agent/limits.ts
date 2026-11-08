@@ -1,7 +1,8 @@
 // Every answer spends the owner's key, whoever asked, so nobody can run it down unnoticed.
 import { getSetting, say, setSetting } from '../ops/settings'
 
-const PER_MINUTE = 30
+// A fast model answers in rounds, a conversation can need many; the benchmark raises this, a family archive never needs to.
+const PER_MINUTE = Number(process.env.AGENT_PER_MINUTE) || 30
 const dayKey = () => `agentTokens:${new Date().toISOString().slice(0, 10)}`
 const dailyLimit = () => Number(process.env.AGENT_DAILY_TOKENS) || 5_000_000
 const recent = new Map<string, number[]>()
