@@ -40,8 +40,6 @@ export function parseLines(text: string): GedLine[] {
 }
 
 const child = (l: GedLine, tag: string) => l.children.find((c) => c.tag === tag)
-const val = (l: GedLine | undefined, tag: string) => (l && child(l, tag)?.value.trim()) || ''
-
 /** A text value together with its continuation lines. */
 function longText(l: GedLine) {
   let out = l.value
@@ -51,6 +49,9 @@ function longText(l: GedLine) {
   }
   return out.replace(/@@/g, '@').trim()
 }
+
+/** The text of a tag with its CONT and CONC lines: a long value is written over several lines, and each of them counts. */
+const val = (l: GedLine | undefined, tag: string) => { const c = l && child(l, tag); return (c && longText(c)) || '' }
 
 const MONTHS: Record<string, string> = { JAN: '01', FEB: '02', MAR: '03', APR: '04', MAY: '05', JUN: '06', JUL: '07', AUG: '08', SEP: '09', OCT: '10', NOV: '11', DEC: '12' }
 
@@ -204,13 +205,13 @@ export function parseGedcom(text: string, lang: 'ru' | 'en' = 'ru'): Imported {
         .filter((c) => c.tag === 'EVEN' || c.tag in FACT_TAGS)
         .map((c) => {
           const source = c.children.find((x) => x.tag === 'SOUR')
-          const note = [c.value, ...c.children.filter((x) => x.tag === 'NOTE' || x.tag === 'SNOTE').map(noteOf)].filter(Boolean).join('\n')
+          const note = [longText(c), ...c.children.filter((x) => x.tag === 'NOTE' || x.tag === 'SNOTE').map(noteOf)].filter(Boolean).join('\n')
           // GEDCOM 7 names those present at an event under it: godparents at a baptism, witnesses at a wedding.
           const people = c.children.filter((x) => x.tag === 'ASSO').map((x) => ({ personId: x.value.startsWith('@') ? x.value : null, name: x.value.startsWith('@') ? '' : x.value, role: roleWord(val(child(x, 'ROLE'), 'PHRASE') || val(x, 'ROLE') || val(x, 'RELA'), lang) }))
-          return { kind: val(c, 'TYPE') || FACT_TAGS[c.tag]?.[lang === 'en' ? 1 : 0] || (lang === 'en' ? 'Event' : 'Событие'), date: fromGedDate(val(c, 'DATE')), place: val(c, 'PLAC'), note, source: source ? sourceTitles.get(source.value) ?? source.value : '', ...(people.length ? { people } : {}) }
+          return { kind: val(c, 'TYPE') || FACT_TAGS[c.tag]?.[lang === 'en' ? 1 : 0] || (lang === 'en' ? 'Event' : 'Событие'), date: fromGedDate(val(c, 'DATE')), place: val(c, 'PLAC'), note, source: source ? sourceTitles.get(source.value) ?? longText(source) : '', ...(people.length ? { people } : {}) }
         }),
       // Citations on an event stay with its fact; the rest are about the person.
-      sources: uniqueSources([...r.children, ...r.children.filter((c) => c.tag !== 'EVEN' && !(c.tag in FACT_TAGS)).flatMap((c) => c.children)].filter((c) => c.tag === 'SOUR').map((c) => ({ title: sourceTitles.get(c.value) ?? c.value, ...pageOf(val(c, 'PAGE')), url: val(c, 'WWW') || val(c, 'NOTE') })).filter((s) => s.title)),
+      sources: uniqueSources([...r.children, ...r.children.filter((c) => c.tag !== 'EVEN' && !(c.tag in FACT_TAGS)).flatMap((c) => c.children)].filter((c) => c.tag === 'SOUR').map((c) => ({ title: sourceTitles.get(c.value) ?? longText(c), ...pageOf(val(c, 'PAGE')), url: val(c, 'WWW') || val(c, 'NOTE') })).filter((s) => s.title)),
     }
   })
 
@@ -245,6 +246,12 @@ export function parseGedcom(text: string, lang: 'ru' | 'en' = 'ru'): Imported {
   return { version, persons, families }
 }
 
+/** A tag with a text that may run over several lines. */
+function textLines(level: number, tag: string, text: string) {
+  const [first, ...rest] = text.split('\n')
+  return [`${level} ${tag} ${first}`, ...rest.map((l) => `${level + 1} CONT ${l}`)]
+}
+
 function factLines(f: Fact, xrefOf?: (id: string) => string | undefined) {
   const tag = Object.entries(FACT_TAGS).find(([, names]) => names.includes(f.kind))?.[0]
   // GEDCOM has no place for a unit or a godparent without a card here, so they ride in the note, as words.
@@ -254,7 +261,7 @@ function factLines(f: Fact, xrefOf?: (id: string) => string | undefined) {
   if (!tag && f.kind) lines.push(`2 TYPE ${f.kind}`)
   if (f.date) lines.push(`2 DATE ${toGedDate(f.date)}`)
   if (f.place) lines.push(`2 PLAC ${f.place}`)
-  if (f.source) lines.push(`2 SOUR ${f.source}`)
+  if (f.source) lines.push(...textLines(2, 'SOUR', f.source))
   for (const x of f.people ?? []) if (x.personId && xrefOf?.(x.personId)) lines.push(`2 ASSO ${xrefOf(x.personId)}`, `3 ROLE OTHER`, `4 PHRASE ${x.role}`)
   return lines
 }
@@ -305,10 +312,10 @@ export function writeGedcom(graph: Graph, opts: { hideLiving: boolean; source: s
       }
       for (const f of p.facts) out.push(...factLines(f, (id) => { const q = people.get(id); return q && !hide(q) ? xref.get(id) : undefined }))
       for (const s of p.sources) {
-        out.push(`1 SOUR ${s.title}`)
+        out.push(...textLines(1, 'SOUR', s.title))
         const page = [s.ref, s.page && `${opts.pageWord ?? 'л.'} ${s.page}`].filter(Boolean).join(', ')
-        if (page) out.push(`2 PAGE ${page}`)
-        if (s.url) out.push(`2 NOTE ${s.url}`)
+        if (page) out.push(...textLines(2, 'PAGE', page))
+        if (s.url) out.push(...textLines(2, 'NOTE', s.url))
       }
     }
     famList.forEach((f, i) => {

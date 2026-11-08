@@ -156,4 +156,37 @@ describe('what will not come across', () => {
     const text = '0 HEAD\n0 @I1@ INDI\n1 NAME Анна /Лес/\n1 BIRT\n2 DATE 1900\n1 OBJE @M1@\n1 OBJE @M2@\n1 _WEIRD x\n1 CHAN\n0 @F1@ FAM\n1 HUSB @I1@\n0 TRLR'
     expect(unreadTags(text)).toEqual([{ tag: 'OBJE', count: 2 }, { tag: '_WEIRD', count: 1 }])
   })
+
+  it('reads an event, a source and a page that run over several lines, with the spaces at the joins', () => {
+    const text = `0 HEAD
+0 @I1@ INDI
+1 NAME Клавдия /Волынкина/
+1 EVEN Первая строка, потом
+2 CONT вторая строка и
+2 CONC  склеенная часть для
+2 CONC  Клавдии
+2 TYPE Рассказ
+2 DATE 1930
+2 SOUR Метрическая книга
+3 CONT церкви села Ивановки
+3 PAGE ф. 12, оп. 3,
+4 CONT д. 45, л. 7
+1 SOUR Ревизская сказка
+2 PAGE строка один
+3 CONT строка два
+0 TRLR`
+    const [p] = parseGedcom(text).persons
+    expect(p.facts[0].note).toBe('Первая строка, потом\nвторая строка и склеенная часть для Клавдии')
+    expect(p.facts[0].source).toBe('Метрическая книга\nцеркви села Ивановки')
+    expect(p.sources.map((s) => s.title)).toContain('Ревизская сказка')
+    expect(p.sources.find((s) => s.title === 'Ревизская сказка')).toMatchObject({ ref: 'строка один\nстрока два' })
+  })
+
+  it('writes a long text over lines again, so a round trip keeps all of it', () => {
+    const g = parseGedcom('0 HEAD\n0 @I1@ INDI\n1 NAME А /Б/\n1 EVEN раз\n2 CONT два\n2 TYPE Рассказ\n2 SOUR Книга\n3 CONT вторая\n0 TRLR')
+    const person = { id: 'a', givenName: 'А', surname: 'Б', patronymic: '', maidenName: '', otherNames: '', sex: 'U', living: true, birthDate: '', birthPlace: '', deathDate: '', deathPlace: '', tags: [], facts: g.persons[0].facts, sources: [], claims: [] }
+    const out = writeGedcom({ persons: [person], parentChild: [], unions: [] } as never, { hideLiving: false, source: 'T' })
+    const [back] = parseGedcom(out).persons
+    expect(back.facts[0]).toMatchObject({ note: 'раз\nдва', source: 'Книга\nвторая' })
+  })
 })
