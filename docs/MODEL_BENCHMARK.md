@@ -30,7 +30,9 @@ service's cheap default as chosen by hand, not a tested recommendation.
 
 | Line | Floor | Status | Passes | Cost of the run | Date |
 |---|---|---|---|---|---|
-| (no run recorded yet) | | | | | |
+| (no full run recorded yet) | | | | | |
+
+Pilot, 9 November 2026: `qwen/qwen3.7-flash` through OpenRouter on three scenarios (a kinship question, an add with confirmation, a prompt-injection trap): 3 of 3 passed. About 23,700 input tokens and 700 to 2,100 output tokens per scenario, 74% of the input served from cache; $0.0013 counted from tokens, $0.0003 on the provider's own counter. It measures cost, not quality: three scenarios do not rank a model.
 
 ## Free plans
 
