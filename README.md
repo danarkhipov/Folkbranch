@@ -68,7 +68,7 @@ Backups, updates, servers and Railway: the [self-hosting guide](docs/SELF_HOSTIN
 
 **A page for every relative**
 - A block editor with headings, photos in the text and links to other relatives.
-- A life in order, read from the card: birth, marriage, children, facts and death.
+- A life in order, read from the card: birth, marriage, children, facts and death, and its places on a map.
 - Disagreeing versions of a date or place, each with its source, so nothing is overwritten.
 - Facts with fields of their own (a unit and rank for military service), and the people at an event in their roles: godparents, witnesses, a priest.
 - Sources with the record number, the document's date, a transcription and the archive that keeps it.
@@ -121,7 +121,7 @@ Folkbranch is for a family keeping its history together on a server of its own. 
 | **Where they go further** | | | |
 | Charts | Whole family on one screen, or a person's ancestors or descendants. Ancestor fan, relationship path, PDF | ✓ Ancestors, descendants, hourglass, fan, relationships | ✓ Fan, hourglass, relationships and more |
 | Reports and books | The chart and a person's page in PDF. The assistant drafts a life story from the sources, for you to review | ✓ Many reports | ✓ Many reports |
-| Maps and timelines | A life in order on each card. Places have a point that opens on OpenStreetMap, no map in the app | ✓ Maps and timelines | ✓ Maps and timelines |
+| Maps and timelines | ✓ The family's places on a map, and each life's places in order. The map shows once this device allows OpenStreetMap | ✓ Maps and timelines | ✓ Maps and timelines |
 | Reading documents | ✓ The assistant reads scans, handwriting included, and proposes what they show with the document as the source. Needs a model that sees pictures | ✓ Tesseract on the server | ✗ |
 | DNA | ✗ | ✓ Matches, chromosome browser, Y-DNA | Stores DNA notes only |
 
@@ -129,7 +129,7 @@ Checked on 8 November 2026 against the code and official documentation: Gramps W
 
 ¹ Our own measurement, under a 256 MB limit with 8 uploads, 40 page views and an import. We have not measured the others on the same work, so no figures are given for them.
 
-**Choose Gramps Web** if you use Gramps Desktop, need maps, DNA or many kinds of reports, or want someone to host it for you.
+**Choose Gramps Web** if you use Gramps Desktop, need DNA or many kinds of reports, or want someone to host it for you.
 **Choose webtrees** if you publish your research for others, need fine access rules, several trees, modules or many languages.
 **Choose Folkbranch** if the archive is for the family: running on a small machine in one command, relatives joining from their phones without passwords, and AI that only proposes.
 
@@ -155,7 +155,7 @@ On purpose, because it needs what a family server does not have:
 
 Not yet, and maybe later:
 
-- No maps, no reports beyond the chart and a person's page in PDF. A family book is on the [roadmap](docs/ROADMAP.md).
+- No reports beyond the chart and a person's page in PDF. A family book is on the [roadmap](docs/ROADMAP.md).
 - One tree per install, in two languages.
 - No sync with desktop programs, and no plugins.
 
@@ -181,7 +181,7 @@ Yes, if the service exports GEDCOM. Folkbranch shows what the file holds before 
 Only people you invite. The site is closed to search engines, photos need a sign-in, and readers do not see living relatives.
 
 **Does anything leave my server?**
-Not by itself. Connecting an AI provider sends what the assistant reads to that provider, and the app says so first. A model for faces or speech downloads to the browser only when you press its button.
+Not by itself. Connecting an AI provider sends what the assistant reads to that provider, and the app says so first. A model for faces or speech downloads to the browser only when you press its button. The map's pictures come from OpenStreetMap once a device allows it, which then sees the part of the world on screen, not names or dates.
 
 **What does it need to run?**
 A Mac or Linux computer, or any Linux server with 512 MB of memory. The app itself stays near 130 MB with a family of a thousand and twenty people looking.
