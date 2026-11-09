@@ -49,7 +49,7 @@ Add `--domain family.example.com` for your own domain. It is tested on Ubuntu, D
 - With Node at hand: `npx folkbranch`. Run it again to open the app.
 - With Docker on a server: `... | sh -s -- --domain family.example.com` runs the image with automatic HTTPS.
 - In Claude Code: `/plugin marketplace add danarkhipov/folkbranch`, then `/plugin install folkbranch@folkbranch`, and ask it to install Folkbranch. Codex or another agent: *"Install Folkbranch following https://raw.githubusercontent.com/danarkhipov/folkbranch/main/skills/folkbranch/SKILL.md"*.
-- Windows: an installer exists, `install.ps1`, but it has not been tried on a real Windows machine yet. Docker is the sure way there.
+- Windows: an archive and an installer, `install.ps1`, are built and started on a Windows build server with every release, but nobody has tried them on a real Windows computer yet. Docker is the sure way there.
 
 </details>
 
@@ -65,6 +65,7 @@ Backups, updates, servers and Railway: the [self-hosting guide](docs/SELF_HOSTIN
 - Places with what they were part of, their old names and a point on a map, so a search for "Tsaritsyn" finds people from Volgograd.
 - Dates and numbers: birthdays and anniversaries of the coming two months, the family in figures, and a file for the calendar on a phone.
 - Save views of a branch. Print the chart to PDF on one sheet or across several.
+- Right-click the chart: on a person to open, add a parent, a spouse or a child, or delete; on an empty place to add someone there or load a file. Hover a person and their whole line lights up.
 
 **A page for every relative**
 - A block editor with headings, photos in the text and links to other relatives.
@@ -82,18 +83,19 @@ Backups, updates, servers and Railway: the [self-hosting guide](docs/SELF_HOSTIN
 - Sign in with Yandex ID, VK ID, Telegram, Google or a code by mail, each switched on in the settings with its steps on the screen. See [ways to sign in](docs/SIGN_IN.md).
 - Keep a person who died, or a single story, from readers. Addresses and phones of the living are for editors only.
 - A view-only link, with an optional password and an expiry date.
-- Works in a browser on a phone or a computer, in English or Russian.
+- Works in a browser on a phone or a computer, in English or Russian. A short guide shows a new person what the app can do on the first visit.
 
 **Your data stays yours**
 - One SQLite file and a folder of photos on your server. No telemetry, and closed to search engines.
-- Import GEDCOM 5.5.1 and 7.0, Excel, CSV, JSON and plain text. Export GEDCOM or a full copy of the archive. [Moving from Gramps or webtrees](docs/MOVING.md) is checked on their own kind of files.
+- Import GEDCOM 5.5.1 and 7.0, Excel, CSV, JSON and plain text: add to the family, merge with the people already there, or replace it all, and bring the photos together with the file. Export GEDCOM or a full copy of the archive. [Moving from Gramps or webtrees](docs/MOVING.md) is checked on their own kind of files.
 - The server copies the database each day by itself, and the settings say when it last did.
 - Bring in a research case from the [ex-USSR kinship skill](https://github.com/DenisSergeevitch/ex-ussr-kinship-research): what was proved goes on the chart, the rest stays a note.
 
 **On this device, if you want it**
 - Faces in photos are found and recognised from the ones you already tagged. A name appears only when you confirm it.
 - Speech becomes text for stories and for talking to the assistant, with GigaAM for Russian or Whisper.
-- Nothing downloads until you press the button, and photos and voice stay on the device.
+- Or the owner connects a speech service once (OpenRouter, Groq, OpenAI, Mistral or a server of their own) and pays for it, so every editor can dictate. The recording is forwarded and kept nowhere.
+- Nothing downloads until you press the button. Photos stay on the device, and so does the voice unless the owner connects a speech service.
 
 ![The family chart with a person's biography open](docs/images/chart.png)
 
@@ -118,7 +120,7 @@ Folkbranch is for a family keeping its history together on a server of its own. 
 | AI agents over MCP | ✓ Built in. An agent's edits wait for review | A third-party server, reads and writes | A third-party module, writes are moderated |
 | An assistant in the app | ✓ Reads and edits after you confirm. Your key or a local model | ✓ A chat that only reads. Your key or a local model | ✗ |
 | Faces in photos | ✓ Found and matched to tagged people on your device. You confirm each name | ✓ Found on the server, named by hand | Tagged by hand, with a module |
-| Speech to text | ✓ On your device: GigaAM for Russian, Whisper for others | ✗ | ✗ |
+| Speech to text | ✓ On your device: GigaAM for Russian, Whisper for others, or a speech service you pay for | ✗ | ✗ |
 | **Where they go further** | | | |
 | Charts | Whole family on one screen, or a person's ancestors or descendants. Ancestor fan, relationship path, PDF | ✓ Ancestors, descendants, hourglass, fan, relationships | ✓ Fan, hourglass, relationships and more |
 | Reports and books | The chart and a person's page in PDF. The assistant drafts a life story from the sources, for you to review | ✓ Many reports | ✓ Many reports |
@@ -168,21 +170,21 @@ cd ~/folkbranch && ./folkbranch connect
 
 This makes a key and connects the Claude Code or Codex it finds on your computer over MCP. For Cursor, Windsurf and others, the app gives the exact text to paste under **Settings → Outside programs**.
 
-Then ask your agent something like *"Find what is missing in the archive and suggest sources"*. Each proposed edit shows in words, and you accept or reject it. An optional assistant in the app uses your own key for OpenRouter, Anthropic, OpenAI, Google, Yandex AI Studio, Cloud.ru (GigaChat, Qwen), DeepSeek or Moonshot (Kimi). Roles and tools are in the [agents guide](docs/AGENTS.md).
+Then ask your agent something like *"Find what is missing in the archive and suggest sources"*. Each proposed edit shows in words, and you accept or reject it. An optional assistant in the app uses your own key for OpenRouter, Anthropic, OpenAI, Google, Yandex AI Studio, Cloud.ru (GigaChat), DeepSeek or Moonshot (Kimi). It lists the models the service really has, recommends cheap ones we tested ([results](docs/MODEL_BENCHMARK.md)), can keep to the newest of them by itself, and if the service takes a model away, another takes its place. Roles and tools are in the [agents guide](docs/AGENTS.md).
 
 ## FAQ
 
 **Is it free?**
-Yes, under AGPL-3.0. You pay only for your own server, if you use one. The optional assistant uses your own key with an AI provider, which you pay directly.
+Yes, under AGPL-3.0. You pay only for your own server, if you use one. The optional assistant and cloud speech use your own keys with their providers, which you pay directly.
 
 **Can I move my tree from Ancestry, MyHeritage or Gramps?**
-Yes, if the service exports GEDCOM. Folkbranch shows what the file holds before anything changes. GEDCOM carries people, links, events and sources, but not photos. See [moving from Gramps or webtrees](docs/MOVING.md).
+Yes, if the service exports GEDCOM. Folkbranch shows what the file holds before anything changes. GEDCOM carries people, links, events and sources, but not the photos themselves: drop the pictures together with the file and they are attached to the right people. See [moving from Gramps or webtrees](docs/MOVING.md).
 
 **Who can see my family's data?**
 Only people you invite. The site is closed to search engines, photos need a sign-in, and readers do not see living relatives.
 
 **Does anything leave my server?**
-Not by itself. Connecting an AI provider sends what the assistant reads to that provider, and the app says so first. A model for faces or speech downloads to the browser only when you press its button. The map's pictures come from OpenStreetMap once a device allows it, which then sees the part of the world on screen, not names or dates.
+Not by itself. Connecting an AI provider sends what the assistant reads to that provider, and the app says so first. Cloud speech, if the owner connects it, sends each recording to that service. A model for faces or speech downloads to the browser only when you press its button. The map's pictures come from OpenStreetMap once a device allows it, which then sees the part of the world on screen, not names or dates.
 
 **What does it need to run?**
 A Mac or Linux computer, or any Linux server with 512 MB of memory. The app itself stays near 130 MB with a family of a thousand and twenty people looking.
@@ -196,7 +198,9 @@ The server copies the database by itself each day and keeps the last seven, and 
 - [Ways to sign in](docs/SIGN_IN.md): Yandex ID, VK ID, Telegram, Google, a code by mail
 - [Agents](docs/AGENTS.md): keys, roles, the assistant
 - [AI and formats](docs/AI_AND_FORMATS.md): MCP tools, REST API, the text format, GEDCOM
+- [Model tests](docs/MODEL_BENCHMARK.md): which assistant models were tried, and how they did
 - [Architecture](docs/ARCHITECTURE.md): how it is built, and why
+- [Releasing](docs/RELEASING.md): how a version is chosen and a release is cut
 - [Roadmap](docs/ROADMAP.md) and [changelog](CHANGELOG.md)
 
 ## Contributing
