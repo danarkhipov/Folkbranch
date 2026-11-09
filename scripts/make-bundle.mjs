@@ -19,20 +19,49 @@ fs.mkdirSync(dist, { recursive: true })
 const windows = process.platform === 'win32'
 const copy = (from, to) => fs.cpSync(from, path.join(stage, to), { recursive: true, force: true, ...(windows ? { dereference: true } : { verbatimSymlinks: true }) })
 copy(standalone, '.')
-// On Windows pnpm's links are junctions, and a copy of one still points back into the build folder: the archive would load
-// its libraries from there. Each becomes the real folder it stood for.
-if (windows) {
-  const flat = (dir) => {
-    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-      const p = path.join(dir, e.name)
-      if (e.isSymbolicLink()) {
-        const target = fs.realpathSync(p)
-        fs.rmSync(p, { recursive: true, force: true })
-        fs.cpSync(target, p, { recursive: true, force: true, dereference: true })
-      } else if (e.isDirectory()) flat(p)
+const pnpmDir = path.join(stage, 'node_modules/.pnpm')
+// The build's trace keeps the files a program loads, and leaves behind those it only needs beside it: the picture library's own
+// DLLs and shared files. Each of its packages comes whole from the install, or the library does not load on Windows.
+for (const d of fs.readdirSync(pnpmDir).filter((n) => n.startsWith('@img+sharp'))) {
+  fs.rmSync(path.join(pnpmDir, d), { recursive: true, force: true })
+  copy(path.join('node_modules/.pnpm', d), path.join('node_modules/.pnpm', d))
+}
+// A zip keeps no links, and on Windows pnpm's are junctions that a copy still points back into the build folder. There every
+// package is laid out flat in node_modules instead, the way `node-linker=hoisted` does; BUNDLE_FLAT=1 tries it on any system.
+const flat = windows || process.env.BUNDLE_FLAT === '1'
+if (flat) {
+  const modules = path.join(stage, 'node_modules')
+  const real = (p) => fs.realpathSync(p)
+  const top = path.join(stage, 'hoisted')
+  for (const store of fs.readdirSync(pnpmDir)) {
+    const inner = path.join(pnpmDir, store, 'node_modules')
+    if (!fs.existsSync(inner)) continue
+    for (const e of fs.readdirSync(inner)) {
+      const names = e.startsWith('@') ? fs.readdirSync(path.join(inner, e)).map((n) => `${e}/${n}`) : [e]
+      for (const name of names) {
+        const to = path.join(top, name)
+        if (fs.existsSync(to)) continue
+        fs.mkdirSync(path.dirname(to), { recursive: true })
+        fs.cpSync(real(path.join(inner, name)), to, { recursive: true, force: true, dereference: true })
+      }
     }
   }
-  flat(path.join(stage, 'node_modules'))
+  // The server's own aliases for packages it loads from outside its bundle are links too.
+  const aliases = path.join(stage, '.next/node_modules')
+  if (fs.existsSync(aliases)) {
+    for (const e of fs.readdirSync(aliases, { withFileTypes: true })) {
+      const p = path.join(aliases, e.name)
+      if (!e.isSymbolicLink()) continue
+      const target = real(p)
+      fs.rmSync(p, { recursive: true, force: true })
+      fs.cpSync(target, p, { recursive: true, force: true, dereference: true })
+    }
+  }
+  // The links at the top of node_modules made room for the real folders.
+  for (const e of fs.readdirSync(modules)) if (e !== '.pnpm') fs.rmSync(path.join(modules, e), { recursive: true, force: true })
+  fs.rmSync(pnpmDir, { recursive: true, force: true })
+  for (const e of fs.readdirSync(top)) fs.renameSync(path.join(top, e), path.join(modules, e))
+  fs.rmSync(top, { recursive: true, force: true })
 }
 // A build made beside a family's archive must never carry any of it away.
 if (fs.existsSync(path.join(stage, 'data'))) { console.error('The build holds a data folder. Remove .next and build again.'); process.exit(1) }
@@ -47,17 +76,11 @@ const media = path.join(stage, '.next/static/media')
 for (const f of fs.readdirSync(media)) if (/^ort-wasm.*\.wasm$/.test(f)) fs.rmSync(path.join(media, f))
 
 // The standalone build keeps the driver out of sight; the server commands need to find it.
-const pnpmDir = path.join(stage, 'node_modules/.pnpm')
-const driver = fs.readdirSync(pnpmDir).find((d) => d.startsWith('better-sqlite3@'))
-if (!driver) { console.error('The database driver is not in the build.'); process.exit(1) }
-fs.rmSync(path.join(stage, 'node_modules/better-sqlite3'), { recursive: true, force: true })
-if (windows) copy(path.join(standalone, 'node_modules/.pnpm', driver, 'node_modules/better-sqlite3'), 'node_modules/better-sqlite3')
-else fs.symlinkSync(`.pnpm/${driver}/node_modules/better-sqlite3`, path.join(stage, 'node_modules/better-sqlite3'))
-// The build's trace keeps the files a program loads, and leaves behind those it only needs beside it: the picture library's own
-// DLLs and shared files. Each of its packages comes whole from the install, or the library does not load on Windows.
-for (const d of fs.readdirSync(pnpmDir).filter((n) => n.startsWith('@img+sharp'))) {
-  fs.rmSync(path.join(pnpmDir, d), { recursive: true, force: true })
-  copy(path.join('node_modules/.pnpm', d), path.join('node_modules/.pnpm', d))
+if (!flat) {
+  const driver = fs.readdirSync(pnpmDir).find((d) => d.startsWith('better-sqlite3@'))
+  if (!driver) { console.error('The database driver is not in the build.'); process.exit(1) }
+  fs.rmSync(path.join(stage, 'node_modules/better-sqlite3'), { recursive: true, force: true })
+  fs.symlinkSync(`.pnpm/${driver}/node_modules/better-sqlite3`, path.join(stage, 'node_modules/better-sqlite3'))
 }
 execFileSync(process.execPath, ['-e', "require('better-sqlite3'); require('sharp')"], { cwd: stage, stdio: 'inherit' })
 
