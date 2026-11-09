@@ -97,9 +97,10 @@ export function lean(value: unknown): unknown {
 }
 
 /** Tool calls older than the last two questions go: their answers are in the replies, and each one costs tokens on every step. */
-export function trimHistory(messages: ModelMessage[]) {
+/** `keepReasoning`: DeepSeek and Kimi refuse the next request with a 400 when the reasoning they sent is not sent back. */
+export function trimHistory(messages: ModelMessage[], keepReasoning = false) {
   const asked = messages.flatMap((m, i) => (m.role === 'user' ? [i] : []))
-  const pruned = asked.length < 3 ? messages : pruneMessages({ messages, toolCalls: `before-last-${messages.length - asked.at(-2)!}-messages`, reasoning: 'before-last-message' })
+  const pruned = asked.length < 3 ? messages : pruneMessages({ messages, toolCalls: `before-last-${messages.length - asked.at(-2)!}-messages`, reasoning: keepReasoning ? 'none' : 'before-last-message' })
   let changed = pruned !== messages
   const out = pruned.map((m, i) => {
     if (m.role !== 'tool' || i >= pruned.length - KEEP_FULL_MESSAGES) return m
@@ -198,7 +199,7 @@ export function buildAgent(person: Actor, opts: { model?: LanguageModel; trustWr
       return status === 'user-approval' ? { type: status, reason: def?.describe?.(actor, toolCall.input) ?? '' } : status
     },
     stopWhen: stepCountIs(MAX_STEPS),
-    prepareStep: ({ messages, steps, stepNumber }) => ({ messages: trimHistory(messages), ...(process.env.AGENT_ALL_TOOLS === '1' ? {} : { activeTools: activeToolNames(new Set(defs.keys()), messages, !!opts.hasFiles) as never }), ...(mustFinish(steps, stepNumber) ? { toolChoice: 'none' as const } : {}) }),
+    prepareStep: ({ messages, steps, stepNumber }) => ({ messages: trimHistory(messages, !!provider?.keepReasoning), ...(process.env.AGENT_ALL_TOOLS === '1' ? {} : { activeTools: activeToolNames(new Set(defs.keys()), messages, !!opts.hasFiles) as never }), ...(mustFinish(steps, stepNumber) ? { toolChoice: 'none' as const } : {}) }),
     maxOutputTokens: 16_000,
     providerOptions: (provider?.options ?? {}) as never,
   })

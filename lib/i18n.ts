@@ -500,6 +500,8 @@ const en: Record<string, string> = {
   'Китайский сервис с бесплатными моделями.': 'A Chinese service with free models.',
   'Ваш собственный сервер: запись не покидает вашу сеть.': 'Your own server: the recording never leaves your network.',
   'Cloud.ru (GigaChat)': 'Cloud.ru (GigaChat)',
+  'Провайдер не нашёл эту модель. Мы подобрали другую, повторите вопрос': 'The provider did not find this model. We picked another, ask again',
+  'Провайдер не принял запрос, возможно, он изменил свой API. Подробности в журнале сервера': 'The provider refused the request, perhaps it changed its API. Details are in the server log',
   'Cloud.ru (GigaChat, Qwen и другие)': 'Cloud.ru (GigaChat, Qwen and others)',
   'Российский сервис: оплата в рублях, здесь же модели GigaChat от Сбера': 'A Russian service: pay in roubles, and Sber’s GigaChat models are here',
   'В консоли откройте сервис Foundation Models, создайте API-ключ и скопируйте его': 'In the console open Foundation Models, create an API key and copy it',

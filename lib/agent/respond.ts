@@ -3,7 +3,7 @@ import { z } from 'zod'
 import type { Actor } from '../ops/core'
 import { assistantActor, assistantTools, buildAgent, ToolRefusal } from './agent'
 import { countTokens } from './limits'
-import { modelSees, providerFailure } from './provider-key'
+import { modelSees, providerFailure, replaceMissingModel } from './provider-key'
 import { attachmentBytes, attachmentIdFromUrl, attachmentView, getAttachment, readAttachmentText } from './attachments'
 
 export const chatInput = z.object({
@@ -51,6 +51,7 @@ const lastAnswerAt = (messages: UIMessage[]) => {
 export async function assistantResponse(person: Actor, body: unknown, opts: { model?: LanguageModel; abortSignal?: AbortSignal } = {}) {
   const input = chatInput.parse(body)
   const messages = await validateUIMessages<UIMessage>({ messages: input.messages, tools: assistantTools(assistantActor(person)) as never })
+  if (!opts.model) await replaceMissingModel()
   const sees = opts.model ? null : await modelSees()
   return createAgentUIStreamResponse({
     agent: buildAgent(person, { sees, model: opts.model, trustWrites: input.trustWrites, focusId: input.focusId, since: lastAnswerAt(messages), hasFiles: messages.some((m) => m.parts.some((p) => p.type === 'file')) }),

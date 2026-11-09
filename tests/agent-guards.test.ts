@@ -474,3 +474,13 @@ describe('tokens', () => {
 
 // Facts carry their people and extra fields: an agent that rewrites the list must see them, or it would drop them.
 const BUDGET_OWNER = 11_500
+
+describe('reasoning sent back', () => {
+  const turn = (i: number) => [{ role: 'user', content: 'q' + i }, { role: 'assistant', content: [{ type: 'reasoning', text: 'think' + i }, { type: 'tool-call', toolCallId: 'c' + i, toolName: 'search', input: {} }] }, { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c' + i, toolName: 'search', output: { type: 'text', value: 'ok' } }] }] as never[]
+  const kinds = (m: ReturnType<typeof trimHistory>) => m.flatMap((x) => (Array.isArray(x.content) ? x.content.map((p: { type: string }) => p.type) : []))
+  it('is dropped from old answers by default and kept for services that demand it', () => {
+    const m = [...turn(1), ...turn(2), ...turn(3)]
+    expect(kinds(trimHistory(m))).not.toContain('reasoning')
+    expect(kinds(trimHistory(m, true))).toContain('reasoning')
+  })
+})

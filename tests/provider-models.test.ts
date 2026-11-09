@@ -1,9 +1,9 @@
 // The models a provider lists today, what they can do, and what the assistant does when its model cannot see.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { newestFirst, PARSERS } from '../lib/agent/models'
-import { connectProvider, disconnectProvider, modelChoices, modelSees } from '../lib/agent/provider-key'
+import { connectProvider, disconnectProvider, modelChoices, modelSees, providerFailure, replaceMissingModel } from '../lib/agent/provider-key'
 import { PRESETS } from '../lib/agent/presets'
-import { setSetting } from '../lib/ops/settings'
+import { getSetting, setSetting } from '../lib/ops/settings'
 import { owner, reader } from './fixture-family'
 
 const KEY = 'sk-test-secret-key-1234'
@@ -83,5 +83,36 @@ describe('what the owner sees and what the assistant knows', () => {
     await connectProvider(owner, { provider: 'anthropic', key: KEY })
     setSetting('agentModel', 'something-new')
     expect(await modelSees()).toBeNull()
+  })
+})
+
+describe('a model the provider took away', () => {
+  const at = (ids: string[]) => ({ data: ids.map((id) => ({ id, display_name: id, created_at: '2026-10-01T00:00:00Z' })) })
+  it('is replaced by the newest of its line, or else by a tested model of the service', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => json(at(['claude-haiku-5-5'])))
+    await connectProvider(owner, { provider: 'anthropic', key: KEY })
+    spy.mockImplementation(async () => json(at(['claude-haiku-5-6', 'claude-sonnet-5-5'])))
+    setSetting('agentModel', 'claude-haiku-5-5')
+    await replaceMissingModel(true)
+    expect(getSetting('agentModel')).toBe('claude-haiku-5-6')
+    spy.mockImplementation(async () => json(at(['claude-haiku-5-5', 'something-else'])))
+    setSetting('agentModel', 'retired-model')
+    await replaceMissingModel(true)
+    expect(getSetting('agentModel')).toBe('claude-haiku-5-5')
+  })
+  it('stays when the list cannot be read or is empty', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => json(at(['claude-haiku-5-5'])))
+    await connectProvider(owner, { provider: 'anthropic', key: KEY })
+    spy.mockImplementation(async () => json({ unexpected: 'shape' }))
+    await replaceMissingModel(true)
+    expect(getSetting('agentModel')).toBe('claude-haiku-5-5')
+    spy.mockImplementation(async () => { throw new Error('offline') })
+    await replaceMissingModel(true)
+    expect(getSetting('agentModel')).toBe('claude-haiku-5-5')
+  })
+  it('a refused request says so in the log and in words', () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(providerFailure({ statusCode: 400, url: 'https://x/v1/chat', responseBody: 'unknown field' })).toContain('API')
+    expect(log.mock.calls[0][0]).toContain('unknown field')
   })
 })

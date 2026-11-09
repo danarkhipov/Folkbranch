@@ -61,6 +61,26 @@ export async function refreshAutoModel(force = false) {
   }
 }
 
+/**
+ * When the service no longer lists the model in use, another takes its place: the newest of its line, else a tested
+ * model of the service. Only for a key set in the app; the server's own setting is the admin's to change.
+ */
+export async function replaceMissingModel(force = false) {
+  const s = saved()
+  if (!s || activeProvider(process.env)) return
+  try {
+    const live = (await liveModels({ id: s.id, key: s.key, folder: s.folder ?? '' }, 4_000, force)).filter((m) => m.usable)
+    // An empty list means we could not read it, not that every model is gone.
+    if (!live.length || live.some((m) => m.id === s.model)) return
+    const ids = live.map((m) => m.id)
+    const line = lineOf(s.model ?? '', LINES[s.id] ?? [])
+    const next = (line && newestOfLine(ids, line)) ?? PRESETS.find((p) => p.id === s.id)?.models.find((m) => ids.includes(m.id))?.id
+    if (next) setSetting('agentModel', next)
+  } catch {
+    // The service could not be asked now: the next message tries again.
+  }
+}
+
 const CHECKS: Record<PresetId, (key: string, folder: string) => { url: string; headers: Record<string, string>; lists?: boolean }> = {
   // Reading the account or the list of models costs nothing, so a check never spends the person's money.
   openrouter: (key) => ({ url: 'https://openrouter.ai/api/v1/key', headers: { authorization: `Bearer ${key}` } }),
@@ -193,9 +213,14 @@ export function disconnectProvider(actor: Actor) {
 export function providerFailure(e: unknown): string | null {
   const failure = (e as { lastError?: unknown })?.lastError ?? e
   const status = (failure as { statusCode?: number })?.statusCode
+  // The cause stays in the server log, without the conversation: a provider that changed its API shows up here.
+  const f = failure as { url?: string; responseBody?: string; message?: string }
+  console.error(`assistant: provider answered ${status ?? 'with an error'} ${f.url ?? ''} ${(f.responseBody ?? f.message ?? '').slice(0, 300)}`)
+  if (status === 404) void replaceMissingModel(true)
   if (status === 401 || status === 403) return say('Провайдер не принял ключ. Замените его в настройках, вкладка «Нейросеть»')
   if (status === 402) return say('На счёте провайдера закончились деньги. Пополните его, и ассистент снова заработает')
-  if (status === 404) return say('Провайдер не нашёл эту модель. Выберите другую в настройках, вкладка «Нейросеть»')
+  if (status === 404) return say('Провайдер не нашёл эту модель. Мы подобрали другую, повторите вопрос')
+  if (status === 400) return say('Провайдер не принял запрос, возможно, он изменил свой API. Подробности в журнале сервера')
   if (status === 429) return say('Провайдер просит подождать: слишком много запросов. Попробуйте через минуту')
   if (status && status >= 500) return say('У провайдера сбой. Попробуйте через несколько минут')
   return null

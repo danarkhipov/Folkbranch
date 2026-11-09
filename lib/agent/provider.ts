@@ -5,6 +5,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import type { LanguageModel } from 'ai'
+import { PRESETS } from './presets'
 
 type ProviderId = 'anthropic' | 'openrouter' | 'openai' | 'google' | 'yandex' | 'cloudru' | 'deepseek' | 'moonshot' | 'local'
 interface Provider {
@@ -17,7 +18,12 @@ interface Provider {
   /** Options sent with every request, and those that mark the fixed instructions for caching. */
   options?: Record<string, unknown>
   cached?: Record<string, unknown>
+  /** The service wants the model's reasoning sent back with the tool results, and refuses the request otherwise. */
+  keepReasoning?: boolean
 }
+
+/** Two other tested models of the service: if the chosen one is gone or fails, OpenRouter tries them in turn. */
+const backups = (model: string) => PRESETS.find((p) => p.id === 'openrouter')!.models.map((m) => m.id).filter((id) => id !== model).slice(0, 2)
 
 const PROVIDERS: Record<ProviderId, Provider> = {
   anthropic: {
@@ -29,18 +35,18 @@ const PROVIDERS: Record<ProviderId, Provider> = {
   openrouter: {
     label: 'OpenRouter', keyEnv: 'OPENROUTER_API_KEY', defaultModel: 'z-ai/glm-5.3-flash',
     // Family data: only routes that promise not to keep it for training, and of those the cheapest first.
-    create: (apiKey, model) => createOpenRouter({ apiKey }).chat(model, { provider: { data_collection: 'deny', sort: 'price' }, ...(process.env.AGENT_REASONING === 'off' ? { reasoning: { effort: 'none' as const } } : {}), ...(model.startsWith('anthropic/') ? { cache_control: { type: 'ephemeral' as const } } : {}) }),
+    create: (apiKey, model) => createOpenRouter({ apiKey }).chat(model, { models: backups(model), provider: { data_collection: 'deny', sort: 'price' }, ...(process.env.AGENT_REASONING === 'off' ? { reasoning: { effort: 'none' as const } } : {}), ...(model.startsWith('anthropic/') ? { cache_control: { type: 'ephemeral' as const } } : {}) }),
   },
   openai: { label: 'OpenAI', keyEnv: 'OPENAI_API_KEY', create: (apiKey, model) => createOpenAI({ apiKey })(model) },
   google: { label: 'Google', keyEnv: 'GOOGLE_GENERATIVE_AI_API_KEY', create: (apiKey, model) => createGoogleGenerativeAI({ apiKey })(model) },
   // Services that speak the OpenAI protocol under their own address, in Russia and China, where the big three are hard to pay for.
   yandex: {
-    label: 'Yandex AI Studio', keyEnv: 'YANDEX_API_KEY', defaultModel: 'yandexgpt/latest',
+    label: 'Yandex AI Studio', keyEnv: 'YANDEX_API_KEY', defaultModel: 'yandexgpt/latest', keepReasoning: true,
     create: (apiKey, model, folder = '') => createOpenAICompatible({ name: 'yandex', baseURL: 'https://ai.api.cloud.yandex.net/v1', headers: { authorization: `Api-Key ${apiKey}`, 'openai-project': folder } })(`gpt://${folder}/${model}`),
   },
-  cloudru: { label: 'Cloud.ru', keyEnv: 'CLOUDRU_API_KEY', defaultModel: 'Qwen/Qwen3.6-35B-A3B', create: (apiKey, model) => createOpenAICompatible({ name: 'cloudru', baseURL: 'https://foundation-models.api.cloud.ru/v1', apiKey })(model) },
-  deepseek: { label: 'DeepSeek', keyEnv: 'DEEPSEEK_API_KEY', defaultModel: 'deepseek-flash', create: (apiKey, model) => createOpenAICompatible({ name: 'deepseek', baseURL: 'https://api.deepseek.com', apiKey })(model) },
-  moonshot: { label: 'Moonshot (Kimi)', keyEnv: 'MOONSHOT_API_KEY', defaultModel: 'kimi-k2.6', create: (apiKey, model) => createOpenAICompatible({ name: 'moonshot', baseURL: 'https://api.moonshot.ai/v1', apiKey })(model) },
+  cloudru: { label: 'Cloud.ru', keyEnv: 'CLOUDRU_API_KEY', defaultModel: 'GigaChat/GigaChat-3-Pro', keepReasoning: true, create: (apiKey, model) => createOpenAICompatible({ name: 'cloudru', baseURL: 'https://foundation-models.api.cloud.ru/v1', apiKey })(model) },
+  deepseek: { label: 'DeepSeek', keyEnv: 'DEEPSEEK_API_KEY', defaultModel: 'deepseek-flash', keepReasoning: true, create: (apiKey, model) => createOpenAICompatible({ name: 'deepseek', baseURL: 'https://api.deepseek.com', apiKey })(model) },
+  moonshot: { label: 'Moonshot (Kimi)', keyEnv: 'MOONSHOT_API_KEY', defaultModel: 'kimi-k3.1-pro', keepReasoning: true, create: (apiKey, model) => createOpenAICompatible({ name: 'moonshot', baseURL: 'https://api.moonshot.ai/v1', apiKey })(model) },
   // Ollama, LM Studio and the like: nothing leaves your server.
   local: { label: 'local model', create: (_key, model) => createOpenAICompatible({ name: 'local', baseURL: process.env.AGENT_BASE_URL ?? '', apiKey: process.env.AGENT_API_KEY })(model) },
 }
