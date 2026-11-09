@@ -70,7 +70,8 @@ const round = async () => {
 const series = [await m()]
 for (let r = 0; r < 6; r++) { await round(); series.push(await m()) }
 console.log(JSON.stringify(series))
-const a = series[1], z = series.at(-1)
+// The page settles into one of two states round by round (a panel left open or not): compare rounds of the same parity.
+const a = series[2], z = series.at(-1)
 ok('no steady growth over a long session', z.heapMB - a.heapMB < 6 && z.nodes - a.nodes < 400 && z.listeners - a.listeners < 150, `heap ${a.heapMB} → ${z.heapMB} MB, nodes ${a.nodes} → ${z.nodes}, listeners ${a.listeners} → ${z.listeners}`)
 ok('no page errors', errs.length === 0, errs.slice(0, 3).join(' | '))
 await br.close(); proxy.close(); proxy.closeAllConnections?.(); execSync('docker rm -fv fg-cl'); process.exit(0)

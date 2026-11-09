@@ -843,7 +843,7 @@ const en: Record<string, string> = {
   'Программа с этим ключом сразу потеряет доступ. Вернуть ключ нельзя, можно выдать новый.': 'The program with this key loses access at once. It cannot be brought back, but you can make a new one.',
   'Адреса для тех, кто подключается к архиву напрямую.': 'Addresses for connecting to the archive directly.',
   'Адрес MCP': 'MCP address',
-  'Описание API в формате OpenAPI': 'API description in OpenAPI format',
+  'Описание для программ в формате OpenAPI': 'Description for programs in the OpenAPI format',
   'Открыть описание': 'Open the description',
   'Вы получите ссылку и отправите её сами. Она одноразовая и действует 30 дней.': 'You get a link and send it yourself. It works once and lasts 30 days.',
   'Схема покажет этому человеку, кем ему приходится каждый.': 'The chart will show this person how everyone is related to them.',

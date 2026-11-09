@@ -8,7 +8,7 @@ perl -e 'alarm 900; exec @ARGV' docker build -q -t folkbranch:check . >/dev/null
 pnpm build >/dev/null && node scripts/make-bundle.mjs >/dev/null
 rc=0
 # The guide for newcomers would stand in front of every browser test, so they skip it; tests/e2e/tour.mjs looks at it.
-export NODE_OPTIONS="--import ./tests/e2e/no-tour.mjs"
+export NODE_OPTIONS="--import \"$PWD/tests/e2e/no-tour.mjs\""
 for s in tests/e2e/local-install.mjs tests/e2e/family-file.mjs tests/e2e/case-import.mjs tests/e2e/tell.mjs tests/e2e/npx.mjs tests/e2e/chart.mjs tests/e2e/hand-fixes.mjs tests/e2e/views.mjs tests/e2e/print.mjs tests/e2e/share.mjs tests/e2e/stories.mjs tests/e2e/card.mjs tests/e2e/merge.mjs tests/e2e/onboarding.mjs tests/e2e/tour.mjs tests/e2e/english.mjs tests/e2e/english-everywhere.mjs tests/e2e/multiuser.mjs tests/e2e/devices.mjs tests/e2e/sign-in.mjs tests/e2e/upgrade.mjs tests/e2e/screens.mjs tests/e2e/render.mjs tests/e2e/page-recovery.mjs tests/stability/crash.mjs tests/stability/failures.mjs tests/stability/restore.mjs; do
   echo "== $s"
   out=$(node "$s" 2>&1) || rc=1

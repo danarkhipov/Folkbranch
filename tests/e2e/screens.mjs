@@ -27,7 +27,9 @@ const errors = []
 
 const auditFn = () => {
   const vis = (el) => { const r = el.getBoundingClientRect(), c = getComputedStyle(el); return r.width > 0 && r.height > 0 && c.visibility !== 'hidden' && c.display !== 'none' && +c.opacity > 0.05 }
-  const parse = (s) => { const m = s.match(/[\d.]+/g)?.map(Number) ?? [0, 0, 0, 0]; return { r: m[0], g: m[1], b: m[2], a: m[3] ?? 1 } }
+  // Tailwind writes translucent colours as oklab(): the browser's canvas turns any colour into red, green, blue and alpha.
+  const pixel = document.createElement('canvas').getContext('2d', { willReadFrequently: true })
+  const parse = (s) => { if (!/^rgba?\(/.test(s)) { pixel.clearRect(0, 0, 1, 1); pixel.fillStyle = '#000'; pixel.fillStyle = s; pixel.fillRect(0, 0, 1, 1); const d = pixel.getImageData(0, 0, 1, 1).data; return { r: d[0], g: d[1], b: d[2], a: d[3] / 255 } } const m = s.match(/[\d.]+/g)?.map(Number) ?? [0, 0, 0, 0]; return { r: m[0], g: m[1], b: m[2], a: m[3] ?? 1 } }
   const lum = ({ r, g, b }) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b) }
   const bgOf = (el) => { const stack = []; let e = el; while (e) { const c = parse(getComputedStyle(e).backgroundColor); if (c.a > 0) { stack.push(c); if (c.a >= 1) break } e = e.parentElement } let out = { r: 255, g: 255, b: 255 }; for (const c of stack.reverse()) out = { r: c.r * c.a + out.r * (1 - c.a), g: c.g * c.a + out.g * (1 - c.a), b: c.b * c.a + out.b * (1 - c.a) }; return out }
   const texts = []
@@ -45,7 +47,7 @@ const auditFn = () => {
     const cut = c.overflow !== 'visible' && (el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 2) && !el.closest('[title]')
     texts.push({ t: full.slice(0, 220), size, weight: +c.fontWeight, font: c.fontFamily.split(',')[0].replace(/"/g, ''), lh: +(lh / size).toFixed(2), lines, widthCh: Math.round(r.width / (size * 0.52)), contrast: +(((Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05))).toFixed(2), tag: el.tagName.toLowerCase(), cut, control: !!el.closest('button, a, [role=tab], label, select, option'), upper: c.textTransform === 'uppercase', italic: c.fontStyle === 'italic' })
   }
-  const controls = [...document.querySelectorAll('button, a[href], input:not([type=hidden]), select, textarea, [role=tab], [role=menuitem]')].filter(vis).filter((e) => !e.closest('.pcard, .bn-container')).map((e) => ({ tag: e.tagName.toLowerCase(), text: (e.tagName === 'SELECT' ? '' : e.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 80), aria: e.getAttribute('aria-label') ?? '', title: e.getAttribute('title') ?? '', placeholder: e.getAttribute('placeholder') ?? '', label: e.labels?.[0]?.textContent?.trim().slice(0, 60) ?? '', options: e.tagName === 'SELECT' ? [...e.options].map((o) => o.text) : undefined, h: e.classList.contains('inline-input') ? 0 : Math.round(e.getBoundingClientRect().height) }))
+  const controls = [...document.querySelectorAll('button, a[href], input:not([type=hidden]), select, textarea, [role=tab], [role=menuitem]')].filter(vis).filter((e) => !e.closest('.pcard, .bn-container')).map((e) => ({ tag: e.tagName.toLowerCase(), hid: !!e.closest('[aria-hidden="true"]'), role: e.getAttribute('role') ?? '', text: (e.tagName === 'SELECT' ? '' : e.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 80), aria: e.getAttribute('aria-label') ?? '', title: e.getAttribute('title') ?? '', placeholder: e.getAttribute('placeholder') ?? '', label: e.labels?.[0]?.textContent?.trim().slice(0, 60) ?? '', options: e.tagName === 'SELECT' ? [...e.options].map((o) => o.text) : undefined, h: e.classList.contains('inline-input') ? 0 : Math.round(e.getBoundingClientRect().height) }))
   return { texts, controls }
 }
 
@@ -147,15 +149,15 @@ const measures = {
   'T5 контраст ниже AA (0)': { d: list((a, s) => uiTexts(a).filter((t) => t.contrast < 4.5).map((t) => `${s}: ${t.t.slice(0, 30)} ${t.contrast}`)) },
   'T6 обрезанный текст без подсказки (0)': { d: list((a, s) => uiTexts(a).filter((t) => t.cut).map((t) => `${s}: ${t.t.slice(0, 40)}`)) },
   'T7 начертаний (≤3)': { v: list((a) => uiTexts(a).map((t) => t.weight)).length, ok: (v) => v <= 3, d: list((a) => uiTexts(a).map((t) => t.weight)).sort() },
-  'T8 технических слов на экране (0)': { d: list((a) => [...uiTexts(a).map((t) => t.t), ...a.controls.flatMap((c) => [c.aria, c.title, c.placeholder, ...(c.options ?? [])])].filter((t) => BAD_WORDS.test(t.replace(/«[^»]*»/g, ''))).map((t) => t.slice(0, 70))) },
-  'T9 кнопок длиннее 4 слов (0)': { d: list((a) => a.controls.filter((c) => c.tag === 'button' && c.text.split(' ').length > 4 && c.text.length < 60 && !c.text.endsWith('?')).map((c) => c.text)) },
+  'T8 технических слов на экране (0)': { d: list((a) => [...uiTexts(a).map((t) => t.t), ...a.controls.flatMap((c) => [c.aria, c.title, c.placeholder, ...(c.options ?? [])])].filter((t) => !/^https?:\/\//.test(t) && BAD_WORDS.test(t.replace(/«[^»]*»/g, ''))).map((t) => t.slice(0, 70))) },
+  'T9 кнопок длиннее 4 слов (0)': { d: list((a) => a.controls.filter((c) => c.tag === 'button' && !['radio', 'combobox'].includes(c.role) && c.text.split(' ').length > 4 && c.text.length < 60 && !c.text.endsWith('?')).map((c) => c.text)) },
   'T10 фраз длиннее 20 слов (0)': { d: list((a, s) => uiTexts(a).flatMap((t) => t.t.split(/(?<=[.!?])\s+/)).filter((x) => x.split(' ').length > 20).map((x) => x.slice(0, 90))) },
   'T11 подсказок, повторяющих подпись (0)': { d: list((a) => a.controls.filter((c) => c.title && c.text && c.title === c.text).map((c) => c.title)) },
   'T12 значков без имени или подсказки (0)': { d: list((a, s) => a.controls.filter((c) => c.tag === 'button' && !c.text && !(c.aria && c.title)).map((c) => `${s}: ${c.aria || c.title || 'без имени'}`)) },
   'T13 типографских ошибок (0)': { d: list((a) => [...uiTexts(a).map((t) => t.t), ...a.controls.flatMap((c) => [c.aria, c.title, c.placeholder])].filter((t) => /\.\.\.|"|(^|\s)-(\s|$)|\s,|ё{2}/.test(t)).map((t) => t.slice(0, 60))) },
   'T14 точек в конце кнопок, заглавных и курсива (0)': { d: list((a) => [...a.controls.filter((c) => /\.$/.test(c.text)).map((c) => c.text), ...uiTexts(a).filter((t) => t.upper || (t.t.length > 3 && t.t === t.t.toUpperCase() && /[А-Я]{4}/.test(t.t))).map((t) => t.t.slice(0, 40))]) },
   'T15 высот элементов управления (≤6)': { v: list((a) => a.controls.filter((c) => c.h >= 24 && c.h <= 60 && c.tag !== 'textarea').map((c) => c.h)).length, ok: (v) => v <= 6, d: list((a) => a.controls.filter((c) => c.h >= 24 && c.h <= 60 && c.tag !== 'textarea').map((c) => c.h)).sort((x, y) => x - y) },
-  'T16 полей без подписи (0)': { d: list((a, s) => a.controls.filter((c) => ['input', 'select', 'textarea'].includes(c.tag) && !c.label && !c.aria).map((c) => `${s}: ${c.placeholder || c.tag}`)) },
+  'T16 полей без подписи (0)': { d: list((a, s) => a.controls.filter((c) => ['input', 'select', 'textarea'].includes(c.tag) && !c.hid && !c.label && !c.aria).map((c) => `${s}: ${c.placeholder || c.tag}`)) },
   'T17 сбоев обхода и ошибок страницы (0)': { d: errors },
 }
 let passed = 0

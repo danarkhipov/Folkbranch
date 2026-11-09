@@ -153,7 +153,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .pcard:hover .ava { transform: translateY(-1px); }
 .pcard .nm { width: max-content; max-width: 150px; overflow-wrap: anywhere; hyphens: auto; hyphenate-limit-chars: 14 6 6; text-wrap: balance; font-family: var(--font-serif); font-weight: 600; font-size: calc(15px * var(--lbl, 1)); line-height: 1.25; padding: 0 6px; color: var(--ink); text-wrap: balance; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .pcard .yr { font-size: calc(14px * var(--lbl, 1)); line-height: 1.3; color: #5c564a; margin-top: 2px; font-variant-numeric: tabular-nums; text-wrap: balance; }
-.pcard .rel { font-size: calc(13px * var(--lbl, 1)); line-height: 1.5; margin-top: 3px; padding: 0 7px; border-radius: 99px; white-space: nowrap; }
+.pcard .rel { font-size: calc(14px * var(--lbl, 1)); line-height: 1.5; margin-top: 3px; padding: 0 7px; border-radius: 99px; white-space: nowrap; }
 .pcard .rel.me { color: var(--accent); }
 .pcard .rel.kin { background: var(--ink); color: #fffdf8; }
 .pcard.dead .ava img { filter: saturate(.5) sepia(.15); }
@@ -189,7 +189,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .legend-ring.sex-F { border-color: var(--female); background: #efdccf; }
 
 .float { background: rgb(255 253 248 / .92); backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 1px 2px rgb(60 45 20 / .06), 0 8px 24px rgb(60 45 20 / .08); }
-.hint { position: fixed; z-index: 100; max-width: min(280px, calc(100vw - 16px)); padding: 6px 10px; border-radius: 8px; background: var(--ink); color: #fffdf8; font-size: 13px; line-height: 1.35; box-shadow: 0 8px 24px rgb(60 45 20 / .22); pointer-events: none; animation: hint-in .12s ease-out; }
+.hint { position: fixed; z-index: 100; max-width: min(280px, calc(100vw - 16px)); padding: 6px 10px; border-radius: 8px; background: var(--ink); color: #fffdf8; font-size: 14px; line-height: 1.35; box-shadow: 0 8px 24px rgb(60 45 20 / .22); pointer-events: none; animation: hint-in .12s ease-out; }
 .hint-more { color: #d9d2c2; margin-top: 2px; font-weight: 400; }
 @keyframes hint-in { from { opacity: 0; } }
 .bar-btn { height: 36px; min-width: 36px; padding: 0 9px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: var(--ink-soft); font-size: 14px; cursor: pointer; white-space: nowrap; }
@@ -333,7 +333,7 @@ aside.panel:focus { outline: none; }
   .main-bar .bar-rest { flex: 1; min-width: 0; justify-content: space-around; }
   .main-bar.folded { justify-content: flex-start; }
   .bar-peek { top: auto; bottom: 8px; left: 8px; margin: 0 0 5px; }
-  .main-bar .bar-btn { flex: 1 1 0; flex-direction: column; gap: 2px; height: 48px; min-width: 0; padding: 0 1px; font-size: 13px; line-height: 1.3; text-align: center; }
+  .main-bar .bar-btn { flex: 1 1 0; flex-direction: column; gap: 2px; height: 48px; min-width: 0; padding: 0 1px; font-size: 14px; line-height: 1.3; text-align: center; }
   .main-bar .nav-label { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .main-bar .hide-bars { display: none; }
   .view-bar { left: 8px !important; bottom: 72px; }
@@ -372,12 +372,12 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
   .panel-tabs { width: auto; height: auto; align-self: stretch; padding: 2px; scrollbar-width: none; }
   .panel-tabs [role=tab] { padding-inline: 2px; flex: 1 0 auto; font-size: 14px; }
 }
-@container (max-width: 320px) { .panel-tabs [role=tab] { padding-inline: 1px; font-size: 13px; } }
+@container (max-width: 320px) { .panel-tabs [role=tab] { padding-inline: 1px; font-size: 14px; } }
 @media (hover: none) { .panel .bn-editor { padding-left: 16px !important; padding-right: 16px !important; } }
 .inline-input:placeholder-shown { border-bottom: 1px dashed var(--ink-faint); }
 .pcard.moving { transition: none; z-index: 5; cursor: grabbing; opacity: .9; }
 .pcard .movable { cursor: grab; }
-.pcard .folded { margin-top: 3px; padding: 0 7px; border-radius: 99px; border: 1px solid var(--line); background: #fffdf8; color: var(--ink); font-size: calc(13px * var(--lbl, 1)); line-height: 1.5; white-space: nowrap; }
+.pcard .folded { margin-top: 3px; padding: 0 7px; border-radius: 99px; border: 1px solid var(--line); background: #fffdf8; color: var(--ink); font-size: calc(14px * var(--lbl, 1)); line-height: 1.5; white-space: nowrap; }
 .pcard .folded:hover { background: var(--muted); }
 
 @media (prefers-reduced-motion: reduce) {
@@ -401,7 +401,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
 }
 
 /* The map: what a mark says when pressed, and the numbers of one life's stops. */
-.map-card { display: flex; flex-direction: column; gap: 4px; max-width: 240px; font-size: 13px; line-height: 1.35; color: var(--ink); }
+.map-card { display: flex; flex-direction: column; gap: 4px; max-width: 240px; font-size: 14px; line-height: 1.35; color: var(--ink); }
 .map-card div:last-child { display: flex; flex-wrap: wrap; gap: 2px 10px; }
 .map-card button { text-decoration: underline; text-underline-offset: 2px; text-align: left; }
 .leaflet-tooltip.map-number { background: transparent; border: 0; box-shadow: none; padding: 0; font-weight: 600; color: var(--ink); }

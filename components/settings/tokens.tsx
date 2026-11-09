@@ -91,7 +91,7 @@ export function TokensTab() {
           <p className="text-xs leading-snug text-ink-soft">{t('Адреса для тех, кто подключается к архиву напрямую.')}</p>
         <CopyField label={t('Адрес MCP')} value={`${origin}/api/mcp`} />
         <div className="flex min-w-0 flex-col gap-1">
-          <CopyField label={t('Описание API в формате OpenAPI')} value={`${origin}/api/v1/openapi.json`} />
+          <CopyField label={t('Описание для программ в формате OpenAPI')} value={`${origin}/api/v1/openapi.json`} />
           <Button asChild size="sm" variant="ghost" className="self-start"><a href="/api/v1/openapi.json" target="_blank" rel="noreferrer"><ExternalLink /> {t('Открыть описание')}</a></Button>
         </div>
         </div>
