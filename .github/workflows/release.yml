@@ -2,6 +2,8 @@ name: Release
 on:
   push:
     tags: ['v*']
+  # Builds and tries the bundles on every platform without publishing anything.
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -9,6 +11,7 @@ permissions:
 
 jobs:
   image:
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -48,6 +51,7 @@ jobs:
   # What the install command downloads when it does not use Docker. Each is built and tried on its own platform.
   bundles:
     needs: image
+    if: ${{ !cancelled() && needs.image.result != 'failure' }}
     strategy:
       fail-fast: false
       matrix:
@@ -60,6 +64,13 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      # pnpm's own node-gyp cannot read this runner's list of Visual Studio versions; a newer one can.
+      - name: A node-gyp that finds Visual Studio
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          npm install -g node-gyp@latest
+          echo "npm_config_node_gyp=$(npm prefix -g)/node_modules/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: node scripts/make-bundle.mjs
@@ -79,6 +90,7 @@ jobs:
           Invoke-WebRequest http://127.0.0.1:3000/api/health -UseBasicParsing
           & (Join-Path $env:FOLKBRANCH_DIR 'folkbranch.cmd') stop
       - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}

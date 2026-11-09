@@ -152,7 +152,8 @@ else
 fi
 cd "$DIR"
 
-random() { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$1"; }
+# A finite read: with a pipe that is closed early, BSD tr never stops when the shell ignores SIGPIPE, as on a CI runner.
+random() { head -c 2048 /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9' | head -c "$1"; }
 value() { sed -n "s/^$1=//p" .env | head -n 1; }
 is_address() { case "$1" in *[!0-9.]*) return 1 ;; *) return 0 ;; esac; }
 
