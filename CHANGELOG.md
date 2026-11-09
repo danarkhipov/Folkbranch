@@ -4,6 +4,15 @@ All notable changes are listed here, newest first. Versions follow [Semantic Ver
 
 ## Unreleased
 
+## 1.5.1 - 2026-11-09
+
+The archives for installing without Docker now build and start on every system. Versions 1.2.0 to 1.5.0 came out without the archives for macOS and Windows; this is the first release that has all of them.
+
+### Fixed
+- The install command no longer hangs on macOS when the shell ignores a closed pipe, as on a build server: the random setup code is read from a finite piece of data.
+- The archive for Windows builds: a newer `node-gyp` finds Visual Studio, and the packages are laid out flat, so the picture library finds its DLLs and the archive holds no links back into the build folder.
+- The release workflow can be run by hand to build and try the archives on all five systems without publishing anything.
+
 ## 1.5.0 - 2026-11-09
 
 The assistant's models are tested, cheap and kept current: a model the provider takes away is replaced by itself. The owner can pay for cloud speech so that everyone can dictate. A guide shows new people what the app does.
