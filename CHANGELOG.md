@@ -4,6 +4,32 @@ All notable changes are listed here, newest first. Versions follow [Semantic Ver
 
 ## Unreleased
 
+## 1.5.0 - 2026-11-09
+
+The assistant's models are tested, cheap and kept current: a model the provider takes away is replaced by itself. The owner can pay for cloud speech so that everyone can dictate. A guide shows new people what the app does.
+
+### Added
+- A guide to what the app can do, shown to a new person on the first visit and kept under the settings' tips: short cards for the chart, the assistant, stories, voice, faces and the rest.
+- Cloud speech: the owner connects a speech service once (OpenRouter, Groq, OpenAI, Mistral, SiliconFlow or a server of their own) and pays for it. Every editor then dictates and transcribes recordings through the server, which keeps the key and keeps no recording. A monthly limit of minutes protects the wallet.
+- Stronger speech models on the device for English (Whisper small and turbo), beside GigaAM for Russian.
+- Each AI service is marked by how it is paid for (free or paid) and what happens to what you send, and a service we did not test is marked as not tested.
+- Models are recommended only where we tested them: 97 scenarios on an invented family, GPT-6 Luna by default, and only cheap and recent models offered. The results are in `docs/MODEL_BENCHMARK.md`.
+- The owner can leave the model on automatic: the newest model of a tested line that the provider lists is used, never an older one than the one tested.
+- A model the provider took away is replaced by another of the same line, or a tested one of the service. OpenRouter gets backup models, and speech services fall back to their other models.
+- `docs/RELEASING.md`: how a version is chosen and a release is cut, and a test that the version and the changelog agree.
+
+### Changed
+- A model is described in one plain sentence.
+
+### Removed
+- The old Qwen 3.6 model from the Cloud.ru list.
+
+### Fixed
+- DeepSeek and Kimi, used directly, no longer refuse a long conversation: their reasoning is sent back with the tool results.
+- A GEDCOM with a repeated or missing record id no longer stops the import, and one odd entry in a provider's list of models no longer empties the list.
+- A request a provider refuses is written to the server log with its cause, and the person is told that the provider may have changed its API.
+- The map falls back to a second free tile server, the engine and model files to a second mirror, and the browser's cache of app files stops growing with every release.
+
 ## 1.4.0 - 2026-11-08
 
 Sign in with Yandex ID, VK ID, Telegram, Google or a code by mail; assistant providers in Russia and China; load a tree together with its photos, by merging or replacing; a clearer chart with menus.
