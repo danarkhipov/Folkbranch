@@ -47,7 +47,7 @@ const auditFn = () => {
     const cut = c.overflow !== 'visible' && (el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 2) && !el.closest('[title]')
     texts.push({ t: full.slice(0, 220), size, weight: +c.fontWeight, font: c.fontFamily.split(',')[0].replace(/"/g, ''), lh: +(lh / size).toFixed(2), lines, widthCh: Math.round(r.width / (size * 0.52)), contrast: +(((Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05))).toFixed(2), tag: el.tagName.toLowerCase(), cut, control: !!el.closest('button, a, [role=tab], label, select, option'), upper: c.textTransform === 'uppercase', italic: c.fontStyle === 'italic' })
   }
-  const controls = [...document.querySelectorAll('button, a[href], input:not([type=hidden]), select, textarea, [role=tab], [role=menuitem]')].filter(vis).filter((e) => !e.closest('.pcard, .bn-container')).map((e) => ({ tag: e.tagName.toLowerCase(), hid: !!e.closest('[aria-hidden="true"]'), role: e.getAttribute('role') ?? '', text: (e.tagName === 'SELECT' ? '' : e.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 80), aria: e.getAttribute('aria-label') ?? '', title: e.getAttribute('title') ?? '', placeholder: e.getAttribute('placeholder') ?? '', label: e.labels?.[0]?.textContent?.trim().slice(0, 60) ?? '', options: e.tagName === 'SELECT' ? [...e.options].map((o) => o.text) : undefined, h: e.classList.contains('inline-input') ? 0 : Math.round(e.getBoundingClientRect().height) }))
+  const controls = [...document.querySelectorAll('button, a[href], input:not([type=hidden]), select, textarea, [role=tab], [role=menuitem]')].filter(vis).filter((e) => !e.closest('.pcard, .bn-container')).map((e) => ({ tag: e.tagName.toLowerCase(), hid: !!e.closest('[aria-hidden="true"]'), cls: (e.getAttribute('class') ?? '').slice(0, 60), role: e.getAttribute('role') ?? '', text: (e.tagName === 'SELECT' ? '' : e.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 80), aria: e.getAttribute('aria-label') ?? '', title: e.getAttribute('title') ?? '', placeholder: e.getAttribute('placeholder') ?? '', label: e.labels?.[0]?.textContent?.trim().slice(0, 60) ?? '', options: e.tagName === 'SELECT' ? [...e.options].map((o) => o.text) : undefined, h: e.classList.contains('inline-input') ? 0 : Math.round(e.getBoundingClientRect().height) }))
   return { texts, controls }
 }
 
@@ -174,4 +174,12 @@ fs.writeFileSync(`${OUT}/score.txt`, lines.join('\n') + '\n')
 fs.writeFileSync(`${OUT}/inventory.md`, all.map(([s, a]) => `## ${s}\nТексты: ${[...new Set(a.texts.map((t) => `${t.t} [${t.size}px/${t.weight}${t.font.startsWith('Lit') ? '/serif' : ''}]`))].join(' | ')}\nКнопки и поля: ${a.controls.map((c) => [c.tag, c.text && `текст="${c.text}"`, c.aria && c.aria !== c.text && `имя="${c.aria}"`, c.title && c.title !== c.aria && c.title !== c.text && `подсказка="${c.title}"`, c.placeholder && `пример="${c.placeholder}"`, c.label && `подпись="${c.label}"`, c.options && `варианты=${c.options.join('/')}`].filter(Boolean).join(' ')).join(' | ')}`).join('\n\n') + '\n')
 fs.writeFileSync(`${OUT}/heights.txt`, [...new Set(all.flatMap(([s, a]) => a.controls.filter((c) => c.h >= 24 && c.h <= 60 && c.tag !== 'textarea').map((c) => `${c.h} ${c.tag} ${(c.aria || c.text || c.placeholder).slice(0, 30)}`)))].sort((x, y) => parseInt(x) - parseInt(y)).join('\n'))
 console.log(lines.join('\n').slice(0, 6000))
+// HEIGHTS=1: which controls stand at which height, to harmonise them.
+if (process.env.HEIGHTS) {
+  const by = new Map()
+  for (const [s, a] of all) for (const c of a.controls) if (c.h >= 24 && c.h <= 60 && c.tag !== 'textarea') {
+    const k = `${c.h}`; const list = by.get(k) ?? new Map(); const key = `${c.tag} ${c.cls.replace(/\s+/g, ' ').slice(0, 55)}`; list.set(key, [(list.get(key)?.[0] ?? 0) + 1, list.get(key)?.[1] ?? `${s}: ${c.text || c.aria}`.slice(0, 40)]); by.set(k, list)
+  }
+  for (const [h, list] of [...by].sort((x, y) => x[0] - y[0])) console.log(`H ${h}: ${[...list].sort((x, y) => y[1][0] - x[1][0]).slice(0, 5).map(([k, v]) => `${v[0]}× ${k} (${v[1]})`).join(' | ')}`)
+}
 process.exit(passed === n ? 0 : 1)

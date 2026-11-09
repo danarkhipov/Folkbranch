@@ -61,7 +61,7 @@ export function StoryRequests() {
           <div className="flex flex-wrap gap-1.5">
             {READY.map((q) => {
               const on = question.split('\n').map((x) => x.trim()).includes(t(q))
-              return <button key={q} type="button" aria-pressed={on} className={`rounded-full border px-2.5 py-1 text-left text-xs ${on ? 'border-ink bg-ink text-white' : 'border-border bg-white text-ink hover:bg-muted'}`} onClick={() => setQuestion(toggleLine(question, t(q)))}>{t(q)}</button>
+              return <button key={q} type="button" aria-pressed={on} className={`min-h-8 rounded-full border px-2.5 py-1 text-left text-xs ${on ? 'border-ink bg-ink text-white' : 'border-border bg-white text-ink hover:bg-muted'}`} onClick={() => setQuestion(toggleLine(question, t(q)))}>{t(q)}</button>
             })}
           </div>
           <Textarea rows={3} maxLength={1200} aria-label={t('Вопросы')} placeholder={t('Свой вопрос, каждый с новой строки')} value={question} onChange={(e) => setQuestion(e.target.value)} />

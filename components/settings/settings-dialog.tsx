@@ -58,7 +58,7 @@ export function SettingsDialog({ open, onOpenChange, familyName, providers, onTe
                 {group && <div className="px-2.5 pb-1.5 font-serif text-sm font-semibold text-ink">{t(group)}</div>}
                 {ids.map((id) => {
                   const Icon = SECTIONS[id][2]
-                  return <button key={id} className={`settings-item flex w-full shrink-0 items-center gap-2 rounded-lg px-2.5 min-h-[34px] max-sm:min-h-11 text-left text-sm ${section === id ? 'on bg-muted font-medium text-ink' : 'text-[#5a5245] hover:bg-muted/60 hover:text-ink'}`} aria-current={section === id ? 'page' : undefined} onClick={() => setSection(id)}><span className="flex-none"><Icon size={15} /></span> {t(SECTIONS[id][0])}<ChevronRight size={15} className="ml-auto flex-none text-ink-faint sm:hidden" /></button>
+                  return <button key={id} className={`settings-item flex w-full shrink-0 items-center gap-2 rounded-lg px-2.5 min-h-9 max-sm:min-h-11 text-left text-sm ${section === id ? 'on bg-muted font-medium text-ink' : 'text-[#5a5245] hover:bg-muted/60 hover:text-ink'}`} aria-current={section === id ? 'page' : undefined} onClick={() => setSection(id)}><span className="flex-none"><Icon size={15} /></span> {t(SECTIONS[id][0])}<ChevronRight size={15} className="ml-auto flex-none text-ink-faint sm:hidden" /></button>
                 })}
               </div>
             ))}

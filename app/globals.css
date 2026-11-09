@@ -219,10 +219,10 @@ kbd { font: 14px var(--font-sans); color: var(--ink-faint); border: 1px solid va
 /* Touch screens: tabs and choices are big enough for a finger. */
 @media (pointer: coarse) {
   [role=tablist] { height: auto; }
-  [role=tab] { min-height: 40px; padding-inline: 12px; }
+  [role=tab] { min-height: 44px; padding-inline: 12px; }
   [role=radio] { min-height: 36px; }
-  .pick { min-height: 34px; padding-inline: 12px; }
-  .bar-btn { min-height: 40px; }
+  .pick { min-height: 36px; padding-inline: 12px; }
+  .bar-btn { min-height: 44px; }
 }
 
 /* Phones: the editor becomes a sheet whose top can be dragged up, and the chart centres above it. */
@@ -345,8 +345,8 @@ aside.panel:focus { outline: none; }
 /* Fingers need room: everything that can be tapped is at least 40 px. */
 @media (pointer: coarse) {
   .panel summary { padding-block: 8px; }
-  .panel button, .side-sheet button, [role=dialog] button, [role=dialog] select, .view-bar button, .main-bar button, .panel select, [data-slot=popover-content] button { min-height: 40px; min-width: 40px; }
-  .composer [data-align="block-end"] button { height: 40px; width: 40px; }
+  .panel button, .side-sheet button, [role=dialog] button, [role=dialog] select, .view-bar button, .main-bar button, .panel select, [data-slot=popover-content] button { min-height: 44px; min-width: 44px; }
+  .composer [data-align="block-end"] button { height: 44px; width: 44px; }
 }
 
 .panel-tabs { height: 36px; padding: 4px; flex: none; }
