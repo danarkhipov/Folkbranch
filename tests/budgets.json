@@ -1,5 +1,6 @@
 {
   "nodes": 2000,
-  "firstLoadKB": 320,
+  "firstLoadKB": 330,
+  "idleKB": 230,
   "hoverMs": 90
 }

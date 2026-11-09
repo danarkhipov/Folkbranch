@@ -199,11 +199,16 @@ export interface Box {
 export const personName = (p: Pick<Person, 'givenName' | 'surname'>) =>
   [p.givenName, p.surname].filter(Boolean).join(' ').trim()
 
-export function lifeYears(p: Person, unknown = '?'): string {
+let serverOpenEnd: (() => string) | null = null
+/** The server says how a living person's open range ends in the archive's language; a browser reads the language of its page. */
+export const setOpenEnd = (f: () => string) => { serverOpenEnd = f }
+const openEnd = () => (typeof document !== 'undefined' ? (document.documentElement.lang === 'en' ? 'now' : 'н. в.') : serverOpenEnd?.() ?? 'н. в.')
+
+export function lifeYears(p: Person, unknown = '?', open: string = openEnd()): string {
   const b = p.birthDate || (p.birthYear ? String(p.birthYear) : '')
   const d = p.deathDate || (p.deathYear ? String(p.deathYear) : '')
   // One date alone would not say whether it is a birth or a death, so a living person's range stays open.
-  if (p.living) return b ? `${b} – ${typeof document !== 'undefined' && document.documentElement.lang === 'en' ? 'now' : 'н. в.'}` : ''
+  if (p.living) return b ? `${b} – ${open}` : ''
   if (!b && !d) return ''
   return `${b || unknown} – ${d || unknown}`
 }

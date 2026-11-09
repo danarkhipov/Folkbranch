@@ -23,7 +23,10 @@ out.readyMs = Date.now() - t0 - 300
 await page.waitForTimeout(1000)
 const snap = () => page.evaluate(() => ({ nodes: document.getElementsByTagName('*').length, cards: document.querySelectorAll('.pcard').length, heapMB: Math.round(performance.memory.usedJSHeapSize / 1048576) }))
 out.afterLoad = await snap()
-out.js = await page.evaluate(() => Math.round(performance.getEntriesByType('resource').filter((r) => r.name.includes('.js')).reduce((a, r) => a + r.encodedBodySize, 0) / 1024))
+// What the first screen needs, apart from the windows fetched while the person looks at it (family-app marks that moment).
+const jsKB = (before) => page.evaluate((before) => { const at = performance.getEntriesByName('folkbranch-warm')[0]?.startTime ?? Infinity; return Math.round(performance.getEntriesByType('resource').filter((r) => r.name.includes('.js') && (r.startTime < at) === before).reduce((a, r) => a + r.encodedBodySize, 0) / 1024) }, before)
+out.js = await jsKB(true)
+out.idleJs = await jsKB(false)
 const C = await page.evaluate(() => { for (let y = 120; y < 860; y += 23) for (let x = 200; x < 1300; x += 31) { const e = document.elementFromPoint(x, y); if (e?.classList.contains('canvas') || e?.classList.contains('world')) return { x, y } } return { x: 720, y: 120 } })
 await run('pan', async () => { await page.mouse.move(C.x, C.y); await page.mouse.down(); for (let i = 0; i < 60; i++) { await page.mouse.move(C.x + i * 10, C.y + i * 3); await page.waitForTimeout(16) } await page.mouse.up() })
 await run('zoomInOut', async () => { await page.mouse.move(C.x, C.y); for (let i = 0; i < 30; i++) { await page.mouse.wheel(0, i < 15 ? -100 : 100); await page.waitForTimeout(16) } })
@@ -58,6 +61,7 @@ await br.close()
 const over = [
   out.afterLoad.nodes > budgets.nodes && `DOM nodes ${out.afterLoad.nodes} > ${budgets.nodes}`,
   out.js > budgets.firstLoadKB && `first load ${out.js} KB > ${budgets.firstLoadKB}`,
+  out.idleJs > budgets.idleKB && `fetched while idle ${out.idleJs} KB > ${budgets.idleKB}`,
   out.hover10 && out.hover10.task / 10 > budgets.hoverMs && `hover ${out.hover10.task / 10} ms > ${budgets.hoverMs}`,
   out.errs.length && `page errors: ${out.errs.length}`,
 ].filter(Boolean)

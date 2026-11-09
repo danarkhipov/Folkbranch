@@ -36,7 +36,7 @@ export interface SheetInput {
 export function personSheet({ person, graph, pages, stories, avatar, t, lang }: SheetInput): string {
   const byId = new Map(graph.persons.map((p) => [p.id, p]))
   const shown = (id: string) => { const p = byId.get(id); return p && !p.hidden ? p : null }
-  const named = (p: Person) => `${esc(personName(p) || t('Без названия'))}${lifeYears(p) ? ` <span class="soft">${esc(lifeYears(p))}</span>` : ''}`
+  const named = (p: Person) => `${esc(personName(p) || t('Без названия'))}${lifeYears(p, '?', t('н. в.')) ? ` <span class="soft">${esc(lifeYears(p, '?', t('н. в.')))}</span>` : ''}`
   const parents = graph.parentChild.filter((l) => l.childId === person.id).flatMap((l) => shown(l.parentId) ?? [])
   const spouses = graph.unions.filter((u) => u.aId === person.id || u.bId === person.id).flatMap((u) => shown(u.aId === person.id ? u.bId : u.aId) ?? [])
   const children = graph.parentChild.filter((l) => l.parentId === person.id).flatMap((l) => shown(l.childId) ?? [])
@@ -58,7 +58,7 @@ blockquote { margin: 4px 0 8px 12px; font-style: italic; }
 figure { margin: 6px 0; break-inside: avoid; } figure img { max-width: 100%; max-height: 90mm; } figcaption { font-size: 9pt; color: #6b604f; }
 footer { margin-top: 16px; font-size: 8.5pt; color: #6b604f; }
 </style></head><body>
-<header>${avatar ? `<img src="${esc(avatar)}" alt="">` : ''}<div><h1>${esc(personName(person) || t('Без названия'))}</h1>${lifeYears(person) ? `<p class="soft">${esc(lifeYears(person))}${where.length ? ` · ${esc(where.join(' — '))}` : ''}</p>` : ''}</div></header>
+<header>${avatar ? `<img src="${esc(avatar)}" alt="">` : ''}<div><h1>${esc(personName(person) || t('Без названия'))}</h1>${lifeYears(person, '?', t('н. в.')) ? `<p class="soft">${esc(lifeYears(person, '?', t('н. в.')))}${where.length ? ` · ${esc(where.join(' — '))}` : ''}</p>` : ''}</div></header>
 ${section('Хронология жизни', life.length ? `<ul>${life.map((e) => `<li><b>${esc(e.date)}</b>${e.age !== null ? ` <span class="soft">(${esc(t('возраст'))} ${e.age})</span>` : ''} ${esc(t(e.title))}${e.note ? `: ${esc(e.note)}` : ''}</li>`).join('')}</ul>` : '')}
 ${section('Семья', kin.map(([title, list]) => `<p><b>${esc(t(title))}:</b> ${list.map(named).join(', ')}</p>`).join(''))}
 ${section('Факты', person.facts.filter((f) => f.kind || factWords(f, t)).map((f) => `<p><b>${esc(f.kind)}</b>${f.date ? ` ${esc(f.date)}` : ''}${f.place ? `, ${esc(f.place)}` : ''}${factWords(f, t) ? `. ${esc(factWords(f, t))}` : ''}</p>`).join(''))}

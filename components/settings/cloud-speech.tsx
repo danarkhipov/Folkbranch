@@ -81,7 +81,7 @@ export function CloudSpeech() {
               <details>
                 <summary className="cursor-pointer text-xs text-ink-soft">{t('Для опытных: выбрать модель самому')}</summary>
                 <div className="mt-2 flex flex-col gap-1">
-                  <p className="text-xs text-ink-soft">{t('Если не выбирать, берётся проверенная модель сервиса, а когда сервис выпустит новее в той же линейке, приложение перейдёт на неё само.')}</p>
+                  <p className="text-xs text-ink-soft">{t('Если не выбирать, берётся проверенная модель, а новую из той же линейки приложение подхватит само.')}</p>
                   <label className="flex flex-col gap-1 text-xs text-ink-soft">
               {t('Модель')}
               <Select aria-label={t('Модель')} value={model || preset.models[0].id} onChange={setModel} options={preset.models.map((m) => ({ value: m.id, label: `${t(m.label)}${hour(m) ? ` · ${t(hour(m)!)}` : ''}` }))} />

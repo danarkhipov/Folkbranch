@@ -120,7 +120,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
   const [dropped, setDropped] = useState<File[] | null>(null)
   // The windows a person is likely to open next are fetched while they look at the chart, so one replaces another with no empty moment between.
   useEffect(() => {
-    const warm = () => { void import('./import-dialog'); void import('./onboarding'); void import('./quick-add'); void import('./settings/settings-dialog'); void import('./text-dialog'); void import('./person-panel'); void import('./person-pickers') }
+    const warm = () => { performance.mark('folkbranch-warm'); void import('./import-dialog'); void import('./onboarding'); void import('./quick-add'); void import('./settings/settings-dialog'); void import('./text-dialog'); void import('./person-panel'); void import('./person-pickers') }
     if (welcome) warm()
     const id = typeof requestIdleCallback === 'function' ? requestIdleCallback(warm, { timeout: 2500 }) : (setTimeout(warm, 800) as unknown as number)
     return () => { if (typeof cancelIdleCallback === 'function') cancelIdleCallback(id); else clearTimeout(id) }

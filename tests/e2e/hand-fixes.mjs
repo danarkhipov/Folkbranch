@@ -22,7 +22,9 @@ const park = async () => { await page.mouse.move(4, 896); await page.waitForTime
 // The visible text of the people's captions, line by line.
 const CAPTION_TEXT = `[...document.querySelectorAll('.pcard .nm, .pcard .yr')].flatMap((e) => {
   const range = document.createRange(); range.selectNodeContents(e)
-  return [...range.getClientRects()].filter((r) => r.width > 1 && r.height > 1).map((r) => ({ who: e.textContent.trim().slice(0, 40), card: e.closest('.pcard'), el: e, x: r.left, y: r.top, r: r.right, b: r.bottom }))
+  // A name cut after three lines still has the later lines in the document, clipped away: only what shows counts.
+  const shown = e.getBoundingClientRect().bottom
+  return [...range.getClientRects()].filter((r) => r.width > 1 && r.height > 1 && r.top < shown - 1).map((r) => ({ who: e.textContent.trim().slice(0, 40), card: e.closest('.pcard'), el: e, x: r.left, y: r.top, r: r.right, b: r.bottom }))
 })`
 const CROSS = 'const cross = (a, b) => Math.min(a.r, b.r) - Math.max(a.x, b.x) > 2 && Math.min(a.b, b.b) - Math.max(a.y, b.y) > 2;'
 

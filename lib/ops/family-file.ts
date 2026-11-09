@@ -177,7 +177,7 @@ export async function buildFamilyFile(actor: Actor): Promise<{ html: string; fil
     const at = `transform="translate(${c.x} ${c.y + AVATAR_CY})"`
     // A hidden card is an empty circle: the same words under fourteen of them would say nothing fourteen times.
     if (p.hidden) return `<g ${at}><title>${esc(t('Живой родственник'))}</title><circle class="ring U" r="${AVATAR + 3}"/></g>`
-    const years = lifeYears(p)
+    const years = lifeYears(p, '?', t('н. в.'))
     let dy = AVATAR + 20
     const text = lines(nameOf(p)).map((line) => { const out = `<text class="name" y="${dy}">${esc(line)}</text>`; dy += 18; return out }).join('')
     const body = `<circle class="ring ${esc(p.sex)}" r="${AVATAR + 3}"/>${face(p)}${text}${years ? `<text class="years" y="${dy}">${esc(years)}</text>` : ''}`
@@ -209,7 +209,7 @@ ${sources && `<h3>${esc(t('Источники'))}</h3><ul class="links">${source
 
   const collator = new Intl.Collator(lang)
   const list = [...seen].sort((a, b) => collator.compare(`${a.surname} ${a.givenName}`, `${b.surname} ${b.givenName}`))
-    .map((p) => `<li><a href="#p-${esc(p.id)}">${esc(nameOf(p))}</a>${lifeYears(p) ? `<span>${esc(lifeYears(p))}</span>` : ''}</li>`).join('')
+    .map((p) => `<li><a href="#p-${esc(p.id)}">${esc(nameOf(p))}</a>${lifeYears(p, '?', t('н. в.')) ? `<span>${esc(lifeYears(p, '?', t('н. в.')))}</span>` : ''}</li>`).join('')
   const hiddenCount = graph.persons.length - seen.length
   const photoCss = [...stored].map(([id, m]) => `.m-${id}{background-image:url(${m.uri})}`).join('\n')
   const today = new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())

@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { and, desc, eq, inArray, isNull, like, ne, or } from 'drizzle-orm'
 import { getDb, schema } from '../db'
-import { personName, type HistoryEntry, type Role } from '../types'
+import { personName, setOpenEnd, type HistoryEntry, type Role } from '../types'
 import { Actor, newId, OpError, requireRole, seesOnlyPublic } from './core'
 import { say } from './app-config'
 import { changeDetails, readableSummary } from './history-text'
@@ -146,3 +146,6 @@ export function listHistory(actor: Actor, limit = 100, personId?: string): Histo
     // In a person's card, not what merely passed through them, such as a whole family loaded at once.
     .filter((e) => !personId || e.personIds.includes(personId))
 }
+
+// What the server writes for a living person's open range follows the archive's language.
+setOpenEnd(() => say('н. в.'))
