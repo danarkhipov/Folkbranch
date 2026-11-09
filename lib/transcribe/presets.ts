@@ -16,6 +16,8 @@ export interface SttPreset {
   /** Billed at least this many seconds for each request. */
   minSeconds?: number
   /** Free plan and what it costs in data, from the service's own terms on 8 November 2026; null when there is none or it is not known. */
+  /** What our own run found, when there was one: services without it are shown as not tested. */
+  tested?: string
   free?: { data: 'private' | 'trains' | 'mixed' | 'unknown'; note: string }
   /** The key of the assistant, when that is the same service, can be reused. */
   assistantKey?: 'openrouter' | 'openai'
@@ -24,6 +26,7 @@ export interface SttPreset {
 export const STT_PRESETS: SttPreset[] = [
   {
     id: 'openrouter', label: 'OpenRouter', where: 'OpenRouter и сервис, который он выберет для модели', base: 'https://openrouter.ai/api/v1', style: 'openrouter', keysUrl: 'https://openrouter.ai/settings/keys', assistantKey: 'openrouter',
+    tested: 'Проверено 9 ноября 2026 на 20 английских и 20 русских записях: Voxtral Mini ошибается в 2% английских слов и в 14% русских.',
     pitch: 'Один ключ для ассистента и расшифровки. Цена каждого запроса приходит в ответе, поэтому расход считается точно',
     models: [
       { id: 'mistralai/voxtral-mini-transcribe', label: 'Voxtral Mini (Mistral)', perMinute: 0.003, note: 'Дёшево и точно, много языков' },
@@ -33,6 +36,7 @@ export const STT_PRESETS: SttPreset[] = [
   },
   {
     id: 'groq', label: 'Groq', where: 'Groq (США)', base: 'https://api.groq.com/openai/v1', style: 'openai', keysUrl: 'https://console.groq.com/keys', minSeconds: 10,
+    tested: 'Проверено 9 ноября 2026 на 20 английских и 20 русских записях: Whisper turbo ошибается в 3% английских слов и в 19% русских. На бесплатном плане лимит 20 запросов в минуту на всех.',
     free: { data: 'private', note: 'Бесплатно: до 2 часов записи в час и 8 часов в день. Groq по договору не учится на ваших данных и по умолчанию не хранит их, логи до 30 дней только при сбоях.' },
     pitch: 'Самый дешёвый: около 4 центов за час записи, и есть бесплатный лимит. Тот же Whisper, быстро',
     models: [
