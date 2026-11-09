@@ -28,6 +28,7 @@ export interface UnionPos { id: string; union: Union; x: number; y: number; path
 export interface EdgePos { id: string; childId: string; parentIds: string[]; path: string; style: LineStyle; links: ParentLink[]; familyKey: string
   /** Around the whole bar with its trunk and all the siblings, so the shared part is never cut. */ box: Box
   /** The stretch that belongs to this child alone, from its bar down to it. */ own: string
+  /** Where the line goes on under the estimated caption, to the point it enters the card: clickable below the cards, where the real caption is shorter than the estimate. */ tail: string
   /** The part shared with siblings: from the parents down to the bar, and the bar itself. */ shared: string
   /** Siblings hanging from one bar share a group. */ group: string
   barAt: [number, number]
@@ -528,8 +529,8 @@ export function layoutFamily(g: Graph, { rootsBelow = false, pins = {}, print = 
 
   /** The card is a portrait over a caption, so a line comes into the portrait from above or under the caption from below. */
   const entryY = (c: CardPos) => (rootsBelow ? c.y + UNDER_CAPTION : c.y + AVATAR_CY - AVATAR_R - 4)
-  /** The clickable part of a line stays outside the caption, so a click on a name is a click on the card, and runs on to where the line ends when that is below a shorter caption. */
-  const hitEndY = (c: CardPos) => (rootsBelow ? Math.max(c.y + heightOf(c.id), entryY(c)) : entryY(c))
+  /** The clickable part of a line stays outside the caption, so a click on a name is a click on the card. */
+  const hitEndY = (c: CardPos) => (rootsBelow ? c.y + heightOf(c.id) : entryY(c))
 
   const edges: EdgePos[] = []
   for (const g2 of groups) {
@@ -561,6 +562,7 @@ export function layoutFamily(g: Graph, { rootsBelow = false, pins = {}, print = 
         links,
         box,
         own: `M${t.x} ${barY}V${hitEndY(t)}`,
+        tail: hitEndY(t) === entryY(t) ? '' : `M${t.x} ${hitEndY(t)}V${entryY(t)}`,
         shared,
         group: `${f.key}@${g2.rank}`,
         barAt: [t.x, barY],

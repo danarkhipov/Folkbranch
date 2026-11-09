@@ -110,7 +110,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .world.animate { transition: transform .45s cubic-bezier(.22, .8, .24, 1); }
 /* Too small to read: drawing the text would only slow the pan. */
 .world.far .cap { visibility: hidden; }
-.world.far > svg.hits { display: none; }
+.world.far > svg.hits, .world.far > svg.links .line-hit { display: none; }
 
 /* One line weight, one colour; meaning comes from the dash, explained in the legend. */
 .line, .union { fill: none; stroke: var(--line); stroke-linejoin: round; stroke-linecap: round; transition: opacity .15s, stroke .15s; }

@@ -113,6 +113,25 @@ export const PersonCard = memo(function PersonCard({ p, left, top, wait, classNa
   )
 })
 
+/** The end of a line under a caption that is shorter than its estimate. Below the cards, so a click on a name still reaches the card. */
+export const HitTails = memo(function HitTails({ edges, acts }: { edges: EdgePos[]; acts: Acts }) {
+  return (
+    <>
+      {edges.filter((e) => e.tail).map((e) => (
+        <path
+          key={`t${e.id}`}
+          d={e.tail}
+          className="line-hit"
+          onMouseEnter={() => acts.current.enterLine(e.familyKey, [e.id])}
+          onMouseMove={(ev) => acts.current.tipEdge(ev, e)}
+          onMouseLeave={() => acts.current.leaveLine()}
+          onClick={(ev) => acts.current.pick(ev, 'edge', [e.id], e.barAt[0], e.barAt[1] - 14)}
+        />
+      ))}
+    </>
+  )
+})
+
 /** Wide invisible strokes on top make thin lines easy to hover. */
 export const HitAreas = memo(function HitAreas({ layout, edges, unions, groupHeads, acts }: { layout: Layout; edges: EdgePos[]; unions: UnionItem[]; groupHeads: EdgePos[]; acts: Acts }) {
   return (

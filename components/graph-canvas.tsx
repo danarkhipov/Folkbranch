@@ -12,7 +12,7 @@ import type { ChartScope } from './chart-scope'
 import { useLinkDrawing } from './chart-links'
 import { useLineSelection } from './chart-selection'
 import { useChartView } from './chart-view'
-import { type ChartActions, Lines, PersonCard, HitAreas, FamilyDots } from './graph-parts'
+import { type ChartActions, Lines, PersonCard, HitAreas, HitTails, FamilyDots } from './graph-parts'
 import { Select } from '@/components/ui/select'
 
 /**
@@ -114,6 +114,7 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
         <div ref={world} className={cn('world', active && 'focused')}>
           <svg className="links" width="1" height="1">
             <Lines families={shown.families} unions={shown.unions} active={active} hotPairs={hotPairs} lightMode={lightMode} selIds={selIds} hoverIds={hoverIds} wave={wave} />
+            <HitTails edges={shown.edges} acts={acts} />
           </svg>
           {graph.persons.map((p) => {
             const c = layout.cards.get(p.id)
