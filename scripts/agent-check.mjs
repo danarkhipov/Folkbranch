@@ -680,7 +680,9 @@ await prepare()
 let passed = 0, total = 0
 // A hard ceiling: the run stops itself, counting from tokens, since the provider's own counter lags.
 const BUDGET = Number(process.env.CHECK_BUDGET ?? 0)
-const prices = process.env.OPENROUTER_API_KEY ? (await (await fetch('https://openrouter.ai/api/v1/models')).json()).data.find((m) => m.id === process.env.AGENT_MODEL)?.pricing : null
+// OpenRouter lists prices itself; for any other service they are given in dollars per million tokens, so the stop at CHECK_BUDGET still works.
+const given = process.env.CHECK_PRICE_IN ? { prompt: Number(process.env.CHECK_PRICE_IN) / 1e6, completion: Number(process.env.CHECK_PRICE_OUT) / 1e6 } : null
+const prices = given ?? (process.env.OPENROUTER_API_KEY ? (await (await fetch('https://openrouter.ai/api/v1/models')).json()).data.find((m) => m.id === process.env.AGENT_MODEL)?.pricing : null)
 const estimate = () => (prices ? (tokens.input - tokens.cached) * prices.prompt + tokens.cached * (prices.input_cache_read ?? prices.prompt) + tokens.output * prices.completion : 0)
 for (const [name, run] of Object.entries(scenarios)) {
   if (ONLY && !ONLY.includes(name)) continue

@@ -59,7 +59,11 @@ export const LINES: Partial<Record<PresetId, Line[]>> = {
   // Not run at the service itself yet: a model tested through OpenRouter is not a test of this one.
   anthropic: [{ match: /^claude-haiku-(\d+(?:-\d+)*)$/, floor: 'claude-haiku-5-5', status: 'provisional' }],
   openai: [{ match: /^gpt-(\d+(?:[.-]\d+)*)-luna$/, floor: 'gpt-6-luna', status: 'provisional' }],
-  google: [{ match: /^gemini-(\d+(?:\.\d+)*)-flash-lite$/, floor: 'gemini-3.1-flash-lite', status: 'provisional' }],
+  // Only models of the last few months: older ones are about to be switched off.
+  google: [
+    { match: /^gemini-(\d+(?:\.\d+)*)-flash-lite$/, floor: 'gemini-3.5-flash-lite', status: 'provisional' },
+    { match: /^gemini-(\d+(?:\.\d+)*)-flash$/, floor: 'gemini-3.8-flash', status: 'provisional' },
+  ],
 }
 
 /** What each service charges nothing for, and what that costs in data, as the services' own terms said on 8 November 2026. */

@@ -107,7 +107,7 @@ describe('connecting', () => {
       ['openrouter', 'openrouter.ai/api/v1/key', 'authorization', { data: {} }],
       ['anthropic', 'api.anthropic.com/v1/models', 'x-api-key', { data: [{ id: 'claude-haiku-5-5' }] }],
       ['openai', 'api.openai.com/v1/models', 'authorization', { data: [{ id: 'gpt-6-luna' }] }],
-      ['google', 'generativelanguage.googleapis.com/v1beta/models', 'x-goog-api-key', { models: [{ name: 'models/gemini-3.1-flash-lite' }] }],
+      ['google', 'generativelanguage.googleapis.com/v1beta/models', 'x-goog-api-key', { models: [{ name: 'models/gemini-3.5-flash-lite' }] }],
     ] as const
     for (const [provider, url, header, body] of cases) {
       vi.restoreAllMocks()
@@ -126,7 +126,7 @@ describe('connecting', () => {
     const cases = [
       ['cloudru', 'foundation-models.api.cloud.ru/v1/models', { data: [{ id: 'Qwen/Qwen3.6-35B-A3B' }] }],
       ['deepseek', 'api.deepseek.com/models', { data: [{ id: 'deepseek-flash' }] }],
-      ['moonshot', 'api.moonshot.ai/v1/models', { data: [{ id: 'kimi-k2.6' }] }],
+      ['moonshot', 'api.moonshot.ai/v1/models', { data: [{ id: 'kimi-k3.1-pro' }] }],
       ['yandex', 'ai.api.cloud.yandex.net/v1/models', { data: [{ id: `gpt://${FOLDER}/yandexgpt/latest` }] }],
     ] as const
     for (const [provider, url, body] of cases) {

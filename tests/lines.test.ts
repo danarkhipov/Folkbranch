@@ -11,6 +11,8 @@ const deepseek = lineOfFloor('deepseek/deepseek-v4.1-flash-1017')
 describe('model lines', () => {
   it('reads the version out of an id, written with dots or dashes', () => {
     expect(versionOf('gemini-3.5-flash-lite', flashLite)).toEqual([3, 5])
+    // Flash and Flash-Lite are different lines.
+    expect(versionOf('gemini-3.8-flash', flashLite)).toBeNull()
     expect(versionOf('claude-haiku-5-5', haiku)).toEqual([5, 5])
     expect(versionOf('claude-sonnet-5-5', haiku)).toBeNull()
     expect(versionOf('deepseek/deepseek-v4.1-flash-1017', deepseek)).toEqual([4, 1])
@@ -25,7 +27,7 @@ describe('model lines', () => {
     const listed = ['gemini-3.1-flash-lite', 'gemini-3.5-flash-lite', 'gemini-4.2-flash-lite', 'gemini-4.2-flash', 'gemini-2.5-flash-lite', 'gemma-4-31b-it']
     expect(newestOfLine(listed, flashLite)).toBe('gemini-4.2-flash-lite')
     // Only an older model is listed: nothing qualifies, and the tested floor stays in use.
-    expect(newestOfLine(['gemini-2.5-flash-lite', 'gemini-3.0-flash-lite'], flashLite)).toBeNull()
+    expect(newestOfLine(['gemini-2.5-flash-lite', 'gemini-3.1-flash-lite'], flashLite)).toBeNull()
     expect(newestOfLine(['z-ai/glm-5.2-flash', 'z-ai/glm-6.0-flash', 'z-ai/glm-6.0-flash-air'], glm)).toBe('z-ai/glm-6.0-flash')
   })
 
