@@ -83,7 +83,7 @@ export function ProviderForm({ onDone }: { onDone?: () => void }) {
   const [pay, setPay] = useState<Pay>('paid')
   const preset = PRESETS.find((p) => p.id === id)!
   // Paid fits every service; free only those that have a free plan, and what it costs in data is said on each.
-  const shown = (p: Preset) => pay !== 'free' || !!ASSISTANT_PLANS[p.id]?.free
+  const shown = (p: Preset) => !p.hidden && (pay !== 'free' || !!ASSISTANT_PLANS[p.id]?.free)
   const connect = async (e: React.FormEvent) => {
     e.preventDefault()
     setBusy(true)

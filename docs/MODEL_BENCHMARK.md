@@ -4,6 +4,12 @@ Nothing is recommended because it is famous. A model becomes a default only afte
 (`scripts/agent-check.sh`: about 75 conversations on an invented family, with the real tools, prompt-injection traps, files and
 writes) and the results are written here with the date, the cost and the number of passes.
 
+## The price band
+
+Only cheap models are offered: about the price of DeepSeek Flash, at most $0.20 per million tokens in and $1 out, and released in the
+last few months (an older model may be switched off soon). Google (Gemini Flash-Lite, $0.30 / $2.50) and Moonshot (Kimi K3.1 Pro, $2 / $10) are
+not offered to new connections for that reason; Claude Sonnet and Gemini Flash were taken off the lists. The tests were run only for models in this band.
+
 ## Lines and floors
 
 The app does not keep a list of names that goes stale. It keeps **lines**: a family of models, such as "Gemini Flash-Lite" or
