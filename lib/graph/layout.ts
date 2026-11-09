@@ -528,8 +528,8 @@ export function layoutFamily(g: Graph, { rootsBelow = false, pins = {}, print = 
 
   /** The card is a portrait over a caption, so a line comes into the portrait from above or under the caption from below. */
   const entryY = (c: CardPos) => (rootsBelow ? c.y + UNDER_CAPTION : c.y + AVATAR_CY - AVATAR_R - 4)
-  /** The clickable part of a line stays outside the caption, so a click on a name is a click on the card. */
-  const hitEndY = (c: CardPos) => (rootsBelow ? c.y + heightOf(c.id) : entryY(c))
+  /** The clickable part of a line stays outside the caption, so a click on a name is a click on the card, and runs on to where the line ends when that is below a shorter caption. */
+  const hitEndY = (c: CardPos) => (rootsBelow ? Math.max(c.y + heightOf(c.id), entryY(c)) : entryY(c))
 
   const edges: EdgePos[] = []
   for (const g2 of groups) {
