@@ -56,9 +56,9 @@ export const LINES: Partial<Record<PresetId, Line[]>> = {
     { match: /^z-ai\/glm-(\d+(?:\.\d+)*)-flash$/, floor: 'z-ai/glm-5.3-flash', status: 'tested' },
     { match: /^anthropic\/claude-haiku-(\d+(?:\.\d+)*)$/, floor: 'anthropic/claude-haiku-5.5', status: 'tested' },
   ],
-  // The same models as above, reached directly: the test ran through OpenRouter.
-  anthropic: [{ match: /^claude-haiku-(\d+(?:-\d+)*)$/, floor: 'claude-haiku-5-5', status: 'tested' }],
-  openai: [{ match: /^gpt-(\d+(?:[.-]\d+)*)-luna$/, floor: 'gpt-6-luna', status: 'tested' }],
+  // Not run at the service itself yet: a model tested through OpenRouter is not a test of this one.
+  anthropic: [{ match: /^claude-haiku-(\d+(?:-\d+)*)$/, floor: 'claude-haiku-5-5', status: 'provisional' }],
+  openai: [{ match: /^gpt-(\d+(?:[.-]\d+)*)-luna$/, floor: 'gpt-6-luna', status: 'provisional' }],
   google: [{ match: /^gemini-(\d+(?:\.\d+)*)-flash-lite$/, floor: 'gemini-3.1-flash-lite', status: 'provisional' }],
 }
 

@@ -5,6 +5,7 @@ import { ExternalLink, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { ASSISTANT_PLANS } from '@/lib/agent/plans'
 import { PRESETS, type Preset, type PresetId } from '@/lib/agent/presets'
+import { recommended, resultFor } from '@/lib/agent/tested'
 import { PayChoice, PlanLines, type Pay } from './plan-badge'
 import { api, useApp } from '@/lib/client'
 import type { AssistantState } from '@/lib/types'
@@ -33,6 +34,12 @@ export function ModelSelect({ presetId, value, onChange }: { presetId: PresetId;
       <Select aria-label={t('Нейросеть')} value={custom ? CUSTOM : value || models[0].id} onChange={(v) => { const c = v === CUSTOM; setCustom(c); onChange(c ? '' : v) }} options={[...models.map((m) => ({ value: m.id, label: m.price ? `${m.label}, ${m.price}` : m.label })), { value: CUSTOM, label: t('Другая нейросеть…') }]} />
       {custom && <input aria-label={t('Название нейросети')} placeholder={t('Название нейросети')} className={`${inputClass} font-mono`} value={value} onChange={(e) => onChange(e.target.value)} />}
       {!custom && current?.note && <span>{t(current.note)}</span>}
+      {!custom && current && (() => {
+        const r = resultFor(presetId, current.id)
+        return r
+          ? <span className={recommended(r) ? 'text-[#2f7d4f]' : 'text-rust'}>{t('Проверена на сценариях ассистента')}: {r.passed} {t('из')} {r.of}{recommended(r) ? '' : `. ${t('Не рекомендуем')}`}</span>
+          : <span className="text-rust">{t('Не проверена на сценариях ассистента у этого сервиса')}</span>
+      })()}
       <span className="text-ink-faint">{t('Цена примерно за тысячу страниц текста: ваш вопрос / ответ нейросети')}</span>
     </label>
   )
@@ -121,6 +128,7 @@ export function ProviderForm({ onDone }: { onDone?: () => void }) {
           <input autoComplete="off" spellCheck={false} aria-label={t('Идентификатор каталога')} placeholder={t('Идентификатор каталога')} className={`${inputClass} font-mono`} value={folder} onChange={(e) => { setFolder(e.target.value); setError('') }} />
         </li>}
       </ol>
+      {!preset.models.some((m) => resultFor(preset.id, m.id)) && <p role="status" className="rounded-lg bg-muted px-3 py-2 text-xs text-ink-soft">{t('Модели этого сервиса мы ещё не проверяли на сценариях ассистента. Надёжнее взять OpenRouter, где проверенные модели уже есть.')}</p>}
       <details>
         <summary className="cursor-pointer text-ink-soft">{t('Для опытных: выбрать нейросеть самому')}</summary>
         <div className="mt-2"><p className="mb-1 text-xs text-ink-soft">{t('Если не выбирать, приложение берёт проверенную нейросеть и потом само переходит на самую новую в её линейке.')}</p><ModelSelect presetId={id} value={model} onChange={setModel} /></div>

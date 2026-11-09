@@ -48,7 +48,7 @@ a deletion (MiniMax), and several import chains (Luna). The checks look for the 
 wording the check did not expect: read the logs before drawing a conclusion about any single scenario.
 
 Limits of this run: one pass per model, so a difference of one or two scenarios is noise; the scenarios are Russian; the models were
-reached through OpenRouter, so the direct Anthropic and OpenAI lines in the app use the same models but were not run directly. The Google line and the
+reached through OpenRouter. A test through one service is not a test of another, so the direct Anthropic, OpenAI, Google, Yandex, Cloud.ru, DeepSeek and Moonshot choices are shown in the app as not tested, with a warning, until they are run at the service itself (`lib/agent/tested.ts` lists what was run). The Google line and the
 free plans (Groq, Gemini) have not been run: they stay `provisional`.
 
 ## Free plans
