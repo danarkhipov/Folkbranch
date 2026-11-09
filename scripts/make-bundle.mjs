@@ -19,6 +19,21 @@ fs.mkdirSync(dist, { recursive: true })
 const windows = process.platform === 'win32'
 const copy = (from, to) => fs.cpSync(from, path.join(stage, to), { recursive: true, force: true, ...(windows ? { dereference: true } : { verbatimSymlinks: true }) })
 copy(standalone, '.')
+// On Windows pnpm's links are junctions, and a copy of one still points back into the build folder: the archive would load
+// its libraries from there. Each becomes the real folder it stood for.
+if (windows) {
+  const flat = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name)
+      if (e.isSymbolicLink()) {
+        const target = fs.realpathSync(p)
+        fs.rmSync(p, { recursive: true, force: true })
+        fs.cpSync(target, p, { recursive: true, force: true, dereference: true })
+      } else if (e.isDirectory()) flat(p)
+    }
+  }
+  flat(path.join(stage, 'node_modules'))
+}
 // A build made beside a family's archive must never carry any of it away.
 if (fs.existsSync(path.join(stage, 'data'))) { console.error('The build holds a data folder. Remove .next and build again.'); process.exit(1) }
 copy('.next/static', '.next/static')
