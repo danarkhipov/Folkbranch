@@ -23,7 +23,7 @@ const perMillion = (v: unknown) => { const n = Number(v) * 1e6; return Number.is
 const NOT_CHAT = /embed|tts|transcribe|whisper|audio|realtime|image|moderation|dall|imagen|veo|sora|speech|rerank|live|robotics/i
 
 /** One parser for each provider's list. An id the list gives is always kept, so a chosen model is always found. */
-export const PARSERS: Record<PresetId, (body: any, folder: string) => LiveModel[]> = {
+const RAW: Record<PresetId, (body: any, folder: string) => LiveModel[]> = {
   openrouter: (b) => rows(b).map((m) => ({
     id: m.id, label: m.name ?? m.id, created: seconds(m.created),
     price: m.pricing ? `$${perMillion(m.pricing.prompt)} / $${perMillion(m.pricing.completion)}` : null,
@@ -62,3 +62,16 @@ export const PARSERS: Record<PresetId, (body: any, folder: string) => LiveModel[
 
 /** Newest first; a model with no date goes after those with one. */
 export const newestFirst = (list: LiveModel[]) => [...list].sort((a, b) => b.created - a.created || a.label.localeCompare(b.label))
+
+/**
+ * Whatever a provider's list looks like one day, a list comes out: a row that is not what we expect is left out
+ * on its own, and the rest still counts. An empty result is read by the callers as "could not read it".
+ */
+const goodId = (m: unknown): m is LiveModel => !!m && typeof (m as LiveModel).id === 'string' && !!(m as LiveModel).id && !/^(undefined|null)$/.test((m as LiveModel).id)
+export const PARSERS = Object.fromEntries(Object.entries(RAW).map(([id, parse]) => [id, (body: any, folder: string): LiveModel[] => {
+  try {
+    return parse(body, folder).filter(goodId)
+  } catch {
+    return rows(body).flatMap((row) => { try { return parse({ data: [row] }, folder).filter(goodId) } catch { return [] } })
+  }
+}])) as Record<PresetId, (body: any, folder: string) => LiveModel[]>

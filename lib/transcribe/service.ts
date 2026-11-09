@@ -144,21 +144,29 @@ const formatOf = (name: string, mime: string) => {
 /** One recording to the service, and the words back. The recording is not kept anywhere. */
 async function send(c: NonNullable<ReturnType<typeof config>>, audio: { bytes: Buffer; name: string; mime: string }, language: string | null) {
   const { preset, base, key } = c
-  const model = await modelFor(c)
-  let res: Response
-  if (preset.style === 'openrouter') {
-    res = await ask('https://openrouter.ai/api/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ model, input_audio: { data: audio.bytes.toString('base64'), format: formatOf(audio.name, audio.mime) }, ...(language ? { language } : {}) }),
-    }, 120_000)
-  } else {
+  let model = await modelFor(c)
+  const attempt = (model: string) => {
+    if (preset.style === 'openrouter') {
+      return ask('https://openrouter.ai/api/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ model, input_audio: { data: audio.bytes.toString('base64'), format: formatOf(audio.name, audio.mime) }, ...(language ? { language } : {}) }),
+      }, 120_000)
+    }
     const form = new FormData()
     form.set('file', new Blob([new Uint8Array(audio.bytes)], { type: audio.mime || 'audio/webm' }), audio.name || 'recording.webm')
     form.set('model', model)
     // OpenAI's newest model finds the language itself and refuses the old field.
     if (language && model !== 'gpt-transcribe') form.set('language', language)
-    res = await ask(`${base}/audio/transcriptions`, { method: 'POST', headers: { authorization: `Bearer ${key}` }, body: form }, 120_000)
+    return ask(`${base}/audio/transcriptions`, { method: 'POST', headers: { authorization: `Bearer ${key}` }, body: form }, 120_000)
+  }
+  let res = await attempt(model)
+  // A model the service has taken away: with "auto", the other tested models of the service are tried, and the one that answers is kept.
+  if ((res.status === 404 || res.status === 400) && c.cfg.model === 'auto') {
+    for (const other of preset.models.map((m) => m.id).filter((id) => id !== model)) {
+      const again = await attempt(other)
+      if (again.ok) { res = again; model = other; chosenModels.set(preset.id, { at: Date.now(), id: other }); break }
+    }
   }
   if (res.status === 401 || res.status === 403) throw new OpError(502, say('Сервис не принял ключ владельца. Сообщите ему'))
   if (res.status === 402) throw new OpError(502, say('На счёте сервиса закончились деньги. Сообщите владельцу'))

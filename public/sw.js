@@ -2,6 +2,12 @@
 // Nothing from /api is ever stored here, so a shared computer keeps no one's archive.
 const CACHE = 'folkbranch-v2'
 const OFFLINE = '/offline.html'
+// Every release brings new hashed files and the old ones are never asked for again: after a year of updates the cache would only grow.
+const KEEP = 400
+async function trim(cache) {
+  const keys = await cache.keys()
+  await Promise.all(keys.slice(0, Math.max(0, keys.length - KEEP)).filter((k) => !k.url.endsWith(OFFLINE)).map((k) => cache.delete(k)))
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.add(OFFLINE)).then(() => self.skipWaiting()))
@@ -27,7 +33,7 @@ self.addEventListener('fetch', (event) => {
       const kept = await cache.match(request)
       if (kept) return kept
       const fresh = await fetch(request)
-      if (fresh.ok) cache.put(request, fresh.clone())
+      if (fresh.ok) cache.put(request, fresh.clone()).then(() => trim(cache)).catch(() => {})
       return fresh
     }))
   }

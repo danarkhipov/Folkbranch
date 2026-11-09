@@ -5,9 +5,9 @@ import type { NextConfig } from 'next'
 // and Telegram's sign-in button, which Telegram draws itself in a frame of its own.
 const dev = process.env.NODE_ENV !== 'production'
 const CSP = [
-  "default-src 'self'", `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://telegram.org${dev ? " 'unsafe-eval'" : ''}`, "frame-src https://oauth.telegram.org", "style-src 'self' 'unsafe-inline'", "img-src 'self' data: blob: https://tile.openstreetmap.org", "font-src 'self' data:",
+  "default-src 'self'", `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://telegram.org${dev ? " 'unsafe-eval'" : ''}`, "frame-src https://oauth.telegram.org", "style-src 'self' 'unsafe-inline'", "img-src 'self' data: blob: https://tile.openstreetmap.org https://*.basemaps.cartocdn.com", "font-src 'self' data:",
   // Model files, fetched only when someone asks for them: these addresses can send data in, and no code from them runs as a script.
-  `connect-src 'self' https://unpkg.com https://cdn.jsdelivr.net https://huggingface.co https://*.hf.co${dev ? ' ws:' : ''}`, "media-src 'self' blob:", "worker-src 'self' blob:", "frame-ancestors 'none'", "base-uri 'self'", "object-src 'none'", "form-action 'self'",
+  `connect-src 'self' https://unpkg.com https://cdn.jsdelivr.net https://huggingface.co https://*.hf.co https://hf-mirror.com${dev ? ' ws:' : ''}`, "media-src 'self' blob:", "worker-src 'self' blob:", "frame-ancestors 'none'", "base-uri 'self'", "object-src 'none'", "form-action 'self'",
 ].join('; ')
 
 const config: NextConfig = {

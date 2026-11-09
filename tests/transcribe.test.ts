@@ -85,6 +85,16 @@ describe('cloud transcription', () => {
     expect(JSON.parse(sent).input_audio.format).toBe('wav')
   })
 
+  it('a speech model the service took away is replaced by another tested one, and that one is kept', async () => {
+    server((url) => (url.endsWith('/models') ? json({ data: [{ id: 'whisper-large-v3-turbo' }] }) : json({ text: 'x' })))
+    await saveTranscription(owner, { provider: 'groq', key: 'gsk_secretvalue1234' })
+    let gone = true
+    server((url, init) => (url.endsWith('/models') ? json({ data: [{ id: 'whisper-large-v3-turbo' }] }) : gone && String((init.body as FormData).get('model')) !== 'whisper-large-v3' ? json({ error: 'model not found' }, 404) : json({ text: 'сказано' })))
+    expect((await transcribe(editor, audio, { language: 'ru', seconds: 30 })).text).toBe('сказано')
+    expect(calls.filter((c) => c.url.endsWith('/audio/transcriptions')).length).toBe(2)
+    gone = false
+  })
+
   it('can be taken away', async () => {
     expect(removeTranscription(owner).current).toBeNull()
     expect(transcriptionInfo().enabled).toBe(false)

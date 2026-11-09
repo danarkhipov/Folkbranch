@@ -1,6 +1,15 @@
 'use client'
 import { ORT_VERSION } from './ort-version'
 
+/** The first address that answers; the first one again when none does, so the error says what failed. */
+async function reachable(urls: string[]) {
+  for (const u of urls) {
+    const ok = await fetch(u, { method: 'HEAD', signal: AbortSignal.timeout(5_000) }).then((r) => r.ok).catch(() => false)
+    if (ok) return u
+  }
+  return urls[0]
+}
+
 export function runSpeech(job: { samples: Float32Array | null; language?: string; model?: string }, onMessage: (m: { type: string; loaded?: number; total?: number; done?: number; text?: string }) => void, signal: AbortSignal) {
   return new Promise<string>((resolve, reject) => {
     const worker = job.model ? new Worker(new URL('./speech-worker.ts', import.meta.url), { type: 'module' }) : new Worker(new URL('./gigaam-worker.ts', import.meta.url), { type: 'module' })
@@ -15,7 +24,8 @@ export function runSpeech(job: { samples: Float32Array | null; language?: string
     // Half the cores at most: the person is still using this device.
     const threads = crossOriginIsolated ? Math.max(1, Math.min(4, Math.ceil((navigator.hardwareConcurrency || 2) / 2))) : 1
     const file = 'ort-wasm-simd-threaded.asyncify'
-    worker.postMessage({ ...job, threads, ort: { mjs: `${location.origin}/ort/${file}.mjs`, wasm: `https://unpkg.com/onnxruntime-web@${ORT_VERSION}/dist/${file}.wasm` } }, job.samples ? [job.samples.buffer] : [])
+    // The engine comes from one of two mirrors: if the first does not answer, the second does.
+    void reachable([`https://unpkg.com/onnxruntime-web@${ORT_VERSION}/dist/${file}.wasm`, `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/${file}.wasm`]).then((wasm) => worker.postMessage({ ...job, threads, ort: { mjs: `${location.origin}/ort/${file}.mjs`, wasm } }, job.samples ? [job.samples.buffer] : []))
   })
 }
 

@@ -229,8 +229,9 @@ export function parseGedcom(text: string, lang: 'ru' | 'en' = 'ru'): Imported {
 
   // ASSO names someone else in the file: read once everyone has a name.
   const named = new Map(persons.map((p) => [p.xref, [p.givenName, p.patronymic, p.surname].filter(Boolean).join(' ')]))
-  for (const r of roots.filter((x) => x.tag === 'INDI')) {
-    const person = persons.find((p) => p.xref === r.xref)!
+  // By position, not by id: a file may repeat an id or leave it out.
+  for (const [i, r] of roots.filter((x) => x.tag === 'INDI').entries()) {
+    const person = persons[i]
     for (const a of r.children.filter((c) => c.tag === 'ASSO')) {
       const rela = val(a, 'RELA') || val(a, 'ROLE')
       const kind = roleWord(rela, lang)

@@ -6,7 +6,7 @@ import { ORT_VERSION } from './ort-version'
 // Nothing downloads until someone presses the button. Files stay in this browser and can be removed again.
 const CACHE = 'folkbranch-models'
 const ort = (file: string) => [`https://unpkg.com/onnxruntime-web@${ORT_VERSION}/dist/${file}`, `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/${file}`]
-const hf = (repo: string, file: string) => [`https://huggingface.co/${repo}/resolve/main/${file}`]
+const hf = (repo: string, file: string) => [`https://huggingface.co/${repo}/resolve/main/${file}`, `https://hf-mirror.com/${repo}/resolve/main/${file}`]
 
 interface ModelFile { name: string; urls: string[]; bytes: number; sha256: string }
 const RUNTIME: ModelFile = { name: 'ort.wasm', urls: ort('ort-wasm-simd-threaded.wasm'), bytes: 14264838, sha256: '06ba057753da3847e4c24f02d91ab133455b0817c69a44993a9a53a2146df9e3' }

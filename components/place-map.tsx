@@ -37,7 +37,14 @@ export function PlaceMap({ marks, path = false, onPerson, className = 'h-72' }: 
       if (gone || !box.current) return
       const m = L.map(box.current, { scrollWheelZoom: false, attributionControl: true })
       map.current = m
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer noopener">OpenStreetMap</a>' }).addTo(m)
+      const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer noopener">OpenStreetMap</a>' }).addTo(m)
+      // OpenStreetMap may one day refuse tiles to an app: after a handful of failures another free map takes over.
+      let failed = 0
+      osm.on('tileerror', () => {
+        if (++failed !== 6) return
+        m.removeLayer(osm)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', { maxZoom: 18, subdomains: 'abcd', attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer noopener">OpenStreetMap</a> © <a href="https://carto.com/attributions" target="_blank" rel="noreferrer noopener">CARTO</a>' }).addTo(m)
+      })
       const color = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#a4502e'
       const points = marks.map((x) => L.latLng(x.lat, x.lon))
       if (path && points.length > 1) L.polyline(points, { color, weight: 2, dashArray: '4 6' }).addTo(m)
