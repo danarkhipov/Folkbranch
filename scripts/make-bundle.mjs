@@ -38,6 +38,12 @@ if (!driver) { console.error('The database driver is not in the build.'); proces
 fs.rmSync(path.join(stage, 'node_modules/better-sqlite3'), { recursive: true, force: true })
 if (windows) copy(path.join(standalone, 'node_modules/.pnpm', driver, 'node_modules/better-sqlite3'), 'node_modules/better-sqlite3')
 else fs.symlinkSync(`.pnpm/${driver}/node_modules/better-sqlite3`, path.join(stage, 'node_modules/better-sqlite3'))
+// The build's trace keeps the files a program loads, and leaves behind those it only needs beside it: the picture library's own
+// DLLs and shared files. Each of its packages comes whole from the install, or the library does not load on Windows.
+for (const d of fs.readdirSync(pnpmDir).filter((n) => n.startsWith('@img+sharp'))) {
+  fs.rmSync(path.join(pnpmDir, d), { recursive: true, force: true })
+  copy(path.join('node_modules/.pnpm', d), path.join('node_modules/.pnpm', d))
+}
 execFileSync(process.execPath, ['-e', "require('better-sqlite3'); require('sharp')"], { cwd: stage, stdio: 'inherit' })
 
 // This archive is public. A family's files must never reach it, whatever the build picked up.
