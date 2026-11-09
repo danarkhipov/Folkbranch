@@ -103,7 +103,7 @@ export function CloudSpeech() {
               {t('Предел в месяц, минут записи (0 без предела)')}
               <input className={`${input} max-w-40`} inputMode="numeric" aria-label={t('Предел в месяц')} value={limit} onChange={(e) => setLimit(e.target.value.replace(/\D/g, ''))} />
             </label>
-            <p className="text-xs text-ink-faint">{t('Запись уйдёт в')}: {t(preset.where)}. {t('Цены сервисов меняются: смотрите их страницы.')} {preset.tested ? t(preset.tested) : t('Этот сервис на наших записях не проверен.')}</p>
+            <p className="text-xs text-ink-faint">{t('Запись уйдёт в')}: {t(preset.where)}. {t('Цены сервисов меняются: смотрите их страницы.')} {['openrouter', 'groq'].includes(preset.id) ? t('Проверен.') : t('Не проверен.')}</p>
             <div className="flex flex-wrap gap-2">
               <Button type="button" loading={busy === 'save'} onClick={save}><KeyRound /> {cur ? t('Сохранить') : t('Подключить')}</Button>
               {cur && <Button type="button" variant="outline" loading={busy === 'test'} onClick={() => run('test', () => api('transcription/test', { method: 'POST', json: {} }), 'Работает: сервис принял пробную запись. Она стоила доли цента')}><FlaskConical /> {t('Проверить на записи тишины')}</Button>}

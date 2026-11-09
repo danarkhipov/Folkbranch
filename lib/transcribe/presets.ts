@@ -26,8 +26,7 @@ export interface SttPreset {
 export const STT_PRESETS: SttPreset[] = [
   {
     id: 'openrouter', label: 'OpenRouter', where: 'OpenRouter и сервис, который он выберет для модели', base: 'https://openrouter.ai/api/v1', style: 'openrouter', keysUrl: 'https://openrouter.ai/settings/keys', assistantKey: 'openrouter',
-    tested: 'Проверено 9 ноября 2026 на 20 английских и 20 русских записях: Voxtral Mini ошибается в 2% английских слов и в 14% русских.',
-    pitch: 'Один ключ для ассистента и расшифровки. Цена каждого запроса приходит в ответе, поэтому расход считается точно',
+        pitch: 'Лучше всех понимает русский.',
     models: [
       { id: 'mistralai/voxtral-mini-transcribe', label: 'Voxtral Mini (Mistral)', perMinute: 0.003, note: 'Дёшево и точно, много языков' },
       { id: 'openai/whisper-large-v3', label: 'Whisper large-v3', perMinute: null },
@@ -36,9 +35,8 @@ export const STT_PRESETS: SttPreset[] = [
   },
   {
     id: 'groq', label: 'Groq', where: 'Groq (США)', base: 'https://api.groq.com/openai/v1', style: 'openai', keysUrl: 'https://console.groq.com/keys', minSeconds: 10,
-    tested: 'Проверено 9 ноября 2026 на 20 английских и 20 русских записях: Whisper turbo ошибается в 3% английских слов и в 19% русских. На бесплатном плане лимит 20 запросов в минуту на всех.',
-    free: { data: 'private', note: 'Бесплатно: до 2 часов записи в час и 8 часов в день. Groq по договору не учится на ваших данных и по умолчанию не хранит их, логи до 30 дней только при сбоях.' },
-    pitch: 'Самый дешёвый: около 4 центов за час записи, и есть бесплатный лимит. Тот же Whisper, быстро',
+        free: { data: 'private', note: 'Бесплатный лимит, записи не используются.' },
+    pitch: 'Самый дешёвый, русский понимает хуже.',
     models: [
       { id: 'whisper-large-v3-turbo', label: 'Whisper large-v3 turbo', perMinute: 0.04 / 60, note: 'Около 4,6% ошибок на английском' },
       { id: 'whisper-large-v3', label: 'Whisper large-v3', perMinute: 0.111 / 60, note: 'Чуть точнее для редких языков' },
@@ -46,19 +44,19 @@ export const STT_PRESETS: SttPreset[] = [
   },
   {
     id: 'openai', label: 'OpenAI', where: 'OpenAI (США)', base: 'https://api.openai.com/v1', style: 'openai', keysUrl: 'https://platform.openai.com/api-keys', assistantKey: 'openai',
-    pitch: 'Одна из самых точных: около 3,3% ошибок на английском, 27 центов за час',
+    pitch: 'Точный, но дороже.',
     models: [{ id: 'gpt-transcribe', label: 'GPT Transcribe', perMinute: 0.0045 }],
   },
   {
     id: 'mistral', label: 'Mistral (Voxtral)', where: 'Mistral AI (Франция)', base: 'https://api.mistral.ai/v1', style: 'openai', keysUrl: 'https://console.mistral.ai/api-keys',
-    free: { data: 'trains', note: 'Бесплатный план есть, но Mistral по умолчанию учится на запросах (отключается в панели). На платном плане не учится, логи 30 дней.' },
-    pitch: 'Европейский сервис: около 21 цента за час, 13 языков с хорошим русским',
+    free: { data: 'trains', note: 'Бесплатно, но компания использует ваши записи.' },
+    pitch: 'Недорогой европейский сервис.',
     models: [{ id: 'voxtral-mini-transcribe-latest', label: 'Voxtral Mini Transcribe', perMinute: 0.0035 }],
   },
   {
     id: 'siliconflow', label: 'SiliconFlow (Китай)', where: 'SiliconFlow (Китай, Сингапур)', base: 'https://api.siliconflow.com/v1', style: 'openai', keysUrl: 'https://cloud.siliconflow.com/account/ak',
-    free: { data: 'unknown', note: 'Бесплатные модели есть, с лимитами. Условия по обучению на данных я не нашёл: считайте, что данные могут использоваться.' },
-    pitch: 'Китайский сервис с бесплатными моделями распознавания: Qwen3-ASR знает больше 30 языков, SenseVoice лучше всего для китайского. Бесплатные модели имеют лимиты',
+    free: { data: 'unknown', note: 'Бесплатно, но условия неясны.' },
+    pitch: 'Китайский сервис с бесплатными моделями.',
     models: [
       { id: 'Qwen/Qwen3-ASR-1.7B', label: 'Qwen3-ASR 1.7B (Alibaba)', perMinute: 0, note: 'Много языков, бесплатно' },
       { id: 'FunAudioLLM/SenseVoiceSmall', label: 'SenseVoice Small', perMinute: 0, note: 'Китайский, английский, японский, корейский' },
@@ -67,7 +65,7 @@ export const STT_PRESETS: SttPreset[] = [
   },
   {
     id: 'custom', label: 'Свой сервер', where: 'сервер, который указал владелец', base: '', style: 'openai', keysUrl: '',
-    pitch: 'Любой сервис, понимающий запросы так же, как OpenAI: например, faster-whisper или whisper.cpp на вашем компьютере. Тогда запись не покидает вашу сеть',
+    pitch: 'Ваш собственный сервер: запись не покидает вашу сеть.',
     models: [{ id: 'whisper-1', label: 'Название модели на вашем сервере', perMinute: null }],
   },
 ]

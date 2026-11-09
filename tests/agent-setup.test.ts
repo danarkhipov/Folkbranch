@@ -124,7 +124,7 @@ describe('connecting', () => {
   it('services in Russia and China are asked the same way, and Yandex also names its folder', async () => {
     const FOLDER = 'b1gabcdefghij12345'
     const cases = [
-      ['cloudru', 'foundation-models.api.cloud.ru/v1/models', { data: [{ id: 'Qwen/Qwen3.6-35B-A3B' }] }],
+      ['cloudru', 'foundation-models.api.cloud.ru/v1/models', { data: [{ id: 'GigaChat/GigaChat-3-Pro' }] }],
       ['deepseek', 'api.deepseek.com/models', { data: [{ id: 'deepseek-flash' }] }],
       ['moonshot', 'api.moonshot.ai/v1/models', { data: [{ id: 'kimi-k3.1-pro' }] }],
       ['yandex', 'ai.api.cloud.yandex.net/v1/models', { data: [{ id: `gpt://${FOLDER}/yandexgpt/latest` }] }],
