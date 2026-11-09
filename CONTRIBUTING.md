@@ -40,7 +40,7 @@ CI runs the first two and builds the image on every pull request.
 
 - `main` is what is released, and work goes to `develop`. Please aim pull requests at `develop`.
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org): `feat:`, `fix:`, `docs:`, `test:`.
-- Note anything people will notice in `CHANGELOG.md`, under the next version.
+- Note anything people will notice in `CHANGELOG.md`, under **Unreleased**. How a version is chosen and a release is cut is in [docs/RELEASING.md](docs/RELEASING.md).
 - **Never commit real family data.** Tests and the demo use invented people only. Please do not attach real names or photos to issues either.
 
 By contributing you agree that your work is licensed under [AGPL-3.0](LICENSE).
