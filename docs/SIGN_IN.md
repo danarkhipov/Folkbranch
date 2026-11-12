@@ -50,6 +50,10 @@ Telegram draws its own button on the page. It works only at the domain the bot w
 3. Copy the Client ID and Client secret into the app.
 4. While the app is in Testing, Google lets in only the test users listed under Audience. Add relatives there, or press Publish app: for a sign-in that asks only for the name and email, Google does not need to review it.
 
+### The owner, with no link
+
+The owner's account is made with no email, so Google does not know it yet. Set `OWNER_EMAIL` to the owner's Google address in the server's environment and restart: the account takes that address, and **Sign in with Google** opens it at once. Nothing else changes: any other Google account is still refused. A server setting wins over an address the owner set themselves.
+
 ## A code by mail
 
 A six-digit code comes by mail and works for 10 minutes. A relative first adds their address under **My account**, confirming it with a code, because someone who came by a link has none on file.

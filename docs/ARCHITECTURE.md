@@ -71,7 +71,7 @@ Dates are inexact: "~1876", "1883 or 1886". So a date is stored as text, with a 
 2. **Railway.** One service with one volume, built from the `Dockerfile`.
 3. **First run.** The first person becomes the owner and chooses the language (English or Russian) and the family name.
 
-All settings are environment variables (see `.env.example`). Optional ones: Google and Yandex OAuth, `SETUP_TOKEN` (protects an empty instance), `RECOVERY_TOKEN` (gets the owner back in). Email and S3 are not connected.
+All settings are environment variables (see `.env.example`). Optional ones: Google and Yandex OAuth, `SETUP_TOKEN` (protects an empty instance), `RECOVERY_TOKEN` (gets the owner back in), `OWNER_EMAIL` (the owner's address, so Google opens their account with no link). Email and S3 are not connected.
 
 ## Railway notes
 

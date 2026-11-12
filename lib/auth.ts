@@ -12,6 +12,7 @@ import { getDb, schema } from './db'
 import { localLoginAllowed } from './local-login'
 import { findInvite, findOwnerId, hasUsers, isRecoveryToken, setSetting } from './ops/settings'
 import { loadDemo } from './demo'
+import { applyOwnerEmail } from './owner-email'
 import { publicOrigins, publicUrl } from './public-url'
 import { serverSecret } from './server-secret'
 import { setupCodeMatches } from './setup-code'
@@ -50,6 +51,7 @@ const familyAccess = () =>
         const u = await createFamilyUser(ctx, ctx.body.name, 'owner', null)
         setSetting('familyName', ctx.body.familyName)
         setSetting('language', ctx.body.language)
+        applyOwnerEmail()
         if (ctx.body.demo) await loadDemo(u.id, ctx.body.name, ctx.body.language)
         return ctx.json({ ok: true })
       }),
@@ -117,6 +119,7 @@ async function createFamilyUser(ctx: any, name: string, role: string, personId: 
 }
 
 function build() {
+  applyOwnerEmail()
   const google = methodConfig('google'), yandex = methodConfig('yandex'), vk = methodConfig('vk'), mail = methodConfig('email')
   // Yandex is served through the same doors as Google and VK: /sign-in/social and /callback/yandex.
   const oauth = yandex
