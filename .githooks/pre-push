@@ -1,0 +1,8 @@
+#!/bin/sh
+# Stops a push that carries a commit naming an AI assistant. Deleting a branch is not checked.
+zero=0000000000000000000000000000000000000000
+while read -r _ local_sha _ remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue
+  if [ "$remote_sha" = "$zero" ]; then range="$local_sha --not --remotes"; else range="$remote_sha..$local_sha"; fi
+  sh "$(git rev-parse --show-toplevel)/scripts/authorship.sh" range "$range" || exit 1
+done
