@@ -1,6 +1,6 @@
 'use client'
 import { useState, type ComponentType } from 'react'
-import { AudioLines, ChevronLeft, ChevronRight, Cpu, DatabaseBackup, DoorOpen, KeyRound, Lightbulb, ListChecks, SlidersHorizontal, UserRound, Users } from 'lucide-react'
+import { AudioLines, ChevronLeft, ChevronRight, Cpu, DatabaseBackup, DoorOpen, KeyRound, Lightbulb, Sparkles, ListChecks, SlidersHorizontal, UserRound, Users } from 'lucide-react'
 import { AssistantIcon } from '../assistant-icon'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useApp } from '@/lib/client'
@@ -11,6 +11,7 @@ import { Archive } from './archive'
 import { Files } from './files'
 import { FeatureGuide } from '../feature-guide'
 import { CloudSpeech } from './cloud-speech'
+import { AiOverview } from './ai-overview'
 import { AssistantSettings } from './assistant'
 import { SetupGuide } from './setup-guide'
 import { ShareLinks } from './share-links'
@@ -19,10 +20,11 @@ import { SmartSettings } from './smart'
 import type { SignInMethods as Methods } from '@/lib/sign-in-methods'
 import { TokensTab } from './tokens'
 
-export type Section = 'speech' | 'tips' | 'setup' | 'account' | 'smart' | 'general' | 'people' | 'signin' | 'assistant' | 'agents' | 'data'
+export type Section = 'ai' | 'speech' | 'tips' | 'setup' | 'account' | 'smart' | 'general' | 'people' | 'signin' | 'assistant' | 'agents' | 'data'
 
 /** Each screen says what it is for, so nobody has to work it out from the fields. */
 const SECTIONS: Record<Section, [string, string, ComponentType<{ size?: number }>]> = {
+  ai: ['ИИ и модели', 'Что подключено: ассистент, расшифровка, лица и голос. И один файл, в котором всё это можно сохранить и загрузить.', Sparkles],
   speech: ['Расшифровка в облаке', 'Один сервис распознавания речи на всех: вы подключаете и платите, редакторы пользуются.', AudioLines],
   tips: ['Возможности и советы', 'Всё, что умеет приложение, и то, что обычно остаётся незамеченным.', Lightbulb],
   setup: ['С чего начать', 'Что уже готово и что ещё можно подключить. Всё необязательное можно пропустить.', ListChecks],
@@ -44,7 +46,7 @@ export function SettingsDialog({ open, onOpenChange, familyName, providers, onTe
   const [inside, setInside] = useState(!!initial)
   const setSection = (next: Section) => { setSectionNow(next); setInside(true) }
   const groups: [string, Section[]][] = isOwner
-    ? [['', ['setup', 'tips', 'account']], ['Основные настройки', ['general', 'people', 'signin', 'data']], ['ИИ и интеграции', ['assistant', 'speech', 'agents', 'smart']]]
+    ? [['', ['setup', 'tips', 'account']], ['Основные настройки', ['general', 'people', 'signin', 'data']], ['ИИ и интеграции', ['ai', 'assistant', 'speech', 'agents', 'smart']]]
     : [['', ['account', 'tips', 'smart', 'data']]]
   const [title, description] = SECTIONS[section]
   return (
@@ -69,6 +71,7 @@ export function SettingsDialog({ open, onOpenChange, familyName, providers, onTe
               <h2 className="font-serif text-xl font-medium">{t(title)}</h2>
               <DialogDescription className="mt-0.5 text-sm text-ink-soft">{t(description)}</DialogDescription>
             </header>
+            {section === 'ai' && isOwner && <AiOverview onGo={setSection} />}
             {section === 'setup' && isOwner && <SetupGuide onGo={setSection} />}
             {section === 'tips' && <FeatureGuide onGo={setSection} />}
             {section === 'account' && <Account providers={providers} />}

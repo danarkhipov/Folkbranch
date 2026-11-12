@@ -1,3 +1,4 @@
+import { exportAiSettings, importAiSettings } from '@/lib/ops/ai-config'
 import { z } from 'zod'
 import { chooseModel, connectProvider, modelChoices, currentProvider, disconnectProvider, providerStatus } from '@/lib/agent/provider-key'
 import { requireRole } from '@/lib/ops/core'
@@ -47,6 +48,8 @@ export const accessRoutes: Route[] = [
   human('GET', 'sign-in-methods', 'Ways into the archive besides an invitation', ({ actor }) => methodsStatus(actor)),
   human('PUT', 'sign-in-methods/:id', 'Switch a way of signing in on, with its keys', async ({ actor, params, body }) => saveMethod(actor, method(params.id), await body())),
   human('DELETE', 'sign-in-methods/:id', 'Switch a way of signing in off', ({ actor, params }) => removeMethod(actor, method(params.id))),
+  human('GET', 'ai-settings', 'Everything chosen about the AI, as a file with no keys in it', ({ actor }) => exportAiSettings(actor)),
+  human('PUT', 'ai-settings', 'Apply such a file: what can be applied is, and the rest is named', async ({ actor, body }) => importAiSettings(actor, await body())),
   human('GET', 'assistant/provider', 'Which AI provider is connected', ({ actor }) => providerStatus(actor)),
   human('PUT', 'assistant/provider', 'Connect an AI provider with a key', async ({ actor, body }) => connectProvider(actor, await body())),
   human('GET', 'assistant/provider/models', 'Models the connected key can use, newest first, with what each can do', ({ actor }) => modelChoices(actor)),

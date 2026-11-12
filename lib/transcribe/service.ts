@@ -64,6 +64,12 @@ function config() {
   return base && key !== null && key !== undefined ? { cfg, preset, base, key } : null
 }
 
+/** The cloud speech setup without its key, for the settings file. */
+export function speechSetup() {
+  const c = config()
+  return c && { provider: c.cfg.provider, model: c.cfg.model, baseUrl: c.cfg.baseUrl ?? null, sameKey: !!c.cfg.sameKey, limitMinutes: c.cfg.limitMinutes, fromServer: !!fromEnv() }
+}
+
 const month = () => new Date().toISOString().slice(0, 7)
 interface Usage { seconds: number; dollars: number; requests: number }
 const readUsage = (): Usage => { try { return JSON.parse(getSetting(`sttUsage:${month()}`) ?? '') } catch { return { seconds: 0, dollars: 0, requests: 0 } } }

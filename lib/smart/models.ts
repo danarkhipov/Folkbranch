@@ -61,6 +61,17 @@ export function chosen(feature: Pack) {
   return list.find((v) => v.suits.includes(tier)) ?? list[0]
 }
 export const recommended = (v: Variant) => v.suits.includes(readDevice().tier)
+/** What this device uses for each feature, for the settings file. */
+export const currentChoices = () => ({ faces: chosen('faces').id, recognize: chosen('recognize').id, speech: chosen('speech').id })
+/** Applies a feature's variant from a settings file, when this version knows it. */
+export function applyChoices(c: Partial<Record<Pack, string>>) {
+  const done: Pack[] = []
+  for (const f of ['faces', 'recognize', 'speech'] as const) {
+    const v = VARIANTS.find((x) => x.id === c[f] && x.feature === f)
+    if (v) { choose(v.id); done.push(f) }
+  }
+  return done
+}
 export function choose(id: string) {
   const v = byId(id)
   try { localStorage.setItem(CHOICE, JSON.stringify({ ...readChoice(), [v.feature]: id })) } catch {}
