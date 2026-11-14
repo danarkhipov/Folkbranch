@@ -2,6 +2,8 @@
 
 import * as React from "react"
 import { cn } from "@/lib/utils"
+import { translate } from "@/lib/i18n"
+import { pageLang } from "@/lib/languages"
 import { XIcon } from "lucide-react"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
@@ -37,7 +39,7 @@ function DialogOverlay({
 }
 
 /** Works on the sign-in screens too, where there is no app context yet. */
-const closeLabel = () => (typeof document !== "undefined" && document.documentElement.lang === "en" ? "Close" : "Закрыть")
+const closeLabel = () => (typeof document === "undefined" ? "Закрыть" : translate(pageLang(), "Закрыть"))
 
 function DialogContent({
   className,

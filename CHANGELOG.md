@@ -5,6 +5,7 @@ All notable changes are listed here, newest first. Versions follow [Semantic Ver
 ## Unreleased
 
 ### Added
+- Spanish and Catalan as archive languages, in Settings → General and on the first screen. A word not yet translated shows in English, never in Russian. Dates such as "12 de marzo de 1890" and "5 d'abril de 1931" are read in search, birthdays and GEDCOM export, a search finds García as Garcia and understands "la esposa de Iván" and "la dona de l'Ivan", and the assistant and speech recognition take the archive's language. The fictional demo family is in English for both for now.
 - **Settings → AI and models**: one screen that shows what is connected (the assistant, cloud transcription, faces and voice on the device, stories by link), and one settings file for all of it. Download it, or load it into another archive: it holds no keys, says what it applied and what it could not and why.
 - `OWNER_EMAIL` in the server's environment puts the owner's address on their account, so "Sign in with Google" opens it with no link to open first. No other Google account gets in.
 - A check that no commit names an AI assistant as author or co-author: a `commit-msg` and a `pre-push` hook in `.githooks`, and a CI job.

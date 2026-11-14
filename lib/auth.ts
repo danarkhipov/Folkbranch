@@ -40,7 +40,7 @@ const familyAccess = () =>
         body: z.object({
           name: z.string().min(1),
           familyName: z.string().min(1),
-          language: z.enum(['ru', 'en']),
+          language: z.enum(['ru', 'en', 'es', 'ca']),
           demo: z.boolean().optional(),
           code: z.string().optional(),
         }),

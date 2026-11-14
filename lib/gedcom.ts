@@ -1,7 +1,9 @@
 // GEDCOM 5.5.1 and 7.0: a deterministic parser and writer. No model is involved.
-import type { Fact, Graph, Person, Source } from './types'
+import type { Fact, Graph, Lang, Person, Source } from './types'
+import { translatePair } from './i18n'
 import { factWords } from './fact-kinds'
 import { splitPatronymic } from './names'
+import { datesIn } from './search/dates'
 
 /** Facts that have their own GEDCOM tag. Any other kind travels as EVEN with a TYPE. */
 export const FACT_TAGS: Record<string, [string, string]> = {
@@ -14,7 +16,9 @@ export const FACT_TAGS: Record<string, [string, string]> = {
   RETI: ['Выход на пенсию', 'Retirement'], CREM: ['Кремация', 'Cremation'], WILL: ['Завещание', 'Will'], PROB: ['Наследство', 'Probate'],
 }
 
-const roleWord = (rela: string, lang: 'ru' | 'en') => ASSOCIATES[rela.toLowerCase()]?.[lang === 'en' ? 1 : 0] || rela || (lang === 'en' ? 'Participant' : 'Участник')
+// Spanish and Catalan look the Russian word up in their own table, else take the English.
+const word = (lang: Lang, pair: [string, string] | undefined) => (pair ? translatePair(lang, ...pair) : '')
+const roleWord = (rela: string, lang: Lang) => word(lang, ASSOCIATES[rela.toLowerCase()]) || rela || translatePair(lang, 'Участник', 'Participant')
 
 /** What ASSO says one person was to another, in the archive's words. */
 const ASSOCIATES: Record<string, [string, string]> = {
@@ -71,19 +75,22 @@ export function fromGedDate(v: string): string {
   return `${m[1]}${m[2] ? m[2].padStart(2, '0') + '.' : ''}${mon ? mon + '.' : ''}${m[4]}`
 }
 
-export function toGedDate(v: string): string {
+export function toGedDate(v: string, lang: Lang = 'ru'): string {
   const s = v.trim()
   const range = s.match(/^([^–]+)–([^–]+)$/)
-  if (range) return `BET ${toGedDate(range[1])} AND ${toGedDate(range[2])}`
-  if (/^[<>]/.test(s)) return `${s[0] === '<' ? 'BEF' : 'AFT'} ${toGedDate(s.slice(1))}`
+  if (range) return `BET ${toGedDate(range[1], lang)} AND ${toGedDate(range[2], lang)}`
+  if (/^[<>]/.test(s)) return `${s[0] === '<' ? 'BEF' : 'AFT'} ${toGedDate(s.slice(1), lang)}`
   let m = s.match(/^(\d{1,2})\.(\d{2})\.(\d{4})$/)
   const names = Object.keys(MONTHS)
   if (m) return `${+m[1]} ${names[+m[2] - 1]} ${m[3]}`
   m = s.match(/^(\d{2})\.(\d{4})$/)
   if (m) return `${names[+m[1] - 1]} ${m[2]}`
   m = s.match(/^~\s*(.+)$/)
-  if (m) return `ABT ${toGedDate(m[1])}`
+  if (m) return `ABT ${toGedDate(m[1], lang)}`
   if (/^\d{3,4}$/.test(s)) return s
+  // In a Spanish or Catalan archive, a date written out in words, alone in the field: "12 de marzo de 1890".
+  const d = lang === 'es' || lang === 'ca' ? datesIn(s) : []
+  if (d.length === 1 && d[0].month && d[0].start === 0 && d[0].end === s.length) return [d[0].day, names[d[0].month - 1], d[0].year].filter(Boolean).join(' ')
   return s ? `(${s})` : ''
 }
 
@@ -125,9 +132,9 @@ function bestQuality(person: GedLine) {
   return quays.length ? Math.max(...quays) : null
 }
 
-/** PAGE holds "ref, л. 12" here: a reference and a sheet, split where we can tell them apart. */
-function pageOf(v: string) {
-  const m = v.match(/^(.*?)(?:,\s*)?(?:л\.|лист|p\.|page)\s*(\S+)$/i)
+/** PAGE holds "ref, л. 12" here: a reference and a sheet, split where we can tell them apart. Spanish and Catalan archives also read "pág.", "fol." and the like. */
+function pageOf(v: string, lang: Lang) {
+  const m = v.match(lang === 'es' || lang === 'ca' ? /^(.*?)(?:,\s*)?(?:л\.|лист|p\.|page|pág\.|pàg\.|fol\.|folio|foli)\s*(\S+)$/i : /^(.*?)(?:,\s*)?(?:л\.|лист|p\.|page)\s*(\S+)$/i)
   return m ? { ref: m[1], page: m[2] } : { ref: v, page: '' }
 }
 
@@ -153,7 +160,7 @@ export function unreadTags(text: string) {
   return [...counts].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count)
 }
 
-export function parseGedcom(text: string, lang: 'ru' | 'en' = 'ru'): Imported {
+export function parseGedcom(text: string, lang: Lang = 'ru'): Imported {
   const roots = parseLines(text)
   const head = roots.find((r) => r.tag === 'HEAD')
   const version = (head && val(child(head, 'GEDC'), 'VERS')) || '?'
@@ -220,10 +227,10 @@ export function parseGedcom(text: string, lang: 'ru' | 'en' = 'ru'): Imported {
           const note = [longText(c), ...c.children.filter((x) => x.tag === 'NOTE' || x.tag === 'SNOTE').map(noteOf)].filter(Boolean).join('\n')
           // GEDCOM 7 names those present at an event under it: godparents at a baptism, witnesses at a wedding.
           const people = c.children.filter((x) => x.tag === 'ASSO').map((x) => ({ personId: x.value.startsWith('@') ? x.value : null, name: x.value.startsWith('@') ? '' : x.value, role: roleWord(val(child(x, 'ROLE'), 'PHRASE') || val(x, 'ROLE') || val(x, 'RELA'), lang) }))
-          return { kind: val(c, 'TYPE') || FACT_TAGS[c.tag]?.[lang === 'en' ? 1 : 0] || (lang === 'en' ? 'Event' : 'Событие'), date: fromGedDate(val(c, 'DATE')), place: val(c, 'PLAC'), note, source: source ? sourceTitles.get(source.value) ?? longText(source) : '', ...(people.length ? { people } : {}) }
+          return { kind: val(c, 'TYPE') || word(lang, FACT_TAGS[c.tag]) || translatePair(lang, 'Событие', 'Event'), date: fromGedDate(val(c, 'DATE')), place: val(c, 'PLAC'), note, source: source ? sourceTitles.get(source.value) ?? longText(source) : '', ...(people.length ? { people } : {}) }
         }),
       // Citations on an event stay with its fact; the rest are about the person.
-      sources: uniqueSources([...r.children, ...r.children.filter((c) => c.tag !== 'EVEN' && !(c.tag in FACT_TAGS)).flatMap((c) => c.children)].filter((c) => c.tag === 'SOUR').map((c) => ({ title: sourceTitles.get(c.value) ?? longText(c), ...pageOf(val(c, 'PAGE')), url: val(c, 'WWW') || val(c, 'NOTE') })).filter((s) => s.title)),
+      sources: uniqueSources([...r.children, ...r.children.filter((c) => c.tag !== 'EVEN' && !(c.tag in FACT_TAGS)).flatMap((c) => c.children)].filter((c) => c.tag === 'SOUR').map((c) => ({ title: sourceTitles.get(c.value) ?? longText(c), ...pageOf(val(c, 'PAGE'), lang), url: val(c, 'WWW') || val(c, 'NOTE') })).filter((s) => s.title)),
     }
   })
 
@@ -265,21 +272,24 @@ function textLines(level: number, tag: string, text: string) {
   return [`${level} ${tag} ${first}`, ...rest.map((l) => `${level + 1} CONT ${l}`)]
 }
 
-function factLines(f: Fact, xrefOf?: (id: string) => string | undefined) {
-  const tag = Object.entries(FACT_TAGS).find(([, names]) => names.includes(f.kind))?.[0]
+function factLines(f: Fact, lang: Lang, xrefOf?: (id: string) => string | undefined) {
+  // A Spanish or Catalan archive keeps the kind in its own words ("Censo"), as its import wrote it.
+  const tag = Object.entries(FACT_TAGS).find(([, names]) => names.includes(f.kind) || translatePair(lang, ...names) === f.kind)?.[0]
   // GEDCOM has no place for a unit or a godparent without a card here, so they ride in the note, as words.
   const note = factWords(f).split('\n')
   const lines = [`1 ${tag ?? 'EVEN'}${note[0] ? ` ${note[0]}` : ''}`]
   note.slice(1).forEach((l) => lines.push(`2 CONT ${l}`))
   if (!tag && f.kind) lines.push(`2 TYPE ${f.kind}`)
-  if (f.date) lines.push(`2 DATE ${toGedDate(f.date)}`)
+  if (f.date) lines.push(`2 DATE ${toGedDate(f.date, lang)}`)
   if (f.place) lines.push(`2 PLAC ${f.place}`)
   if (f.source) lines.push(...textLines(2, 'SOUR', f.source))
   for (const x of f.people ?? []) if (x.personId && xrefOf?.(x.personId)) lines.push(`2 ASSO ${xrefOf(x.personId)}`, `3 ROLE OTHER`, `4 PHRASE ${x.role}`)
   return lines
 }
 
-export function writeGedcom(graph: Graph, opts: { hideLiving: boolean; source: string; pageWord?: string }): string {
+/** `lang` is the archive's: a Spanish or Catalan one has its own words for dates and kinds of fact. */
+export function writeGedcom(graph: Graph, opts: { hideLiving: boolean; source: string; pageWord?: string; lang?: Lang }): string {
+  const lang = opts.lang ?? 'ru'
   const out = ['0 HEAD', `1 SOUR ${opts.source}`, '1 GEDC', '2 VERS 5.5.1', '2 FORM LINEAGE-LINKED', '1 CHAR UTF-8']
   const hide = (p: Person) => opts.hideLiving && (p.living || !!p.keepPrivate)
   const xref = new Map(graph.persons.map((p, i) => [p.id, `@I${i + 1}@`]))
@@ -315,15 +325,15 @@ export function writeGedcom(graph: Graph, opts: { hideLiving: boolean; source: s
       if (p.neverMarried) out.push('1 NMR 0')
       if (p.birthDate || p.birthPlace) {
         out.push('1 BIRT')
-        if (p.birthDate) out.push(`2 DATE ${toGedDate(p.birthDate)}`)
+        if (p.birthDate) out.push(`2 DATE ${toGedDate(p.birthDate, lang)}`)
         if (p.birthPlace) out.push(`2 PLAC ${p.birthPlace}`)
       }
       if (!p.living) {
         out.push(p.deathDate || p.deathPlace ? '1 DEAT' : '1 DEAT Y')
-        if (p.deathDate) out.push(`2 DATE ${toGedDate(p.deathDate)}`)
+        if (p.deathDate) out.push(`2 DATE ${toGedDate(p.deathDate, lang)}`)
         if (p.deathPlace) out.push(`2 PLAC ${p.deathPlace}`)
       }
-      for (const f of p.facts) out.push(...factLines(f, (id) => { const q = people.get(id); return q && !hide(q) ? xref.get(id) : undefined }))
+      for (const f of p.facts) out.push(...factLines(f, lang, (id) => { const q = people.get(id); return q && !hide(q) ? xref.get(id) : undefined }))
       for (const s of p.sources) {
         out.push(...textLines(1, 'SOUR', s.title))
         const page = [s.ref, s.page && `${opts.pageWord ?? 'л.'} ${s.page}`].filter(Boolean).join(', ')
@@ -347,12 +357,12 @@ export function writeGedcom(graph: Graph, opts: { hideLiving: boolean; source: s
     f.children.forEach((c) => out.push(`1 CHIL ${xref.get(c.id)}`))
     if (f.kind === 'marriage') {
       out.push('1 MARR')
-      if (f.start) out.push(`2 DATE ${toGedDate(f.start)}`)
+      if (f.start) out.push(`2 DATE ${toGedDate(f.start, lang)}`)
       if (f.place) out.push(`2 PLAC ${f.place}`)
     }
     if (f.end) {
       out.push('1 DIV')
-      if (f.end !== '?') out.push(`2 DATE ${toGedDate(f.end)}`)
+      if (f.end !== '?') out.push(`2 DATE ${toGedDate(f.end, lang)}`)
     }
   })
   out.push('0 TRLR')

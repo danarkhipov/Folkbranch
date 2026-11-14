@@ -7,7 +7,7 @@ import { normal } from '../search/words'
 import { placeWords } from '../places'
 import { personName, shownTags, type Person, type Place, type Sex } from '../types'
 import { listPlaces } from './places'
-import { say } from './app-config'
+import { archiveLang, say } from './app-config'
 import { seesOnlyPublic, type Actor } from './core'
 import { listAllMedia } from './media'
 import { readablePages } from './pages'
@@ -100,14 +100,36 @@ const ROLES: [RegExp, 'parents' | 'children' | 'spouses' | 'siblings' | 'grandch
   [/^(бабушка|бабушки|бабка|grandmother)$/, 'grandparents', 'F', 'бабушка'], [/^(дед|деда|дедушка|дедушки|grandfather)$/, 'grandparents', 'M', 'дедушка'],
 ]
 
+/** The same relatives in Spanish and Catalan, as normal() leaves the words (germà as germa). Only an archive in either language reads them. */
+const ROLES_ES_CA: typeof ROLES = [
+  [/^(esposa|mujer|dona|muller)$/, 'spouses', 'F', 'жена'], [/^(esposo|marido|marit|espos|home)$/, 'spouses', 'M', 'муж'],
+  [/^(madre|mare)$/, 'parents', 'F', 'мать'], [/^(padre|pare)$/, 'parents', 'M', 'отец'], [/^(padres|pares)$/, 'parents', null, 'родитель'],
+  [/^(hijo|fill)$/, 'children', 'M', 'сын'], [/^(hija|filla)$/, 'children', 'F', 'дочь'], [/^(hijos|fills)$/, 'children', null, 'ребёнок'],
+  [/^(hermano|germa)$/, 'siblings', 'M', 'брат'], [/^(hermana|germana)$/, 'siblings', 'F', 'сестра'],
+  [/^(nieta|neta)$/, 'grandchildren', 'F', 'внучка'], [/^(nieto|net)$/, 'grandchildren', 'M', 'внук'],
+  [/^(abuela|avia)$/, 'grandparents', 'F', 'бабушка'], [/^(abuelo|avi)$/, 'grandparents', 'M', 'дедушка'],
+]
+/** "la esposa de Iván", "l'avi d'en Joan": [article] relative, de / del / d', [personal article] name. */
+const OF_NAME = /^(?:(?:el|la|los|las|els|les)\s+|l')?(\p{L}+)\s+(?:del?\s+|d')(?:(?:en|na|el|la)\s+|l')?(.+)$/u
+
+/** "жена Ивана" / "Ivan's wife": the relative's word and the rest, the name. */
+function relationIn(query: string) {
+  const words = normal(query).trim().split(/\s+/)
+  if (words.length < 2) return null
+  const at = words.findIndex((w) => ROLES.some(([re]) => re.test(w)))
+  if (at >= 0) return { role: ROLES.find(([re]) => re.test(words[at]))!, name: words.filter((_, i) => i !== at).join(' ') }
+  if (!['es', 'ca'].includes(archiveLang())) return null
+  const m = normal(query).trim().replace(/’/g, "'").replace(/\s+/g, ' ').match(OF_NAME)
+  const role = m && ROLES_ES_CA.find(([re]) => re.test(m[1]))
+  return role ? { role, name: m[2] } : null
+}
+
 /** "жена Ивана": finds Ivan, then answers with his wife. */
 function byRelation(actor: Actor, names: SearchIndex, query: string): SearchResult[] {
-  const words = normal(query).trim().split(/\s+/)
-  if (words.length < 2) return []
-  const at = words.findIndex((w) => ROLES.some(([re]) => re.test(w)))
-  if (at < 0) return []
-  const [, kind, sex, word] = ROLES.find(([re]) => re.test(words[at]))!
-  const sure = search(names, words.filter((_, i) => i !== at).join(' '), 10).filter((r) => !r.partial)
+  const asked = relationIn(query)
+  if (!asked) return []
+  const [, kind, sex, word] = asked.role
+  const sure = search(names, asked.name, 10, archiveLang()).filter((r) => !r.partial)
   if (!sure.length) return []
   const g = getGraph(actor)
   const people = new Map(g.persons.filter((p) => !p.hidden).map((p) => [p.id, p]))
@@ -136,7 +158,7 @@ function byRelation(actor: Actor, names: SearchIndex, query: string): SearchResu
 export function searchPeople(actor: Actor, query: string, limit = 30): SearchResult[] {
   const { index, names } = indexFor(actor)
   const related = byRelation(actor, names, query)
-  const found = search(index, query, limit)
+  const found = search(index, query, limit, archiveLang())
   if (!related.length) return found
   // The answer to "whose wife" comes alone, with only what really has all the words after it.
   const seen = new Set(related.map((r) => r.personId))

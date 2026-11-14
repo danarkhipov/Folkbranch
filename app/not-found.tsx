@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { headers } from 'next/headers'
 import { Logo } from '@/components/logo'
 import { langFromHeader, translate } from '@/lib/i18n'
+import '@/lib/i18n-server'
 
 export default async function NotFound() {
   const lang = langFromHeader((await headers()).get('accept-language'))

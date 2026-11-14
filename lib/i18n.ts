@@ -1009,9 +1009,33 @@ const en: Record<string, string> = {
   'Находит лица и на старых групповых снимках, чтобы не обводить их вручную.': 'Finds faces, even in old group photos, so you need not outline them by hand.',
   'Подсказывает, кто на новом фото, по уже отмеченным лицам. Имя появится, только если вы его подтвердите.': 'Suggests who is in a new photo from faces already tagged. A name appears only once you confirm it.',
   'Превращает запись рассказа в текст и позволяет говорить с ассистентом голосом. Пока идёт расшифровка, приложением можно пользоваться.': 'Turns a recorded story into text and lets you speak to the assistant. You can keep using the app while it runs.',
+  '{price} в час': '{price} an hour',
+  'от: {name}': 'by {name}',
+  'до {date}': 'before {date}',
+  // Confirm questions: each has its own line, so a language can ask in its own way rather than glue a button to a name.
+  'Удалить человека «{name}»?': 'Delete person «{name}»?',
+  'Удалить «{name}»?': 'Delete «{name}»?',
+  'Удалить рассказ «{name}»?': 'Delete the story «{name}»?',
+  'Удалить рассказ?': 'Delete the story?',
+  'Удалить сведения о месте «{name}»?': "Delete the place's details «{name}»?",
+  'Удалить архив «{name}»?': 'Delete archive «{name}»?',
+  'Удалить модель: {name}?': 'Remove model: {name}?',
+  'Закрыть доступ: {name}?': 'Remove access: {name}?',
+  'Выключить вход: {name}?': 'Turn off sign-in: {name}?',
+  'Закрыть ссылку: {name}?': 'Close the link: {name}?',
 }
 
-export const translate = (lang: Lang, key: string) => (lang === 'en' ? (en[key] ?? key) : key)
+/** Spanish and Catalan live in lib/i18n-es.ts and lib/i18n-ca.ts, and reach a browser only when it reads in them (lib/i18n-load.ts). */
+const more: Partial<Record<Lang, Record<string, string>>> = {}
+export const addTable = (lang: Lang, table: Record<string, string>) => { more[lang] = table }
+export const hasTable = (lang: Lang) => lang === 'ru' || lang === 'en' || lang in more
+/** The English table, for the tests and the gaps script. */
+export const english: Readonly<Record<string, string>> = en
 
-/** The language to offer first: the browser's own first choice, English unless that is Russian. */
-export const langFromHeader = (header: string | null): Lang => (/^\s*ru\b/i.test(header ?? '') ? 'ru' : 'en')
+/** Only English is required: a word Spanish or Catalan does not have yet shows in English, never in Russian. */
+export const translate = (lang: Lang, key: string) => (lang === 'ru' ? key : (more[lang]?.[key] ?? en[key] ?? key))
+/** A word kept as a Russian and English pair beside its code: Spanish and Catalan look the Russian up in their own table, else take the English. */
+export const translatePair = (lang: Lang, ru: string, english: string) => (lang === 'ru' ? ru : lang === 'en' ? english : (more[lang]?.[ru] ?? english))
+
+/** The language to offer first: the browser's own first choice when the app speaks it, English otherwise. */
+export const langFromHeader = (header: string | null): Lang => (/^\s*(ru|es|ca)\b/i.exec(header ?? '')?.[1].toLowerCase() as Lang | undefined) ?? 'en'

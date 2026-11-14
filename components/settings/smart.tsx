@@ -34,7 +34,7 @@ function ModelRow({ v, inUse, only }: { v: Variant; inUse: boolean; only: boolea
         )}
         {m.status === 'none' && <Button variant="outline" size="sm" onClick={() => downloadVariant(v.id)}><Download /> {t('Скачать модель')}, {variantSize(v.id)} {t('МБ')}</Button>}
         {ready && !only && (inUse ? <span className="flex items-center gap-1 pr-1 text-xs"><Check size={13} /> {t('Используется')}</span> : <Button variant="outline" size="sm" onClick={() => choose(v.id)}>{t('Использовать')}</Button>)}
-        {ready && <Button variant="ghost" size="sm" onClick={async () => { if (await ask(`${t('Удалить модель')}: ${t(v.name)}?`, t('Удалить'), t('Её можно будет скачать снова.'))) removeVariant(v.id) }}><Trash2 /> {t('Удалить модель')}, {variantSize(v.id)} {t('МБ')}</Button>}
+        {ready && <Button variant="ghost" size="sm" onClick={async () => { if (await ask(t('Удалить модель: {name}?').replace('{name}', () => t(v.name)), t('Удалить'), t('Её можно будет скачать снова.'))) removeVariant(v.id) }}><Trash2 /> {t('Удалить модель')}, {variantSize(v.id)} {t('МБ')}</Button>}
         {m.status === 'unavailable' && <span className="text-xs text-ink-soft">{t('Модели можно скачать только по защищённому адресу (https) или на этом компьютере.')}</span>}
       </div>
       {m.failed && <p role="alert" className="text-xs text-destructive">{t('Не удалось скачать модель. Проверьте соединение и попробуйте ещё раз.')}</p>}

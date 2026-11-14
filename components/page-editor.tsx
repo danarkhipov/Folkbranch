@@ -1,10 +1,11 @@
 'use client'
 import { translate } from '@/lib/i18n'
+import { pageLang } from '@/lib/languages'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { BlockNoteSchema, defaultInlineContentSpecs } from '@blocknote/core'
 import { filterSuggestionItems } from '@blocknote/core/extensions'
-import { ru, en } from '@blocknote/core/locales'
+import { ru, en, es } from '@blocknote/core/locales'
 import { createReactInlineContentSpec, SuggestionMenuController, useCreateBlockNote } from '@blocknote/react'
 import { BlockNoteView } from '@blocknote/mantine'
 import '@blocknote/core/fonts/inter.css'
@@ -29,7 +30,7 @@ const Mention = createReactInlineContentSpec(
 /** A mark on a paragraph: nobody has checked this yet. */
 const Unverified = createReactInlineContentSpec(
   { type: 'unverified', propSchema: {}, content: 'none' } as const,
-  { render: () => <span className="mark-chip unverified">⚠ {translate(typeof document !== 'undefined' && document.documentElement.lang === 'en' ? 'en' : 'ru', 'не проверено')}</span> },
+  { render: () => <span className="mark-chip unverified">⚠ {translate(typeof document !== 'undefined' ? pageLang() : 'ru', 'не проверено')}</span> },
 )
 
 /** A link from a paragraph to one of this person's sources. */
@@ -79,7 +80,8 @@ function Editor({ page, personId, onChanged }: { page: Page; personId: string; o
   const editor = useCreateBlockNote({
     schema,
     initialContent: initial,
-    dictionary: lang === 'en' ? en : ru,
+    // BlockNote has no Catalan: a Catalan page editor reads in English.
+    dictionary: { ru, en, es, ca: en }[lang],
     uploadFile: async (file: File) => {
       const form = new FormData()
       form.set('file', file)

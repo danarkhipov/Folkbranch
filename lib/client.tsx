@@ -5,6 +5,7 @@ import type { Proposal } from '@/lib/ops/proposals'
 import type { Family } from './kinship'
 import type { Graph, HistoryEntry, Lang, Me, Person } from './types'
 import { translate } from './i18n'
+import { useTable } from './i18n-load'
 import { drawnAvatar } from './avatar'
 
 export async function api<T = any>(path: string, init?: { method?: string; json?: unknown; body?: BodyInit }): Promise<T> {
@@ -52,7 +53,10 @@ export const useApp = () => useContext(App)
 /** Who else has the archive open. Apart from App, so someone arriving does not redraw the chart. */
 export const Presence = createContext<{ id: string; name: string; focusId: string | null }[]>([])
 
-export const useTr = (lang: Lang) => (key: string) => translate(lang, key)
+export const useTr = (lang: Lang) => {
+  useTable(lang)
+  return (key: string) => translate(lang, key)
+}
 
 /** Any write refreshes everything derived from it: the graph and history at least. */
 /** The change just made, to offer taking it back. */

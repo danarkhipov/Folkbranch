@@ -3,7 +3,7 @@ export type Sex = 'M' | 'F' | 'U'
 export type Certainty = 'documented' | 'family' | 'assumed'
 export type ParentKind = 'birth' | 'adopted' | 'step'
 export type UnionKind = 'marriage' | 'civil'
-export type Lang = 'ru' | 'en'
+export type Lang = 'ru' | 'en' | 'es' | 'ca'
 
 export interface Person {
   id: string
@@ -202,7 +202,9 @@ export const personName = (p: Pick<Person, 'givenName' | 'surname'>) =>
 let serverOpenEnd: (() => string) | null = null
 /** The server says how a living person's open range ends in the archive's language; a browser reads the language of its page. */
 export const setOpenEnd = (f: () => string) => { serverOpenEnd = f }
-const openEnd = () => (typeof document !== 'undefined' ? (document.documentElement.lang === 'en' ? 'now' : 'н. в.') : serverOpenEnd?.() ?? 'н. в.')
+/** The page's own word for it: this file cannot reach the tables. The server's word comes from 'н. в.' in them. A language not here reads 'now'. */
+const OPEN_END: Partial<Record<Lang, string>> = { ru: 'н. в.', en: 'now', es: 'hoy', ca: 'avui' }
+const openEnd = () => (typeof document !== 'undefined' ? (OPEN_END[document.documentElement.lang.slice(0, 2) as Lang] ?? 'now') : serverOpenEnd?.() ?? 'н. в.')
 
 export function lifeYears(p: Person, unknown = '?', open: string = openEnd()): string {
   const b = p.birthDate || (p.birthYear ? String(p.birthYear) : '')

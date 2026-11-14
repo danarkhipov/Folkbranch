@@ -1,5 +1,5 @@
 // Russian patronymics, so nobody has to type what the father's name already says.
-import type { Sex } from './types'
+import type { Lang, Sex } from './types'
 
 const IRREGULAR: Record<string, [string, string]> = {
   'Илья': ['Ильич', 'Ильинична'], 'Никита': ['Никитич', 'Никитична'], 'Лука': ['Лукич', 'Лукинична'], 'Фома': ['Фомич', 'Фоминична'], 'Кузьма': ['Кузьмич', 'Кузьминична'],
@@ -27,9 +27,17 @@ export function splitPatronymic(given: string): [string, string] {
   return [given.trim(), '']
 }
 
-/** "72 года" / "aged 72". */
-export function ageWords(n: number, lang: 'ru' | 'en') {
-  if (lang === 'en') return `${n} ${n === 1 ? 'year' : 'years'}`
+/** One and many, for the languages with only these two forms. */
+const OTHER: Record<Exclude<Lang, 'ru'>, { year: [string, string]; person: [string, string]; family: [string, string] }> = {
+  en: { year: ['year', 'years'], person: ['person', 'people'], family: ['family', 'families'] },
+  es: { year: ['año', 'años'], person: ['persona', 'personas'], family: ['familia', 'familias'] },
+  ca: { year: ['any', 'anys'], person: ['persona', 'persones'], family: ['família', 'famílies'] },
+}
+const form = (n: number, [one, many]: [string, string]) => `${n} ${n === 1 ? one : many}`
+
+/** "72 года" / "72 years" / "72 años" / "72 anys". */
+export function ageWords(n: number, lang: Lang) {
+  if (lang !== 'ru') return form(n, OTHER[lang].year)
   const a = n % 100, b = n % 10
   return `${n} ${a >= 11 && a <= 14 ? 'лет' : b === 1 ? 'год' : b >= 2 && b <= 4 ? 'года' : 'лет'}`
 }
@@ -39,6 +47,6 @@ const ruForm = (n: number, one: string, few: string, many: string) => {
   return a >= 11 && a <= 14 ? many : b === 1 ? one : b >= 2 && b <= 4 ? few : many
 }
 
-/** "1 человек", "3 семьи" / "1 person", "3 families". */
-export const peopleWords = (n: number, lang: 'ru' | 'en') => `${n} ${lang === 'en' ? (n === 1 ? 'person' : 'people') : ruForm(n, 'человек', 'человека', 'человек')}`
-export const familyWords = (n: number, lang: 'ru' | 'en') => `${n} ${lang === 'en' ? (n === 1 ? 'family' : 'families') : ruForm(n, 'семья', 'семьи', 'семей')}`
+/** "1 человек", "3 семьи" / "1 person", "3 families" / "3 personas" / "3 famílies". */
+export const peopleWords = (n: number, lang: Lang) => (lang === 'ru' ? `${n} ${ruForm(n, 'человек', 'человека', 'человек')}` : form(n, OTHER[lang].person))
+export const familyWords = (n: number, lang: Lang) => (lang === 'ru' ? `${n} ${ruForm(n, 'семья', 'семьи', 'семей')}` : form(n, OTHER[lang].family))

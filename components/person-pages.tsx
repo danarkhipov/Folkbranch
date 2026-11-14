@@ -25,7 +25,7 @@ export function Pages({ person, full, startAt, onDetails }: { person: Person; fu
     setOpenId(p.id)
   }
   const remove = async (p: PageMeta) => {
-    if (await confirm(`${t('Удалить')} «${p.title || t('Без названия')}»?`, t('Удалить'))) {
+    if (await confirm(t('Удалить «{name}»?').replace('{name}', () => p.title || t('Без названия')), t('Удалить'))) {
       await api(`pages/${p.id}`, { method: 'DELETE' })
       if (openId === p.id) setOpenId(null)
       refresh()

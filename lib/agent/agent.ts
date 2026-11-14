@@ -3,9 +3,9 @@
 import { pruneMessages, stepCountIs, tool, ToolLoopAgent, type LanguageModel, type ModelMessage, type ToolSet } from 'ai'
 import { z } from 'zod'
 import { Actor, OpError, withHistoryScope } from '../ops/core'
-import { getSetting, say } from '../ops/settings'
+import { archiveLang, getSetting, say } from '../ops/settings'
 import { CORE_TOOLS, TOOL_GROUPS, toolsFor, type ToolDef } from '../ops/tools'
-import type { AssistantState } from '../types'
+import type { AssistantState, Lang } from '../types'
 import { currentProvider } from './provider-key'
 
 const MAX_STEPS = 25
@@ -18,6 +18,9 @@ const MAX_TOOL_CHARS = 60_000
 /** Answers older than this many messages are shortened: what mattered in them is in the steps that followed. */
 const KEEP_FULL_MESSAGES = 6
 const OLD_ANSWER_CHARS = 1000
+
+/** Only these archives are told their language: a Russian or English one gets the instructions as they always were. */
+const ARCHIVE_LANGUAGE: Partial<Record<Lang, string>> = { es: 'Spanish (Spain)', ca: 'Catalan' }
 
 const INSTRUCTIONS = `You are the assistant in Folkbranch, a private family archive, acting for the person talking to you. You see and can change everything they can, living relatives included. Reply in their language, in short plain sentences, naming people rather than ids. Answer from the archive only, and never invent people, dates, sources or ids.
 
@@ -173,8 +176,11 @@ export function buildAgent(person: Actor, opts: { model?: LanguageModel; trustWr
   // A model the provider says cannot take pictures is not offered the tool that shows it one.
   const defs = new Map(toolsFor(actor, 'assistant').filter((d) => opts.sees !== false || d.name !== 'view_photo').map((d) => [d.name, d]))
   let unasked = 0
+  const language = ARCHIVE_LANGUAGE[archiveLang()]
   const situation = [
     `The person is ${person.name}, with the role ${person.role}.`,
+    // The interface is in this language too: what the assistant writes into the archive should match it.
+    language ? `The archive is kept in ${language}: write what you add to it in that language, and reply in it unless the person writes in another.` : '',
     actor.role === 'reader' ? 'As a reader they do not see living relatives, and neither do you.' : '',
     opts.hasFiles ? FILES : '',
     opts.sees === false ? 'The model answering cannot see pictures. Say so when asked to read a scan or photo, and suggest the owner choose a model that can under Settings.' : '',

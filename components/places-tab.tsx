@@ -114,7 +114,7 @@ export function PlacesTab({ onOpen }: { onOpen: (id: string) => void }) {
   }, [uses, places, filter])
   const blank = (name: string): Draft => ({ id: null, name: name.split(',')[0].trim(), kind: '', parentId: null, otherNames: [], lat: null, lon: null, note: '' })
   const remove = async (p: Place) => {
-    if (!(await confirm(`${t('Удалить сведения о месте')} «${p.name}»?`, t('Удалить'), t('Карточки людей не изменятся. Вернуть можно в истории.')))) return
+    if (!(await confirm(t('Удалить сведения о месте «{name}»?').replace('{name}', () => p.name), t('Удалить'), t('Карточки людей не изменятся. Вернуть можно в истории.')))) return
     await api(`places/${p.id}`, { method: 'DELETE' })
     qc.invalidateQueries({ queryKey: ['places'] })
   }
@@ -195,7 +195,7 @@ export function ArchivesTab() {
     }
   }
   const remove = async (r: Repository) => {
-    if (!(await confirm(`${t('Удалить архив')} «${r.name}»?`, t('Удалить'), t('Источники останутся, но без ссылки на архив. Вернуть можно в истории.')))) return
+    if (!(await confirm(t('Удалить архив «{name}»?').replace('{name}', () => r.name), t('Удалить'), t('Источники останутся, но без ссылки на архив. Вернуть можно в истории.')))) return
     await api(`repositories/${r.id}`, { method: 'DELETE' })
     qc.invalidateQueries({ queryKey: ['repositories'] })
   }

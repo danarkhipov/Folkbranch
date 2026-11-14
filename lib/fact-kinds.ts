@@ -15,9 +15,9 @@ export const FACT_FIELDS: Record<string, string[]> = {
 /** Who else was there: in Russian church books mostly godparents and the priest. */
 export const ROLES = ['Крёстный отец', 'Крёстная мать', 'Восприемник', 'Свидетель', 'Священник', 'Поручитель', 'Участник']
 
-/** The role a new participant most likely has, from the kind of event. */
+/** The role a new participant most likely has, from the kind of event. Spanish and Catalan as whole words. */
 export const firstRole = (kind: string, t: (k: string) => string = (k) => k) =>
-  /крещ|baptis|christen/i.test(kind) ? t('Крёстный отец') : /брак|венч|marri|wedding/i.test(kind) ? t('Свидетель') : t('Участник')
+  /крещ|baptis|christen|\b(?:bautismo|bautizo|bateig)\b/i.test(kind) ? t('Крёстный отец') : /брак|венч|marri|wedding|\b(?:matrimonio?|boda|casamiento|casament|noces)\b/i.test(kind) ? t('Свидетель') : t('Участник')
 
 /** The extra fields for a kind, whether it was written in Russian or in the archive's other language. */
 export const fieldsFor = (kind: string, t: (k: string) => string = (k) => k) =>

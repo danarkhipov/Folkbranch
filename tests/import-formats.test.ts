@@ -23,6 +23,15 @@ describe('csv', () => {
     expect(guessMapping(['ФИО', 'Дата рождения', 'Место рождения', 'Отец', 'Мать', 'Что-то'])).toEqual(['name', 'birthDate', 'birthPlace', 'father', 'mother', ''])
     expect(guessMapping(['First name', 'Last name', 'Born', 'Birth place', 'Died', 'Spouse', 'Gender'])).toEqual(['given', 'surname', 'birthDate', 'birthPlace', 'deathDate', 'spouse', 'sex'])
     expect(guessMapping(['Фамилия', 'Имя', 'Отчество', 'Девичья фамилия', 'Пол'])).toEqual(['surname', 'given', 'patronymic', 'maiden', 'sex'])
+    expect(guessMapping(['Nombre', 'Apellidos', 'Fecha de nacimiento', 'Lugar de nacimiento', 'Fecha de defunción', 'Lugar de defunción', 'Padre', 'Madre', 'Cónyuge', 'Sexo'])).toEqual(['given', 'surname', 'birthDate', 'birthPlace', 'deathDate', 'deathPlace', 'father', 'mother', 'spouse', 'sex'])
+    expect(guessMapping(['Nom', 'Cognoms', 'Data de naixement', 'Lloc de naixement', 'Data de defunció', 'Pare', 'Mare', 'Parella', 'Sexe'])).toEqual(['given', 'surname', 'birthDate', 'birthPlace', 'deathDate', 'father', 'mother', 'spouse', 'sex'])
+    expect(guessMapping(['Nombre completo', 'Apellido de soltera'])).toEqual(['name', 'maiden'])
+    expect(guessMapping(['Nom del pare', 'Nom de la mare', 'Lloc de mort'])).toEqual(['father', 'mother', 'deathPlace'])
+  })
+  it('reads an English or Russian table exactly as before, though a header holds a Spanish or Catalan word', () => {
+    expect(guessMapping(['Parent', 'Marital status', 'Num', 'Nightmare', 'Mortgage place', 'Obituary'])).toEqual(['', '', '', '', '', ''])
+    expect(guessMapping(['Name', 'Parents', 'Spouse', 'Born'])).toEqual(['given', '', 'spouse', 'birthDate'])
+    expect(guessMapping(['ФИО', 'Отец', 'Мать', 'Супруг'])).toEqual(['name', 'father', 'mother', 'spouse'])
   })
 })
 

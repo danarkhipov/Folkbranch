@@ -26,6 +26,16 @@ describe('files that come with a tree', () => {
     expect(how('Архипов Даниил.jpg')).toMatchObject({ xrefs: ['@P001@'], how: 'name' })
     expect(how('Архипов.jpg').how).toBeNull()
   })
+  it('in a Spanish or Catalan archive, reads a name without its accents, as files are often named', () => {
+    const family = [{ xref: '@I1@', name: 'Inés Peñalver' }, { xref: '@I2@', name: 'Lluís Gonçal' }, { xref: '@I3@', name: 'José García' }]
+    for (const lang of ['es', 'ca'] as const) {
+      expect(matchFiles([{ name: 'ines_penalver_1950.jpg' }], family, [], lang)[0]).toMatchObject({ xrefs: ['@I1@'], how: 'name' })
+      expect(matchFiles([{ name: 'Lluis Goncal.jpg' }], family, [], lang)[0]).toMatchObject({ xrefs: ['@I2@'], how: 'name' })
+      expect(matchFiles([{ name: 'García José.pdf' }], family, [], lang)[0]).toMatchObject({ xrefs: ['@I3@'], how: 'name' })
+    }
+    // A Russian or English archive reads names as before.
+    for (const lang of ['ru', 'en', undefined] as const) expect(matchFiles([{ name: 'ines_penalver_1950.jpg' }], family, [], lang)[0].how).toBeNull()
+  })
   it('leaves a file nobody claims', () => {
     expect(how('IMG_2041.jpg')).toMatchObject({ xrefs: [], how: null })
   })

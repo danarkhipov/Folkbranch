@@ -55,7 +55,7 @@ export function Access() {
             : <ListRow key={u.id} title={u.name} actions={<>
               <Select look="small" className="w-32" aria-label={`${t('Что сможет делать')}: ${u.name}`} value={u.role} onChange={async (v) => { await api(`users/${u.id}`, { method: 'PATCH', json: { role: v } }); refresh() }} options={ROLES.map((r) => ({ value: r, label: t(roleName[r]) }))} />
               <Button size="sm" variant="outline" title={t('Новая ссылка для входа')} data-hint={t('Если человек потерял вход или сменил устройство.')} onClick={() => makeLink({ name: u.name, role: u.role, userId: u.id })}><RefreshCw /> {t('Новая ссылка')}</Button>
-              <Button size="icon-sm" variant="danger" title={t('Закрыть доступ')} aria-label={`${t('Закрыть доступ')}: ${u.name}`} data-hint={t('Человек больше не сможет войти. Его правки останутся.')} onClick={async () => { if (await ask(`${t('Закрыть доступ')}: ${u.name}?`, t('Закрыть доступ'))) { await api(`users/${u.id}`, { method: 'DELETE' }); refresh() } }}><Trash2 /></Button>
+              <Button size="icon-sm" variant="danger" title={t('Закрыть доступ')} aria-label={`${t('Закрыть доступ')}: ${u.name}`} data-hint={t('Человек больше не сможет войти. Его правки останутся.')} onClick={async () => { if (await ask(t('Закрыть доступ: {name}?').replace('{name}', () => u.name), t('Закрыть доступ'))) { await api(`users/${u.id}`, { method: 'DELETE' }); refresh() } }}><Trash2 /></Button>
             </>} />)}
         </List>
       </Section>

@@ -13,10 +13,19 @@ describe('the language', () => {
     setSetting('language', 'ru')
     expect(archiveLang()).toBe('ru')
     expect(say('Удалить')).toBe('Удалить')
+    setSetting('language', 'es')
+    expect(archiveLang()).toBe('es')
+    setSetting('language', 'xx')
+    expect(archiveLang()).toBe('en')
   })
 
-  it("offers the browser's first choice, English unless that is Russian", () => {
+  it("offers the browser's first choice when the app speaks it, English otherwise", () => {
     expect(langFromHeader('ru-RU,ru;q=0.9,en;q=0.8')).toBe('ru')
+    expect(langFromHeader('es-ES,es;q=0.9,en;q=0.8')).toBe('es')
+    expect(langFromHeader('ca,es;q=0.8')).toBe('ca')
+    expect(langFromHeader('CA-es')).toBe('ca')
+    expect(langFromHeader('en-GB,es;q=0.9')).toBe('en')
+    expect(langFromHeader('cat')).toBe('en')
     expect(langFromHeader('RU')).toBe('ru')
     expect(langFromHeader('en-US,ru;q=0.9')).toBe('en')
     expect(langFromHeader('de-DE')).toBe('en')

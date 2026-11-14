@@ -127,5 +127,5 @@ export function importGedcom(actor: Actor, text: string, mode: ImportMode = 'add
 export function exportGedcom(actor: Actor, hideLiving: boolean) {
   const graph = getGraph(actor)
   // Readers never get living relatives, whatever the checkbox says.
-  return writeGedcom(graph, { hideLiving: hideLiving || seesOnlyPublic(actor), source: 'Folkbranch', pageWord: say('л.') })
+  return writeGedcom(graph, { hideLiving: hideLiving || seesOnlyPublic(actor), source: 'Folkbranch', pageWord: say('л.'), lang: archiveLang() })
 }
