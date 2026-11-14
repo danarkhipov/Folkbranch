@@ -17,7 +17,7 @@ interface Status {
 }
 
 const input = 'h-9 w-full rounded-lg border border-input bg-white px-3 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring/40'
-const hour = (p: SttPreset['models'][number]) => (p.perMinute === null ? null : p.perMinute === 0 ? 'бесплатно' : `$${(p.perMinute * 60).toFixed(2)} в час`)
+const hour = (p: SttPreset['models'][number], t: (k: string) => string) => (p.perMinute === null ? null : p.perMinute === 0 ? t('бесплатно') : t('{price} в час').replace('{price}', `$${(p.perMinute * 60).toFixed(2)}`))
 
 /** Where the owner connects one speech service for everyone and pays for it. Editors only use it. */
 export function CloudSpeech() {
@@ -73,7 +73,7 @@ export function CloudSpeech() {
               <label className="flex flex-col gap-1 text-xs text-ink-soft">
               {t('Модель')}
               {preset.id === 'custom' ? <input className={`${input} font-mono`} aria-label={t('Модель')} value={model} placeholder="whisper-1" onChange={(e) => setModel(e.target.value)} /> : (
-                <Select aria-label={t('Модель')} value={model || preset.models[0].id} onChange={setModel} options={preset.models.map((m) => ({ value: m.id, label: `${t(m.label)}${hour(m) ? ` · ${t(hour(m)!)}` : ''}` }))} />
+                <Select aria-label={t('Модель')} value={model || preset.models[0].id} onChange={setModel} options={preset.models.map((m) => ({ value: m.id, label: `${t(m.label)}${hour(m, t) ? ` · ${hour(m, t)}` : ''}` }))} />
               )}
               {preset.models.find((m) => m.id === (model || preset.models[0].id))?.note && <span>{t(preset.models.find((m) => m.id === (model || preset.models[0].id))!.note!)}</span>}
             </label>
@@ -84,7 +84,7 @@ export function CloudSpeech() {
                   <p className="text-xs text-ink-soft">{t('Если не выбирать, берётся проверенная модель, а новую из той же линейки приложение подхватит само.')}</p>
                   <label className="flex flex-col gap-1 text-xs text-ink-soft">
               {t('Модель')}
-              <Select aria-label={t('Модель')} value={model || preset.models[0].id} onChange={setModel} options={preset.models.map((m) => ({ value: m.id, label: `${t(m.label)}${hour(m) ? ` · ${t(hour(m)!)}` : ''}` }))} />
+              <Select aria-label={t('Модель')} value={model || preset.models[0].id} onChange={setModel} options={preset.models.map((m) => ({ value: m.id, label: `${t(m.label)}${hour(m, t) ? ` · ${hour(m, t)}` : ''}` }))} />
               {preset.models.find((m) => m.id === (model || preset.models[0].id))?.note && <span>{t(preset.models.find((m) => m.id === (model || preset.models[0].id))!.note!)}</span>}
             </label>
                 </div>

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Mic, RotateCcw, Send, Square, Upload } from 'lucide-react'
 import { translate } from '@/lib/i18n'
+import { useTable } from '@/lib/i18n-load'
 import type { Lang } from '@/lib/types'
 import { clock, useRecorder } from '@/lib/use-recorder'
 import { Logo } from './logo'
@@ -11,6 +12,7 @@ const TOPICS = ['Что вам запомнилось больше всего?',
 
 /** For someone who has never seen the app, perhaps on an old phone: one thing on the screen, in large letters. */
 export function TellScreen({ token, info, lang }: { token: string; info: { about: string; tellerName: string; question: string; familyName: string } | null; lang: Lang }) {
+  useTable(lang)
   const t = (k: string) => translate(lang, k)
   const rec = useRecorder()
   const input = useRef<HTMLInputElement>(null)

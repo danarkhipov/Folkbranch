@@ -214,7 +214,7 @@ const roleInput = z.enum(['owner', 'editor', 'reader'])
 const ASSISTANT_ONLY: Omit<ToolDef, 'output'>[] = [
   { name: 'get_settings', risk: 'read', minRole: 'reader', surfaces: ['assistant'], description: "The archive's name and language.", input: z.object({}),
     run: () => ({ familyName: getSetting('familyName') ?? '', language: archiveLang() }) },
-  { name: 'update_settings', risk: 'admin', minRole: 'owner', surfaces: ['assistant'], description: "Rename the archive or change its language.", input: z.object({ familyName: z.string().min(1).max(120).optional(), language: z.enum(['ru', 'en']).optional() }),
+  { name: 'update_settings', risk: 'admin', minRole: 'owner', surfaces: ['assistant'], description: "Rename the archive or change its language.", input: z.object({ familyName: z.string().min(1).max(120).optional(), language: z.enum(['ru', 'en', 'es', 'ca']).optional() }),
     describe: (_a, x) => [x.familyName && `${say('Название')}: ${x.familyName}`, x.language && `${say('Язык')}: ${x.language}`].filter(Boolean).join(', '),
     run: (_a, x) => {
       Object.entries(x).forEach(([k, v]) => setSetting(k, v as string))

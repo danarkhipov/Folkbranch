@@ -5,6 +5,9 @@ import { chosen } from './models'
 import { cloudChosen, transcribeCloud } from './cloud'
 import { runSpeech } from './speech-run'
 
+/** The archive's language as Whisper names it. */
+const WHISPER = { ru: 'russian', en: 'english', es: 'spanish', ca: 'catalan' } as const
+
 export type SpeechProgress =
   | { stage: 'preparing' }
   | { stage: 'download'; loaded: number; total: number }
@@ -20,7 +23,7 @@ export async function transcribe(blob: Blob, lang: Lang, onProgress: (p: SpeechP
     return text
   }
   let text = ''
-  return runSpeech({ samples: await decodeSpeech(blob), language: lang === 'ru' ? 'russian' : 'english', model: chosen('speech').whisper?.repo }, (m) => {
+  return runSpeech({ samples: await decodeSpeech(blob), language: WHISPER[lang], model: chosen('speech').whisper?.repo }, (m) => {
     if (m.type === 'download') onProgress({ stage: 'download', loaded: m.loaded!, total: m.total! })
     else if (m.type === 'reading') onProgress({ stage: 'reading', share: m.done! / m.total!, text })
     else if (m.type === 'text') { text = m.text!; onProgress({ stage: 'reading', share: 1, text }) }

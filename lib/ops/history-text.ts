@@ -1,4 +1,5 @@
 import { translate } from '../i18n'
+import { LANGS } from '../languages'
 import type { HistoryEntry } from '../types'
 import { say } from './app-config'
 import { FIELD } from './people'
@@ -13,7 +14,7 @@ const CERTAIN: Record<string, string> = { documented: 'по документу',
 const PLAIN = ['givenName', 'surname', 'maidenName', 'patronymic', 'birthDate', 'birthPlace', 'deathDate', 'deathPlace']
 const LONGEST = 60
 
-const words = (key: string) => [key, translate('en', key)]
+const words = (key: string) => [...new Set(LANGS.map((l) => translate(l, key)))]
 const short = (v: unknown) => {
   if (v === null || v === undefined || v === '') return null
   const s = String(v)

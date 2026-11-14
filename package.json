@@ -34,7 +34,8 @@
     "predev": "node scripts/copy-wasm.mjs",
     "prebuild": "node scripts/copy-wasm.mjs",
     "check": "tsc --noEmit && vitest run && npx --yes madge --circular --extensions ts,tsx --ts-config tsconfig.json app components lib",
-    "check:full": "sh tests/run-all.sh"
+    "check:full": "sh tests/run-all.sh",
+    "i18n:gaps": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/i18n-gaps.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

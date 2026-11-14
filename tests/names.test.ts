@@ -24,4 +24,11 @@ describe('patronymics', () => {
     expect([1, 3, 5].map((n) => familyWords(n, 'ru'))).toEqual(['1 семья', '3 семьи', '5 семей'])
     expect(peopleWords(1, 'en')).toBe('1 person')
   })
+  it('counts in Spanish and Catalan, one and many', () => {
+    expect([1, 2, 0].map((n) => ageWords(n, 'es'))).toEqual(['1 año', '2 años', '0 años'])
+    expect([1, 72].map((n) => ageWords(n, 'ca'))).toEqual(['1 any', '72 anys'])
+    expect([1, 3].map((n) => peopleWords(n, 'es'))).toEqual(['1 persona', '3 personas'])
+    expect([1, 3].map((n) => peopleWords(n, 'ca'))).toEqual(['1 persona', '3 persones'])
+    expect([1, 3].map((n) => familyWords(n, 'ca'))).toEqual(['1 família', '3 famílies'])
+  })
 })

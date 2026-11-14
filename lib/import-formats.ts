@@ -68,18 +68,44 @@ const HEADERS: [ColumnField, RegExp][] = [
   ['given', /(^имя$|given|first.?name|^name$)/],
 ]
 
+/** Spanish and Catalan headers. Whole words where an English one could hold them: "pare" is in "parent", "marit" in "marital". */
+const HEADERS_ES_CA: [ColumnField, RegExp][] = [
+  ['id', /^(n[º°]|núm\.?|número|numero)$/],
+  ['father', /\b(padre|pare)\b/],
+  ['mother', /\b(madre|mare)\b/],
+  ['spouse', /(c[óò]nyuge|conyuge|\b(espos[oa]|esp[òo]s|marido|marit|pareja|parella)\b)/],
+  ['maiden', /soltera/],
+  ['birthPlace', /((naci|naix|neix).*(lugar|lloc)|(lugar|lloc).*(naci|naix|neix))/],
+  ['deathPlace', /((defunc|fallec|muert|\bmort\b|[óo]bito).*(lugar|lloc)|(lugar|lloc).*(defunc|fallec|muert|\bmort\b|[óo]bito))/],
+  ['birthDate', /(nacimiento|^nacid[oa]$|naixement|^nascut)/],
+  ['deathDate', /(defunci|fallec|muerte|^mort$|data de mort|[óo]bito)/],
+  ['sex', /^(sexo|sexe|g[ée]nero|g[èe]nere)$/],
+  ['surname', /(apellido|cognom)/],
+  ['name', /^(nombre completo|nom complet|persona)$/],
+  ['given', /^(nombres?|noms?)$/],
+]
+
 /** Each header takes the first field it matches, and a field is used once. */
 export function guessMapping(headers: string[]): Mapping {
   const used = new Set<ColumnField>()
-  return headers.map((h) => {
+  const first = headers.map((h) => {
     const key = h.trim().toLowerCase().replace(/ё/g, 'е')
     const hit = HEADERS.find(([f, re]) => !used.has(f) && re.test(key))?.[0] ?? ''
     if (hit) used.add(hit)
     return hit
   })
+  // Then Spanish and Catalan, for the headers still unread: a Russian or English table is read exactly as before.
+  return first.map((hit, i) => {
+    if (hit) return hit
+    const again = HEADERS_ES_CA.find(([f, re]) => !used.has(f) && re.test(headers[i].trim().toLowerCase()))?.[0] ?? ''
+    if (again) used.add(again)
+    return again
+  })
 }
 
-const SEX_WORDS: Record<string, string> = { м: 'm', муж: 'm', мужской: 'm', m: 'm', male: 'm', ж: 'f', жен: 'f', женский: 'f', f: 'f', female: 'f' }
+// Spanish and Catalan on the second line. "M" stays male, as in Russian and English tables: in a Spanish one it can mean mujer. The whole words are safe.
+const SEX_WORDS: Record<string, string> = { м: 'm', муж: 'm', мужской: 'm', m: 'm', male: 'm', ж: 'f', жен: 'f', женский: 'f', f: 'f', female: 'f',
+  h: 'm', v: 'm', hombre: 'm', varón: 'm', varon: 'm', masculino: 'm', home: 'm', masculí: 'm', mujer: 'f', femenino: 'f', dona: 'f', femení: 'f' }
 const clean = (s: unknown) => String(s ?? '').replace(/\s+/g, ' ').trim()
 // The text format reads these as its own syntax, so they cannot stay inside a name.
 const safeName = (s: string) => clean(s).replace(/:/g, ' ').replace(/ \+ /g, ' и ').replace(/^@/, '').replace(/,/g, ' ').replace(/\s+/g, ' ').trim()

@@ -143,7 +143,7 @@ export function SignInMethods() {
   // The page was drawn with the old list of ways; My account and the sign-in page need the new one.
   const done = () => { setOpen(null); void qc.invalidateQueries({ queryKey: ['sign-in-methods'] }); router.refresh() }
   const off = async (m: Method) => {
-    if (!await ask(`${t('Выключить вход')}: ${t(GUIDE[m.id].name)}?`, t('Выключить'), t('Кто входил так, войдёт другим способом или по новой ссылке.'))) return
+    if (!await ask(t('Выключить вход: {name}?').replace('{name}', () => t(GUIDE[m.id].name)), t('Выключить'), t('Кто входил так, войдёт другим способом или по новой ссылке.'))) return
     await api(`sign-in-methods/${m.id}`, { method: 'DELETE' })
     done()
   }

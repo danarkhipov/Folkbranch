@@ -99,7 +99,7 @@ export function ShareLinks() {
       <Section title={t('Открытые ссылки')}>
         {!links.length && <p className="text-xs text-ink-soft">{t('Пока ни одной.')}</p>}
         <List>
-          {links.map((l) => <ListRow key={l.id} title={l.name} meta={[l.viewId ? (named.find((v) => v.id === l.viewId)?.name ?? '') : t('Всю семью'), l.hasPassword && t('с паролем'), l.expiresAt ? `${t('до')} ${date.format(l.expiresAt)}` : t('Пока не закрою'), `${t('открывали')}: ${l.opens}`].filter(Boolean).join(' · ')} actions={<Button size="sm" variant="danger" onClick={async () => { if (await ask(`${t('Закрыть ссылку')}: ${l.name}?`, t('Закрыть ссылку'))) { await api(`shares/${l.id}`, { method: 'DELETE' }); refresh() } }}><X /> {t('Закрыть ссылку')}</Button>} />)}
+          {links.map((l) => <ListRow key={l.id} title={l.name} meta={[l.viewId ? (named.find((v) => v.id === l.viewId)?.name ?? '') : t('Всю семью'), l.hasPassword && t('с паролем'), l.expiresAt ? t('до {date}').replace('{date}', date.format(l.expiresAt)) : t('Пока не закрою'), `${t('открывали')}: ${l.opens}`].filter(Boolean).join(' · ')} actions={<Button size="sm" variant="danger" onClick={async () => { if (await ask(t('Закрыть ссылку: {name}?').replace('{name}', () => l.name), t('Закрыть ссылку'))) { await api(`shares/${l.id}`, { method: 'DELETE' }); refresh() } }}><X /> {t('Закрыть ссылку')}</Button>} />)}
         </List>
       </Section>
     </div>

@@ -2,6 +2,7 @@
 // strongest first; the guessing ones (sound, typos, part of a word) only speak when nothing certain was found.
 import { dateMatches, datesIn, takeDates, type DateAt } from './dates'
 import { distance, NAME_FORMS, normal, otherLayout, SIMILAR_WORDS, sound, stem, toCyrillic } from './words'
+import type { Lang } from '../types'
 
 export type CardTab = 'details' | 'pages' | 'family' | 'photos' | 'stories'
 export interface SearchField { key: string; label: string; text: string; tab: CardTab; weight: number; target?: string; refId?: string }
@@ -14,6 +15,10 @@ const FOREIGN = 0.9
 const NOISE = new Set(['в', 'во', 'на', 'из', 'и', 'с', 'со', 'по', 'у', 'к', 'от', 'за', 'о', 'об', 'а', 'год', 'года', 'году', 'г', 'кто', 'где', 'когда', 'был', 'была', 'жил', 'жила', 'in', 'of', 'at', 'the', 'and'])
 const BORN = /^(родил|рожд|рожден|урожд|born|birth)/
 const DIED = /^(умер|скончал|смерт|погиб|died|death)/
+// What a Spanish or Catalan archive adds, as normal() leaves the words. Only there: "al", "la" or "on" can be a name in English.
+const NOISE_ES_CA = new Set(['de', 'del', 'la', 'el', 'los', 'las', 'y', 'en', 'a', 'al', 'que', 'quien', 'donde', 'cuando', 'i', 'els', 'les', 'qui', 'on', 'quan', 'va', 'any', 'ano'])
+const BORN_ES_CA = /^(naci(o|do|da|miento)$|neixer$|naixement|nascu)/
+const DIED_ES_CA = /^(murio$|muert[oae]$|falleci|defunci|morir$|morta?$)/
 const SNIPPET = 140
 const ROOT = 5
 
@@ -94,15 +99,19 @@ function matchToken(index: SearchIndex, token: string) {
 
 interface Hit { doc: number; field: number; start: number; end: number; value: number }
 
-export function search(index: SearchIndex, query: string, limit = 30): SearchResult[] {
+/** `lang` is the archive's. */
+export function search(index: SearchIndex, query: string, limit = 30, lang: Lang = 'ru'): SearchResult[] {
   const asked = normal(query).trim()
   if (!asked) return []
   const { terms: dateTerms, rest } = takeDates(asked)
   const raw = rest.match(/[\p{L}\p{N}]+/gu) ?? []
-  const born = raw.some((w) => BORN.test(w))
-  const died = raw.some((w) => DIED.test(w))
-  const hinted = raw.filter((w) => !BORN.test(w) && !DIED.test(w))
-  const kept = hinted.filter((w) => !NOISE.has(w))
+  const more = lang === 'es' || lang === 'ca'
+  const isBorn = (w: string) => BORN.test(w) || (more && BORN_ES_CA.test(w))
+  const isDied = (w: string) => DIED.test(w) || (more && DIED_ES_CA.test(w))
+  const born = raw.some(isBorn)
+  const died = raw.some(isDied)
+  const hinted = raw.filter((w) => !isBorn(w) && !isDied(w))
+  const kept = hinted.filter((w) => !NOISE.has(w) && !(more && NOISE_ES_CA.has(w)))
   const tokens = kept.length || dateTerms.length ? kept : hinted.length ? hinted : raw
   const parts = tokens.length + dateTerms.length
   if (!parts) return []

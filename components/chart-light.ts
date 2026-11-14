@@ -7,7 +7,7 @@ import { pairKey, type LightMode } from './graph-parts'
 
 /** Who and which lines stand out: the open card's family, a path, a group, or whatever the cursor is on. */
 export function useChartLight(layout: Layout, pathIds: string[] | null, groupIds: Set<string> | null, isFar: () => boolean) {
-  const { family, focusId, me, lang, byId } = useApp()
+  const { family, focusId, me, lang, byId, t } = useApp()
   const kin = useMemo(() => (focusId ? family.relatives(focusId, lang) : null), [focusId, family, lang])
   // Hovering lights the closest family and names each relative, without any click.
   const [hoverId, setHoverId] = useState<string | null>(null)
@@ -51,7 +51,7 @@ export function useChartLight(layout: Layout, pathIds: string[] | null, groupIds
     if ((family.spouses.get(parent) ?? []).length < 2) return ''
     const other = (family.parents.get(child) ?? []).find((p) => p !== parent)
     const name = other && byId.get(other)?.givenName
-    return name ? (lang === 'en' ? ` · by ${name}` : ` · от: ${name}`) : ''
+    return name ? ` · ${t('от: {name}').replace('{name}', name)}` : ''
   }
   const fromMe = useMemo(() => (me.personId && byId.has(me.personId) && !focusId && !pathIds ? family.relatives(me.personId, lang) : null), [me.personId, focusId, pathIds, family, lang, byId])
 

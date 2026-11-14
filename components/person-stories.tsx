@@ -40,7 +40,7 @@ export function StoriesTab({ person }: { person: Person }) {
     return (p && personName(p)) || s.tellerName
   }
   const remove = async (s: Story) => {
-    if (!(await confirm(`${t('Удалить рассказ')}${s.title ? ` «${s.title}»` : ''}?`, t('Удалить'), t('Вернуть можно в разделе «История».')))) return
+    if (!(await confirm(s.title ? t('Удалить рассказ «{name}»?').replace('{name}', () => s.title) : t('Удалить рассказ?'), t('Удалить'), t('Вернуть можно в разделе «История».')))) return
     await api(`stories/${s.id}`, { method: 'DELETE' }).catch((e) => notify(String(e.message)))
     qc.invalidateQueries({ queryKey: ['stories'] })
     qc.invalidateQueries({ queryKey: ['history'] })

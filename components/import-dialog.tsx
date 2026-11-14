@@ -22,7 +22,7 @@ type Loaded =
 const TAG_WORDS: Record<string, string> = { OBJE: 'ссылки на файлы', ASSO: 'связи с другими людьми', ALIA: 'другие записи о человеке', SUBM: 'сведения об авторе' }
 
 export function ImportDialog({ open, files, onOpenChange }: { open: boolean; files?: File[] | null; onOpenChange: (v: boolean) => void }) {
-  const { t, graph, familyName, notify, undoLast } = useApp()
+  const { t, lang, graph, familyName, notify, undoLast } = useApp()
   const qc = useQueryClient()
   const input = useRef<HTMLInputElement>(null)
   const [loaded, setLoaded] = useState<Loaded | null>(null)
@@ -79,7 +79,7 @@ export function ImportDialog({ open, files, onOpenChange }: { open: boolean; fil
 
   const tree = loaded?.kind === 'gedcom' ? loaded.preview : null
   const key = (f: File) => `${f.name}:${f.size}`
-  const matches = useMemo(() => (tree ? matchFiles(extra.map((f) => ({ name: f.name, path: (f as File & { webkitRelativePath?: string }).webkitRelativePath || undefined })), tree.people, tree.media) : []), [extra, tree])
+  const matches = useMemo(() => (tree ? matchFiles(extra.map((f) => ({ name: f.name, path: (f as File & { webkitRelativePath?: string }).webkitRelativePath || undefined })), tree.people, tree.media, lang) : []), [extra, tree, lang])
   /** Who each file goes to: the match, or what a person chose. */
   const owners = (i: number) => (chosen[key(extra[i])] === 'skip' ? [] : chosen[key(extra[i])] ? [chosen[key(extra[i])]] : matches[i]?.xrefs ?? [])
   const attached = extra.filter((_, i) => owners(i).length).length

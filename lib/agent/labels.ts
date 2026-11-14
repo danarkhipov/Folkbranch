@@ -1,5 +1,6 @@
 // What people see in the chat for each tool. Plain data, so the browser can use it without the
 // server's code. A test checks this list against the real tools.
+import { translatePair } from '../i18n'
 import type { Lang } from '../types'
 
 const READ: Record<string, [string, string]> = {
@@ -80,4 +81,5 @@ export const TOOL_NAMES = { read: Object.keys(READ), write: Object.keys(WRITE), 
 export const isOrdinaryEdit = (name: string) => name in WRITE
 /** Whether finishing this tool may have changed what is on screen. */
 export const changesData = (name: string) => name in WRITE || name in CAREFUL
-export const toolLabel = (name: string, lang: Lang) => (READ[name] ?? WRITE[name] ?? CAREFUL[name])?.[lang === 'en' ? 1 : 0] ?? name
+/** Spanish and Catalan look the Russian label up in their own table, else read the English. */
+export const toolLabel = (name: string, lang: Lang) => { const pair = READ[name] ?? WRITE[name] ?? CAREFUL[name]; return pair ? translatePair(lang, ...pair) : name }

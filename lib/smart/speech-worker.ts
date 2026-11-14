@@ -3,7 +3,7 @@
 import { env, pipeline } from '@huggingface/transformers'
 import { RATE, splitAtQuiet } from './audio'
 
-interface Job { samples: Float32Array | null; language: 'russian' | 'english'; model: string; threads: number; ort: { mjs: string; wasm: string } }
+interface Job { samples: Float32Array | null; language: 'russian' | 'english' | 'spanish' | 'catalan'; model: string; threads: number; ort: { mjs: string; wasm: string } }
 
 const send = (m: unknown) => (self as unknown as Worker).postMessage(m)
 

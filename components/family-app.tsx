@@ -319,7 +319,7 @@ export function FamilyApp({ me, lang, familyName, providers, assistant }: Props)
 
   const onDelete = async (id: string) => {
     const p = ctx.byId.get(id)
-    if (await ctx.confirm(`${t('Удалить человека')} «${personName(p!) || t('Без названия')}»?`, t('Удалить'), t('Вернуть можно в разделе «История».'))) {
+    if (await ctx.confirm(t('Удалить человека «{name}»?').replace('{name}', () => personName(p!) || t('Без названия')), t('Удалить'), t('Вернуть можно в разделе «История».'))) {
       await delPerson.mutateAsync(id)
       if (focusId === id) focus(null)
     }

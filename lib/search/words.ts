@@ -1,6 +1,7 @@
 // What makes two words "the same" for a person looking for a relative: case endings, sound, keyboard, nicknames.
 
-export const normal = (s: string) => s.toLowerCase().replace(/ё/g, 'е')
+/** Lower case, ё as е, and Latin accents dropped (García as garcia; ç stays). One letter for one, so a match is marked where it stands. */
+export const normal = (s: string) => s.toLowerCase().replace(/ё/g, 'е').replace(/[\u00e0-\u024f]/g, (c) => { const b = c.normalize('NFD').replace(/[\u0300-\u0326\u0328-\u036f]/g, ''); return b.length === 1 ? b : c })
 
 const CASE_ENDINGS = ['ого', 'его', 'ому', 'ему', 'ыми', 'ими', 'ами', 'ями', 'ая', 'яя', 'ую', 'юю', 'ой', 'ей', 'ий', 'ый', 'ое', 'ее', 'ые', 'ие', 'ых', 'их', 'ым', 'им', 'ам', 'ям', 'ах', 'ях', 'ом', 'ем', 'ию', 'ия', 'ии', 'ью', 'а', 'я', 'ы', 'и', 'у', 'ю', 'е', 'о', 'ь', 'й']
 const MIN_STEM = 3

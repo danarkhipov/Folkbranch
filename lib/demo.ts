@@ -65,8 +65,10 @@ const quote = (text: string) => ({ type: 'quote', content: [{ type: 'text', text
 
 export async function loadDemo(userId: string, name: string, lang: Lang) {
   const actor: Actor = { userId, name, role: 'owner', personId: null }
-  const w = WORDS[lang]
-  const people = lang === 'en' ? PEOPLE.map(inEnglish) : PEOPLE
+  // Spanish and Catalan archives get the English family for now.
+  const demo = lang === 'ru' ? 'ru' : 'en'
+  const w = WORDS[demo]
+  const people = demo === 'ru' ? PEOPLE : PEOPLE.map(inEnglish)
   const fullName = (key: string) => { const r = people.find((x) => x[0] === key)!; return `${r[1]} ${r[2]}` }
   const group = await storeUpload(await sharp(Buffer.from(groupPhoto())).jpeg({ quality: 88 }).toBuffer(), w.file, userId)
 

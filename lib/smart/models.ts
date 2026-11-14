@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useSyncExternalStore } from 'react'
 import { readDevice } from './device'
+import { pageLang } from '../languages'
 import { ORT_VERSION } from './ort-version'
 
 // Nothing downloads until someone presses the button. Files stay in this browser and can be removed again.
@@ -44,7 +45,7 @@ export const VARIANTS: Variant[] = [
   { id: 'whisper-turbo', feature: 'speech', name: 'Whisper, максимальная', facts: 'На английском ошибается в 5% слов, на русском в 15%, лучше других справляется с акцентом и шумом. Скачивать около 1,1 ГБ, в 5 раз медленнее лёгкой: нужен сильный компьютер', files: [], whisper: { repo: 'onnx-community/whisper-large-v3-turbo', mb: 1090 }, suits: [] },
 ]
 const byId = (id: string) => VARIANTS.find((v) => v.id === id)!
-const language = () => (typeof document === 'undefined' ? 'en' : document.documentElement.lang)
+const language = () => pageLang()
 
 export const variantsFor = (feature: Pack) => VARIANTS.filter((v) => v.feature === feature && (!v.languages || v.languages.includes(language())))
 

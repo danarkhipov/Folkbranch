@@ -1,6 +1,8 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { startTransition, useEffect, useRef, useState } from 'react'
 import { translate } from '@/lib/i18n'
+import { useTable } from '@/lib/i18n-load'
+import { LANG_NAMES } from '@/lib/languages'
 import type { Lang } from '@/lib/types'
 import { MailCode, OAuthButtons, TelegramButton, authPost } from './sign-in-buttons'
 import type { SignInMethods } from '@/lib/sign-in-methods'
@@ -22,6 +24,7 @@ const useHtmlLang = (lang: Lang) => useEffect(() => { document.documentElement.l
 export function SetupScreen({ needsCode, initialCode = '', initialLang, wrongAddress }: { needsCode: boolean; initialCode?: string; initialLang: Lang; wrongAddress: string | null }) {
   const [lang, setLang] = useState<Lang>(initialLang)
   useHtmlLang(lang)
+  useTable(lang)
   const t = (k: string) => translate(lang, k)
   const [name, setName] = useState('')
   const [familyName, setFamilyName] = useState('')
@@ -43,7 +46,8 @@ export function SetupScreen({ needsCode, initialCode = '', initialLang, wrongAdd
         <p className="text-ink-soft -mt-2 text-sm">{t('Вы станете владельцем архива.')}</p>
         {wrongAddress && <p role="alert" className="rounded-lg bg-muted px-3 py-2 text-sm text-destructive break-anywhere">{t('Вы открыли не тот адрес, что указан в настройках, и вход работать не будет. В настройках')}: <b>{wrongAddress}</b>. {t('Откройте этот адрес или поменяйте BETTER_AUTH_URL.')}</p>}
         <div className="flex gap-1">
-          {(['en', 'ru'] as const).map((l) => <button type="button" key={l} onClick={() => setLang(l)} className={lang === l ? 'bar-btn on' : 'bar-btn'}>{l === 'ru' ? 'Русский' : 'English'}</button>)}
+          {/* A transition: the old words stay on screen while a Spanish or Catalan table arrives. */}
+          {(['en', 'ru', 'es', 'ca'] as const).map((l) => <button type="button" key={l} onClick={() => startTransition(() => setLang(l))} className={lang === l ? 'bar-btn on' : 'bar-btn'}>{LANG_NAMES[l]}</button>)}
         </div>
         <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Ваше имя')}<input required autoFocus className={field} value={name} onChange={(e) => setName(e.target.value)} /></label>
         <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Название семьи')}<input required className={field} value={familyName} onChange={(e) => setFamilyName(e.target.value)} /></label>
@@ -63,6 +67,7 @@ export function SetupScreen({ needsCode, initialCode = '', initialLang, wrongAdd
 
 export function LoginScreen({ lang, familyName, providers, error }: { lang: Lang; familyName: string; providers: SignInMethods; error?: string }) {
   useHtmlLang(lang)
+  useTable(lang)
   const t = (k: string) => translate(lang, k)
   const [telegramError, setTelegramError] = useState('')
   const telegram = async (data: Record<string, unknown>) => {
@@ -91,6 +96,7 @@ export function LoginScreen({ lang, familyName, providers, error }: { lang: Lang
 
 export function InviteScreen({ token, lang, familyName, name, valid, auto }: { token: string; lang: Lang; familyName: string; name: string; valid: boolean; auto?: boolean }) {
   useHtmlLang(lang)
+  useTable(lang)
   const t = (k: string) => translate(lang, k)
   const [busy, setBusy] = useState(!!auto)
   const accept = async () => {
@@ -133,6 +139,7 @@ export function InviteScreen({ token, lang, familyName, name, valid, auto }: { t
 /** A link for viewing: a button first, so a preview in a messenger opens nothing and learns nothing. */
 export function ShareScreen({ token, valid, needsPassword, lang }: { token: string; valid: boolean; needsPassword: boolean; lang: Lang }) {
   useHtmlLang(lang)
+  useTable(lang)
   const t = (k: string) => translate(lang, k)
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)

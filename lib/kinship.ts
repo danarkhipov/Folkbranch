@@ -1,5 +1,8 @@
 // Kinship terms are computed from links and sex; nothing like "son" or "father" is ever stored.
 import type { Graph, Lang, Sex } from './types'
+import { CA } from './kinship-ca'
+import { ES } from './kinship-es'
+import type { KinWords } from './kinship-words'
 
 export interface Kin {
   /** Term for `to` as seen from `from`, e.g. "дед". */
@@ -78,7 +81,7 @@ export class Family {
 
   relation(from: string, to: string, lang: Lang = 'ru'): Kin | null {
     if (from === to) return null
-    const T = lang === 'en' ? EN : RU
+    const T = WORDS[lang] ?? EN
     const s = this.sex.get(to) ?? 'U'
     const b = this.blood(from, to)
     if (b) {
@@ -112,7 +115,7 @@ export class Family {
       if (!via) continue
       const named = T.inLawOfKin(`${via.up},${via.down}`, s)
       if (named) return { label: named, path: [...via.path, to], blood: false }
-      return { label: T.kinSpouse(T.blood(via.up, via.down, this.sex.get(sp) ?? 'U', false), s), path: [...via.path, to], blood: false }
+      return { label: T.kinSpouse(T.blood(via.up, via.down, this.sex.get(sp) ?? 'U', false), s, this.sex.get(sp) ?? 'U'), path: [...via.path, to], blood: false }
     }
     return null
   }
@@ -147,7 +150,7 @@ const genitiveWord = (w: string) => GENITIVE[w] ?? (
     : w + 'а')
 export const genitive = (term: string) => term.split(/([ /])/).map((w) => (/^[ /]$/.test(w) ? w : genitiveWord(w))).join('')
 
-const RU = {
+const RU: KinWords = {
   blood(up: number, down: number, s: Sex, half: boolean): string {
     if (down === 0) {
       if (up === 1) return g(s, 'отец', 'мать', 'родитель')
@@ -190,10 +193,11 @@ const RU = {
   },
   spouseKin: (term: string, spouse: Sex) => `${term} ${g(spouse, 'мужа', 'жены', 'супруга')}`,
   kinSpouse: (term: string, s: Sex) => `${g(s, 'муж', 'жена', 'супруг')} ${genitive(term)}`,
+  your: (label: string, s: Sex) => (/^(муж|жена|супруг) /.test(label) ? label : `${s === 'F' ? 'ваша' : 'ваш'} ${label}`),
 }
 
 const pick = (s: Sex, m: string, f: string, n: string) => (s === 'M' ? m : s === 'F' ? f : n)
-const EN = {
+const EN: KinWords = {
   blood(up: number, down: number, s: Sex, half: boolean): string {
     const greats = (n: number) => (n > 0 ? 'great-'.repeat(n) : '')
     if (down === 0) return up === 1 ? pick(s, 'father', 'mother', 'parent') : greats(up - 2) + pick(s, 'grandfather', 'grandmother', 'grandparent')
@@ -221,11 +225,11 @@ const EN = {
   },
   spouseKin: (term: string, spouse: Sex) => `${pick(spouse, "husband's", "wife's", "spouse's")} ${term}`,
   kinSpouse: (term: string, s: Sex) => `${term}'s ${pick(s, 'husband', 'wife', 'spouse')}`,
+  your: (label: string) => `your ${label}`,
 }
 
-/** "ваш прадед" / "ваша бабушка". */
-export function yourTerm(label: string, sex: Sex, lang: Lang) {
-  if (lang === 'en') return `your ${label}`
-  if (/^(муж|жена|супруг) /.test(label)) return label
-  return `${sex === 'F' ? 'ваша' : 'ваш'} ${label}`
-}
+/** Spanish and Catalan name relatives in English until their own words are filled in. */
+const WORDS: Partial<Record<Lang, KinWords | null>> = { ru: RU, en: EN, es: ES, ca: CA }
+
+/** "ваш прадед" / "ваша бабушка" / "your great-grandfather". */
+export const yourTerm = (label: string, sex: Sex, lang: Lang) => (WORDS[lang] ?? EN).your(label, sex)

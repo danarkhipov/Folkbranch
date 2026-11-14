@@ -1,10 +1,12 @@
 import { eq } from 'drizzle-orm'
 import { getDb, schema } from '../db'
 import { translate } from '../i18n'
+import '../i18n-server'
+import { isLang } from '../languages'
 import type { Lang } from '../types'
 
-/** English unless the archive chose Russian, so a place with no answer yet reads in English. */
-export const archiveLang = (): Lang => (getSetting('language') === 'ru' ? 'ru' : 'en')
+/** English unless the archive chose another language, so a place with no answer yet reads in English. */
+export const archiveLang = (): Lang => { const l = getSetting('language'); return isLang(l) ? l : 'en' }
 
 /** A label in the archive's language, for summaries written on the server. */
 export const say = (key: string) => translate(archiveLang(), key)

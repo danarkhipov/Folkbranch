@@ -83,7 +83,7 @@ Backups, updates, servers and Railway: the [self-hosting guide](docs/SELF_HOSTIN
 - Sign in with Yandex ID, VK ID, Telegram, Google or a code by mail, each switched on in the settings with its steps on the screen. See [ways to sign in](docs/SIGN_IN.md).
 - Keep a person who died, or a single story, from readers. Addresses and phones of the living are for editors only.
 - A view-only link, with an optional password and an expiry date.
-- Works in a browser on a phone or a computer, in English or Russian. A short guide shows a new person what the app can do on the first visit.
+- Works in a browser on a phone or a computer, in English, Russian, Spanish or Catalan (Spanish and Catalan show English where a word is not translated yet). A short guide shows a new person what the app can do on the first visit.
 
 **Your data stays yours**
 - One SQLite file and a folder of photos on your server. No telemetry, and closed to search engines.
@@ -159,7 +159,7 @@ On purpose, because it needs what a family server does not have:
 Not yet, and maybe later:
 
 - No reports beyond the chart and a person's page in PDF. A family book is on the [roadmap](docs/ROADMAP.md).
-- One tree per install, in two languages.
+- One tree per install, in four languages.
 - No sync with desktop programs, and no plugins.
 
 ## AI agents
