@@ -90,7 +90,7 @@ try {
     const q = strip(p), base = like?.persons.find((x) => x.id === p.id)
     return base ? Object.fromEntries(Object.keys(strip(base)).map((k) => [k, q[k]])) : q
   }))
-  ok('still signed in, and every person is the same', after.persons?.length === before.persons.length && byId(after, before) === byId(before), `${after.persons?.length} vs ${before.persons.length}`)
+  ok('still signed in, and every person is the same', after.persons?.length === before.persons.length && byId(after, before) === byId(before), `${after.persons?.length} vs ${before.persons.length} ` + JSON.stringify(before.persons.flatMap((b) => { const a = after.persons.find((x) => x.id === b.id); return a ? Object.keys(strip(b)).filter((k) => JSON.stringify(a[k]) !== JSON.stringify(b[k])).map((k) => [k, b[k], a[k]]) : [[b.id, 'missing']] }).slice(0, 3)))
   const added = after.persons.flatMap((p) => { const base = before.persons.find((x) => x.id === p.id) ?? {}; return Object.keys(p).filter((k) => !(k in base)).map((k) => [k, p[k]]) })
   ok('a field this version added is empty for what the old version wrote', added.every(([, v]) => v == null || v === '' || (Array.isArray(v) && !v.length)), JSON.stringify(added.filter(([, v]) => !(v == null || v === '')).slice(0, 3)))
   ok('every link is the same', JSON.stringify(after.parentChild.length + after.unions.length) === JSON.stringify(before.parentChild.length + before.unions.length))
