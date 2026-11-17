@@ -12,7 +12,10 @@ const scope = self as unknown as { postMessage: (m: unknown, t?: Transferable[])
 let draw: ReturnType<typeof atlasDrawer> | null = null
 let canvas: OffscreenCanvas | null = null
 
-scope.onmessage = async ({ data }) => {
+scope.onmessage = async (e) => {
+  // A dedicated worker hears only the page that made it; this says so, and ignores a message from any other origin.
+  if (e.origin && e.origin !== (self as unknown as { location: { origin: string } }).location.origin) return
+  const { data } = e
   if (data.type === 'init') {
     try {
       // A proxy or an offline page can answer with HTML: anything but the files themselves is a failure, not a map.

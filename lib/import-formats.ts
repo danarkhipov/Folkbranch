@@ -21,7 +21,15 @@ export const COLUMN_FIELDS: [ColumnField, string][] = [
 const RESIDENCE_FIELDS: [ColumnField, ColumnField][] = [['residencePlace', 'residenceDate'], ['residencePlace2', 'residenceDate2'], ['residencePlace3', 'residenceDate3']]
 
 /** Gramps XML, whatever the file was called: its root is <database> in Gramps' namespace. */
-export const isGrampsXml = (text: string) => /^﻿?\s*(<\?xml[^>]*>\s*)?(<!DOCTYPE\s+database[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*<database\b[^>]*gramps-project\.org/.test(text.slice(0, 2000))
+export function isGrampsXml(text: string): boolean {
+  // Read step by step, not by one regular expression with nested repeats, which a crafted file of comments could make
+  // run for minutes (a polynomial backtracking attack).
+  let s = text.slice(0, 2000).replace(/^\uFEFF/, '').trimStart()
+  if (s.startsWith('<?xml')) { const e = s.indexOf('>'); if (e < 0) return false; s = s.slice(e + 1).trimStart() }
+  if (/^<!DOCTYPE\s+database/i.test(s)) { const e = s.indexOf('>'); if (e < 0) return false; s = s.slice(e + 1).trimStart() }
+  while (s.startsWith('<!--')) { const e = s.indexOf('-->'); if (e < 0) return false; s = s.slice(e + 3).trimStart() }
+  return /^<database\b[^>]*gramps-project\.org/.test(s)
+}
 
 export function detectKind(fileName: string, head: string): ImportKind {
   const ext = fileName.toLowerCase().split('.').pop() ?? ''

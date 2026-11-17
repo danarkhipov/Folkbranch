@@ -430,7 +430,7 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
     if (kept && y >= kept.from && y < kept.until) return kept.p
     const [start, end] = lifeSpan(tr)
     const p = positionAt(tr, y)
-    let until = Infinity
+    let until: number
     if (!p) until = y < start ? start : Infinity
     else if (p.leg) until = Math.min(p.leg.arrive, end + 1)
     else {

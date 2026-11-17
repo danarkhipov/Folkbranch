@@ -9,7 +9,7 @@ import { exportGedcom, importGedcom, previewGedcom } from '../lib/ops/gedcom'
 import { getGraph } from '../lib/ops/people'
 import { listPlaces, savePlace } from '../lib/ops/places'
 import { grampsDate, grampsPoint, parseGramps, parseXml } from '../lib/gramps'
-import { detectKind } from '../lib/import-formats'
+import { detectKind, isGrampsXml } from '../lib/import-formats'
 import { findPlace } from '../lib/places'
 
 const owner: Actor = { userId: 'o', name: 'Owner', role: 'owner', personId: null }
@@ -99,5 +99,27 @@ describe('importing Gramps XML', () => {
     const names = listPlaces(owner).map((p) => p.name)
     expect(names).toEqual(['Новоречье'])
     expect(listPlaces(owner)[0].otherNames).toEqual([])
+  })
+})
+
+describe('recognising a Gramps file by its first lines', () => {
+  const NS = 'xmlns="http://gramps-project.org/xml/1.7.1/"'
+  it('accepts the usual starts: a declaration, a doctype, comments, a byte-order mark, none of them', () => {
+    expect(isGrampsXml(`<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE database PUBLIC "x" "y">\n<database ${NS}>`)).toBe(true)
+    expect(isGrampsXml(`\uFEFF<?xml version="1.0"?>\n<!-- made by Gramps -->\n<!-- again -->\n<database ${NS}>`)).toBe(true)
+    expect(isGrampsXml(`<database ${NS}>`)).toBe(true)
+  })
+  it('refuses another XML, a GEDCOM and a table', () => {
+    expect(isGrampsXml('<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">')).toBe(false)
+    expect(isGrampsXml('<database>no namespace</database>')).toBe(false)
+    expect(isGrampsXml('0 HEAD\n1 CHAR UTF-8')).toBe(false)
+    expect(isGrampsXml('name,born\nAnn,1900')).toBe(false)
+  })
+  it('answers at once on a crafted start made of comments, which the old regular expression could be kept busy with for minutes', () => {
+    for (const text of ['<!-->'.repeat(400), '<!--' + ' -->'.repeat(300), '<!---->'.repeat(280) + 'x', ('<!-- -->' + ' '.repeat(5)).repeat(150) + 'x', '<!--'.repeat(500)]) {
+      const t = Date.now()
+      expect(isGrampsXml(text)).toBe(false)
+      expect(Date.now() - t).toBeLessThan(100)
+    }
   })
 })

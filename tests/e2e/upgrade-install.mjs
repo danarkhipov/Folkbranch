@@ -56,14 +56,22 @@ try {
   const v = await api('GET', 'update')
   ok('the new version answers', v.current === JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')).version, JSON.stringify(v))
   const after = await api('GET', 'graph')
-  const byId = (g) => JSON.stringify([...g.persons].sort((x, y) => x.id.localeCompare(y.id)).map(({ updatedAt, ...p }) => p))
-  ok('still signed in, everyone and every field the same', after.persons?.length === before.persons.length && byId(after) === byId(before))
+  // Every field the old version had must be the same. A later version may add fields (a link to a place record): those are
+  // left out of this comparison and checked on their own below, since an old archive can hold nothing in them.
+  const strip = ({ updatedAt, ...p }) => p
+  const byId = (g, like) => JSON.stringify([...g.persons].sort((x, y) => x.id.localeCompare(y.id)).map((p) => {
+    const q = strip(p), base = like?.persons.find((x) => x.id === p.id)
+    return base ? Object.fromEntries(Object.keys(strip(base)).map((k) => [k, q[k]])) : q
+  }))
+  ok('still signed in, everyone and every field the same', after.persons?.length === before.persons.length && byId(after, before) === byId(before))
+  const added = after.persons.flatMap((p) => { const base = before.persons.find((x) => x.id === p.id) ?? {}; return Object.keys(p).filter((k) => !(k in base)).map((k) => [k, p[k]]) })
+  ok('a field this version added is empty for what the old version wrote', added.every(([, v]) => v == null || v === '' || (Array.isArray(v) && !v.length)), JSON.stringify(added.filter(([, v]) => !(v == null || v === '')).slice(0, 3)))
   ok('every link the same', after.parentChild.length === before.parentChild.length && after.unions.length === before.unions.length)
   const env1 = fs.readFileSync(path.join(dir, '.env'), 'utf8')
   ok('settings in .env are kept', env0.split('\n').filter(Boolean).every((l) => env1.includes(l)))
   spawnSync('sh', ['-c', './folkbranch restart'], { cwd: dir, env, encoding: 'utf8' })
   await waitUp(B, 90000)
-  ok('and after a restart', byId(await api('GET', 'graph')) === byId(before))
+  ok('and after a restart', byId(await api('GET', 'graph'), before) === byId(before))
 } catch (e) {
   console.log('ERROR', e.message)
   for (const f of fs.existsSync(path.join(dir, 'logs')) ? fs.readdirSync(path.join(dir, 'logs')) : []) console.log(`--- ${f}\n` + fs.readFileSync(path.join(dir, 'logs', f), 'utf8').slice(-2500))
