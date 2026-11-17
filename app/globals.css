@@ -328,8 +328,8 @@ aside.panel:focus { outline: none; }
 .show-bars { position: absolute; inset: 0; display: none; }
 .main-bar.folded .show-bars { display: block; border-radius: 11px; }
 .main-bar.folded .show-bars:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
-.view-bar, .view-switch { transition: transform .34s cubic-bezier(.3, .7, .2, 1), opacity .22s, left .2s; }
-.view-bar.folded, .view-switch.folded { transform: translateY(24px); opacity: 0; visibility: hidden; transition: transform .34s, opacity .22s, visibility 0s .34s; }
+.view-bar { transition: transform .34s cubic-bezier(.3, .7, .2, 1), opacity .22s, left .2s; }
+.view-bar.folded { transform: translateY(24px); opacity: 0; visibility: hidden; transition: transform .34s, opacity .22s, visibility 0s .34s; }
 .panel header .grow-text { min-height: 24px; }
 .nav-label { display: none; }
 .main-bar:not(.compact) .nav-label { display: inline; }
@@ -345,11 +345,7 @@ aside.panel:focus { outline: none; }
   .main-bar .bar-btn { flex: 1 1 0; flex-direction: column; gap: 2px; height: 48px; min-width: 0; padding: 0 1px; font-size: 14px; line-height: 1.3; text-align: center; }
   .main-bar .nav-label { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .main-bar .hide-bars { display: none; }
-  /* A phone: tree or map is its own row right above the app's bar, its halves sharing the width, in thumb reach;
-     the view's own tools sit above it. */
-  .bottom-row { left: 8px !important; right: 8px; bottom: 72px; flex-direction: column-reverse; align-items: flex-start; }
-  .view-switch { align-self: stretch; }
-  .view-switch .bar-btn { flex: 1 1 0; justify-content: center; }
+  .view-bar { left: 8px !important; bottom: 72px; }
   .chart-hint { display: none; }
   .panel { bottom: 68px; }
   .panel.full { bottom: 68px; }
@@ -358,7 +354,7 @@ aside.panel:focus { outline: none; }
 /* Fingers need room: everything that can be tapped is at least 40 px. */
 @media (pointer: coarse) {
   .panel summary { padding-block: 8px; }
-  .panel button, .side-sheet button, [role=dialog] button, [role=dialog] select, .view-bar button, .view-switch button, .main-bar button, .panel select, [data-slot=popover-content] button { min-height: 44px; min-width: 44px; }
+  .panel button, .side-sheet button, [role=dialog] button, [role=dialog] select, .view-bar button, .main-bar button, .panel select, [data-slot=popover-content] button { min-height: 44px; min-width: 44px; }
   .composer [data-align="block-end"] button { height: 44px; width: 44px; }
   /* A switch keeps its own shape; stretched to 44 px it turned into a circle. Its row is the larger target. */
   .panel button[role=switch], [role=dialog] button[role=switch] { min-height: 0; min-width: 0; }
@@ -489,16 +485,6 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
 .map-bar { bottom: 12px; }
 /* With the person card open beside it, the bar centres in the room left of the card. */
 .map-bar { left: calc((100vw - var(--map-card, 0px)) / 2); max-width: calc(100vw - 16px - var(--map-card, 0px)); }
-/* The tree-or-map switch holds the bottom left corner. On a wide screen the bar stays beside it, centred in the room to
-   its right where the centred bar would reach it; where that room is too narrow for the timeline, the bar rises above
-   the switch and keeps the full width. A phone stacks the same way. */
-@media (min-width: 641px) and (max-width: 1099px) { .map-bar { bottom: calc(20px + var(--view-switch-h, 46px)); } }
-@media (min-width: 1100px) {
-  .map-bar {
-    left: max(calc((100vw - var(--map-card, 0px)) / 2), calc(12px + var(--view-switch-w, 0px) + 8px + min(960px, 100vw - var(--view-switch-w, 0px) - 28px - var(--map-card, 0px)) / 2));
-    max-width: calc(100vw - var(--view-switch-w, 0px) - 28px - var(--map-card, 0px));
-  }
-}
 /* Who is followed, over the track: face, name and years, then Open and the way out. */
 .map-chip { padding: 2px 4px 4px; margin-bottom: 2px; border-bottom: 1px solid var(--border); }
 .map-chip-mode button { white-space: nowrap; }
@@ -535,7 +521,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
 @media (max-width: 640px) { .map-now-inline { display: inline; } }
 .map-bar .bar-btn:disabled { opacity: .35; cursor: default; background: none; }
 @media (max-width: 640px) {
-  .map-bar { bottom: calc(80px + var(--view-switch-h, 52px)); }
+  .map-bar { bottom: 72px; }
   .map-bar .map-controls { flex-wrap: wrap; }
   .map-bar .map-count { display: none; }
   .map-bar .map-show { margin-left: auto; }

@@ -75,10 +75,16 @@ export async function dispatch(actor: Actor, name: string, raw: unknown) {
 const PLACE_FIELDS = new Set(['place', 'birthPlace', 'deathPlace'])
 
 /** Every place a write names: a card's fields, a fact, a marriage. */
-function namedPlaces(value: unknown, key = '', out: string[] = []): string[] {
-  if (Array.isArray(value)) value.forEach((v) => namedPlaces(v, key, out))
-  else if (value && typeof value === 'object') Object.entries(value).forEach(([k, v]) => namedPlaces(v, k, out))
-  else if (typeof value === 'string' && PLACE_FIELDS.has(key) && value.trim()) out.push(value)
+function namedPlaces(value: unknown, out: places.NamedPlace[] = []): places.NamedPlace[] {
+  if (Array.isArray(value)) value.forEach((v) => namedPlaces(v, out))
+  else if (value && typeof value === 'object') {
+    const o = value as Record<string, unknown>
+    // A place field and its link beside it: place and placeId, birthPlace and birthPlaceId.
+    for (const [k, v] of Object.entries(o)) {
+      if (typeof v === 'string' && PLACE_FIELDS.has(k) && v.trim()) out.push({ text: v, id: typeof o[`${k}Id`] === 'string' ? (o[`${k}Id`] as string) : null })
+      else if (v && typeof v === 'object') namedPlaces(v, out)
+    }
+  }
   return out
 }
 

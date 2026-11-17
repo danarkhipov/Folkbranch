@@ -16,6 +16,7 @@ export const familyRoutes: Route[] = [
   human('POST', 'places', 'Add a place', async ({ actor, body }) => places.savePlace(actor, null, await body())),
   human('PUT', 'places/:id', 'Change a place', async ({ actor, params, body }) => places.savePlace(actor, params.id, await body())),
   human('DELETE', 'places/:id', 'Delete a place; what was inside it moves up', ({ actor, params }) => places.deletePlace(actor, params.id)),
+  human('POST', 'places/:id/merge', 'Merge another record of the same place into this one', async ({ actor, params, body }) => places.mergePlaces(actor, params.id, String(((await body()) as { from?: unknown })?.from ?? ''))),
   open('repositories', 'Archives and other places sources are kept', ({ actor }) => places.listRepositories(actor)),
   human('POST', 'repositories', 'Add an archive', async ({ actor, body }) => places.saveRepository(actor, null, await body())),
   human('PUT', 'repositories/:id', 'Change an archive', async ({ actor, params, body }) => places.saveRepository(actor, params.id, await body())),

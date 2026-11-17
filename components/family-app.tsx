@@ -9,7 +9,7 @@ import { App, Presence, api, undoFailure, useProposals, useTr, useWrite, type Ap
 import { Family } from '@/lib/kinship'
 import { personName, shownTags, type Graph, type HistoryEntry, type Lang, type Me } from '@/lib/types'
 import { GraphCanvas, type CanvasHandle } from './graph-canvas'
-import { ConnectionNotice, MainBar, BottomRow, ViewBar, ViewSwitch, type Side } from './chart-bars'
+import { ConnectionNotice, MainBar, ViewBar, type Side } from './chart-bars'
 import { useChartScope } from './chart-scope'
 import type { GuideSection } from './feature-guide'
 import { ConfirmDialog } from './confirm-dialog'
@@ -123,23 +123,17 @@ export function FamilyApp({ me, lang, archiveLang, familyName, providers, assist
   }, [me.role, me.guest])
   const endTour = () => { setTour(false); try { localStorage.setItem('folkbranch-tour', '1') } catch {} }
   const [path, setPath] = useState<string[] | null>(null)
-  // Tree or map, remembered in the address so a reload keeps it; each switch is a step Back can undo.
+  // Tree or map, remembered in the address so a reload keeps it.
   const [mapOn, setMapOn] = useState(() => typeof location !== 'undefined' && new URLSearchParams(location.search).get('view') === 'map')
-  const showMap = (on: boolean) => {
-    if (on === mapOn) return
+  const toggleMap = () => {
     const url = new URL(location.href)
-    if (on) url.searchParams.set('view', 'map')
-    else url.searchParams.delete('view')
-    history.pushState(history.state, '', url)
+    if (mapOn) url.searchParams.delete('view')
+    else url.searchParams.set('view', 'map')
+    history.replaceState(null, '', url)
     // The person selected in the tree is followed on the map; a phone shows them on the map, not under the sheet.
-    if (on) setMapCard(!matchMedia('(max-width: 640px)').matches)
-    setMapOn(on)
+    if (!mapOn) setMapCard(!matchMedia('(max-width: 640px)').matches)
+    setMapOn(!mapOn)
   }
-  useEffect(() => {
-    const back = () => setMapOn(new URLSearchParams(location.search).get('view') === 'map')
-    addEventListener('popstate', back)
-    return () => removeEventListener('popstate', back)
-  }, [])
   // On the map, `p` is who is followed and the card is apart from it: a phone follows with the map left clear, and
   // closing the card goes on following. A link to a person on the map opens a phone on the map, not on the sheet.
   const [mapCard, setMapCard] = useState(() => typeof location === 'undefined' || !(new URLSearchParams(location.search).get('view') === 'map' && matchMedia('(max-width: 640px)').matches))
@@ -344,7 +338,6 @@ export function FamilyApp({ me, lang, archiveLang, familyName, providers, assist
   }, [focusId, ctx, mapCard])
   if (!ctx) return <div className="canvas" />
   const focused = focusId ? ctx.byId.get(focusId) : undefined
-  const barsLeft = side === 'assistant' ? assistantWidth + 24 : side === 'history' || side === 'review' ? 408 : 12
   const panelOpen = !!focused && !focused.hidden && (!mapOn || mapCard)
 
   const onDelete = async (id: string) => {
@@ -362,17 +355,14 @@ export function FamilyApp({ me, lang, archiveLang, familyName, providers, assist
       <ConnectionNotice t={t} />
       <UndoKeys />
       <a href="#chart" className="skip-link bar-btn float" onClick={(e) => { e.preventDefault(); document.querySelector<HTMLElement>('.card-main')?.focus() }}>{t('Перейти к схеме')}</a>
-      <MainBar folded={barsHidden} onHide={() => hideBars(true)} onShow={() => hideBars(false)} guest={!!me.guest} familyName={familyName} present={present} mode={barMode} navRef={nav} side={side} draftOps={draftOps} onSearch={() => setSearch(true)} onSide={(next) => { setSide(next); setPath(null) }} onAssistant={toggleAssistant} onSettings={() => openSettings()} />
+      <MainBar folded={barsHidden} onHide={() => hideBars(true)} onShow={() => hideBars(false)} guest={!!me.guest} familyName={familyName} present={present} mode={barMode} navRef={nav} side={side} draftOps={draftOps} onSearch={() => setSearch(true)} onSide={(next) => { setSide(next); setPath(null) }} onAssistant={toggleAssistant} onSettings={() => openSettings()} mapOn={mapOn} onMap={toggleMap} />
       <main id="chart" aria-label={t('Схема семьи')}>
       {mapOn ? <MapView card={panelOpen} onCard={setMapCard} root={scope.scope === 'all' ? null : scope.rootId} /> : <>
       <GraphCanvas ref={canvas} scope={scope} pathIds={path} groupIds={groupIds} panelOpen={panelOpen} leftInset={side === 'assistant' ? assistantWidth + 12 : 0}/>
 
+      <ViewBar folded={barsHidden} onHide={() => hideBars(true)} onOverview={() => setOverview(true)} onPrint={() => setPrinting(true)} scope={scope} canvas={canvas} rootsBelow={rootsBelow} onFlip={flipChart} groups={groups} onGroups={setGroups} allGroups={allGroups} left={side === 'assistant' ? assistantWidth + 24 : side === 'history' || side === 'review' ? 408 : 12} crowded={panelOpen || !!side} />
       </>}
       </main>
-      <BottomRow left={barsLeft}>
-        <ViewSwitch map={mapOn} onChange={showMap} folded={barsHidden} />
-        {!mapOn && <ViewBar folded={barsHidden} onHide={() => hideBars(true)} onOverview={() => setOverview(true)} onPrint={() => setPrinting(true)} scope={scope} canvas={canvas} rootsBelow={rootsBelow} onFlip={flipChart} groups={groups} onGroups={setGroups} allGroups={allGroups} crowded={panelOpen || !!side} />}
-      </BottomRow>
 
       {!ctx.graph.persons.length && ctx.canEdit && (
         <div className="fixed inset-0 grid place-items-center pointer-events-none">

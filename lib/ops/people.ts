@@ -1,7 +1,8 @@
 import { and, eq, isNull, or } from 'drizzle-orm'
 import { dataStamp, getDb, schema } from '../db'
 import type { Certainty, Claim, Fact, Graph, ParentKind, Person, Sex, Source, UnionKind } from '../types'
-import { personName, yearOf } from '../types'
+import { personName, yearOf, type Place } from '../types'
+import { placeLink } from '../places'
 import { Actor, Changes, can, mutate, newId, OpError, requireRole, seesOnlyPublic, dropStoriesAboutNobody } from './core'
 import { say } from './app-config'
 import { reconcile } from './merge'
@@ -109,6 +110,8 @@ export interface PersonInput {
   birthPlace?: string
   deathDate?: string
   deathPlace?: string
+  birthPlaceId?: string | null
+  deathPlaceId?: string | null
   living?: boolean
   keepPrivate?: boolean
   noChildren?: boolean
@@ -132,11 +135,40 @@ export function normalize(input: PersonInput) {
   return row
 }
 
+/**
+ * Each place written on a card keeps beside it the record it means: the one that answers to the text, or the one the
+ * person picked among several of one name. A link that no longer fits the text is dropped, so a corrected place is
+ * never held to the old village. Only what this write touches is looked at; the text itself is never changed.
+ */
+export function linkPlaces(input: PersonInput, before?: Person): PersonInput {
+  const touches = ['birthPlace', 'birthPlaceId', 'deathPlace', 'deathPlaceId', 'facts'].some((k) => k in input)
+  if (!touches) return input
+  const all = allPlaces()
+  const out = { ...input }
+  for (const f of ['birth', 'death'] as const) {
+    const text = `${f}Place` as const, link = `${f}PlaceId` as const
+    if (!(text in input) && !(link in input)) continue
+    out[link] = placeLink(input[text] ?? before?.[text] ?? '', all, link in input ? input[link] : before?.[link])
+  }
+  if (input.facts) {
+    const was = new Map((before?.facts ?? []).filter((f) => f.id).map((f) => [f.id, f.placeId]))
+    out.facts = input.facts.map((f) => {
+      const placeId = placeLink(f.place ?? '', all, f.placeId !== undefined ? f.placeId : f.id ? was.get(f.id) : null)
+      const { placeId: _, ...rest } = f
+      return placeId ? { ...rest, placeId } : rest
+    })
+  }
+  return out
+}
+
+/** The Places list, as the links are checked against it. */
+export const allPlaces = (): Place[] => getDb().select().from(schema.places).all().map((r) => ({ ...r, otherNames: JSON.parse(r.otherNames ?? '[]') }))
+
 export type QuickRelation = 'father' | 'mother' | 'son' | 'daughter' | 'spouse'
 
 export function insertPerson(c: Changes, input: PersonInput) {
   const id = newId()
-  const row = normalize(input)
+  const row = normalize(linkPlaces(input))
   const birthYear = (row.birthYear as number | null) ?? null
   const deathYear = (row.deathYear as number | null) ?? null
   const living = input.living ?? isLikelyLiving(birthYear, input.deathDate ?? '', deathYear)
@@ -215,7 +247,7 @@ export function addUnion(c: Changes, aId: string, bId: string, kind: UnionKind =
   const pa = parentsOf(aId), pb = parentsOf(bId)
   if (pa.some((p) => pb.includes(p)) || pa.includes(bId) || pb.includes(aId)) return
   const dup = db.select().from(s).where(or(and(eq(s.aId, aId), eq(s.bId, bId)), and(eq(s.aId, bId), eq(s.bId, aId)))).get()
-  if (!dup) c.insert('unions', { id: newId(), aId, bId, kind, startDate, endDate, place, ...(certainty ? { certainty } : {}) })
+  if (!dup) c.insert('unions', { id: newId(), aId, bId, kind, startDate, endDate, place, placeId: place ? placeLink(place, allPlaces()) : null, ...(certainty ? { certainty } : {}) })
 }
 
 export const FIELD: Record<string, string> = {
@@ -228,7 +260,7 @@ export function updatePerson(actor: Actor, id: string, input: PersonInput, seen?
   const p = getPersonRow(id)
   return mutate(actor, { summary: `${label(p)}: ${Object.keys(input).map((k) => say(FIELD[k] ?? k)).join(', ')}`, personIds: [id], key: `person:${id}` }, (c) => {
     // Read here, inside the write: nothing can slip in between the comparison and the change.
-    const row = normalize(seen ? reconcile(getPersonRow(id), input as Record<string, unknown>, seen) as PersonInput : input)
+    const row = normalize(linkPlaces(seen ? reconcile(getPersonRow(id), input as Record<string, unknown>, seen) as PersonInput : input, PERSON_JSON(getPersonRow(id)) as Person))
     // Only an edit of a date is checked: a card saved wrong by an older version can still have its other fields fixed.
     if ('birthDate' in row || 'deathDate' in row) assertDates((row.birthDate ?? p.birthDate) as string, (row.deathDate ?? p.deathDate) as string)
     if (input.deathDate && input.living === undefined) row.living = false
@@ -263,13 +295,19 @@ export function deletePerson(actor: Actor, id: string) {
   db.update(schema.storyRequests).set({ revokedAt: Date.now() }).where(and(eq(schema.storyRequests.personId, id), isNull(schema.storyRequests.revokedAt))).run()
 }
 
-export function updateRelation(actor: Actor, type: 'parent' | 'union', id: string, patch: Record<string, string>) {
+export function updateRelation(actor: Actor, type: 'parent' | 'union', id: string, patch: Record<string, string | null | undefined>) {
   requireRole(actor, 'editor')
   const table = type === 'parent' ? 'parentChild' : 'unions'
   const db = getDb()
   const row = type === 'parent' ? db.select().from(schema.parentChild).where(eq(schema.parentChild.id, id)).get() : db.select().from(schema.unions).where(eq(schema.unions.id, id)).get()
   const ids = !row ? [] : 'parentId' in row ? [row.parentId, row.childId] : [row.aId, row.bId]
-  mutate(actor, { summary: `${say('Связь')}: ${Object.values(patch).filter(Boolean).join(', ')}`, personIds: ids }, (c) => c.update(table, id, patch))
+  // A marriage's place keeps its link as a card's places do: the record the text means, or the one picked.
+  const linked: Record<string, unknown> = { ...patch }
+  if (type === 'union' && row && ('place' in patch || 'placeId' in patch)) {
+    const u = row as typeof schema.unions.$inferSelect
+    linked.placeId = placeLink(patch.place ?? u.place, allPlaces(), 'placeId' in patch ? patch.placeId : u.placeId)
+  }
+  mutate(actor, { summary: `${say('Связь')}: ${Object.values(patch).filter(Boolean).join(', ')}`, personIds: ids }, (c) => c.update(table, id, linked))
 }
 
 export function removeRelation(actor: Actor, type: 'parent' | 'union', id: string) {

@@ -77,7 +77,7 @@ function FactRow({ fact, person, readOnly, fresh, kinds, places, onChange, onRem
             draw leaves the event off the map, and the reason belongs here, not only in the map's gap list.
             While the field is being typed in, the hint waits: half a word is not a wrong place. */}
         <span className="text-xs text-ink-faint">{t('Где')}</span>
-        <span className="flex min-w-0 flex-col">{field('place', 'например, Пермь', 'text-ink', places, false, 'Где')}<PlaceHint text={editing === 'place' ? '' : f.place} /></span>
+        <span className="flex min-w-0 flex-col">{field('place', 'например, Пермь', 'text-ink', places, false, 'Где')}<PlaceHint text={editing === 'place' ? '' : f.place} placeId={f.placeId} onPick={(placeId) => { const next = { ...f, placeId }; setF(next); commit(next) }} /></span>
         {extra.map((k) => (
           <Fragment key={k}>
             <span className="text-xs text-ink-faint">{t(k)}</span>
@@ -330,7 +330,7 @@ function LifeLine({ person }: { person: Person }) {
       {map && <PlaceMap marks={marks} path onPerson={(id) => focus(id, { center: true })} className="mt-2 h-64" />}
       {unplaced.length > 0 && (
         <p className="mt-1.5 text-xs text-ink-soft break-anywhere">
-          {t('не на карте')}: {unplaced.map((u) => `${t(u.what)}${u.date ? ` ${u.date}` : ''}, ${u.text} — ${t(u.why === 'unknown' ? 'нет в списке мест' : u.why === 'no-date' ? 'нет года' : 'у места нет координат')}`).join(' · ')}
+          {t('не на карте')}: {unplaced.map((u) => `${t(u.what)}${u.date ? ` ${u.date}` : ''}, ${u.text} — ${t(u.why === 'unknown' ? 'нет в списке мест' : u.why === 'no-date' ? 'нет года' : u.why === 'ambiguous' ? 'несколько мест с таким названием' : 'у места нет координат')}`).join(' · ')}
         </p>
       )}
     </details>
@@ -395,7 +395,7 @@ export function Details({ person, patch: send }: { person: Person; patch: (p: Pa
         <span className="text-xs text-ink-soft @min-[441px]:hidden -mb-1.5">{t('Дата')}</span>
         <span className="text-xs text-ink-soft @min-[441px]:hidden -mb-1.5">{t('Место')}</span>
         <span className="flex min-w-0 flex-col"><DateField id="f-birth-date" readOnly={ro} value={person.birthDate} placeholder={t('например, 1890')} onSave={saveClaimField('birthDate')} /><DateHint date={person.birthDate} field="birth" person={person} onFix={ro ? undefined : saveClaimField('birthDate')} /></span>
-        <span className="flex min-w-0 flex-col"><Field id="f-birth-place" suggestions={places} readOnly={ro} value={person.birthPlace} placeholder={t('например, Пермь')} onSave={saveClaimField('birthPlace')} /><PlaceHint text={person.birthPlace} /></span>
+        <span className="flex min-w-0 flex-col"><Field id="f-birth-place" suggestions={places} readOnly={ro} value={person.birthPlace} placeholder={t('например, Пермь')} onSave={saveClaimField('birthPlace')} /><PlaceHint text={person.birthPlace} placeId={person.birthPlaceId} onPick={ro ? undefined : (birthPlaceId) => patch({ birthPlaceId })} /></span>
         <span className="@max-[440px]:hidden" />
         <Versions person={person} field="birthDate" current={current} change={change} attach={attachSource} />
         <Versions person={person} field="birthPlace" current={current} change={change} attach={attachSource} />
@@ -406,7 +406,7 @@ export function Details({ person, patch: send }: { person: Person; patch: (p: Pa
         <span className="text-xs text-ink-soft @min-[441px]:hidden -mb-1.5">{t('Дата')}</span>
         <span className="text-xs text-ink-soft @min-[441px]:hidden -mb-1.5">{t('Место')}</span>
             <span className="flex min-w-0 flex-col"><DateField id="f-death-date" readOnly={ro} value={person.deathDate} placeholder={t('например, 1950')} onSave={saveClaimField('deathDate')} /><DateHint date={person.deathDate} field="death" person={person} onFix={ro ? undefined : saveClaimField('deathDate')} /></span>
-            <span className="flex min-w-0 flex-col"><Field id="f-death-place" suggestions={places} readOnly={ro} value={person.deathPlace} placeholder={t('например, Пермь')} onSave={saveClaimField('deathPlace')} /><PlaceHint text={person.deathPlace} /></span>
+            <span className="flex min-w-0 flex-col"><Field id="f-death-place" suggestions={places} readOnly={ro} value={person.deathPlace} placeholder={t('например, Пермь')} onSave={saveClaimField('deathPlace')} /><PlaceHint text={person.deathPlace} placeId={person.deathPlaceId} onPick={ro ? undefined : (deathPlaceId) => patch({ deathPlaceId })} /></span>
             <span className="@max-[440px]:hidden" />
             <Versions person={person} field="deathDate" current={current} change={change} attach={attachSource} />
             <Versions person={person} field="deathPlace" current={current} change={change} attach={attachSource} />

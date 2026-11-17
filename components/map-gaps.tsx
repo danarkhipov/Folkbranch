@@ -8,7 +8,7 @@ import type { Gap, MapTimeline, Unplaced } from '@/lib/map-timeline'
 import { eventWords } from '@/lib/map-scrub'
 import { peopleWords } from '@/lib/names'
 
-export const GAP_LABEL: Record<Gap, string> = { 'no-place': 'место неизвестно', 'no-coords': 'у места нет координат', 'bad-coords': 'координаты места вне допустимого', 'unknown-place': 'такого места нет в списке мест', 'no-date': 'дата неизвестна', 'outside-span': 'вне лет жизни человека', future: 'этот год ещё не наступил', 'death-before-birth': 'смерть раньше рождения' }
+export const GAP_LABEL: Record<Gap, string> = { 'no-place': 'место неизвестно', 'no-coords': 'у места нет координат', 'bad-coords': 'координаты места вне допустимого', 'unknown-place': 'такого места нет в списке мест', 'ambiguous-place': 'в списке несколько мест с таким названием — выберите нужное в карточке', 'no-date': 'дата неизвестна', 'outside-span': 'вне лет жизни человека', future: 'этот год ещё не наступил', 'death-before-birth': 'смерть раньше рождения' }
 
 /**
  * `only`: the list opened from a line's chip shows just the people of that line who are not on the map, and why.
