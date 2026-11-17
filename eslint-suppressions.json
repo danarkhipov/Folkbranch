@@ -68,9 +68,6 @@
     }
   },
   "components/person-details.tsx": {
-    "react-hooks/refs": {
-      "count": 11
-    },
     "react-hooks/set-state-in-effect": {
       "count": 2
     }

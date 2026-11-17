@@ -155,6 +155,8 @@ jobs:
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # A read-only token cannot comment on a pull request; the job's result is what counts.
+          GITLEAKS_ENABLE_COMMENTS: 'false'
       - name: No archive, photo or backup of real people is committed
         run: |
           bad=$(git ls-files | grep -E '(^|/)(data/|.*\.(db|sqlite|sqlite3|ged|gramps)$)' | grep -vE '^(tests/|docs/|public/|drizzle/)' || true)
@@ -169,7 +171,7 @@ jobs:
         run: |
           docker build -t folkbranch .
           docker run -d --name folkbranch -p 3000:3000 folkbranch
-          for i in $(seq 1 30); do curl -fs http://127.0.0.1:3000/api/health && docker exec folkbranch node folkbranch.mjs doctor && exit 0; sleep 2; done
+          for _ in $(seq 1 30); do curl -fs http://127.0.0.1:3000/api/health && docker exec folkbranch node folkbranch.mjs doctor && exit 0; sleep 2; done
           docker logs folkbranch
           exit 1
       - name: The image has no critical vulnerability with a fix available

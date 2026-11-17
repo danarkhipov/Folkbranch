@@ -1,0 +1,15 @@
+# The default rules, minus the invented keys that tests and docs use as examples ("fp-secret", "test-key-1234").
+# A real secret anywhere else still fails the `secrets` job.
+title = "Folkbranch"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Invented credentials in tests, fixtures and documentation"
+paths = [
+  '''^tests/''',
+  '''^docs/''',
+  '''^public/''',
+  '''^CHANGELOG\.md$''',
+]
