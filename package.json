@@ -1,6 +1,6 @@
 {
   "name": "folkbranch",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Your family tree, photos and voice stories, kept together: free, open-source family tree software you host yourself. Relatives join by link; GEDCOM import and export; AI agents over MCP with review of every edit.",
   "private": true,
   "license": "AGPL-3.0-only",
