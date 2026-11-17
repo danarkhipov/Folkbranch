@@ -1,18 +1,24 @@
 // Files people actually keep their family in. Everything except GEDCOM becomes the text graph
 // format, so duplicates, review and undo work the same way for every source. Runs in the browser:
 // the file goes no further than the person's own server, and only when they press Import.
-import { serializeNameLine } from './textformat'
+import { serializeNameLine, setResidences, type Residence } from './textformat'
 import { yearOf } from './types'
 
 export type ImportKind = 'gedcom' | 'table' | 'xlsx' | 'json' | 'text'
-export type ColumnField = '' | 'id' | 'name' | 'given' | 'patronymic' | 'surname' | 'maiden' | 'sex' | 'birthDate' | 'birthPlace' | 'deathDate' | 'deathPlace' | 'father' | 'mother' | 'spouse'
+export type ColumnField = '' | 'id' | 'name' | 'given' | 'patronymic' | 'surname' | 'maiden' | 'sex' | 'birthDate' | 'birthPlace' | 'deathDate' | 'deathPlace' | 'residencePlace' | 'residenceDate' | 'residencePlace2' | 'residenceDate2' | 'residencePlace3' | 'residenceDate3' | 'father' | 'mother' | 'spouse'
 export type Mapping = ColumnField[]
 
 export const COLUMN_FIELDS: [ColumnField, string][] = [
   ['', 'не загружать'], ['name', 'Имя целиком'], ['given', 'Имя'], ['patronymic', 'Отчество'], ['surname', 'Фамилия'], ['maiden', 'Девичья фамилия'], ['sex', 'Пол'],
   ['birthDate', 'Дата рождения'], ['birthPlace', 'Место рождения'], ['deathDate', 'Дата смерти'], ['deathPlace', 'Место смерти'],
+  ['residencePlace', 'Место жительства'], ['residenceDate', 'Год (к месту жительства)'],
+  ['residencePlace2', 'Место жительства 2'], ['residenceDate2', 'Год (к месту жительства) 2'],
+  ['residencePlace3', 'Место жительства 3'], ['residenceDate3', 'Год (к месту жительства) 3'],
   ['father', 'Отец'], ['mother', 'Мать'], ['spouse', 'Супруг'], ['id', 'Номер строки (id)'],
 ]
+
+/** A table may give a move as a place and a year, or as a period in one year column: all three pairs are offered. */
+const RESIDENCE_FIELDS: [ColumnField, ColumnField][] = [['residencePlace', 'residenceDate'], ['residencePlace2', 'residenceDate2'], ['residencePlace3', 'residenceDate3']]
 
 export function detectKind(fileName: string, head: string): ImportKind {
   const ext = fileName.toLowerCase().split('.').pop() ?? ''
@@ -96,12 +102,35 @@ export function guessMapping(headers: string[]): Mapping {
     return hit
   })
   // Then Spanish and Catalan, for the headers still unread: a Russian or English table is read exactly as before.
-  return first.map((hit, i) => {
+  const mapping = first.map((hit, i) => {
     if (hit) return hit
     const again = HEADERS_ES_CA.find(([f, re]) => !used.has(f) && re.test(headers[i].trim().toLowerCase()))?.[0] ?? ''
     if (again) used.add(again)
     return again
   })
+  return withResidences(mapping, headers)
+}
+
+// "Где жил", "Место жительства", "Переезд", "Residence", "Residencia", "Mudanza": the columns a table keeps moves in.
+const RESIDENCE_PLACE = /(^|\s)(resid\S*|move\S*|mudanza\S*|trasllat\S*)(\s|$|\d)|^где\s+(жил|прожив)|^переезд|(мест|plac)[а-яёa-z]*\s*(жител|прожив)/
+// A bare year column belongs to a residence only when the table also has a residence place: otherwise it is just a year.
+const RESIDENCE_DATE = /^(год|года|годы|years?|años?|anys?)(\s*\(.*\))?(\s*\d+)?$/
+
+/**
+ * Residence columns come in pairs and may repeat ("Где жил 1", "Год 1"), which the one-field-per-column
+ * rules above cannot express. Places are numbered first, then the years, so "Год | Где жил" pairs up too.
+ */
+function withResidences(mapping: Mapping, headers: string[]): Mapping {
+  const keys = headers.map((h) => h.trim().toLowerCase().replace(/ё/g, 'е'))
+  const places = keys.flatMap((k, i) => (!mapping[i] && RESIDENCE_PLACE.test(k) ? [i] : []))
+  places.forEach((i, n) => { if (n < RESIDENCE_FIELDS.length) mapping[i] = RESIDENCE_FIELDS[n][0] })
+  if (!places.length) return mapping
+  keys.forEach((k, i) => {
+    if (mapping[i] || !RESIDENCE_DATE.test(k)) return
+    const free = RESIDENCE_FIELDS.find(([place, date]) => mapping.includes(place) && !mapping.includes(date))
+    if (free) mapping[i] = free[1]
+  })
+  return mapping
 }
 
 // Spanish and Catalan on the second line. "M" stays male, as in Russian and English tables: in a Spanish one it can mean mujer. The whole words are safe.
@@ -112,20 +141,25 @@ const clean = (s: unknown) => String(s ?? '').replace(/\s+/g, ' ').trim()
 const safeName = (s: string) => clean(s).replace(/:/g, ' ').replace(/ \+ /g, ' и ').replace(/^@/, '').replace(/,/g, ' ').replace(/\s+/g, ' ').trim()
 const norm = (s: string) => s.toLowerCase().replace(/ё/g, 'е')
 
-interface Row { name: string; attrs: Record<string, string>; father: string; mother: string; spouse: string; id: string }
+interface Row { name: string; attrs: Record<string, string>; father: string; mother: string; spouse: string; id: string; lived: Residence[] }
 
 export interface TableResult { text: string; people: number; warnings: { key: string; detail?: string }[] }
 
-export function rowsToText(rows: string[][], mapping: Mapping, title = ''): TableResult {
+export function rowsToText(rows: string[][], mapping: Mapping, title = '', headers: string[] = []): TableResult {
   const warnings: TableResult['warnings'] = []
+  // A column nobody could read is named, not dropped in silence: its values will not reach the archive.
+  const unused = mapping.map((f, i) => (f ? '' : (headers[i] ?? '').trim())).filter(Boolean)
+  if (unused.length) warnings.push({ key: 'Столбцы, которые никуда не попали, останутся только в файле', detail: unused.join(', ') })
   const parsed: Row[] = []
   for (const r of rows) {
     const cell = (f: ColumnField) => { const i = mapping.indexOf(f); return i < 0 ? '' : clean(r[i]) }
     const name = safeName(cell('name') || [cell('given'), cell('patronymic'), cell('surname')].filter(Boolean).join(' '))
     if (!name) continue
     const birth = cell('birthDate'), death = cell('deathDate')
+    // A year without a place is no residence: there is nowhere to put it on the map.
+    const lived = RESIDENCE_FIELDS.map(([place, date]) => ({ place: cell(place), date: cell(date) })).filter((x) => x.place)
     parsed.push({
-      name, id: cell('id'), father: safeName(cell('father')), mother: safeName(cell('mother')), spouse: safeName(cell('spouse')),
+      name, id: cell('id'), father: safeName(cell('father')), mother: safeName(cell('mother')), spouse: safeName(cell('spouse')), lived,
       attrs: { b: birth, bp: cell('birthPlace'), d: death, dp: cell('deathPlace'), sex: SEX_WORDS[norm(cell('sex'))] ?? '', maiden: safeName(cell('maiden')) },
     })
   }
@@ -140,10 +174,10 @@ export function rowsToText(rows: string[][], mapping: Mapping, title = ''): Tabl
   const repeated = [...counts].filter(([, n]) => n > 1).length
   if (repeated) warnings.push({ key: 'Одинаковые имена в файле будут считаться одним человеком', detail: String(repeated) })
 
-  const people = new Map<string, { name: string; attrs: Record<string, string> }>()
+  const people = new Map<string, { name: string; attrs: Record<string, string>; lived: Residence[] }>()
   const touch = (name: string, sex = '') => {
     const k = norm(name)
-    const p = people.get(k) ?? { name, attrs: {} }
+    const p = people.get(k) ?? { name, attrs: {}, lived: [] }
     if (sex && !p.attrs.sex) p.attrs.sex = sex
     people.set(k, p)
   }
@@ -151,6 +185,8 @@ export function rowsToText(rows: string[][], mapping: Mapping, title = ''): Tabl
     touch(p.name)
     const cur = people.get(norm(p.name))!
     for (const [k, v] of Object.entries(p.attrs)) if (v && !cur.attrs[k]) cur.attrs[k] = v
+    // Several rows about one person add their moves up instead of keeping only the first row's.
+    for (const r of p.lived) if (!cur.lived.some((x) => x.date === r.date && x.place === r.place)) cur.lived.push(r)
   }
   const parents = new Map<string, Set<string>>()
   const unions = new Map<string, [string, string]>()
@@ -169,7 +205,11 @@ export function rowsToText(rows: string[][], mapping: Mapping, title = ''): Tabl
 
   const lines = [`family ${title}`.trim(), '']
   const ordered = [...people.values()].sort((a, b) => (yearOf(a.attrs.b ?? '') ?? 9999) - (yearOf(b.attrs.b ?? '') ?? 9999))
-  for (const p of ordered) lines.push(serializeNameLine(p.name, p.attrs))
+  for (const p of ordered) {
+    const attrs = { ...p.attrs }
+    setResidences(attrs, p.lived)
+    lines.push(serializeNameLine(p.name, attrs))
+  }
   lines.push('')
   const families = new Map<string, { parents: string[]; children: string[] }>()
   for (const [child, set] of parents) {

@@ -59,7 +59,7 @@ figure { margin: 6px 0; break-inside: avoid; } figure img { max-width: 100%; max
 footer { margin-top: 16px; font-size: 8.5pt; color: #6b604f; }
 </style></head><body>
 <header>${avatar ? `<img src="${esc(avatar)}" alt="">` : ''}<div><h1>${esc(personName(person) || t('Без названия'))}</h1>${lifeYears(person, '?', t('н. в.')) ? `<p class="soft">${esc(lifeYears(person, '?', t('н. в.')))}${where.length ? ` · ${esc(where.join(' — '))}` : ''}</p>` : ''}</div></header>
-${section('Хронология жизни', life.length ? `<ul>${life.map((e) => `<li><b>${esc(e.date)}</b>${e.age !== null ? ` <span class="soft">(${esc(t('возраст'))} ${e.age})</span>` : ''} ${esc(t(e.title))}${e.note ? `: ${esc(e.note)}` : ''}</li>`).join('')}</ul>` : '')}
+${section('Хронология жизни', life.length ? `<ul>${life.map((e) => `<li><b>${esc(e.date)}</b>${e.age !== null ? ` <span class="soft">(${esc(t('возраст'))} ${e.age})</span>` : ''} ${esc(t(e.title))}${e.note ? `: ${esc(e.note)}` : ''}${e.place ? `, ${esc(e.place)}` : ''}</li>`).join('')}</ul>` : '')}
 ${section('Семья', kin.map(([title, list]) => `<p><b>${esc(t(title))}:</b> ${list.map(named).join(', ')}</p>`).join(''))}
 ${section('Факты', person.facts.filter((f) => f.kind || factWords(f, t)).map((f) => `<p><b>${esc(f.kind)}</b>${f.date ? ` ${esc(f.date)}` : ''}${f.place ? `, ${esc(f.place)}` : ''}${factWords(f, t) ? `. ${esc(factWords(f, t))}` : ''}</p>`).join(''))}
 ${pages.map((p) => section(p.title || 'Биография', blocks(p.content))).join('')}

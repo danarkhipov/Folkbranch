@@ -41,7 +41,7 @@ export const OPS: Record<string, Def> = {
   }),
   update_person: def({
     risk: 'write',
-    description: 'Change fields of a person. Only the given fields change.',
+    description: 'Change fields of a person. Only the given fields change. Add a fact with add_fact: facts replaces the list.',
     // `seen`: each field as the editor last saw it, so a relative's edit made meanwhile is not lost.
     input: z.object({ id: z.string(), patch: personInput, seen: z.record(z.string(), z.unknown()).optional() }),
     agentInput: z.object({ id: z.string(), patch: agentPatch }),
@@ -52,6 +52,25 @@ export const OPS: Record<string, Def> = {
       const cur = x.id.startsWith('tmp_') ? null : people.getPersonRow(x.id) as Record<string, unknown>
       return { text: c.name(x.id), details: Object.entries(x.patch).map(([k, v]) => `${tell(FIELD[k] ?? k)}: ${cur?.[k] ?? ''} → ${v}`) }
     },
+  }),
+  add_fact: def({
+    risk: 'write',
+    description: 'Add one fact, keeping the others: a move, a job, a service. Its place must be one in list_places with a point, or it stays off the map.',
+    input: z.object({
+      personId: z.string(),
+      fact: z.strictObject({
+        kind: z.string().max(80).min(1, 'say what happened: "Occupation", "Move", "Service"'),
+        date: z.string().max(60).default(''), place: z.string().max(120).default(''), note: z.string().max(800).default(''), source: z.string().max(300).optional(),
+      }),
+    }),
+    refs: { personId: 'persons' },
+    apply: (a, x) => {
+      const p = personFor(a, x.personId)
+      const fact = { ...x.fact, id: newId() }
+      // Appended to the list as it stands, merged as a card edit is, so a fact added meanwhile stays.
+      return { ...people.updatePerson(a, x.personId, { facts: [...p.facts, fact] }, { facts: p.facts }), factId: fact.id }
+    },
+    describe: (x, c) => ({ text: `${c.name(x.personId)}: ${x.fact.kind}`, details: [x.fact.date, x.fact.place, x.fact.note].filter(Boolean) }),
   }),
   update_people: def({
     risk: 'danger',
@@ -246,7 +265,7 @@ export const OPS: Record<string, Def> = {
   }),
   create_place: def({
     risk: 'write',
-    description: 'Add a place: a village, town, parish or region, with what it was part of, its other and old names, and its point on a map. Look in list_places first. Give coordinates only for a place you are sure of, and say in the note where they come from.',
+    description: 'Add a place: a village, town, parish or region, with what it was part of, its other and old names, and its point on a map. Look in list_places first. A place with no point stays off the map: give lat and lon only for a place you are sure of, and say in the note where they come from.',
     input: places.placeInput,
     creates: true,
     prepare: (_a, x) => { if (x.parentId && !isTemp(x.parentId)) places.getPlace(x.parentId); return x },

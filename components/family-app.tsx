@@ -45,6 +45,7 @@ const ReviewPanel = dynamic(() => import('./review-panel').then((m) => m.ReviewP
 const PrintDialog = dynamic(() => import('./print-dialog').then((m) => m.PrintDialog), { ssr: false })
 // The card opens on a press, so its tabs need not come with the first screen.
 const PersonPanel = dynamic(() => import('./person-panel').then((m) => m.PersonPanel), { ssr: false })
+const MapView = dynamic(() => import('./map-view'), { ssr: false })
 const FeatureTour = dynamic(() => import('./feature-tour').then((m) => m.FeatureTour), { ssr: false })
 const TextDialog = dynamic(() => import('./text-dialog').then((m) => m.TextDialog), { ssr: false })
 
@@ -122,6 +123,20 @@ export function FamilyApp({ me, lang, archiveLang, familyName, providers, assist
   }, [me.role, me.guest])
   const endTour = () => { setTour(false); try { localStorage.setItem('folkbranch-tour', '1') } catch {} }
   const [path, setPath] = useState<string[] | null>(null)
+  // Tree or map, remembered in the address so a reload keeps it.
+  const [mapOn, setMapOn] = useState(() => typeof location !== 'undefined' && new URLSearchParams(location.search).get('view') === 'map')
+  const toggleMap = () => {
+    const url = new URL(location.href)
+    if (mapOn) url.searchParams.delete('view')
+    else url.searchParams.set('view', 'map')
+    history.replaceState(null, '', url)
+    // The person selected in the tree is followed on the map; a phone shows them on the map, not under the sheet.
+    if (!mapOn) setMapCard(!matchMedia('(max-width: 640px)').matches)
+    setMapOn(!mapOn)
+  }
+  // On the map, `p` is who is followed and the card is apart from it: a phone follows with the map left clear, and
+  // closing the card goes on following. A link to a person on the map opens a phone on the map, not on the sheet.
+  const [mapCard, setMapCard] = useState(() => typeof location === 'undefined' || !(new URLSearchParams(location.search).get('view') === 'map' && matchMedia('(max-width: 640px)').matches))
   const [groups, setGroups] = useState<string[]>([])
   const [importing, setImporting] = useState(false)
   const [printing, setPrinting] = useState(false)
@@ -164,6 +179,7 @@ export function FamilyApp({ me, lang, archiveLang, familyName, providers, assist
 
   const focus = useCallback((id: string | null, opts?: { center?: boolean }) => {
     setFocusId(id)
+    setMapCard(true)
     const url = new URL(location.href)
     if (id) url.searchParams.set('p', id)
     else url.searchParams.delete('p')
@@ -319,10 +335,10 @@ export function FamilyApp({ me, lang, archiveLang, familyName, providers, assist
     if (card) seen.observe(card)
     window.addEventListener('resize', measure)
     return () => { seen.disconnect(); window.removeEventListener('resize', measure) }
-  }, [focusId, ctx])
+  }, [focusId, ctx, mapCard])
   if (!ctx) return <div className="canvas" />
   const focused = focusId ? ctx.byId.get(focusId) : undefined
-  const panelOpen = !!focused && !focused.hidden
+  const panelOpen = !!focused && !focused.hidden && (!mapOn || mapCard)
 
   const onDelete = async (id: string) => {
     const p = ctx.byId.get(id)
@@ -339,11 +355,13 @@ export function FamilyApp({ me, lang, archiveLang, familyName, providers, assist
       <ConnectionNotice t={t} />
       <UndoKeys />
       <a href="#chart" className="skip-link bar-btn float" onClick={(e) => { e.preventDefault(); document.querySelector<HTMLElement>('.card-main')?.focus() }}>{t('Перейти к схеме')}</a>
-      <MainBar folded={barsHidden} onHide={() => hideBars(true)} onShow={() => hideBars(false)} guest={!!me.guest} familyName={familyName} present={present} mode={barMode} navRef={nav} side={side} draftOps={draftOps} onSearch={() => setSearch(true)} onSide={(next) => { setSide(next); setPath(null) }} onAssistant={toggleAssistant} onSettings={() => openSettings()} />
+      <MainBar folded={barsHidden} onHide={() => hideBars(true)} onShow={() => hideBars(false)} guest={!!me.guest} familyName={familyName} present={present} mode={barMode} navRef={nav} side={side} draftOps={draftOps} onSearch={() => setSearch(true)} onSide={(next) => { setSide(next); setPath(null) }} onAssistant={toggleAssistant} onSettings={() => openSettings()} mapOn={mapOn} onMap={toggleMap} />
       <main id="chart" aria-label={t('Схема семьи')}>
+      {mapOn ? <MapView card={panelOpen} onCard={setMapCard} root={scope.scope === 'all' ? null : scope.rootId} /> : <>
       <GraphCanvas ref={canvas} scope={scope} pathIds={path} groupIds={groupIds} panelOpen={panelOpen} leftInset={side === 'assistant' ? assistantWidth + 12 : 0}/>
 
       <ViewBar folded={barsHidden} onHide={() => hideBars(true)} onOverview={() => setOverview(true)} onPrint={() => setPrinting(true)} scope={scope} canvas={canvas} rootsBelow={rootsBelow} onFlip={flipChart} groups={groups} onGroups={setGroups} allGroups={allGroups} left={side === 'assistant' ? assistantWidth + 24 : side === 'history' || side === 'review' ? 408 : 12} crowded={panelOpen || !!side} />
+      </>}
       </main>
 
       {!ctx.graph.persons.length && ctx.canEdit && (
@@ -360,7 +378,7 @@ export function FamilyApp({ me, lang, archiveLang, familyName, providers, assist
       {side === 'review' && <ReviewPanel onClose={() => setSide(null)} />}
       {!assistant.ready && <AssistantSetup state={assistant} open={side === 'assistant'} width={assistantWidth} onWidth={setAssistantWidth} onClose={() => setSide(null)} />}
       {assistant.ready && assistantUsed && <AssistantPanel open={side === 'assistant'} width={assistantWidth} onWidth={setAssistantWidth} onClose={() => setSide(null)} onPath={setPath} onDirection={directChart} onBranch={(id, s) => { scope.show({ scope: s, rootId: s === 'all' ? null : id }); focus(id) }} />}
-      {panelOpen && <PersonPanel key={focused!.id} person={focused!} hit={searchHit?.personId === focused!.id ? searchHit : null} onClearHit={() => setSearchHit(null)} onClose={() => focus(null)} onDelete={onDelete} />}
+      {panelOpen && <PersonPanel key={focused!.id} person={focused!} hit={searchHit?.personId === focused!.id ? searchHit : null} onClearHit={() => setSearchHit(null)} onClose={() => (mapOn ? setMapCard(false) : focus(null))} onDelete={onDelete} />}
 
       {search && <SearchDialog open onOpenChange={setSearch} onPick={(id, hit) => { setSearchHit(hit ?? null); focus(id) }} />}
       {quick && <QuickAdd state={quick} onClose={(id) => {

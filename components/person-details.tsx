@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useApp } from '@/lib/client'
 import { translate } from '@/lib/i18n'
 import { accept, addVersion, editValue, hasConflict, NAME_FIELDS, reject, RELIABILITY, restore, setSource, sourceOf, summary, versions, type ClaimPatch } from '@/lib/claims'
-import { lifeEvents } from '@/lib/family-dates'
+import { lifeEvents, undatedEvents } from '@/lib/family-dates'
 import { listWriter } from '@/lib/list-writes'
 import { SwitchRow } from '@/components/ui/switch'
 import { ageWords } from '@/lib/names'
@@ -14,9 +14,9 @@ import { cn } from '@/lib/utils'
 import { personName, shownTags, yearOf, type Fact, type FactPerson, type ClaimField, type Person, type Reliability, type Source } from '@/lib/types'
 import { fieldsFor, firstRole, ROLES } from '@/lib/fact-kinds'
 import { PersonPopover } from './person-pickers'
-import { ContactsBlock, PlaceHint } from './person-extras'
+import { ContactsBlock, DateHint, PlaceHint } from './person-extras'
 import { usePlaces, useRepositories } from './places-tab'
-import { lifeStops } from '@/lib/places'
+import { lifeStops, unplacedStops } from '@/lib/places'
 
 const PlaceMap = dynamic(() => import('./place-map').then((m) => m.PlaceMap), { ssr: false })
 import { AddMenu, Field, GrowText, Hints, OpenAddress, ReadText, TagInput, DateField, Segmented } from './person-fields'
@@ -26,7 +26,7 @@ import { inputClass } from '@/components/ui/input'
 const MergeDialog = dynamic(() => import('./merge-dialog').then((m) => m.MergeDialog), { ssr: false })
 
 /** One dated fact: what happened, when, where, a note and where it is known from. Saved when the field loses focus. */
-function FactRow({ fact, readOnly, fresh, kinds, places, onChange, onRemove }: { fact: Fact; readOnly: boolean; fresh: boolean; kinds: string[]; places: string[]; onChange: (f: Fact) => void; onRemove: () => void }) {
+function FactRow({ fact, person, readOnly, fresh, kinds, places, onChange, onRemove }: { fact: Fact; person: Person; readOnly: boolean; fresh: boolean; kinds: string[]; places: string[]; onChange: (f: Fact) => void; onRemove: () => void }) {
   const { t, archiveLang } = useApp()
   const at = (key: string) => translate(archiveLang, key)
   const [f, setF] = useState(fact)
@@ -34,14 +34,14 @@ function FactRow({ fact, readOnly, fresh, kinds, places, onChange, onRemove }: {
   useEffect(() => setF(fact), [fact])
   const extra = fieldsFor(f.kind, at)
   const commit = (next = f) => { if (JSON.stringify(next) !== JSON.stringify(fact)) onChange(next) }
-  const field = (key: TextKey, placeholder: string, cls: string, known?: string[], auto?: boolean) => {
+  const field = (key: TextKey, placeholder: string, cls: string, known?: string[], auto?: boolean, name = placeholder) => {
     const value = f[key] ?? ''
     if (readOnly) return <ReadText value={value} className={cls} />
     const typed = value.trim().toLowerCase()
     const hints = editing === key && typed && known ? known.filter((x) => x.toLowerCase().includes(typed) && x.toLowerCase() !== typed).slice(0, 5) : []
     return (
       <span className="relative flex items-start gap-1 min-w-0">
-        <GrowText value={value} autoFocus={auto} placeholder={t(placeholder)} aria-label={t(placeholder)} className={cls} onChange={(e) => setF({ ...f, [key]: e.target.value })} onFocus={() => setEditing(key)} onBlur={() => { setEditing(null); commit() }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }} />
+        <GrowText value={value} autoFocus={auto} placeholder={t(placeholder)} aria-label={t(name)} className={cls} onChange={(e) => setF({ ...f, [key]: e.target.value })} onFocus={() => setEditing(key)} onBlur={() => { setEditing(null); commit() }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }} />
         <OpenAddress value={value} />
         {hints.length > 0 && <Hints items={hints} onPick={(x) => { const next = { ...f, [key]: x }; setF(next); commit(next) }} />}
       </span>
@@ -50,8 +50,8 @@ function FactRow({ fact, readOnly, fresh, kinds, places, onChange, onRemove }: {
   if (readOnly) {
     return (
       <div className="min-w-0 border-l-2 border-border pl-2.5 py-0.5 flex flex-col gap-0.5">
-        <span className="break-anywhere font-medium">{[f.date, f.kind].filter(Boolean).join(' · ')}</span>
-        {f.place && <ReadText value={f.place} className="text-ink-soft" />}
+        <span className="break-anywhere font-medium">{f.date || <span className="text-xs italic font-normal text-ink-faint">{t('Дата неизвестна')}</span>}{f.kind && ` · ${f.kind}`}</span>
+        {f.place ? <ReadText value={f.place} className="text-ink-soft" /> : <span className="text-xs italic text-ink-faint">{t('Место неизвестно')}</span>}
         {f.note && <ReadText value={f.note} />}
         {Object.entries(f.fields ?? {}).filter(([, v]) => v).map(([k, v]) => <span key={k} className="break-anywhere"><span className="text-ink-soft">{t(k)}:</span> {v}</span>)}
         {(f.people ?? []).filter((x) => x.name).map((x, i) => <Participant key={i} person={x} />)}
@@ -62,7 +62,10 @@ function FactRow({ fact, readOnly, fresh, kinds, places, onChange, onRemove }: {
   const row = (label: string, key: TextKey, placeholder: string, known?: string[], auto?: boolean) => (!readOnly || f[key]) && (
     <>
       <span className="text-xs text-ink-faint">{t(label)}</span>
-      {field(key, placeholder, 'text-ink', known, auto)}
+      {/* A screen reader names the field ("Когда"), not its example ("например, 1912"). */}
+      {key === 'date'
+        ? <span className="flex min-w-0 flex-col">{field(key, placeholder, 'text-ink', known, auto, label)}{editing !== 'date' && <DateHint date={f.date} field="fact" person={person} what={f.kind} onFix={(date) => { const next = { ...f, date }; setF(next); commit(next) }} />}</span>
+        : field(key, placeholder, 'text-ink', known, auto, label)}
     </>
   )
   return (
@@ -70,7 +73,11 @@ function FactRow({ fact, readOnly, fresh, kinds, places, onChange, onRemove }: {
       <div className="pr-6 max-sm:pr-9">{field('kind', 'Что произошло', 'font-medium', kinds, fresh && !fact.kind)}</div>
       <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-x-2 gap-y-0.5 items-baseline">
         {row('Когда', 'date', 'например, 1912', undefined, fresh && !!fact.kind)}
-        {row('Где', 'place', 'например, Пермь', places)}
+        {/* The place of a move or a residence, with the same hint the card gives: a place the archive cannot
+            draw leaves the event off the map, and the reason belongs here, not only in the map's gap list.
+            While the field is being typed in, the hint waits: half a word is not a wrong place. */}
+        <span className="text-xs text-ink-faint">{t('Где')}</span>
+        <span className="flex min-w-0 flex-col">{field('place', 'например, Пермь', 'text-ink', places, false, 'Где')}<PlaceHint text={editing === 'place' ? '' : f.place} /></span>
         {extra.map((k) => (
           <Fragment key={k}>
             <span className="text-xs text-ink-faint">{t(k)}</span>
@@ -290,11 +297,15 @@ function LifeLine({ person }: { person: Person }) {
   const { data: places = [] } = usePlaces()
   const [map, setMap] = useState(false)
   const events = useMemo(() => lifeEvents(person, graph), [person, graph])
+  // A fact with no year still belongs to the story: it is listed after the dated ones, never silently dropped.
+  const undated = useMemo(() => undatedEvents(person), [person])
+  // The stops the little map cannot draw (a place the archive has no point for), with the reason.
+  const unplaced = useMemo(() => unplacedStops(person, graph, places), [person, graph, places])
   const marks = useMemo(() => lifeStops(person, graph, places).map((s, i) => {
     const other = s.withId ? byId.get(s.withId) : undefined
     return { id: `${s.place.id}:${i}`, lat: s.place.lat, lon: s.place.lon, title: s.place.name, note: [t(s.what), s.date].filter(Boolean).join(', '), people: other ? [{ id: other.id, name: personName(other) }] : [] }
   }), [person, graph, places, byId, t])
-  if (events.length < 2) return null
+  if (events.length < 2 && !undated.length) return null
   return (
     <details className="group">
       <summary className="cursor-pointer text-base font-medium">{t('Хронология жизни')}</summary>
@@ -303,11 +314,25 @@ function LifeLine({ person }: { person: Person }) {
           <li key={i} className="min-w-0">
             <span className="font-medium">{e.date}</span>{e.age !== null && <span className="text-ink-soft"> · {t('возраст')} {e.age}</span>}
             <span className="block break-anywhere">{t(e.title)}{e.note && ': '}{e.otherId ? <button className="pick underline underline-offset-2 hover:text-ink" onClick={() => focus(e.otherId, { center: true })}>{e.note}</button> : e.note}</span>
+            {e.place !== null && (e.place ? <span className="block break-anywhere text-ink-soft">📍 {e.place}</span> : <span className="block text-xs italic text-ink-faint">📍 {t('Место неизвестно')}</span>)}
           </li>
         ))}
+        {undated.length > 0 && (
+          <li className="min-w-0">
+            <span className="font-medium italic text-ink-soft">{t('Без даты')}</span>
+            {undated.map((e, i) => (
+              <span key={i} className="block break-anywhere text-ink-soft">{t(e.title)}{e.note && ': '}{e.note}{e.place && ` · ${e.place}`}</span>
+            ))}
+          </li>
+        )}
       </ol>
       {marks.length > 0 && <button type="button" className="pick mt-2 text-sm underline underline-offset-2 hover:text-ink" onClick={() => setMap(!map)}>{t(map ? 'Скрыть карту' : 'Места жизни на карте')}</button>}
       {map && <PlaceMap marks={marks} path onPerson={(id) => focus(id, { center: true })} className="mt-2 h-64" />}
+      {unplaced.length > 0 && (
+        <p className="mt-1.5 text-xs text-ink-soft break-anywhere">
+          {t('не на карте')}: {unplaced.map((u) => `${t(u.what)}${u.date ? ` ${u.date}` : ''}, ${u.text} — ${t(u.why === 'unknown' ? 'нет в списке мест' : u.why === 'no-date' ? 'нет года' : 'у места нет координат')}`).join(' · ')}
+        </p>
+      )}
     </details>
   )
 }
@@ -369,7 +394,7 @@ export function Details({ person, patch: send }: { person: Person; patch: (p: Pa
         <div className="text-ink-soft @max-[440px]:col-span-2 @max-[440px]:-mb-1">{t('Рождение')}</div>
         <span className="text-xs text-ink-soft @min-[441px]:hidden -mb-1.5">{t('Дата')}</span>
         <span className="text-xs text-ink-soft @min-[441px]:hidden -mb-1.5">{t('Место')}</span>
-        <DateField id="f-birth-date" readOnly={ro} value={person.birthDate} placeholder={t('например, 1890')} onSave={saveClaimField('birthDate')} />
+        <span className="flex min-w-0 flex-col"><DateField id="f-birth-date" readOnly={ro} value={person.birthDate} placeholder={t('например, 1890')} onSave={saveClaimField('birthDate')} /><DateHint date={person.birthDate} field="birth" person={person} onFix={ro ? undefined : saveClaimField('birthDate')} /></span>
         <span className="flex min-w-0 flex-col"><Field id="f-birth-place" suggestions={places} readOnly={ro} value={person.birthPlace} placeholder={t('например, Пермь')} onSave={saveClaimField('birthPlace')} /><PlaceHint text={person.birthPlace} /></span>
         <span className="@max-[440px]:hidden" />
         <Versions person={person} field="birthDate" current={current} change={change} attach={attachSource} />
@@ -380,7 +405,7 @@ export function Details({ person, patch: send }: { person: Person; patch: (p: Pa
             <div className="text-ink-soft @max-[440px]:col-span-2 @max-[440px]:-mb-1">{t('Смерть')}</div>
         <span className="text-xs text-ink-soft @min-[441px]:hidden -mb-1.5">{t('Дата')}</span>
         <span className="text-xs text-ink-soft @min-[441px]:hidden -mb-1.5">{t('Место')}</span>
-            <DateField id="f-death-date" readOnly={ro} value={person.deathDate} placeholder={t('например, 1950')} onSave={saveClaimField('deathDate')} />
+            <span className="flex min-w-0 flex-col"><DateField id="f-death-date" readOnly={ro} value={person.deathDate} placeholder={t('например, 1950')} onSave={saveClaimField('deathDate')} /><DateHint date={person.deathDate} field="death" person={person} onFix={ro ? undefined : saveClaimField('deathDate')} /></span>
             <span className="flex min-w-0 flex-col"><Field id="f-death-place" suggestions={places} readOnly={ro} value={person.deathPlace} placeholder={t('например, Пермь')} onSave={saveClaimField('deathPlace')} /><PlaceHint text={person.deathPlace} /></span>
             <span className="@max-[440px]:hidden" />
             <Versions person={person} field="deathDate" current={current} change={change} attach={attachSource} />
@@ -426,6 +451,7 @@ export function Details({ person, patch: send }: { person: Person; patch: (p: Pa
             <FactRow
               key={i}
               fact={fact}
+              person={person}
               readOnly={ro}
               fresh={fresh === i}
               kinds={kinds}

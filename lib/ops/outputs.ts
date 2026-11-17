@@ -4,7 +4,9 @@ import { z } from 'zod'
 
 const id = z.string()
 const text = z.string()
-const ok = z.object({ ok: z.literal(true) })
+/** A place a write named that the map cannot show; the reply keeps it, so the model can say why and fix it. */
+const placeNote = z.object({ name: text, problem: z.enum(['unknown', 'no-coords']), message: text })
+const ok = z.object({ ok: z.literal(true), places: z.array(placeNote).optional() })
 
 const brief = z.object({ id, hidden: z.literal(true).optional(), name: text.optional(), years: text.optional(), sex: text.optional(), living: z.boolean().optional(), place: text.optional() })
 const fact = z.object({ kind: text, date: text, place: text, note: text, source: text }).partial()
@@ -16,16 +18,16 @@ const fullPerson = z.object({
   tags: z.array(text), facts: z.array(fact), sources: z.array(source), claims: z.array(claim),
 })
 /** A write answers with what was written, short: the model already knows the rest. */
-const written = z.object({ id, givenName: text, surname: text, birthDate: text, deathDate: text, living: z.boolean() })
+const written = z.object({ id, givenName: text, surname: text, birthDate: text, deathDate: text, living: z.boolean(), factId: id.optional(), places: z.array(placeNote).optional() })
 const relative = z.object({ name: text.optional() })
 const pageMeta = z.object({ id, personId: id, parentPageId: id.nullable(), title: text, icon: text, updatedAt: z.number() })
 const photo = z.object({ id, kind: text, originalName: text, caption: text, date: text, place: text, tags: z.array(z.object({ id, personId: id.nullable(), label: text.nullable() })).optional() })
 const proposal = z.object({ id, status: text, error: text.nullable(), ops: z.array(z.object({ op: text, text })) })
-const applied = z.object({ applied: z.number(), ids: z.record(z.string(), z.string()), people: z.array(z.object({ name: text, id, parents: z.array(text).optional(), spouses: z.array(text).optional() })).optional(), check: z.object({ unlinked: z.array(text) }).optional() })
+const applied = z.object({ applied: z.number(), ids: z.record(z.string(), z.string()), people: z.array(z.object({ name: text, id, parents: z.array(text).optional(), spouses: z.array(text).optional() })).optional(), check: z.object({ unlinked: z.array(text) }).optional(), places: z.array(placeNote).optional() })
 const importCount = z.object({ persons: z.number(), ids: z.record(z.string(), z.string()).optional() })
 
 /** A token's write can wait for a person instead of running. */
-const pending = z.object({ status: z.literal('pending_review'), proposalId: id, tempId: id.optional(), id: id.optional(), tempIds: z.array(id).optional(), message: text })
+const pending = z.object({ status: z.literal('pending_review'), proposalId: id, tempId: id.optional(), id: id.optional(), tempIds: z.array(id).optional(), message: text, places: z.array(placeNote).optional() })
 const write = (shape: z.ZodType) => z.union([pending, shape])
 
 export const OUTPUTS: Record<string, z.ZodType> = {
@@ -62,6 +64,7 @@ export const OUTPUTS: Record<string, z.ZodType> = {
 
   create_person: write(written),
   update_person: write(written),
+  add_fact: write(written),
   update_people: write(applied),
   delete_person: write(ok),
   add_relation: write(ok),

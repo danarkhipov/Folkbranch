@@ -83,18 +83,18 @@ const READS: Record<string, { description: string; input: z.ZodObject; run: (a: 
     run: (a, x) => findGaps(a, x).map(({ person, ...r }) => ({ ...brief(person), ...r })),
   },
   parse_table: {
-    description: 'Turn a CSV table into the text format, ready for preview_text and import_text. Columns are guessed from the headers (Russian or English: name, surname, born, died, father, mother, spouse...). Pass `columns` to override, one field per column: id, name, given, patronymic, surname, maiden, sex, birthDate, birthPlace, deathDate, deathPlace, father, mother, spouse, or empty to skip.',
+    description: 'Turn a CSV table into the text format, ready for preview_text and import_text. Columns are guessed from the headers (Russian or English: name, surname, born, died, father, mother, spouse...). Pass `columns` to override, one field per column: id, name, given, patronymic, surname, maiden, sex, birthDate, birthPlace, deathDate, deathPlace, residencePlace, residenceDate, residencePlace2, residenceDate2, residencePlace3, residenceDate3, father, mother, spouse, or empty to skip.',
     input: z.object({ csv: z.string().min(1), columns: z.array(z.string()).optional() }),
     run: (_a, x) => {
       const rows = parseCsv(x.csv)
       if (rows.length < 2) throw new OpError(400, 'the table has no rows with people')
       const mapping = (x.columns ?? guessMapping(rows[0])) as Mapping
       if (!mapping.some((m) => m === 'name' || m === 'given' || m === 'surname')) throw new OpError(400, `no name column among: ${rows[0].join(', ')}. Pass columns.`)
-      return { columns: Object.fromEntries(rows[0].map((h, i) => [h, mapping[i] ?? ''])), ...rowsToText(rows.slice(1), mapping, getSetting('familyName') ?? '') }
+      return { columns: Object.fromEntries(rows[0].map((h, i) => [h, mapping[i] ?? ''])), ...rowsToText(rows.slice(1), mapping, getSetting('familyName') ?? '', rows[0]) }
     },
   },
   search_people: {
-    description: 'Find people by parts of a name in any order, patronymic, maiden or other name, place, group or fact. Forgives typos. Empty query lists people up to the limit: get_overview gives the total. Use before creating anyone.',
+    description: 'Find people by parts of a name in any order, patronymic, maiden name, place, group or fact. Forgives typos. An empty query lists people; get_overview has the total. Use before creating anyone.',
     input: z.object({ query: z.string().default(''), limit: z.number().int().min(1).max(500).default(20) }),
     run: (a, x) => findPeople(a, x.query, x.limit).map(brief),
   },
@@ -196,15 +196,15 @@ const READS: Record<string, { description: string; input: z.ZodObject; run: (a: 
 }
 
 /** Every request carries what its tools look like, so only these go along until the model asks for more. */
-export const CORE_TOOLS = ['search_people', 'query_people', 'search_archive', 'get_person', 'how_related', 'create_person', 'update_person', 'delete_person', 'add_relation', 'remove_relation', 'import_text', 'add_source', 'undo', 'get_history', 'set_plan', 'use_tools']
+export const CORE_TOOLS = ['search_people', 'query_people', 'search_archive', 'get_person', 'how_related', 'create_person', 'update_person', 'add_fact', 'delete_person', 'add_relation', 'remove_relation', 'import_text', 'undo', 'get_history', 'set_plan', 'use_tools']
 export const TOOL_GROUPS: Record<string, { about: string; tools: string[] }> = {
-  people: { about: 'many at once, relatives, gaps, overview, link details, whole tree, tables', tools: ['update_people', 'get_relatives', 'find_gaps', 'get_overview', 'update_relation', 'remove_parent_links', 'export_text', 'preview_text', 'parse_table'] },
-  sources: { about: 'removing sources, versions of values', tools: ['remove_source', 'add_version', 'choose_version', 'reject_version', 'restore_version'] },
+  people: { about: 'many at once, relatives, gaps, overview, links, tree, tables', tools: ['update_people', 'get_relatives', 'find_gaps', 'get_overview', 'update_relation', 'remove_parent_links', 'export_text', 'preview_text', 'parse_table'] },
+  sources: { about: 'adding or removing a source, versions of values', tools: ['add_source', 'remove_source', 'add_version', 'choose_version', 'reject_version', 'restore_version'] },
   files: { about: 'photos, scans, avatars, attached files, GEDCOM, research cases', tools: ['import_kinship_case', 'list_photos', 'view_photo', 'save_attachment', 'set_avatar', 'tag_photo', 'untag_photo', 'update_photo', 'delete_photo', 'upload_photo', 'read_attachment', 'import_gedcom_attachment', 'export_gedcom', 'preview_gedcom', 'import_gedcom'] },
   pages: { about: 'pages about people', tools: ['list_pages', 'get_page', 'create_page', 'update_page', 'move_page', 'delete_page'] },
   places: { about: 'places, old names', tools: ['list_places', 'create_place', 'update_place'] },
   screen: { about: 'show someone, a branch or a path', tools: ['focus_person', 'show_branch', 'show_path', 'set_chart_direction'] },
-  admin: { about: 'archive name, language, people with access, invitations', tools: ['get_settings', 'update_settings', 'list_users', 'set_user_role', 'list_invites', 'create_invite', 'revoke_invite'] },
+  admin: { about: 'name, language, access, invitations', tools: ['get_settings', 'update_settings', 'list_users', 'set_user_role', 'list_invites', 'create_invite', 'revoke_invite'] },
 }
 
 const toModelSafeInvite = () => ({ created: true, note: 'The link is shown to the person in the chat. You do not have it.' })
@@ -346,7 +346,7 @@ type Untyped = Omit<ToolDef, 'output'>
 export const TOOLS: ToolDef[] = ([
   ...Object.entries(READS).map(([name, r]): Untyped => ({ name, ...r, risk: 'read', minRole: 'reader', surfaces: surfaces(name) })),
   { name: 'query_people', risk: 'read', minRole: 'reader', surfaces: surfaces('query_people'), input: queryInput,
-    description: 'People by exact conditions, with a total and optional counts: birth and death years, place, sex, group, sources, whether they have parents. Use for lists, counts and questions like "who was born in Tula before 1900".',
+    description: 'People by exact conditions, with a total and optional counts: years, place, sex, group, sources, parents. For lists, counts and questions like "who was born in Tula before 1900".',
     run: (a, x) => queryPeople(a, x) },
   { name: 'search_archive', risk: 'read', minRole: 'reader', surfaces: surfaces('search_archive'), input: z.object({ query: z.string().min(1), limit: z.number().int().min(1).max(50).default(20) }),
     description: 'Search everything written: people, facts, sources, page text and photo captions. Forgives typos and word endings. Use when you do not know where something is written.',

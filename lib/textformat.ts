@@ -5,7 +5,8 @@ import { splitPatronymic } from './names'
 import type { Certainty, Graph, ParentKind, Person, Sex } from './types'
 import { personName, yearOf } from './types'
 
-const KEYS = ['id', 'b', 'bp', 'd', 'dp', 'sex', 'maiden', 'c', 'm', 'end', 'kind', 'union']
+// `resi` and `resiDate` carry the places a person lived, numbered for a second and third (see residencesFrom).
+const KEYS = ['id', 'b', 'bp', 'd', 'dp', 'sex', 'maiden', 'c', 'm', 'end', 'kind', 'union', 'resiDate\\d*', 'resi\\d*']
 const ATTR = new RegExp(`(?:^|[\\s,])(${KEYS.join('|')}):\\s*`, 'g')
 
 export interface TextPerson {
@@ -39,6 +40,41 @@ function splitAttrs(s: string) {
 }
 
 const SEX: Record<string, Sex> = { m: 'M', f: 'F', u: 'U', м: 'M', ж: 'F' }
+
+/** The kind a table import gives a place a person lived, in the archive's source words. */
+export const RESIDENCE_KIND = 'Место жительства'
+export interface Residence { date: string; place: string }
+
+const RESI = /^resi(Date)?(\d*)$/i
+const sameResidence = (a: Residence, b: Residence) => a.date === b.date && a.place === b.place
+
+/**
+ * Places lived ride on a person's line as `resi: Тула, resiDate: 1941–1944`, numbered for a second and
+ * third place. Numbered keys instead of one list, so a place keeps the commas people write in it.
+ */
+export function residencesFrom(attrs: Record<string, string>): Residence[] {
+  const slots = new Map<number, Residence>()
+  for (const [key, value] of Object.entries(attrs)) {
+    const m = RESI.exec(key)
+    if (!m || !value.trim()) continue
+    const n = m[2] ? Number(m[2]) : 1
+    const r = slots.get(n) ?? { date: '', place: '' }
+    if (m[1]) r.date = value.trim()
+    else r.place = value.trim()
+    slots.set(n, r)
+  }
+  return [...slots.entries()].sort((a, b) => a[0] - b[0]).map(([, r]) => r).filter((r) => r.place)
+}
+
+/** Writes places lived back in that numbered form, replacing whatever was there before. */
+export function setResidences(attrs: Record<string, string>, list: Residence[]) {
+  for (const key of Object.keys(attrs)) if (RESI.test(key)) delete attrs[key]
+  list.forEach((r, i) => {
+    const n = i ? String(i + 1) : ''
+    if (r.place) attrs[`resi${n}`] = r.place
+    if (r.date) attrs[`resiDate${n}`] = r.date
+  })
+}
 
 export function parseFamilyText(text: string): ParsedText {
   const out: ParsedText = { title: '', people: new Map(), unions: [], parents: [], errors: [] }
@@ -77,6 +113,13 @@ export function parseFamilyText(text: string): ParsedText {
   const merge = (ref: string, attrs: Record<string, string>) => {
     const p = out.people.get(ref)!
     for (const k of ['b', 'bp', 'd', 'dp', 'sex', 'maiden', 'c']) if (attrs[k]) p.attrs[k] = attrs[k]
+    // A person may come back on another line or another row of the table: every place they lived counts.
+    const lived = residencesFrom(attrs)
+    if (lived.length) {
+      const all = residencesFrom(p.attrs)
+      for (const r of lived) if (!all.some((x) => sameResidence(x, r))) all.push(r)
+      setResidences(p.attrs, all)
+    }
   }
 
   text.replace(/\r/g, '').split('\n').forEach((raw, i) => {
@@ -151,6 +194,10 @@ export interface TextPlan {
 
 const FIELDS: [string, keyof Person][] = [['b', 'birthDate'], ['bp', 'birthPlace'], ['d', 'deathDate'], ['dp', 'deathPlace'], ['maiden', 'maidenName'], ['c', 'certainty']]
 
+// An archive may already hold a residence under another language's word: the same trip is not added twice.
+const RESIDENCE_NAMES = new Set([RESIDENCE_KIND, 'Residence', 'Residencia', 'Residència'])
+const factOf = (r: Residence) => ({ kind: RESIDENCE_KIND, date: r.date, place: r.place, note: '' })
+
 /**
  * Compares the text with the current graph. Text only adds and changes: removing a line never
  * deletes anybody, so a model that returns part of the tree cannot wipe the rest.
@@ -189,10 +236,12 @@ export function planFamilyText(parsed: ParsedText, graph: Graph, resolutions: Re
       ids.set(t.ref, tempId)
       plan.creates.push(`${t.givenName} ${t.surname}`.trim())
       const [givenName, patronymic] = splitPatronymic(t.givenName)
+      const lived = residencesFrom(t.attrs)
       plan.ops.push({ op: 'create_person', tempId, args: { person: {
         givenName, ...(patronymic ? { patronymic } : {}), surname: t.surname, sex: SEX[(t.attrs.sex ?? '').toLowerCase()] ?? 'U', maidenName: t.attrs.maiden ?? '',
         birthDate: t.attrs.b ?? '', birthPlace: t.attrs.bp ?? '', deathDate: t.attrs.d ?? '', deathPlace: t.attrs.dp ?? '',
         ...(t.attrs.c ? { certainty: t.attrs.c } : {}),
+        ...(lived.length ? { facts: lived.map(factOf) } : {}),
       } } })
     }
   }
@@ -205,6 +254,9 @@ export function planFamilyText(parsed: ParsedText, graph: Graph, resolutions: Re
     for (const [key, field] of FIELDS) if (t.attrs[key] && t.attrs[key] !== cur[field]) patch[field] = t.attrs[key]
     const sex = SEX[(t.attrs.sex ?? '').toLowerCase()]
     if (sex && sex !== cur.sex) patch.sex = sex
+    // A residence already written on the card is not added again; a new one is appended, never replaces.
+    const lived = residencesFrom(t.attrs).filter((r) => !cur.facts.some((f) => RESIDENCE_NAMES.has(f.kind) && f.date === r.date && f.place === r.place))
+    if (lived.length && cur.facts.length < 100) patch.facts = [...cur.facts, ...lived.map(factOf)].slice(0, 100)
     if (Object.keys(patch).length) {
       plan.updates.push(personName(cur))
       plan.ops.push({ op: 'update_person', args: { id, patch } })

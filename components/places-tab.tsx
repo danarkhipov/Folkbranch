@@ -1,5 +1,5 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import dynamic from 'next/dynamic'
 import { ExternalLink, Plus, Trash2, X } from 'lucide-react'
@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { api, useApp } from '@/lib/client'
-import { findPlace, mapSpots, placeChain, placesInUse, PLACE_KINDS } from '@/lib/places'
+import { isOnLand, loadLand, type Land } from '@/lib/land'
+import { coordinateIssue, findPlace, mapSpots, parseCoords, placeChain, placesInUse, PLACE_KINDS } from '@/lib/places'
 import { personName, type Place, type PlaceName, type Repository } from '@/lib/types'
 import { Segmented } from './person-fields'
 
@@ -33,6 +34,23 @@ function PlaceForm({ draft, places, onDone }: { draft: Draft; places: Place[]; o
   // Nothing inside this place can become what it belongs to.
   const inside = useMemo(() => new Set(d.id ? places.filter((p) => placeChain(p, places).some((x) => x.id === d.id)).map((p) => p.id) : []), [d.id, places])
   const num = (s: string) => (s.trim() === '' ? null : Number(s.replace(',', '.')))
+  // The coast is only needed to tell a sea point from a harbour: without it the other checks still work.
+  const [land, setLand] = useState<Land | null>(null)
+  useEffect(() => {
+    let live = true
+    loadLand().then((l) => { if (live) setLand(l) }).catch(() => {})
+    return () => { live = false }
+  }, [])
+  const landAt = useMemo(() => (land ? (a: number, b: number) => isOnLand(a, b, land) : null), [land])
+  const point = useMemo(() => coordinateIssue(num(lat), num(lon), landAt), [lat, lon, landAt])
+  /** A pair pasted into the latitude field is split into both: "55°45′N 37°37′E", "55.7558, 37.6173". */
+  const typeLat = (value: string) => {
+    const pair = parseCoords(value)
+    if (!pair) { setLat(value); return }
+    setLat(String(pair.lat))
+    setLon(String(pair.lon))
+  }
+  const swap = () => { setLat(lon); setLon(lat) }
   const save = async () => {
     setBusy(true)
     try {
@@ -67,13 +85,24 @@ function PlaceForm({ draft, places, onDone }: { draft: Draft; places: Place[]; o
         <button type="button" className="self-start underline underline-offset-2 hover:text-ink" onClick={() => setD({ ...d, otherNames: [...d.otherNames, { name: '', years: '' }] })}>+ {t('название')}</button>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Широта')}<Input inputMode="decimal" value={lat} placeholder="56.86" onChange={(e) => setLat(e.target.value)} /></label>
+        <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Широта')}<Input inputMode="decimal" value={lat} placeholder="56.86" onChange={(e) => typeLat(e.target.value)} /></label>
         <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Долгота')}<Input inputMode="decimal" value={lon} placeholder="35.90" onChange={(e) => setLon(e.target.value)} /></label>
       </div>
       {badCoords && <p role="alert" className="text-xs text-destructive">{t('Координаты пишутся числом, например 56.86')}</p>}
+      {point && (
+        <p role={point.block ? 'alert' : 'status'} className={`text-xs ${point.block ? 'text-destructive' : 'text-rust'}`}>
+          {point.kind === 'range' && t('Широта от −90 до 90, долгота от −180 до 180. Проверьте координаты')}
+          {point.kind === 'zero' && t('0, 0 — пустая точка в океане. Проверьте координаты')}
+          {point.kind === 'sea' && t('Точка в море — проверьте координаты')}
+          {point.kind === 'swapped' && <>
+            {t('Похоже, широта и долгота перепутаны')}{' '}
+            <button type="button" className="underline underline-offset-2 hover:text-ink" onClick={swap}>{t('Поменять местами')}</button>
+          </>}
+        </p>
+      )}
       <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Заметка')}<Textarea rows={2} value={d.note} onChange={(e) => setD({ ...d, note: e.target.value })} /></label>
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" disabled={busy || !d.name.trim() || badCoords} onClick={save}>{t('Сохранить')}</Button>
+        <Button size="sm" disabled={busy || !d.name.trim() || badCoords || !!point?.block} onClick={save}>{t('Сохранить')}</Button>
         <Button size="sm" variant="outline" onClick={onDone}>{t('Отмена')}</Button>
       </div>
     </div>

@@ -53,7 +53,7 @@ export const relationType = z.enum(['father', 'mother', 'son', 'daughter', 'spou
 const notForAgents = { claims: true, sources: true, keepPrivate: true, noChildren: true, neverMarried: true } as const
 export const agentCreate = personInput.omit(notForAgents)
 
-export const agentPatch = personInput.omit(notForAgents).extend({ facts: personInput.shape.facts.describe('Replaces the whole list: include the facts to keep') })
+export const agentPatch = personInput.omit(notForAgents).extend({ facts: personInput.shape.facts.describe('Replaces the whole list: include the facts to keep. To add one fact, use add_fact.') })
 
 export const relationInput = z.object({ type: relationType.describe('What the new person is to `to`'), to: z.string(), otherParentId: z.string().nullish() })
 

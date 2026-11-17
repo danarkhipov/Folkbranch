@@ -21,6 +21,9 @@ const ERRORS: Record<string, Partial<Record<Lang, string>>> = {
   'the page changed since this copy was read': { ru: 'Страницу уже изменили в другом окне. Обновите её', es: 'La página cambió en otra ventana. Recárgala', ca: "La pàgina ha canviat en una altra finestra. Recarrega-la" },
   'already resolved': { ru: 'Это уже решено', es: 'Ya está resuelto', ca: 'Ja està resolt' },
   'invalid JSON': { ru: 'Сервер не понял запрос. Обновите страницу', es: 'El servidor no entendió la petición. Recarga la página', ca: "El servidor no ha entès la petició. Recarrega la pàgina" },
+  'coordinates out of range': { ru: 'Координаты вне допустимых пределов: широта от −90 до 90, долгота от −180 до 180', es: 'Coordenadas fuera de rango: la latitud va de −90 a 90 y la longitud de −180 a 180', ca: 'Coordenades fora de rang: la latitud va de −90 a 90 i la longitud de −180 a 180' },
+  'point 0,0 is not a place': { ru: '0, 0 — пустая точка в океане, а не место', es: '0, 0 es un punto vacío en el océano, no un lugar', ca: "0, 0 és un punt buit a l'oceà, no un lloc" },
+  'latitude and longitude look swapped': { ru: 'Похоже, широта и долгота перепутаны. Поменяйте их местами', es: 'Parece que la latitud y la longitud están cambiadas. Cámbialas de sitio', ca: 'Sembla que la latitud i la longitud estan canviades. Canvia-les de lloc' },
 }
 
 /** The person's wording of a protocol error, or the error as it is when there is none. */

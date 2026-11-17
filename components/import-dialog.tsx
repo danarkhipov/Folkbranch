@@ -1,10 +1,12 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, Loader2, Upload } from 'lucide-react'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { api, useApp } from '@/lib/client'
 import { COLUMN_FIELDS, detectKind, guessMapping, jsonToTable, parseCsv, rowsToText, sheetCell, type ColumnField, type ImportKind, type Mapping } from '@/lib/import-formats'
+import { placesOffMap } from '@/lib/places'
+import type { Place } from '@/lib/types'
 import { familyWords, peopleWords } from '@/lib/names'
 import { matchFiles, splitDropped, type FileLink, type FilePerson } from '@/lib/import-files'
 import { parseFamilyText, planFamilyText } from '@/lib/textformat'
@@ -86,7 +88,15 @@ export function ImportDialog({ open, files, onOpenChange }: { open: boolean; fil
 
   const table = loaded && 'rows' in loaded ? loaded : null
   const named = mapping.includes('name') || mapping.includes('given') || mapping.includes('surname')
-  const built = useMemo(() => (table && named ? rowsToText(table.rows, mapping, familyName) : null), [table, mapping, named, familyName])
+  const built = useMemo(() => (table && named ? rowsToText(table.rows, mapping, familyName, table.headers) : null), [table, mapping, named, familyName])
+  // The archive's own places, to say before the import which towns the map will not have yet.
+  const { data: places } = useQuery({ queryKey: ['places'], queryFn: () => api<Place[]>('places'), enabled: !!table })
+  const filePlaces = useMemo(() => {
+    if (!table) return []
+    const fields = new Set<ColumnField>(['birthPlace', 'deathPlace', 'residencePlace', 'residencePlace2', 'residencePlace3'])
+    return table.rows.flatMap((row) => mapping.flatMap((f, i) => (f && fields.has(f) ? [row[i] ?? ''] : [])).map((x) => x.trim())).filter(Boolean)
+  }, [table, mapping])
+  const offMap = useMemo(() => (places ? placesOffMap(filePlaces, places) : []), [places, filePlaces])
   const text = loaded?.kind === 'text' ? loaded.text : built?.text ?? ''
   const plan = useMemo(() => (text ? planFamilyText(parseFamilyText(text), graph, choices) : null), [text, graph, choices])
   const ready = loaded?.kind === 'gedcom' ? true : !!plan && !plan.errors.length && !plan.ambiguous.length && plan.ops.length > 0
@@ -189,6 +199,11 @@ export function ImportDialog({ open, files, onOpenChange }: { open: boolean; fil
             </div>
             {!named && <p className="text-xs text-destructive">{t('Укажите, в каком столбце имя')}</p>}
             {built?.warnings.map((w) => <p key={w.key} className="text-xs text-rust">⚠ {t(w.key)}: {w.detail}</p>)}
+            {offMap.length > 0 && (
+              <p className="text-xs text-rust" data-testid="import-off-map">
+                ⚠ {t('Не будет на карте, пока у этих мест нет координат')}: {offMap.join(', ')}
+              </p>
+            )}
           </section>
         )}
 

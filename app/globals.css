@@ -412,6 +412,129 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
 }
 
 /* The map: what a mark says when pressed, and the numbers of one life's stops. */
+.family-map.leaflet-container { background: color-mix(in srgb, var(--paper-dot) 75%, var(--ink-faint) 6%); font-family: var(--font-serif); overscroll-behavior: none; }
+/* Our own canvases (atlas, trails) sit in Leaflet panes; the bar lifts the map's buttons where they would meet. */
+.family-map .leaflet-bottom { bottom: var(--map-lift, 0px); }
+/* A face: centred on its spot, moved within a stack or ring by --dx/--dy, its name beside it on the side that was free. */
+.map-face { overflow: visible; }
+.map-face-in { position: absolute; left: 12px; top: 12px; width: 0; height: 0; transform: translate(var(--dx, 0px), var(--dy, 0px)); }
+.map-face-in img { position: absolute; left: -12px; top: -12px; width: 24px; height: 24px; max-width: none; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 1.5px var(--ink), 0 0 0 3px var(--paper); filter: grayscale(.6) sepia(.35) contrast(.95); background: var(--paper); cursor: pointer; }
+/* On the way: the one accent on the map, a ring in the app's rust. */
+.map-face-in.moving img { box-shadow: 0 0 0 2px var(--accent), 0 0 0 3.5px var(--paper); filter: grayscale(.35) sepia(.25); }
+.map-face-in.hidden-face { display: none; }
+/* After a stay written as a period, where the person went is not known: the face stays, faded and dashed. */
+.map-face-in.unsure { opacity: .5; outline: 1px dashed currentColor; outline-offset: 1px; }
+.map-face.map-yield { pointer-events: none !important; }
+/* A face fanned or ringed aside leaves a dot on the town's own point, so the place is still seen where it is. */
+.map-face.anchored::after { content: ''; position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; margin: -1.5px 0 0 -1.5px; border-radius: 50%; background: color-mix(in srgb, var(--ink) 60%, transparent); pointer-events: none; }
+/* A mark moved off its place (a fanned face, a numbered stop, an event's glyph) keeps a hairline back to the place,
+   so two marks that are the same place no longer read as two places. */
+.map-face-in.moved::before, .map-stop-in.moved::before, .map-event-in.moved::before { content: ''; position: absolute; left: var(--lx, 0); top: var(--ly, 0); width: var(--ll, 0); height: 1px; background: color-mix(in srgb, var(--ink) 38%, transparent); transform: rotate(var(--la, 0rad)); transform-origin: 0 0; pointer-events: none; }
+.map-face-in.moved::after, .map-stop-in.moved::after, .map-event-in.moved::after { content: ''; position: absolute; left: var(--px, 0); top: var(--py, 0); width: 3px; height: 3px; margin: -1.5px 0 0 -1.5px; border-radius: 50%; background: color-mix(in srgb, var(--ink) 55%, transparent); pointer-events: none; }
+/* A finger needs more than a 24 px face: an unseen 44 px circle around it takes the tap. */
+@media (pointer: coarse) { .map-face-in::before { content: ''; position: absolute; left: -22px; top: -22px; width: 44px; height: 44px; border-radius: 50%; } }
+.map-name { position: absolute; top: 0; white-space: nowrap; font: 11px/1.4 var(--font-serif); color: var(--ink); background: color-mix(in srgb, var(--paper) 88%, transparent); border-radius: 3px; padding: 0 4px; cursor: pointer; }
+.map-name strong { font-weight: 500; }
+.map-name:not([data-side]), .map-name.collide { display: none; }
+.map-name[data-side=right] { left: 15px; transform: translateY(-50%); }
+.map-name[data-side=left] { right: 15px; transform: translateY(-50%); }
+.map-name[data-side=above] { left: 0; transform: translate(-50%, calc(-100% - 15px)); }
+.map-name[data-side=below] { left: 0; transform: translate(-50%, 15px); }
+.map-name > span { display: none; }
+/* Hovered: the name always shows, with where and when. */
+.map-face-in.open .map-name { display: block; }
+.map-face-in.open .map-name:not([data-side]) { left: 15px; transform: translateY(-50%); }
+.map-face-in.open .map-name > span { display: block; color: var(--ink-soft); }
+.map-event { overflow: visible; color: var(--ink); cursor: pointer; }
+.map-event-in { position: absolute; left: 0; top: 0; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; transform: translate(calc(var(--gx, 0px) - 8px), calc(var(--gy, 27px) - 8px)); transition: opacity .3s; }
+.map-event-in b { display: inline-grid; place-items: center; width: 16px; height: 16px; border: 1px solid var(--ink); border-radius: 50%; background: var(--paper); font: 600 11px/1 var(--font-serif); }
+.map-event-in > span { font: italic 10.5px/1.2 var(--font-serif); color: var(--ink-soft); text-shadow: 0 0 2px var(--paper), 0 0 2px var(--paper); }
+.map-event-in > span.off { display: none; }
+/* Reached by the keyboard: the same ring as hovering, a little stronger. */
+.map-face-in:focus { outline: none; }
+.map-face-in:focus-visible img { box-shadow: 0 0 0 2px var(--ink), 0 0 0 4.5px var(--paper), 0 0 0 6px var(--ink); }
+/* Following one person: their face in the accent ring and on top, everyone else quieter but still there to press. */
+.focusing .map-face-in:not(.focused):not(.open):not(.kin) { opacity: .5; }
+.focusing .map-face-in:not(.focused):not(.kin) .map-name { color: var(--ink-soft); }
+/* A line of descent: everyone in it bright, in their own ink ring; the one who carries it now wears the accent. */
+.map-face-in.kin:not(.focused) img { filter: grayscale(.4) sepia(.3); }
+/* Two rings, so the person followed is not taken for a traveller (one ring). */
+.map-face-in.focused img { box-shadow: 0 0 0 2.5px var(--accent), 0 0 0 4.5px var(--paper), 0 0 0 5.5px var(--accent); filter: grayscale(.25) sepia(.2); }
+.focusing .map-event:not(.mine) { opacity: .4; }
+/* Their route's stops: small numbered circles in order of time, with the year and place where there is room. */
+.map-stop { overflow: visible; pointer-events: none; }
+.map-stop-in { position: absolute; left: 0; top: 0; width: 0; height: 0; transform: translate(var(--ox, 0px), var(--oy, 0px)); }
+.map-stop-in b { position: absolute; left: 0; top: 0; translate: -50% -50%; min-width: 16px; height: 16px; padding: 0 4px; display: grid; place-items: center; border-radius: 8px; background: var(--ink); color: var(--paper); font: 600 10.5px/1 var(--font-serif); font-variant-numeric: tabular-nums; box-shadow: 0 0 0 1.5px var(--paper); }
+.map-stop-in > span { position: absolute; top: 0; white-space: nowrap; font: 500 11px/1.4 var(--font-serif); color: var(--ink); background: color-mix(in srgb, var(--paper) 88%, transparent); border-radius: 3px; padding: 0 4px; }
+.map-stop-in > span:not([data-side]) { display: none; }
+/* A stop the clock has not reached yet: there to read the way ahead, but not yet a place the person has been. */
+.map-stop-in.ahead b { background: var(--paper); color: var(--ink-soft); box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 35%, transparent); }
+/* A generation mark: an open ring with its number, quieter than a route's stops, so the faces stay the eye's first stop. */
+.map-gen b { background: var(--paper); color: var(--ink); box-shadow: 0 0 0 1.25px var(--ink), 0 0 0 3px var(--paper); }
+.map-gen > span { font-style: italic; }
+.map-stop-in > span[data-side=right] { left: var(--g, 10px); transform: translateY(-50%); }
+.map-stop-in > span[data-side=left] { right: var(--g, 10px); transform: translateY(-50%); }
+.map-stop-in > span[data-side=above] { left: 0; transform: translate(-50%, calc(-100% - var(--g, 10px))); }
+.map-stop-in > span[data-side=below] { left: 0; transform: translate(-50%, var(--g, 10px)); }
+.map-place-face { width: 28px; height: 28px; flex: none; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 1.5px var(--ink); filter: grayscale(.6) sepia(.35) contrast(.95); background: var(--paper); }
+.atlas-label { width: auto !important; height: auto !important; white-space: nowrap; transform-origin: center; translate: -50% -50%; pointer-events: none; color: var(--ink-soft); font-family: var(--font-serif); text-shadow: 0 0 2px var(--paper), 0 0 2px var(--paper); }
+.atlas-country { font-size: 10px; letter-spacing: .18em; text-transform: uppercase; opacity: .75; }
+.atlas-city { font-size: 11px; font-style: italic; opacity: .8; }
+/* The bar under the map: the track (a quiet histogram of the family's events, the line, decade ticks, labels every
+   50 years), then the controls. On a phone it sits above the app's own bar, with room for fingers. */
+.map-bar { bottom: 12px; }
+/* With the person card open beside it, the bar centres in the room left of the card. */
+.map-bar { left: calc((100vw - var(--map-card, 0px)) / 2); max-width: calc(100vw - 16px - var(--map-card, 0px)); }
+/* Who is followed, over the track: face, name and years, then Open and the way out. */
+.map-chip { padding: 2px 4px 4px; margin-bottom: 2px; border-bottom: 1px solid var(--border); }
+.map-chip-mode button { white-space: nowrap; }
+/* A phone: the choice takes its own row under the name, its two halves sharing the width. */
+@media (max-width: 640px) {
+  .map-chip-mode { order: 3; flex: 1 1 100%; }
+  .map-chip-mode button { flex: 1 1 0; }
+}
+.map-track { position: relative; height: 46px; margin: 0 6px; cursor: pointer; touch-action: none; outline: none; --at: 0; }
+.map-track:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
+.map-hist { position: absolute; left: 0; right: 0; top: 2px; width: 100%; height: 20px; overflow: visible; }
+.map-hist-all { fill: var(--ink); opacity: .2; }
+.map-hist-moves { fill: var(--ink); opacity: .42; }
+.map-band { fill: var(--accent); opacity: .12; }
+/* A line's generations, two quiet tints in turn, each named where its name fits. */
+.map-band-a { opacity: .16; }
+.map-band-b { fill: var(--ink); opacity: .07; }
+.map-band-name { position: absolute; top: 1px; padding-left: 4px; overflow: hidden; white-space: nowrap; font: italic 12px/14px var(--font-serif); color: var(--ink-soft); text-shadow: 0 0 2px var(--paper), 0 0 2px var(--paper); pointer-events: none; }
+.map-line { position: absolute; left: 0; right: 0; top: 24px; height: 2px; border-radius: 1px; background: color-mix(in srgb, var(--ink) 18%, transparent); }
+.map-played { height: 100%; width: calc(var(--at) * 100%); border-radius: 1px; background: var(--ink); }
+.map-ticks { position: absolute; left: 0; right: 0; top: 27px; width: 100%; height: 5px; }
+.map-tick, .map-tick-major { fill: none; vector-effect: non-scaling-stroke; }
+.map-tick { stroke: var(--ink-faint); stroke-width: 1; opacity: .5; }
+.map-tick-major { stroke: var(--ink-soft); stroke-width: 1; }
+.map-ticks-focus { position: absolute; left: 0; right: 0; top: 17px; width: 100%; height: 15px; }
+.map-ticks-focus path { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.map-axis { position: absolute; top: 31px; translate: -50% 0; font: 12px/14px var(--font-serif); color: var(--ink-faint); pointer-events: none; font-variant-numeric: tabular-nums; }
+.map-handle { position: absolute; top: 25px; left: calc(var(--at) * 100%); width: 14px; height: 14px; translate: -50% -50%; border-radius: 50%; background: var(--paper); box-shadow: 0 0 0 2px var(--ink), 0 1px 3px rgb(60 45 20 / .25); pointer-events: none; }
+.map-track.dragging .map-handle, .map-track:focus-visible .map-handle { box-shadow: 0 0 0 2.5px var(--ink), 0 0 0 6px color-mix(in srgb, var(--ink) 12%, transparent); }
+.map-bubble { position: absolute; bottom: calc(100% - 2px); left: calc(var(--at) * 100%); translate: -50% 0; padding: 1px 7px; border-radius: 6px; background: var(--ink); color: var(--paper); font: 500 14px/20px var(--font-serif); font-variant-numeric: tabular-nums; pointer-events: none; white-space: nowrap; }
+.map-now-inline { display: none; }
+.map-show-phone { display: none; }
+@media (max-width: 640px) { .map-bar .map-show-phone { display: block; } }
+@media (max-width: 640px) { .map-now-inline { display: inline; } }
+.map-bar .bar-btn:disabled { opacity: .35; cursor: default; background: none; }
+@media (max-width: 640px) {
+  .map-bar { bottom: 72px; }
+  .map-bar .map-controls { flex-wrap: wrap; }
+  .map-bar .map-count { display: none; }
+  .map-bar .map-show { margin-left: auto; }
+  /* The caption is one small line between the track and the buttons, so the bar is two rows of controls, not three. */
+  .map-bar .map-caption { order: -1; flex: 1 1 100%; padding: 0 4px; font-size: 12.5px; line-height: 18px; }
+  .map-bar .map-show { display: none; }
+  .map-bar .map-now { display: none; }
+  .map-bar { padding-inline: 8px; }
+  .map-bar .map-controls { column-gap: 2px; }
+  .map-bar .map-show { margin-left: auto; }
+  .map-bar .map-show button { padding-inline: 6px; }
+}
+@media (pointer: coarse) { .map-bar button { min-height: 44px; min-width: 44px; } .map-track { height: 48px; } }
 .map-card { display: flex; flex-direction: column; gap: 4px; max-width: 240px; font-size: 14px; line-height: 1.35; color: var(--ink); }
 .map-card div:last-child { display: flex; flex-wrap: wrap; gap: 2px 10px; }
 .map-card button { text-decoration: underline; text-underline-offset: 2px; text-align: left; }
@@ -449,3 +572,9 @@ button[aria-busy='true']:not([data-slot='button'])::before { content: ''; width:
 .pcard.just-changed .avatar, .pcard.just-changed > :first-child { animation: just-changed 2.4s ease-out 1; }
 @keyframes just-changed { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent, #a4502e) 70%, transparent); } 25% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--accent, #a4502e) 25%, transparent); } 100% { box-shadow: 0 0 0 0 transparent; } }
 @media (prefers-reduced-motion: reduce) { .pcard.just-changed .avatar, .pcard.just-changed > :first-child { animation: none; outline: 2px solid var(--accent, #a4502e); outline-offset: 2px; } }
+
+/* The map's key: each sample drawn as the map draws it. */
+.map-key-glyph { width: 18px; height: 18px; display: grid; place-items: center; border-radius: 50%; background: var(--paper); box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 40%, transparent); font: 600 11px/1 var(--font-serif); flex: none; }
+.map-key-stop { min-width: 18px; height: 16px; padding: 0 4px; display: grid; place-items: center; border-radius: 8px; background: var(--ink); color: var(--paper); font: 600 10.5px/1 var(--font-serif); flex: none; }
+.map-key-line { width: 18px; height: 0; border-top: 1.7px dashed color-mix(in srgb, var(--ink) 35%, transparent); flex: none; }
+.map-key-face { width: 18px; height: 18px; border-radius: 50%; background: var(--muted); opacity: .5; outline: 1px dashed currentColor; outline-offset: 1px; flex: none; }

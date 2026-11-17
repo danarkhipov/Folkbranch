@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import { ArrowUpDown, CalendarDays, ChevronRight, CircleHelp, ClipboardCheck, EyeOff, Clock, Minus, Plus, Printer, Search, Settings, Tags } from 'lucide-react'
+import { ArrowUpDown, CalendarDays, ChevronRight, GitFork, Map as MapIcon, CircleHelp, ClipboardCheck, EyeOff, Clock, Minus, Plus, Printer, Search, Settings, Tags } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useApp } from '@/lib/client'
 import { useLiveConnected, type Present } from '@/lib/use-live'
@@ -51,7 +51,7 @@ function useFoldWidth(navRef: RefObject<HTMLElement | null>, folded: boolean) {
   }, [navRef, folded])
 }
 
-export function MainBar({ folded, onHide, onShow, guest, familyName, present, mode, navRef, side, draftOps, onSearch, onSide, onAssistant, onSettings }: { folded: boolean; onHide: () => void; onShow: () => void;  guest: boolean; familyName: string; present: Present[]; mode: 'full' | 'no-name' | 'compact'; navRef: RefObject<HTMLElement | null>; side: Side; draftOps: number; onSearch: () => void; onSide: (next: Side) => void; onAssistant: () => void; onSettings: () => void }) {
+export function MainBar({ folded, onHide, onShow, guest, familyName, present, mode, navRef, side, draftOps, onSearch, onSide, onAssistant, onSettings, mapOn = false, onMap }: { mapOn?: boolean; onMap?: () => void; folded: boolean; onHide: () => void; onShow: () => void;  guest: boolean; familyName: string; present: Present[]; mode: 'full' | 'no-name' | 'compact'; navRef: RefObject<HTMLElement | null>; side: Side; draftOps: number; onSearch: () => void; onSide: (next: Side) => void; onAssistant: () => void; onSettings: () => void }) {
   const { t, canEdit, me } = useApp()
   // The owner sees a dot on Settings when a newer release is out; nobody else is asked about it.
   const newer = useUpdate(me.role === 'owner').data?.newer
@@ -66,6 +66,7 @@ export function MainBar({ folded, onHide, onShow, guest, familyName, present, mo
         <span className="family-name font-serif font-medium text-base px-2.5 max-w-[220px] truncate">{familyName}</span>
         {present.length > 0 && <span className="presence" title={`${t('Сейчас в архиве')}: ${present.map((o) => o.name).join(', ')}`} aria-label={`${t('Сейчас в архиве')}: ${present.map((o) => o.name).join(', ')}`} role="img">{present.slice(0, 3).map((o) => <span key={o.id}>{o.name.slice(0, 1).toUpperCase()}</span>)}{present.length > 3 && <span>+{present.length - 3}</span>}</span>}
         <span className="sep w-px h-5 bg-border mx-0.5" />
+        {onMap && <button className="bar-btn" title={t(mapOn ? 'Показать схему' : 'Показать семью на карте')} data-hint={t(mapOn ? 'Вернуться к схеме семьи.' : 'Кто где жил, год за годом.')} aria-label={t(mapOn ? 'Схема' : 'Карта')} onClick={onMap}>{mapOn ? <GitFork size={16} className="rotate-180" /> : <MapIcon size={16} />} <span className="nav-label">{t(mapOn ? 'Схема' : 'Карта')}</span></button>}
         {!guest && <button className={side === 'assistant' ? 'bar-btn on' : 'bar-btn'} title={t('ИИ-ассистент')} data-hint={t('Спросите о семье или попросите внести правки. Откроется чат.')} aria-label={t('ИИ-ассистент')} onClick={onAssistant}><AssistantIcon /> <span className="nav-label"><span className="max-sm:hidden">{t('ИИ-ассистент')}</span><span className="sm:hidden">{t('ИИ')}</span></span></button>}
         <button className="bar-btn" title={t('Поиск людей')} data-hint={t('Найти человека по имени и показать на схеме.')} aria-label={t('Поиск людей')} onClick={onSearch}><Search size={16} /> <span className="nav-label">{t('Поиск')}</span></button>
         {!guest && canEdit && <button className={side === 'review' ? 'bar-btn on relative' : 'bar-btn relative'} title={t('Правки на подтверждение, незаполненные карточки и похожие люди.')} data-hint={t('Правки на подтверждение, незаполненные карточки и похожие люди.')} aria-label={t('Проверка')} onClick={() => onSide(side === 'review' ? null : 'review')}><ClipboardCheck size={16} /> <span className="nav-label">{t('Проверка')}</span>{draftOps > 0 && <span className="absolute right-1 top-1 min-w-4 rounded-full bg-rust px-1 text-center text-xs leading-4 text-white">{draftOps}</span>}</button>}

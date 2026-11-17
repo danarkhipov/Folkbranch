@@ -41,33 +41,42 @@ export function comingDays(graph: Graph, today = new Date(), within = 60): Comin
 }
 
 export type LifeKind = 'birth' | 'death' | 'union' | 'child' | 'fact'
-export interface LifeEvent { kind: LifeKind; date: string; year: number; age: number | null; title: string; note: string; otherId: string | null }
+/** `place` is where it happened as written, '' when nobody wrote it, null when the event has no place of its own (a child's birth). */
+export interface LifeEvent { kind: LifeKind; date: string; year: number; age: number | null; title: string; note: string; otherId: string | null; place: string | null }
 
 /** One life in order, from what the card and the family already say. Nothing here is stored or guessed. */
 export function lifeEvents(person: Person, graph: Graph): LifeEvent[] {
   const byId = new Map(graph.persons.map((p) => [p.id, p]))
   const born = yearOf(person.birthDate)
   const events: LifeEvent[] = []
-  const add = (kind: LifeKind, date: string, title: string, note = '', otherId: string | null = null) => {
+  const add = (kind: LifeKind, date: string, title: string, note = '', otherId: string | null = null, place: string | null = null) => {
     const year = yearOf(date)
-    if (year !== null) events.push({ kind, date, year, age: born !== null && year >= born && kind !== 'birth' ? year - born : null, title, note, otherId })
+    if (year !== null) events.push({ kind, date, year, age: born !== null && year >= born && kind !== 'birth' ? year - born : null, title, note, otherId, place })
   }
-  add('birth', person.birthDate, 'Рождение', person.birthPlace)
+  add('birth', person.birthDate, 'Рождение', '', null, person.birthPlace)
   for (const u of graph.unions) {
     if (u.aId !== person.id && u.bId !== person.id) continue
     const other = byId.get(u.aId === person.id ? u.bId : u.aId)
-    if (other && shown(other)) add('union', u.startDate, u.kind === 'civil' ? 'Союз' : 'Брак', personName(other), other.id)
+    if (other && shown(other)) add('union', u.startDate, u.kind === 'civil' ? 'Союз' : 'Брак', personName(other), other.id, u.place)
   }
   for (const l of graph.parentChild) {
     if (l.parentId !== person.id) continue
     const child = byId.get(l.childId)
     if (child && shown(child)) add('child', child.birthDate, 'Рождение ребёнка', personName(child), child.id)
   }
-  for (const f of person.facts) add('fact', f.date, f.kind, [f.place, f.note].filter(Boolean).join('. '))
-  add('death', person.deathDate, 'Смерть', person.deathPlace)
+  for (const f of person.facts) add('fact', f.date, f.kind, f.note, null, f.place)
+  add('death', person.deathDate, 'Смерть', '', null, person.deathPlace)
   const order: Record<LifeKind, number> = { birth: 0, union: 1, child: 1, fact: 1, death: 2 }
   return events.sort((a, b) => a.year - b.year || order[a.kind] - order[b.kind])
 }
+
+/** What a fact says when no year is written on it: part of the story still, but it cannot be put in order. */
+export interface UndatedEvent { title: string; note: string; place: string }
+
+/** The facts of a life with no year at all. `lifeEvents` leaves them out, as they cannot be placed in time. */
+export const undatedEvents = (person: Person): UndatedEvent[] => person.facts
+  .filter((f) => (f.kind || f.place) && yearOf(f.date) === null)
+  .map((f) => ({ title: f.kind, note: f.note, place: f.place }))
 
 export interface FamilyNumbers {
   people: number; living: number; generations: number

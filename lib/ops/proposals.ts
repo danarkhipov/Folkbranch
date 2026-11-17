@@ -6,6 +6,7 @@ import { personName } from '../types'
 import { Actor, mutateGroup, newId, OpError, requireRole,  } from './core'
 import * as media from './media'
 import * as people from './people'
+import * as places from './places'
 import { say, tell } from './settings'
 import { type Ctx, type Def, nameOfReal } from './op-defs'
 import { announceChange } from '../live'
@@ -60,14 +61,31 @@ export async function dispatch(actor: Actor, name: string, raw: unknown) {
 
   if (d.expand) {
     const ops = d.expand(actor, parsed)
-    if (queue) return enqueue(actor, ops.map((o) => ({ ...o, args: OPS[o.op].input.parse(o.args) as PlannedOp['args'] })))
+    if (queue) return withPlaces(parsed, enqueue(actor, ops.map((o) => ({ ...o, args: OPS[o.op].input.parse(o.args) as PlannedOp['args'] }))))
     const { result, historyId, map } = applyOps(actor, ops, {}, d.summary?.(parsed) ?? say('Загрузка и скачивание'))
-    return { ...result, ...readback(actor, ops, map), historyId }
+    return withPlaces(parsed, { ...result, ...readback(actor, ops, map), historyId })
   }
   // Ids a model got earlier may be temporary ones from a draft that has since been accepted.
   const args = await (d.prepare ? d.prepare(actor, withKnownIds(actor, parsed)) : withKnownIds(actor, parsed))
-  if (queue) return enqueue(actor, [{ op: name, args: args as PlannedOp['args'] }])
-  return d.apply(actor, args)
+  if (queue) return withPlaces(args, enqueue(actor, [{ op: name, args: args as PlannedOp['args'] }]))
+  return withPlaces(args, d.apply(actor, args))
+}
+
+/** The fields that name a place, wherever they sit in an operation's arguments. */
+const PLACE_FIELDS = new Set(['place', 'birthPlace', 'deathPlace'])
+
+/** Every place a write names: a card's fields, a fact, a marriage. */
+function namedPlaces(value: unknown, key = '', out: string[] = []): string[] {
+  if (Array.isArray(value)) value.forEach((v) => namedPlaces(v, key, out))
+  else if (value && typeof value === 'object') Object.entries(value).forEach(([k, v]) => namedPlaces(v, k, out))
+  else if (typeof value === 'string' && PLACE_FIELDS.has(key) && value.trim()) out.push(value)
+  return out
+}
+
+/** A write whose place the map cannot show says so with the place's name, so a model does not tell the person it is on the map. */
+function withPlaces<T>(args: unknown, answer: T): T & { places?: places.PlaceWarning[] } {
+  const warnings = places.placeWarnings(namedPlaces(args))
+  return (warnings.length && answer && typeof answer === 'object' ? { ...answer, places: warnings } : answer) as T & { places?: places.PlaceWarning[] }
 }
 
 /** What now stands for each new person, read from the graph: the model checks its work against this for free. */

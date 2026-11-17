@@ -2,23 +2,53 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, useApp } from '@/lib/client'
-import { findPlace, placeChain } from '@/lib/places'
-import type { Contacts } from '@/lib/types'
+import { findPlace, onMap, placeChain, placeProblem } from '@/lib/places'
+import { DATE_PROBLEM_TEXT, dateProblem } from '@/lib/date-checks'
+import { yearOf, type Contacts, type Person } from '@/lib/types'
 import { GrowText } from './person-fields'
 import { usePlaces } from './places-tab'
 
-/** Under a place as written: what it belonged to and what it was also called, once someone has said so. */
+/**
+ * Under a place as written: what it belonged to and what it was also called, once someone has said so.
+ * A place the archive does not know, or one with no point, is said out loud: without it the event never
+ * reaches the map, and nobody would guess why from the empty field alone.
+ */
 export function PlaceHint({ text }: { text: string }) {
   const { t } = useApp()
   const { data: places = [] } = usePlaces()
+  const problem = placeProblem(text, places)
+  if (problem) {
+    return (
+      <span className="text-xs text-ink-soft break-anywhere">
+        {t(problem === 'unknown' ? 'нет в списке мест' : 'у места нет координат')} · {t('событие не попадёт на карту')}
+      </span>
+    )
+  }
   const place = findPlace(text, places)
-  if (!place) return null
+  if (!onMap(place)) return null
   const up = placeChain(place, places).slice(1).map((p) => p.name)
   const also = place.otherNames.map((n) => n.name).filter((n) => n.toLowerCase() !== text.trim().toLowerCase())
   if (!up.length && !also.length) return null
   return (
     <span className="text-xs text-ink-soft break-anywhere">
       {up.join(' → ')}{up.length && also.length ? ' · ' : ''}{also.length ? `${t('также')} ${also.join(', ')}` : ''}
+    </span>
+  )
+}
+
+/**
+ * Under a date: a year that cannot be right for this life, said at once, with the likely slip mended in one press
+ * (2034 → 1934). A date that may be right is never changed for the person.
+ */
+export function DateHint({ date, field, person, what, onFix }: { date: string; field: 'birth' | 'death' | 'fact'; person: Person; what?: string; onFix?: (date: string) => void }) {
+  const { t } = useApp()
+  const life = { born: yearOf(person.birthDate) ?? person.birthYear ?? null, died: yearOf(person.deathDate) ?? person.deathYear ?? null, what }
+  const problem = dateProblem(date, field, life)
+  if (!problem) return null
+  return (
+    <span role="status" className="text-xs text-rust break-anywhere">
+      {t(DATE_PROBLEM_TEXT[problem.kind])}
+      {problem.fix && onFix && <> · <button type="button" className="underline underline-offset-2 hover:text-ink" onClick={() => onFix(problem.fix!)}>{t('исправить на')} {problem.fix}</button></>}
     </span>
   )
 }
