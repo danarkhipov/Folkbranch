@@ -1,7 +1,7 @@
 'use client'
 // The people and events the map cannot show, and why: no place, a place with no coordinates, or no year. Opens
 // into a list; a click opens the person.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { MapPinOff, X } from 'lucide-react'
 import { useApp } from '@/lib/client'
 import type { Gap, MapTimeline, Unplaced } from '@/lib/map-timeline'
@@ -19,6 +19,13 @@ export function MapGaps({ data, only = null, open, onOpen }: { data: MapTimeline
   const [own, setOwn] = useState(false)
   const listOpen = open ?? own
   const setListOpen = (v: boolean) => { setOwn(v); onOpen?.(v) }
+  // Escape closes the list, as it closes the other panels over the map.
+  useEffect(() => {
+    if (!listOpen) return
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { setOwn(false); onOpen?.(false) } }
+    addEventListener('keydown', key)
+    return () => removeEventListener('keydown', key)
+  }, [listOpen, onOpen])
   // The chip counts two different things: people with nowhere to stand, and events of people who are on the map.
   const absentIds = new Set(data.absent.map((a) => a.personId))
   const absent = only ? data.absent.filter((a) => only.has(a.personId)) : data.absent
@@ -28,7 +35,7 @@ export function MapGaps({ data, only = null, open, onOpen }: { data: MapTimeline
   return (
     <>
       {(data.absent.length > 0 || gapEvents > 0) && (
-        <div className="map-gaps fixed left-3 top-16 z-10 max-sm:top-[max(12px,env(safe-area-inset-top))] flex max-h-[calc(100vh-180px)] flex-col items-start gap-1">
+        <div className="map-gaps fixed left-3 top-16 z-10 max-sm:top-[max(12px,env(safe-area-inset-top))] max-sm:max-w-[calc(100vw-80px)] flex max-h-[calc(100vh-180px)] flex-col items-start gap-1">
           <button type="button" className="float flex min-h-9 items-center gap-1.5 px-2.5 py-1.5 text-left text-sm text-ink-soft" aria-expanded={listOpen} onClick={() => setListOpen(!listOpen)}>
             <MapPinOff size={13} className="flex-none" />
             <span>

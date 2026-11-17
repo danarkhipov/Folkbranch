@@ -65,7 +65,7 @@ async function measure(label, { viewport, phone }) {
   const r = { errs }
   const t0 = Date.now()
   await page.goto(O + '/', { waitUntil: 'domcontentloaded' })
-  await page.getByRole('button', { name: 'Map', exact: true }).click({ timeout: 60000 })
+  await page.getByRole('radio', { name: 'Map', exact: true }).click({ timeout: 60000 })
   await page.waitForSelector('.atlas-country', { timeout: 60000 })
   await page.waitForTimeout(1500)
   r.openMs = Date.now() - t0

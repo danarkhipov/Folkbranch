@@ -3,6 +3,7 @@
 // travellers move; stacks and labels are worked out again only when someone appears, leaves, sets off or arrives,
 // when the whole year changes, or when the map stops moving.
 import type * as Leaflet from 'leaflet'
+import { GLYPH } from '@/lib/map-glyphs'
 import { canRing, fanOffset, FAN_PX, freeOffset, leader, namedFace, ringOffset, stackShift, stackSpots, Taken, type Box, type Spot } from '@/lib/map-layout'
 import { clipPlace, routeStopLabel, sinceAt, stopAt, type EventKind, type Position, type RouteStop, type Track } from '@/lib/map-timeline'
 
@@ -21,8 +22,6 @@ export const FADE_YEARS = 3
 const CAPTION_ZOOM = 6
 /** Up to this many people on their way at once, each keeps a name even when it must go over another mark. */
 const KEPT_NAMES = 6
-/** One quiet glyph per kind of event, in the map's ink. */
-export const GLYPH: Record<EventKind, string> = { birth: '*', death: '†', union: '∞', move: '⌂', work: '✎', other: '·' }
 
 export interface Mark { key: string; lat: number; lon: number; kind: EventKind; caption: string; year: number; personId: string }
 /** A stack of faces pressed (or Enter on it): where it stands and who is in it, for the "who is here" card. */
@@ -31,6 +30,8 @@ interface RouteEl { marker: Leaflet.Marker; el: HTMLElement; num: HTMLElement; l
 
 type Side = 'right' | 'left' | 'above' | 'below'
 interface Face {
+  /** Whose route a hover shows: in a folded stack, the person named on top, whichever face is under the pointer. */
+  hoverAs?: string
   marker: Leaflet.Marker; el: HTMLElement; name: HTMLElement; strong: HTMLElement; where: HTMLElement
   shown: boolean; moving: boolean; yields: boolean; focused: boolean; kin: boolean; hidden: boolean; unsure: boolean
   at: string; dx: number; dy: number; side: Side | null; text: string; w: number; z: number
@@ -78,7 +79,7 @@ export class PeopleLayer {
   private order: string[] = []
   private active: string | null = null
 
-  constructor(private L: typeof Leaflet, private map: Leaflet.Map, private opts: { avatar: (id: string) => string; pick: (id: string) => void; stack: (s: StackHit) => void; t: (k: string) => string; people: (n: number) => string }) {
+  constructor(private L: typeof Leaflet, private map: Leaflet.Map, private opts: { avatar: (id: string) => string; pick: (id: string) => void; stack: (s: StackHit) => void; t: (k: string) => string; people: (n: number) => string; hover?: (id: string | null) => void }) {
     this.group = L.layerGroup().addTo(map)
     const serif = getComputedStyle(document.documentElement).getPropertyValue('--font-serif').trim() || 'serif'
     this.font = `500 11px ${serif}`
@@ -162,6 +163,24 @@ export class PeopleLayer {
     if (this.active && !keep.has(this.active)) this.active = null
   }
 
+  /** Portraits still to put in, and whether a slice of them is already asked for. */
+  private portraits: [HTMLImageElement, string][] = []
+  private portraitsAsked = false
+  private later(img: HTMLImageElement, id: string) {
+    img.decoding = 'async'
+    this.portraits.push([img, id])
+    if (this.portraitsAsked) return
+    this.portraitsAsked = true
+    const idle = (fn: () => void) => ('requestIdleCallback' in window ? requestIdleCallback(fn, { timeout: 200 }) : setTimeout(fn, 16))
+    const slice = () => {
+      // Forty at a time between frames, the ones on screen first as they were made.
+      for (const [im, who] of this.portraits.splice(0, 40)) im.src = this.opts.avatar(who)
+      if (this.portraits.length) idle(slice)
+      else this.portraitsAsked = false
+    }
+    idle(slice)
+  }
+
   private face(id: string, name: string): Face {
     let f = this.faces.get(id)
     if (f) return f
@@ -170,7 +189,8 @@ export class PeopleLayer {
     el.setAttribute('role', 'button')
     el.tabIndex = -1
     const img = el.appendChild(document.createElement('img'))
-    img.src = this.opts.avatar(id)
+    // The portrait comes a moment later, a few at a time: hundreds decoded at once held the first zoom for seconds.
+    this.later(img, id)
     img.alt = ''
     // Built from text, not HTML: names and places are what relatives typed.
     const label = el.appendChild(document.createElement('span'))
@@ -181,8 +201,9 @@ export class PeopleLayer {
     const marker = this.L.marker([0, 0], { icon: this.L.divIcon({ className: 'map-face', html: el, iconSize: [24, 24] }), keyboard: false })
     marker.on('click', () => this.activate(id))
     // Hovered or reached by the keyboard: on top, named, with where and when.
-    const open = () => { el.classList.add('open'); marker.setZIndexOffset(30000) }
-    const close = () => { if (document.activeElement === el || el.matches(':hover')) return; el.classList.remove('open'); marker.setZIndexOffset(f!.z) }
+    // Their route lights up as well, as a line of descent does on the chart.
+    const open = () => { el.classList.add('open'); marker.setZIndexOffset(30000); this.opts.hover?.(f?.hoverAs ?? id) }
+    const close = () => { if (document.activeElement === el || el.matches(':hover')) return; el.classList.remove('open'); marker.setZIndexOffset(f!.z); this.opts.hover?.(null) }
     marker.on('mouseover', open)
     marker.on('mouseout', close)
     el.addEventListener('focus', () => { open(); this.setActive(id) })
@@ -224,6 +245,8 @@ export class PeopleLayer {
     if (f[key] === on) return
     f[key] = on
     f.el.classList.toggle(key === 'hidden' ? 'hidden-face' : key, on)
+    // A face folded into a stack is not drawn, and its marker must not catch the press meant for the stack's top.
+    if (key === 'hidden') f.marker.getElement()?.classList.toggle('map-folded', on)
   }
   /** A traveller over a stack lets presses through to it. */
   private yieldTo(f: Face, on: boolean) {
@@ -279,6 +302,8 @@ export class PeopleLayer {
       if (!f?.shown) { changed = true; continue }
       if (!!pos.leg !== f.moving) { changed = true; continue }
       if (!f.moving) continue
+      // On the way they are on their own, not in a town's stack.
+      f.hoverAs = undefined
       this.place(f, pos.lat, pos.lon)
       const p = this.map.latLngToContainerPoint([pos.lat, pos.lon])
       // Just setting off or about to arrive, they stand over a town's stack: a press there is meant for the stack.
@@ -362,6 +387,7 @@ export class PeopleLayer {
         this.place(f, s.lat, s.lon)
         const hidden = i >= shown
         this.setFlag(f, 'hidden', hidden)
+        f.hoverAs = spread ? id : ids[0]
         // Hovered, a stack tells who is in it: two names and the rest counted, so the platform's own tooltip stays a
         // line or two rather than a black box over the map. The card has the whole list.
         f.el.title = !spread && i === 0 && ids.length > 1 ? `${ids.slice(0, 2).map((x) => names.get(x)).join(', ')}${ids.length > 2 ? ` +${ids.length - 2}` : ''}` : ''

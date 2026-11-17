@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { drawGhost, legTooFar, recentInk, type TrailState } from '../components/map-trails'
+import { drawGhost, drawTrails, GHOST_YEARS, ghostInk, ghostKey, legTooFar, recentInk, type TrailState } from '../components/map-trails'
 import { leader, marksAt } from '../lib/map-layout'
 import { mercator } from '../lib/map-motion'
 import type { Track } from '../lib/map-timeline'
@@ -38,21 +38,72 @@ describe('the ghost of finished journeys', () => {
     // Two people took exactly the same way: drawn leg by leg, the ink would be laid twice (0.3 + 0.3).
     const a = track('a', [0, 0], [0, 1], [1900, 1901])
     const b = track('b', [0, 0], [0, 1], [1900, 1901])
-    drawGhost(view(ctx, 6), state([a, b], 2000))
+    drawGhost(view(ctx, 6), state([a, b], 1910))
     expect(ctx.strokes).toBe(1)
     // And the whole pass is at the ghost's own, capped ink.
     expect(Math.max(...ctx.alphas)).toBeLessThanOrEqual(0.3)
+  })
+
+  it('keeps a finished journey for a generation, then lets it go, so the oldest moves do not grey the map', () => {
+    const moved = track('m', [0, 0], [0, 1], [1900, 1901])
+    const drawn = (year: number) => { const ctx = recorder(); drawGhost(view(ctx, 6), state([moved], year)); return ctx.xs.length }
+    expect(drawn(1901 + GHOST_YEARS)).toBeGreaterThan(0)
+    expect(drawn(1902 + GHOST_YEARS)).toBe(0)
+    // A later move takes the place of the one before: only the last way in stays.
+    const twice: Track = { ...moved, stops: [...moved.stops, { ...moved.stops[1], lon: 2, year: 1910, date: '1910', time: 1910 }] }
+    const ctx = recorder(); drawGhost(view(ctx, 6), state([twice], 1911))
+    const x1 = mercator([0, 1])[0] * 64 - (mercator([0, 0])[0] * 64 - 720)
+    expect(Math.min(...ctx.xs)).toBeGreaterThan(x1 - 1)
+    // The canvas is drawn again when the journey leaves, not only when one arrives.
+    expect(ghostKey(state([moved], 1901 + GHOST_YEARS))).not.toBe(ghostKey(state([moved], 1902 + GHOST_YEARS)))
+  })
+
+  it('keeps every journey when all past moves are chosen, the oldest included', () => {
+    const moved: Track = { ...track('m', [0, 0], [0, 1], [1900, 1901]) }
+    moved.stops = [...moved.stops, { ...moved.stops[1], lon: 2, year: 1910, date: '1910', time: 1910 }]
+    const xs = (routes: 'recent' | 'all') => { const ctx = recorder(); drawGhost(view(ctx, 6), { ...state([moved], 1990), routes }); return ctx.xs }
+    const x0 = 720
+    // Recent: the move of 1901 is long gone and only the last one would show, but 1910 is past a generation too.
+    expect(xs('recent').length).toBe(0)
+    // All: both moves are there, from the very first place.
+    // (the second place is 45 px east of the first at this zoom)
+    expect(Math.min(...xs('all'))).toBeLessThan(x0 + 20)
+    expect(ghostKey({ ...state([moved], 1990), routes: 'all' })).not.toBe(ghostKey(state([moved], 1990)))
+  })
+
+  it('quiets the ghost when hundreds of lines share the screen, so they do not fill the space between with grey', () => {
+    expect(ghostInk(10)).toBe(1)
+    expect(ghostInk(2000)).toBeLessThan(0.2)
+    const many = Array.from({ length: 400 }, (_, i) => track(`p${i}`, [0, 0], [0, 1 + i / 1000], [1900, 1901]))
+    const ctx = recorder(); drawGhost(view(ctx, 6), state(many, 1910))
+    expect(ctx.alphas[0]).toBeLessThan(0.1)
+  })
+
+  it('draws the whole route of the person under the pointer dark, journeys still ahead included', () => {
+    const moved: Track = { ...track('m', [0, 0], [0, 1], [1900, 1901]) }
+    moved.stops = [...moved.stops, { ...moved.stops[1], lon: 2, year: 1960, date: '1960', time: 1960 }]
+    const pass = (hover: Track | null) => {
+      const ctx = recorder()
+      drawTrails(view(ctx, 6), { ...state([moved], 1950), hover })
+      return ctx
+    }
+    const with_ = pass(moved), without = pass(null)
+    expect(Math.max(...with_.alphas)).toBeGreaterThan(0.9)
+    // The move of 1960 is drawn too: the line reaches the third place.
+    const x3 = mercator([0, 2])[0] * 64 - (mercator([0, 0])[0] * 64 - 720)
+    expect(Math.max(...with_.xs)).toBeGreaterThan(x3 - 1)
+    expect(Math.max(...without.xs, 0)).toBeLessThan(x3 - 1)
   })
 
   it('leaves a leg that crosses the whole view out of a city view, but keeps it in the world view', () => {
     const local = track('local', [0, 0], [0, 0.05], [1900, 1901])
     const crossing = track('crossing', [0, -70], [0, 70], [1900, 1901])
     const near = recorder()
-    drawGhost(view(near, 8.5), state([local, crossing], 2000))
+    drawGhost(view(near, 8.5), state([local, crossing], 1910))
     // Only the town's own traffic: no line spanning the continent.
     expect(Math.max(...near.xs) - Math.min(...near.xs)).toBeLessThan(200)
     const far = recorder()
-    drawGhost(view(far, 3), state([local, crossing], 2000))
+    drawGhost(view(far, 3), state([local, crossing], 1910))
     // From the whole world, the same crossing is part of the pattern.
     expect(Math.max(...far.xs) - Math.min(...far.xs)).toBeGreaterThan(500)
   })

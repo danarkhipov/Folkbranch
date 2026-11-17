@@ -8,7 +8,17 @@ export const placeKey = (text: string) => key(text.split(',')[0] ?? '')
  * A name with its spelling levelled: case, diacritics, punctuation and hyphens do not tell places apart, since one town
  * reaches the archive with and without a hyphen, or with a full stop typed at the end of its name on a card.
  */
-const looseKey = (s: string) => key(s).replace(/[.,;:!?'"«»()]/g, ' ').replace(/[-–—]/g, ' ').replace(/\s+/g, ' ').trim()
+const looseKeys = new Map<string, string>()
+/** Asked for the same few names thousands of times when the map opens, so each is worked out once. */
+const looseKey = (s: string) => {
+  let k = looseKeys.get(s)
+  if (k === undefined) {
+    k = key(s).replace(/[.,;:!?'"«»()]/g, ' ').replace(/[-–—]/g, ' ').replace(/\s+/g, ' ').trim()
+    if (looseKeys.size > 50000) looseKeys.clear()
+    looseKeys.set(s, k)
+  }
+  return k
+}
 
 /**
  * Every place a text could mean: by its name or any other name, word for word first, then with spelling levelled.

@@ -1,4 +1,4 @@
-// The family on a map through time, on the invented demo family: the Map button, the year slider and its keys, Play and
+// The family on a map through time, on the invented demo family: the tree-or-map switch, the year slider and its keys, Play and
 // Pause, stepping through events, a person's route, who is here, a phone's bars, nothing asked of another server, and
 // a reader who sees no living relative on it.
 // FG_URL=http://localhost:3417 node tests/e2e/map.mjs runs it against a `pnpm dev` that holds the English demo family
@@ -53,7 +53,7 @@ const pressFace = async (p, label) => {
   await p.mouse.click(at.x, at.y)
 }
 const openMap = async (p) => {
-  await p.getByRole('button', { name: 'Map', exact: true }).click()
+  await p.getByRole('radio', { name: 'Map', exact: true }).click()
   await p.locator('.family-map canvas').first().waitFor({ state: 'attached', timeout: 30000 })
   await faces(p).first().waitFor({ state: 'attached', timeout: 30000 }); await sleep(1500)
 }
@@ -69,7 +69,7 @@ ok('the demo family has living relatives to hide', living.length > 0, `${living.
 const atlas = []
 A.on('request', (r) => { if (r.url().includes('/atlas/')) atlas.push(new URL(r.url()).pathname) })
 await openMap(A)
-ok('the Map button opens the map and keeps it in the address', A.url().includes('view=map'))
+ok('the switch opens the map and keeps it in the address', A.url().includes('view=map'))
 ok('the base map comes from this server', ['land', 'borders', 'labels'].every((f) => atlas.includes(`/atlas/${f}.json`)), atlas.join(' '))
 const min = Number(await track(A).getAttribute('aria-valuemin')), max = Number(await track(A).getAttribute('aria-valuemax'))
 ok('the slider spans the family', min <= 1890 && max >= 1980, `${min}–${max}`)
@@ -117,7 +117,7 @@ ok('Previous event steps back to it', second > first && (await now(A)) === first
 
 // Who is here: zoomed out by hand, the towns' people stand in stacks, and a stack's card lists them.
 await pressYear(A, 1925)
-for (let i = 0; i < 3; i++) { await A.locator('.leaflet-control-zoom-out').click(); await sleep(700) }
+for (let i = 0; i < 3; i++) { await A.getByRole('button', { name: 'Zoom out', exact: true }).click(); await sleep(700) }
 await sleep(600)
 ok('a move by hand stops following, and offers it back', (await A.getByRole('button', { name: 'Follow' }).count()) === 1)
 const stack = (await shownFaces(A)).find((l) => /: \d+ people, /.test(l))

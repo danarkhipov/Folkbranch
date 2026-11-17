@@ -15,8 +15,9 @@ import { bearerAt, lineFor, lineThread, threadPoints, withLine, type Thread } fr
 import { mercator } from '@/lib/map-motion'
 import { msAt, schedule, yearAtMs } from '@/lib/map-pacing'
 import { generationWords } from '@/lib/map-scrub'
-import { eventYear, lifeSpan, mapTimeline, positionAt, routePoints, routeStops, sinceAt, trackLegs, type MapTimeline, type Position, type RouteStop, type Track } from '@/lib/map-timeline'
+import { eventYear, lifeSpan, mapTimeline, positionAt, routePoints, routeStops, sinceAt, trackLegs, withoutKinds, type MapTimeline, type Position, type RouteStop, type Track } from '@/lib/map-timeline'
 import { lifeYears, personName, type Graph, type Place } from '@/lib/types'
+import { useLayers } from '@/lib/map-layers'
 import { loadAtlas } from './map-atlas'
 import { canvasLayer, type CanvasLayer } from './map-canvas'
 import { useStoryClock } from './map-clock'
@@ -106,6 +107,9 @@ function smoothTouchZoom(L: typeof import('leaflet'), m: import('leaflet').Map) 
   wheel.addHooks()
   void L
 }
+/** The family before the places are known: an empty map, not a slow list of everyone missing. */
+const NO_ONE: Graph = { persons: [], parentChild: [], unions: [] }
+
 /** The person card slides in over this long; the camera fits a route once it is there. */
 const CARD_MS = 380
 
@@ -149,8 +153,11 @@ const narrow = () => matchMedia('(max-width: 640px)').matches
 export default function MapView({ card: cardOpen, onCard, root = null }: { card: boolean; onCard: (open: boolean) => void; root?: string | null }) {
   const { t, lang, view, graph, family, me, focus, byId, focusId } = useApp()
   const { data: places, isSuccess } = useQuery({ queryKey: ['places'], queryFn: () => api<Place[]>('places') })
+  // What the viewer switched on and off, remembered in this browser.
+  const layers = useLayers()
   // A line is found in the whole family the page holds, not only the part the tree shows, and so is who is placed.
-  const whole = useMemo(() => mapTimeline(graph, places ?? [], t), [graph, places, lang]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Nothing is built before the places come in: without them every life would be worked through only to be missing.
+  const whole = useMemo(() => mapTimeline(places ? graph : NO_ONE, places ?? [], t), [graph, places, lang]) // eslint-disable-line react-hooks/exhaustive-deps
   const placedIds = useMemo(() => new Set(whole.tracks.map((x) => x.personId)), [whole])
   /** How each parent and child are linked, for preferring a chain of birth links. */
   const linkKind = useMemo(() => new Map(graph.parentChild.map((l) => [`${l.parentId}|${l.childId}`, l.kind])), [graph])
@@ -172,7 +179,9 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
   // Everyone in the line stands on the map, also those outside the tree's current view.
   const shown = useMemo<Graph>(() => (line ? withLine(view, graph, line.ids) : view), [view, graph, line])
   // By language, not by `t`: the app makes a new `t` every render, and new tracks would rebuild every face.
-  const data = useMemo(() => (shown === graph ? whole : mapTimeline(shown, places ?? [], t)), [shown, graph, whole, places, lang]) // eslint-disable-line react-hooks/exhaustive-deps
+  const built = useMemo(() => (shown === graph || !places ? whole : mapTimeline(shown, places, t)), [shown, graph, whole, places, lang]) // eslint-disable-line react-hooks/exhaustive-deps
+  /** Without the kinds of event the viewer switched off: the same object when none is. */
+  const data = useMemo(() => withoutKinds(built, layers.hidden), [built, layers.hidden])
   /** The thread of the line followed, worked out from the tracks drawn. */
   // Null too when nobody in the line is on the map: then there is nothing to draw, play or frame, only the chip to say so.
   const thread = useMemo<Thread | null>(() => {
@@ -265,7 +274,8 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
   const pause = useRef(clock.toggle)
   useLayoutEffect(() => { pause.current = clock.toggle })
   const [card, setCard] = useState<Omit<PlaceCardProps, 'onPick' | 'onZoom' | 'onClose'> & { lat: number; lon: number; el: HTMLElement } | null>(null)
-  const [show, setShow] = useState<Show>('both')
+  // Faces, marks or both, from the layers.
+  const show: Show = layers.people && layers.events ? 'both' : layers.people ? 'people' : 'events'
   const [counts, setCounts] = useState({ people: 0, events: 0 })
   const [following, setFollowing] = useState(true)
   const [ready, setReady] = useState(false)
@@ -294,7 +304,9 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
   useLayoutEffect(() => { faceOf.current = faceFor })
   /** What the canvas and the layout read, kept outside React. */
   const state = useRef<TrailState & { show: Show; events: Mark[]; points: [number, number][] }>({ tracks: [], year: data.min, positions: new Map(), pulses: [], ink: '#2a2620', show: 'both', events: [], focus: null, line: null, points: [] })
-  useLayoutEffect(() => { state.current.focus = focusTrack; state.current.line = lineDraw })
+  useLayoutEffect(() => { state.current.focus = focusTrack; state.current.line = lineDraw; state.current.routes = layers.routes; state.current.trails = layers.trails })
+  // Chosen in the map's layers: the lines are drawn again at once.
+  useEffect(() => { engine.current?.ghost.redraw(); engine.current?.live.redraw() }, [layers.routes, layers.trails])
   /** The places a followed route or line keeps in view, framed once when it is followed; null when no one is. */
   const followPoints = useMemo(() => (thread ? threadPoints(thread) : focusTrack ? routePoints(focusTrack) : null), [thread, focusTrack])
   const followRef = useRef(followPoints)
@@ -350,7 +362,7 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
       live.layer.addTo(m)
       const trails: CanvasLayer = { layer: live.layer, redraw: () => { ghost.redraw(); live.redraw() } }
       state.current.accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#a4502e'
-      const people = new PeopleLayer(L, m, { avatar: (id) => faceOf.current(id), pick: (id) => pick.current(id), stack: (h) => openStack.current(h), t: (k) => tr.current(k), people: (n) => peopleWords(n, langRef.current) })
+      const people = new PeopleLayer(L, m, { avatar: (id) => faceOf.current(id), pick: (id) => pick.current(id), stack: (h) => openStack.current(h), t: (k) => tr.current(k), people: (n) => peopleWords(n, langRef.current), hover: (id) => { state.current.hover = id ? state.current.tracks.find((t) => t.personId === id) ?? null : null; engine.current?.live.redraw() } })
       const follow = new Follow(L, m, () => insets(m), () => setFollowing(false))
       // Without the base map the family still stands and travels on plain paper, and the atlas can be asked again.
       const atlas = await loadAtlas(L).catch(() => null)
@@ -372,7 +384,9 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
       engine.current?.map.remove()
       engine.current = null
       setReady(false)
-      writeYear(null)
+      // The year leaves the address only when the map does: React may take the map down and put it straight back
+      // (as it does in development), and a reload right after must still find the year there.
+      setTimeout(() => { if (new URLSearchParams(location.search).get('view') !== 'map') writeYear(null) }, 0)
     }
   }, [])
 
@@ -535,6 +549,15 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
 
   // A new family, new places or a new choice of what to show: everything is laid out again.
   const started = useRef(false)
+  /** The reader moved the map before the family came in: the first framing does not take their view away. */
+  const touched = useRef(false)
+  useEffect(() => {
+    const el = box.current
+    if (!el) return
+    const mark = () => { if (!started.current) touched.current = true }
+    for (const k of ['wheel', 'pointerdown', 'touchstart', 'keydown'] as const) el.addEventListener(k, mark, { passive: true })
+    return () => { for (const k of ['wheel', 'pointerdown', 'touchstart', 'keydown'] as const) el.removeEventListener(k, mark) }
+  }, [])
   useEffect(() => {
     const e = engine.current
     if (!ready || !e) return
@@ -562,7 +585,7 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
       st.positions = place(y)
       // The camera is set first and only then the map is shown: drawn before, it showed the whole world for a moment
       // and then jumped to the family.
-      e.follow.fit(keepInView(y, 0), false)
+      if (!touched.current) e.follow.fit(keepInView(y, 0), false)
       relayout.current()
       e.trails.redraw()
       box.current?.classList.remove('map-waiting')
@@ -785,7 +808,7 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
       <div ref={bar}>
         <TimelineBar min={data.min} max={data.max} year={clock.shown} playing={clock.playing} speed={clock.speed} show={show} counts={counts}
           events={barEvents} focus={barFocus} listen={clock.listen} chip={chip}
-          onSeek={clock.seek} onPlay={play} onSpeed={clock.nextSpeed} onShow={setShow} />
+          onSeek={clock.seek} onPlay={play} onSpeed={clock.nextSpeed} />
       </div>
       {!following && (
         <button type="button" className="map-follow float bar-btn fixed right-3 top-16 z-10 !h-9 text-ink max-sm:top-3" onClick={followAgain}>

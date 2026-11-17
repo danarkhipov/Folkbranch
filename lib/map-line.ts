@@ -219,7 +219,7 @@ export function bearerAt(thread: Thread, y: number): string | null {
 /** Every point of the thread, for framing it whole. */
 export function threadPoints(thread: Thread): [number, number][] {
   const out: [number, number][] = []
-  // Every fourth point and each end: a great circle bulges past its ends, and the points run on past ±180°.
+  // Every fourth point and each end: and the points run on past ±180° where the short way crosses it.
   for (const s of thread.stretches) for (const seg of s.segs) seg.pts.forEach((p, i) => { if (i % 4 === 0 || i === seg.pts.length - 1) out.push([p[0], wrapLon(p[1])]) })
   for (const h of thread.handovers) if (h.lat !== null && h.lon !== null) out.push([h.lat, h.lon])
   return out

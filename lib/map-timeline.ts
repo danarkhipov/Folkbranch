@@ -22,6 +22,22 @@ export type Gap = 'no-place' | 'no-coords' | 'bad-coords' | 'unknown-place' | 'a
 export interface Unplaced { personId: string; name: string; what: string; date: string; place: string; gap: Gap }
 /** Someone with nowhere to stand: not one event with both a place that has a point and a year. */
 export interface Absent { personId: string; name: string; gaps: Unplaced[] }
+/**
+ * The timeline with some kinds of event left out: no birth place, say, so a person stands first where they next had
+ * an event. Someone left with no place is not on the map; they are not listed as missing, the viewer chose this. The
+ * very same object comes back when nothing is hidden, so nothing downstream is built again for it.
+ */
+export function withoutKinds(data: MapTimeline, hidden: readonly EventKind[]): MapTimeline {
+  if (!hidden.length) return data
+  const left = new Set(hidden)
+  const tracks: Track[] = []
+  for (const tr of data.tracks) {
+    const stops = tr.stops.filter((s) => !left.has(s.kind))
+    if (stops.length) tracks.push(stops.length === tr.stops.length ? tr : { ...tr, stops })
+  }
+  return { ...data, tracks }
+}
+
 export interface MapTimeline { tracks: Track[]; missing: Unplaced[]; absent: Absent[]; min: number; max: number }
 
 /**
@@ -67,7 +83,12 @@ export function mapTimeline(graph: Graph, places: Place[], t: (k: string) => str
   const tracks: Track[] = []
   const missing: Unplaced[] = []
   const absent: Absent[] = []
+  // Each person's marriages, found once: going through every marriage of the family for every person was the
+  // slowest part of opening the map in a large archive.
+  const unionsOf = new Map<string, Graph['unions']>()
+  for (const u of graph.unions) for (const id of [u.aId, u.bId]) { const l = unionsOf.get(id); if (l) l.push(u); else unionsOf.set(id, [u]) }
   for (const p of graph.persons) {
+    const ownGaps = missing.length
     if (p.hidden) continue
     const name = personName(p) || t('Без имени')
     const born = inYears(p.birthYear) ?? eventYear(p.birthDate)
@@ -91,8 +112,7 @@ export function mapTimeline(graph: Graph, places: Place[], t: (k: string) => str
       stops.push({ lat: place.lat, lon: place.lon, place: text.trim(), year, date: date || String(year), what, kind, time: year, ...(union ? { union } : {}), ...(until ? { until } : {}) })
     }
     add(p.birthPlace, p.birthPlaceId, p.birthDate, t('Рождение'), born, 'birth')
-    for (const u of graph.unions) {
-      if (u.aId !== p.id && u.bId !== p.id) continue
+    for (const u of unionsOf.get(p.id) ?? []) {
       const other = byId.get(u.aId === p.id ? u.bId : u.aId)
       // A partner hidden from this reader hides the marriage too, as the Places list and the life chronology do.
       if (other?.hidden) continue
@@ -132,7 +152,7 @@ export function mapTimeline(graph: Graph, places: Place[], t: (k: string) => str
       if (b.until === undefined && a.until !== undefined && a.lat === b.lat && a.lon === b.lon && b.year <= a.until) b.until = a.until
     }
     if (stops.length) tracks.push({ personId: p.id, name, born, died, living: p.living, stops })
-    else absent.push({ personId: p.id, name, gaps: missing.filter((m) => m.personId === p.id) })
+    else absent.push({ personId: p.id, name, gaps: missing.slice(ownGaps) })
   }
   // The slider spans people's lives, not raw facts, in whole decades; never past this year, and never backwards.
   const spans = tracks.map(lifeSpan)
@@ -297,7 +317,7 @@ export const stopAt = (stop: RouteStop, year: number): RouteStop | null => {
   return n === stop.years.length ? stop : { ...stop, visits: stop.visits.slice(0, n), years: stop.years.slice(0, n), ...(stop.dates ? { dates: stop.dates.slice(0, n) } : {}) }
 }
 
-/** Points that frame a whole route: every stop, and points along each journey (a great circle bulges past its ends). */
+/** Points that frame a whole route: every stop, and points along each journey (a line over the 180° meridian runs on past it). */
 export function routePoints(track: Track): [number, number][] {
   const out: [number, number][] = track.stops.map((s) => [s.lat, s.lon])
   for (const leg of trackLegs(track)) for (const f of [0.25, 0.5, 0.75]) { const [lat, lon] = along(leg.path, f); out.push([lat, wrapLon(lon)]) }

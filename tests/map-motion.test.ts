@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { along, bow, distanceKm, easeInOut, easeInOutInverse, greatCircle, legPath, mercator, wrapLon } from '../lib/map-motion'
+import { along, BOW, distanceKm, easeInOut, easeInOutInverse, legPath, mercator, straight, unmercator, wrapLon } from '../lib/map-motion'
 
 const reus: [number, number] = [41.15, 1.1], tarragona: [number, number] = [41.12, 1.25]
 const madrid: [number, number] = [40.42, -3.7], baires: [number, number] = [-34.6, -58.38]
@@ -16,26 +16,30 @@ describe('how people travel', () => {
     expect(easeInOut(0.9)).toBeGreaterThan(0.9)
     for (const u of [0.05, 0.3, 0.5, 0.71, 0.99]) expect(easeInOutInverse(easeInOut(u))).toBeCloseTo(u, 9)
   })
-  it('goes the great circle on a long leg, and ends exactly at both stops', () => {
-    const gc = greatCircle(madrid, [40.71, -74.0])
-    expect(gc[0]).toEqual(madrid)
-    expect(gc.at(-1)).toEqual([40.71, -74.0])
-    // Madrid to New York arcs north of both ends.
-    expect(Math.max(...gc.map((p) => p[0]))).toBeGreaterThan(45)
-    const legPathLong = legPath(madrid, baires)
-    expect(legPathLong.pts.length).toBe(65)
+  it('goes from stop to stop nearly straight, bowed a little, and ends exactly at both', () => {
+    for (const [from, to] of [[madrid, [40.71, -74.0]], [madrid, baires], [reus, tarragona]] as [[number, number], [number, number]][]) {
+      const line = straight(from, to)
+      expect(line[0]).toEqual(from)
+      expect(line.at(-1)).toEqual(to)
+      // No point strays from the line between the two ends by more than the bow: no swing across the globe.
+      const [ax, ay] = mercator(from), [bx, by] = mercator(to), len = Math.hypot(bx - ax, by - ay)
+      for (const pt of line) {
+        const [x, y] = mercator(pt)
+        expect(Math.abs((bx - ax) * (y - ay) - (by - ay) * (x - ax)) / len).toBeLessThanOrEqual(BOW * len + 1e-9)
+      }
+    }
+    // Madrid to New York no longer swings north of both towns.
+    expect(Math.max(...straight(madrid, [40.71, -74.0]).map((p) => p[0]))).toBeLessThan(45)
     expect(distanceKm(madrid, baires)).toBeGreaterThan(10000)
+    expect(unmercator(mercator([55.75, 37.62]))[0]).toBeCloseTo(55.75, 9)
   })
-  it('bows a short leg to the left of the way, so there and back do not overlap', () => {
-    expect(distanceKm(reus, tarragona)).toBeLessThan(800)
-    const there = bow(reus, tarragona), back = bow(tarragona, reus)
-    expect(there[0]).toEqual(reus)
-    expect(there.at(-1)).toEqual(tarragona)
-    // Going east, left is north; going back west, left is south.
-    expect(there[16][0]).toBeGreaterThan((reus[0] + tarragona[0]) / 2)
-    expect(back[16][0]).toBeLessThan((reus[0] + tarragona[0]) / 2)
+  it('bows there and back to opposite sides, so a return trip does not hide under the way out', () => {
+    const there = straight(reus, tarragona), back = straight(tarragona, reus)
+    const side = (pts: [number, number][]) => { const [ax, ay] = mercator(reus), [bx, by] = mercator(tarragona), [x, y] = mercator(pts[8]); return Math.sign((bx - ax) * (y - ay) - (by - ay) * (x - ax)) }
+    expect(side(there)).not.toBe(0)
+    expect(side(back)).toBe(-side(there))
   })
-  it('travels evenly by length along the curve', () => {
+  it('travels evenly by length along the line', () => {
     const p = legPath(madrid, baires)
     expect(along(p, 0)).toEqual(madrid)
     expect(along(p, 1)).toEqual(p.pts.at(-1))

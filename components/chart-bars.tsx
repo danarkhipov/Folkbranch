@@ -10,6 +10,7 @@ import { AssistantIcon } from './assistant-icon'
 import { useUpdate } from './settings/update-notice'
 import type { ChartScope } from './chart-scope'
 import { ViewMenu } from './chart-view-menu'
+import { MapLayers } from './map-layers'
 import { Legend } from './graph-parts'
 import { Logo } from './logo'
 
@@ -188,6 +189,7 @@ export function ViewTools({ map, onChange, onZoom, folded, card }: { map: boolea
   }
   return (
     <div ref={box} inert={folded} className={cn('float view-tools fixed bottom-3 z-10 flex flex-col p-1', folded && 'folded')} style={{ right }}>
+      {map && <><MapLayers /><span className="mx-1 my-1 h-px bg-border" aria-hidden /></>}
       <button className="bar-btn view-zoom" title={t('Приблизить')} data-hint={t('Показать людей крупнее.')} aria-label={t('Приблизить')} onClick={() => onZoom(true)}><Plus size={16} /></button>
       <button className="bar-btn view-zoom" title={t('Отдалить')} data-hint={t('Показать больше людей на экране.')} aria-label={t('Отдалить')} onClick={() => onZoom(false)}><Minus size={16} /></button>
       <span className="view-zoom mx-1 my-1 h-px bg-border" aria-hidden />

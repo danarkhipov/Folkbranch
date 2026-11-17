@@ -3,8 +3,6 @@
 // to drag (its year in a bubble), previous / next event, Play, the speed, what to show, and how many are shown.
 // Plain props in and plain calls out; the handle follows the clock itself while it plays, so React redraws the bar
 // only once a year.
-import { MapKey } from './map-key'
-import { Select } from '@/components/ui/select'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import { Pause, Play, SkipBack, SkipForward } from 'lucide-react'
 import { useApp } from '@/lib/client'
@@ -12,7 +10,6 @@ import { axisTicks, bins, caption, eventWords, share, stepYear, yearAt } from '@
 import { peopleWords } from '@/lib/names'
 
 export type Show = 'both' | 'people' | 'events'
-const SHOWS: Show[] = ['both', 'people', 'events']
 
 /** One event as the bar tells it. */
 export interface BarEvent { year: number; moved: boolean; what: string; name: string; place: string; personId: string }
@@ -37,14 +34,13 @@ export interface TimelineBarProps {
   listen?: (fn: (at: number) => void) => () => void
   /** A new moment; `settled` when the hand has let go (end of a drag, a key). */
   onSeek: (year: number, settled: boolean) => void
-  onPlay: () => void; onSpeed: () => void; onShow: (show: Show) => void
+  onPlay: () => void; onSpeed: () => void
 }
 
 const speedText = (s: number) => (s === 0.5 ? '½×' : `${s}×`)
 
-export function TimelineBar({ min, max, year, playing, speed, show, counts, events, focus, chip, listen, onSeek, onPlay, onSpeed, onShow }: TimelineBarProps) {
+export function TimelineBar({ min, max, year, playing, speed, show, counts, events, focus, chip, listen, onSeek, onPlay, onSpeed }: TimelineBarProps) {
   const { t, lang } = useApp()
-  const shows = useRef<(HTMLButtonElement | null)[]>([])
   const track = useRef<HTMLDivElement>(null)
   const line = useRef<HTMLDivElement>(null)
   const [drag, setDrag] = useState(false)
@@ -127,14 +123,6 @@ export function TimelineBar({ min, max, year, playing, speed, show, counts, even
     onSeek(y, true)
     say(y)
   }
-  const showKeys = (e: KeyboardEvent<HTMLDivElement>) => {
-    const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key]
-    if (!d) return
-    e.preventDefault()
-    const nextShow = SHOWS[(SHOWS.indexOf(show) + d + SHOWS.length) % SHOWS.length]
-    onShow(nextShow)
-    shows.current[SHOWS.indexOf(nextShow)]?.focus()
-  }
 
   const count = show === 'events'
     ? `${eventWords(counts.events, lang)} ${t('на карте сейчас')}`
@@ -179,17 +167,9 @@ export function TimelineBar({ min, max, year, playing, speed, show, counts, even
         </button>
         <button type="button" className="bar-btn !px-0" aria-label={t('Следующее событие')} title={t('Следующее событие')} disabled={next === null} onClick={() => step(1)}><SkipForward size={15} /></button>
         <button type="button" className="bar-btn map-speed !px-1 font-serif tabular-nums" aria-label={`${t('Скорость')}: ${speedText(speed)}`} title={t('Скорость')} onClick={onSpeed}>{speedText(speed)}</button>
-        <MapKey />
         <span className="map-now ml-1 w-14 flex-none font-serif text-xl tabular-nums" aria-hidden>{whole}</span>
         {/* On a phone the year leads the caption line, so the buttons and the choice fit one row. */}
         <span className="map-caption min-w-0 flex-1 truncate font-serif text-sm italic text-ink-soft" title={told || undefined}><span className="map-now-inline not-italic text-ink" aria-hidden>{whole}{told && ' · '}</span>{told}</span>
-        <div role="radiogroup" aria-label={t('Что показать')} className="map-show ml-2 flex flex-none rounded-md border border-border text-sm" onKeyDown={showKeys}>
-          {SHOWS.map((k, i) => (
-            <button key={k} ref={(el) => { shows.current[i] = el }} type="button" role="radio" aria-checked={show === k} tabIndex={show === k ? 0 : -1} className={`px-2 py-1 ${show === k ? 'bg-muted text-ink' : 'text-ink-soft'}`} onClick={() => onShow(k)}>{t({ both: 'Всё', people: 'Люди', events: 'События' }[k])}</button>
-          ))}
-        </div>
-        {/* On a phone three buttons of 44 px each pushed the bar to a third row: there the same choice is one list. */}
-        <span className="map-show-phone ml-auto flex-none"><Select look="quiet" aria-label={t('Что показать')} value={show} onChange={(v) => onShow(v as typeof show)} options={SHOWS.map((k) => ({ value: k, label: t({ both: 'Всё', people: 'Люди', events: 'События' }[k]) }))} /></span>
         <span className="map-count ml-2 flex-none text-sm text-ink-soft">{count}</span>
       </div>
       <span className="sr-only" aria-live="polite">{said}</span>

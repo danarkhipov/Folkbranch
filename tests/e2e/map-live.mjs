@@ -25,7 +25,7 @@ const b = await make('Bea', 1852, 1925)
 ok('the writer adds two people', !!a?.id && !!b?.id, `${a?.id} ${b?.id}`)
 
 await viewer.goto(O + '/')
-await viewer.getByRole('button', { name: 'Map', exact: true }).click()
+await viewer.getByRole('radio', { name: 'Map', exact: true }).click()
 await viewer.waitForSelector('.atlas-country', { timeout: 60000 })
 // Follow Ada: her card opens and the map follows her life.
 await viewer.goto(`${O}/?view=map&p=${a.id}&y=1900`)

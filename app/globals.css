@@ -342,8 +342,11 @@ aside.panel:focus { outline: none; }
   .main-bar .family-name, .main-bar .sep, .main-bar:not(.folded) .bar-logo { display: none; }
   .main-bar .bar-rest { flex: 1; min-width: 0; justify-content: space-around; }
   .main-bar.folded { justify-content: flex-start; }
-  .main-bar .bar-btn { flex: 1 1 0; flex-direction: column; gap: 2px; height: 48px; min-width: 0; padding: 0 1px; font-size: 14px; line-height: 1.3; text-align: center; }
-  .main-bar .nav-label { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Icons only on a phone: the words did not fit and took room from the family; each button keeps its name for a
+     screen reader and its tooltip. */
+  .main-bar { padding: 2px; transition: background-color .18s, box-shadow .18s; }
+  .main-bar .bar-btn { flex: 1 1 0; height: 44px; min-width: 0; padding: 0; }
+  .main-bar .nav-label { display: none; }
   .main-bar .hide-bars { display: none; }
   .bottom-row { left: 8px !important; bottom: 72px; }
   /* A phone is zoomed with fingers; tree or map waits top right, clear of the bars at the bottom, as on map apps. */
@@ -408,9 +411,13 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
 
 /* The button to hide the bars moves down here on a phone, to leave the labels room; fingers zoom without buttons. */
 .view-bar .hide-here { display: none; }
-@media (max-width: 640px) { .view-bar .hide-here { display: inline-flex; } }
+@media (max-width: 640px) {
+  .view-bar .hide-here { display: inline-flex; }
+  /* The other panels on a phone: icons edge to edge, no padding around them to spare. */
+  .view-bar, .view-tools { padding: 2px; gap: 0; }
+  .view-tools > span[aria-hidden] { margin: 1px 6px; }
+}
 @media (max-width: 360px) {
-  .main-bar .bar-btn { font-size: 10.5px; }
   .panel-tabs [role=tab] { font-size: 12.5px; }
 }
 
@@ -431,6 +438,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
 /* After a stay written as a period, where the person went is not known: the face stays, faded and dashed. */
 .map-face-in.unsure { opacity: .5; outline: 1px dashed currentColor; outline-offset: 1px; }
 .map-face.map-yield { pointer-events: none !important; }
+.map-face.map-folded { pointer-events: none !important; }
 /* A face fanned or ringed aside leaves a dot on the town's own point, so the place is still seen where it is. */
 .map-face.anchored::after { content: ''; position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; margin: -1.5px 0 0 -1.5px; border-radius: 50%; background: color-mix(in srgb, var(--ink) 60%, transparent); pointer-events: none; }
 /* A mark moved off its place (a fanned face, a numbered stop, an event's glyph) keeps a hairline back to the place,
@@ -506,7 +514,6 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
 @media (min-width: 641px) and (max-width: 1099px) { .map-bar .map-count { display: none; } }
 @media (min-width: 641px) and (max-width: 759px) {
   .map-bar { padding-inline: 8px; }
-  .map-bar .map-show button { padding-inline: 6px; }
 }
 /* Who is followed, over the track: face, name and years, then Open and the way out. */
 .map-chip { padding: 2px 4px 4px; margin-bottom: 2px; border-bottom: 1px solid var(--border); }
@@ -539,23 +546,17 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
 .map-track.dragging .map-handle, .map-track:focus-visible .map-handle { box-shadow: 0 0 0 2.5px var(--ink), 0 0 0 6px color-mix(in srgb, var(--ink) 12%, transparent); }
 .map-bubble { position: absolute; bottom: calc(100% - 2px); left: calc(var(--at) * 100%); translate: -50% 0; padding: 1px 7px; border-radius: 6px; background: var(--ink); color: var(--paper); font: 500 14px/20px var(--font-serif); font-variant-numeric: tabular-nums; pointer-events: none; white-space: nowrap; }
 .map-now-inline { display: none; }
-.map-show-phone { display: none; }
-@media (max-width: 640px) { .map-bar .map-show-phone { display: block; } }
 @media (max-width: 640px) { .map-now-inline { display: inline; } }
 .map-bar .bar-btn:disabled { opacity: .35; cursor: default; background: none; }
 @media (max-width: 640px) {
   .map-bar { bottom: 72px; }
   .map-bar .map-controls { flex-wrap: wrap; }
   .map-bar .map-count { display: none; }
-  .map-bar .map-show { margin-left: auto; }
   /* The caption is one small line between the track and the buttons, so the bar is two rows of controls, not three. */
   .map-bar .map-caption { order: -1; flex: 1 1 100%; padding: 0 4px; font-size: 12.5px; line-height: 18px; }
-  .map-bar .map-show { display: none; }
   .map-bar .map-now { display: none; }
   .map-bar { padding-inline: 8px; }
   .map-bar .map-controls { column-gap: 2px; }
-  .map-bar .map-show { margin-left: auto; }
-  .map-bar .map-show button { padding-inline: 6px; }
 }
 @media (pointer: coarse) { .map-bar button { min-height: 44px; min-width: 44px; } .map-track { height: 48px; } }
 .map-card { display: flex; flex-direction: column; gap: 4px; max-width: 240px; font-size: 14px; line-height: 1.35; color: var(--ink); }

@@ -38,7 +38,8 @@ export function canvasLayer(L: typeof Leaflet, pane: string, draw: ((v: View) =>
   const reset = () => {
     if (!map) return
     // One picture is asked for at a time; asked again meanwhile, the newest view is drawn once that one is in.
-    if (busy) { again = true; return }
+    // Meanwhile the picture already shown keeps following the map, so it never stands still under moving lines.
+    if (busy) { again = true; fit(map.getCenter(), map.getZoom()); return }
     const size = map.getSize()
     const tl = map.containerPointToLayerPoint([-size.x * PAD, -size.y * PAD]).round()
     const w = Math.round(size.x * (1 + 2 * PAD)), h = Math.round(size.y * (1 + 2 * PAD))
@@ -88,13 +89,16 @@ export function canvasLayer(L: typeof Leaflet, pane: string, draw: ((v: View) =>
     const size = map.getSize(), a = map.containerPointToLayerPoint([0, 0])
     if (a.x < box.x0 || a.y < box.y0 || a.x + size.x > box.x1 || a.y + size.y > box.y1) reset()
   }
-  // During a pinch, a wheel zoom or a flight the canvas follows by transform; the drawing waits for the zoom's end.
-  // Zoomed out past the drawn margin (blank edges would show) or in to twice the size (soft lines): drawn anew.
+  // During a pinch, a wheel zoom or a flight the canvas follows by transform; the drawing waits for the zoom's end,
+  // since drawing thousands of lines inside a gesture is what made it stutter. Zoomed out so far that blank edges
+  // would show, it is drawn anew, but at most a few times a second.
+  let lastEdge = 0
   const zooming = () => {
     if (!map) return
+    fit(map.getCenter(), map.getZoom())
     const k = map.getZoomScale(map.getZoom(), drawnZoom)
-    if (k < 1 / (1 + 2 * PAD) + 0.1 || k > 2) reset()
-    else fit(map.getCenter(), map.getZoom())
+    const now = performance.now()
+    if (k < 1 / (1 + 2 * PAD) + 0.1 && now - lastEdge > 200) { lastEdge = now; reset() }
   }
   const zoomanim = (e: Leaflet.ZoomAnimEvent) => fit(e.center, e.zoom)
 

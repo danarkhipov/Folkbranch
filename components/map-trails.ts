@@ -1,7 +1,8 @@
 // Where people have been. The last years of a journey are drawn in ink, thick at the traveller and thinning to a
 // hairline behind, so the way of travel shows while it happens; a followed person's journeys carry one arrowhead
-// each. Everything older stays as a faint ghost of the same curves on a canvas of its own, drawn as one stroke at one
-// capped ink: the family's routes build up as the years play without any place turning black. Close in, a route of
+// each. A person's last finished journey stays as a faint ghost on a canvas of its own, drawn as one stroke at one
+// capped ink, for a generation and then it is gone: the map shows where each one came from most recently, not a web
+// of every move ever made. The person followed or under the pointer shows their whole route. Close in, a route of
 // another region is left out rather than crossing the view; the one followed keeps its own curves at every zoom. A
 // short ring marks an event as it happens.
 import type { Thread, ThreadSeg } from '@/lib/map-line'
@@ -14,6 +15,10 @@ export const RECENT_YEARS = 12
 /** Ink of the ghost of older trails, and how thin its line: one pass at this ink, never one per journey. */
 const GHOST = 0.28
 const GHOST_PX = 1
+/** How much of its ink the ghost keeps with n lines on screen: a few at full ink, hundreds faint. */
+export function ghostInk(n: number) { return Math.min(1, Math.sqrt(40 / Math.max(1, n))) }
+/** How long a person's last journey stays in the ghost: about a generation. Earlier ones leave the map at once. */
+export const GHOST_YEARS = 30
 /** From this zoom on, a journey that spans several screens is traffic of another region, not of this view. */
 export const FAR_ZOOM = 5
 const FAR_SCREENS = 1.5
@@ -41,7 +46,7 @@ export interface Pulse { at: World; t0: number }
 const headOf = (pos: Position): World => mercator(pos.leg ? along(pos.leg.path, pos.progress) : [pos.lat, pos.lon])
 /** A line of descent followed: its thread, everyone in it, and a key that changes with it (for the ghost cache). */
 export interface LineDraw { thread: Thread; ids: Set<string>; key: string }
-export interface TrailState { tracks: Track[]; year: number; positions: Map<string, Position | null>; pulses: Pulse[]; ink: string; accent?: string; focus: Track | null; line?: LineDraw | null }
+export interface TrailState { tracks: Track[]; year: number; positions: Map<string, Position | null>; pulses: Pulse[]; ink: string; accent?: string; focus: Track | null; line?: LineDraw | null; /** The person under the pointer: their whole route is drawn dark. */ hover?: Track | null; /** Every finished journey, or each person's last one (the default). */ routes?: 'recent' | 'all'; /** The routes layer: off leaves only the person followed, the one pointed at and a line. */ trails?: boolean }
 
 /** The thread: ahead of the clock a faint outline, behind it full ink; an assumed link is dashed in both. */
 const THREAD_AHEAD = 0.2, THREAD_INK = 0.9, THREAD_PX = 2.4, LINK_PX = 1.6, DASH = [5, 5]
@@ -148,6 +153,7 @@ function pen({ ctx, scale: s, ox, oy, dpr }: View, st: TrailState) {
 }
 
 export function drawGhost(v: View, st: TrailState) {
+  if (st.trails === false) return
   const { ctx } = v, { year } = st
   const { quiet, apart } = pen(v, st)
   // The ghost goes into ONE path and is stroked once: a place where many took the same way reads no darker than a
@@ -159,11 +165,15 @@ export function drawGhost(v: View, st: TrailState) {
   ctx.globalAlpha = GHOST * quiet
   ctx.beginPath()
   const ends: [number, number][] = []
-  let drew = false
+  let drew = false, count = 0
   for (const tr of st.tracks) {
     if (apart(tr.personId)) continue
-    for (const leg of trackLegs(tr)) {
-      if (leg.arrive > year) break
+    // Each person's last finished journey, for a generation: where they came from most recently. Or, chosen, every
+    // journey so far, the family's routes building up as the years play.
+    let last: Leg | null = null
+    const done: Leg[] = []
+    for (const leg of trackLegs(tr)) { if (leg.arrive > year) break; last = leg; done.push(leg) }
+    for (const leg of st.routes === 'all' ? done : last && year - last.arrive <= GHOST_YEARS ? [last] : []) {
       const box = legBox(leg)
       if (!leg.path.wraps && (!onCanvas(box, v) || legTooFar(box, v))) continue
       const { world } = leg.path
@@ -176,9 +186,12 @@ export function drawGhost(v: View, st: TrailState) {
       const end = mercator([leg.to.lat, leg.to.lon])
       for (const sh of shifts) ends.push([(end[0] + sh) * v.scale - v.ox, end[1] * v.scale - v.oy])
       drew = true
+      count++
     }
   }
   if (drew) {
+    // Hundreds of lines at one ink fill the space between them with grey: the more of them, the quieter they are.
+    ctx.globalAlpha = GHOST * quiet * ghostInk(count)
     ctx.stroke()
     // The arrival dots are one fill too: many arrivals at one place stay a dot, not a blot.
     ctx.beginPath()
@@ -203,7 +216,7 @@ export function drawTrails(v: View, st: TrailState) {
   /** Every trail of the recent years to ink this frame, and where its traveller is. */
   const live: { tr: Track; pos: Position | null }[] = []
 
-  for (const tr of st.tracks) {
+  for (const tr of st.trails === false ? [] : st.tracks) {
     // Most lives have no journey under way and none in the last years: nothing of theirs to draw live.
     const legs = trackLegs(tr)
     if (!legs.length || legs[0].leave >= year || year - legs[legs.length - 1].arrive > RECENT_YEARS) continue
@@ -263,6 +276,12 @@ export function drawTrails(v: View, st: TrailState) {
   }
 
   if (line) drawLine(line.thread)
+  // The person under the pointer: their whole route, every journey of the life, in full ink over the grey of the rest.
+  if (st.hover && st.hover !== st.focus) {
+    ctx.lineWidth = 2.2
+    ctx.globalAlpha = 0.95
+    for (const leg of trackLegs(st.hover)) stroke(leg, leg.path.world.length, null)
+  }
 
   /** A piece of the thread up to a year (all of it with Infinity): one stroke, again one world over past ±180°. */
   function seg(sg: ThreadSeg, until: number) {
@@ -373,5 +392,7 @@ export function drawTrails(v: View, st: TrailState) {
 export function ghostKey(st: TrailState) {
   const focusId = st.focus?.personId, line = st.line ?? null
   const apart = (id: string) => id === focusId || !!line?.ids.has(id)
-  return `${finishedBy(st.tracks, `${focusId}|${line?.key}`, apart, st.year)}|${focusId}|${line?.key}|${st.ink}`
+  const who = `${focusId}|${line?.key}`
+  // A journey enters the ghost when it ends and leaves it a generation later: either way the canvas changes.
+  return `${st.routes ?? 'recent'}|${st.trails === false ? 'off' : 'on'}|${finishedBy(st.tracks, who, apart, st.year)}-${finishedBy(st.tracks, who, apart, st.year - GHOST_YEARS - 1e-9)}|${focusId}|${line?.key}|${st.ink}`
 }
