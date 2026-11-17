@@ -6,7 +6,7 @@ All notable changes are listed here, newest first. Versions follow [Semantic Ver
 
 ## 1.7.0 - 2026-11-17
 
-The family on a map, year by year. It began as [pull request #14](https://github.com/danarkhipov/Folkbranch/pull/14) by [@andratwiro](https://github.com/andratwiro), their first contribution to Folkbranch: thank you. On top of it this release tells two villages of one name apart, suggests points for places that have none, imports Gramps files with their places, and guards the archive against several easy mistakes.
+The family on a map, year by year. It began as [pull request #14](https://github.com/danarkhipov/Folkbranch/pull/14) by [@andratwiro](https://github.com/andratwiro): thank you. On top of it this release tells two villages of one name apart, suggests points for places that have none, imports Gramps files with their places, and guards the archive against several easy mistakes.
 
 ### Security
 - A reader no longer sees the date or place of a marriage to someone hidden from them, nor which place record a hidden person was born or died in.

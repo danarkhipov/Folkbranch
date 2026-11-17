@@ -1,0 +1,13 @@
+# Who reviews what. A pull request that touches these needs the owner's review, once "Require review from Code Owners"
+# is on in the branch rules (docs/MAINTAINING.md).
+*                          @danarkhipov
+/.github/                  @danarkhipov
+/.githooks/                @danarkhipov
+/scripts/                  @danarkhipov
+/lib/ops/privacy.ts        @danarkhipov
+/lib/db/                   @danarkhipov
+/drizzle/                  @danarkhipov
+/SECURITY.md               @danarkhipov
+/Dockerfile                @danarkhipov
+/install.sh                @danarkhipov
+/install.ps1               @danarkhipov

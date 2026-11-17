@@ -8,7 +8,7 @@ import { IMAGE, sh, sleep, waitUp } from './lib.mjs'
 
 const ok = (n, c, x = '') => { console.log(`${c ? 'PASS' : 'FAIL'} ${n}${x ? ' · ' + x : ''}`); if (!c) process.exitCode = 1 }
 const O = process.env.FG_URL ?? 'http://localhost:3447'
-let cookie = ''
+let cookie = process.env.FG_COOKIE ?? ''
 if (!process.env.FG_URL) {
   try { sh('docker rm -fv fg-map') } catch {}
   sh(`docker run -d --name fg-map -p 127.0.0.1:3447:3000 -e BETTER_AUTH_URL=${O} -e SETUP_TOKEN=x ${IMAGE}`)

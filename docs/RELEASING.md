@@ -17,7 +17,7 @@ A deploy never changes the version, and nothing is released by accident: only a 
 - Branch from `develop`, pull request into `develop`, squash-merge. The PR title is the commit message: `feat:`, `fix:`, `docs:`, `test:`, `chore:`, and `!` after the type (or `BREAKING CHANGE:` in the body) for a break.
 - Anything a person using the app would notice goes under **Unreleased** in `CHANGELOG.md`, in the same pull request, written for them and not for developers: what they can do now, not which file changed. Groups: Added, Changed, Fixed, Removed, Security. Security goes first.
 - A change to what the app promises (a feature, a way to sign in, a supported provider) also changes `README.md` and `README.ru.md` in the same pull request, and the matching page in `docs/`.
-- Run `pnpm check` before opening it. A screen needs a browser test in `tests/e2e`.
+- Run `pnpm check` before opening it. A screen needs a browser check in `tests/ui` (see [TESTING.md](TESTING.md)), and `pnpm build && pnpm check:ui` before you open the pull request.
 - No real family data in code, tests, screenshots or issues.
 
 ## Choosing the number
@@ -31,7 +31,7 @@ A deploy never changes the version, and nothing is released by accident: only a 
 
 Done by the maintainer, from a clean `main`. Agents prepare the commit and stop: they never merge to `main`, tag, push or publish without a clear yes for that step.
 
-1. `develop` is green: `pnpm check`, the browser tests, and a check by hand of what is new.
+1. `develop` is green: `pnpm check`, `pnpm check:ui`, the browser tests, and a check by hand of what is new.
 2. In `CHANGELOG.md` rename **Unreleased** to `## X.Y.Z - YYYY-MM-DD` and put a new empty **Unreleased** above it. Read the section once as a user: is anything missing, is anything internal?
 3. Set `version` to `X.Y.Z` in `package.json` and `npm/package.json`. `tests/release.test.ts` fails when they differ or the changelog has no section for that version.
 4. Commit `chore(release): X.Y.Z`, merge `develop` into `main`.

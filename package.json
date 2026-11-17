@@ -39,6 +39,8 @@
     "predev": "node scripts/copy-wasm.mjs",
     "prebuild": "node scripts/copy-wasm.mjs",
     "check": "pnpm lint && vitest run && pnpm audit --audit-level high && madge --circular --extensions ts,tsx --ts-config tsconfig.json app components lib",
+    "check:ui": "node scripts/ui-check.mjs",
+    "check:perf": "node scripts/ui-check.mjs --perf map-reload",
     "check:full": "sh tests/run-all.sh",
     "i18n:gaps": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/i18n-gaps.mjs"
   },

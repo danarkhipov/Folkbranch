@@ -2,5 +2,13 @@
   "nodes": 2000,
   "firstLoadKB": 330,
   "idleKB": 230,
-  "hoverMs": 100
+  "hoverMs": 100,
+  "mapReload": {
+    "desktopShownMs": 3000,
+    "desktopZoomMs": 1500,
+    "desktopLongMs": 2000,
+    "phoneShownMs": 7000,
+    "phoneZoomMs": 3500,
+    "phoneLongMs": 6000
+  }
 }

@@ -1,0 +1,27 @@
+name: Speed
+
+# Speed on a large family, on a laptop and on a phone's processor. Slower and noisier than the checks that gate a pull
+# request, so it runs once a week and on demand; a failure is a reason to look, with the numbers in the log.
+on:
+  schedule:
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  map-speed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Reload the map of 2,000 people and zoom at once; the budgets are in tests/budgets.json
+        run: node scripts/ui-check.mjs --no-build --perf map-reload
