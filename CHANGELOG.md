@@ -9,6 +9,7 @@ All notable changes are listed here, newest first. Versions follow [Semantic Ver
 - **Ctrl+Z** (⌘Z) takes back your last change, **Ctrl+Shift+Z** or **Ctrl+Y** brings it back. In a text field the keys stay the field's own.
 - The interface speaks the viewer's language: invitations, sign-in and setup follow the browser, and each person can pick their own interface language in their account settings. The archive's language still sets the language of the data.
 - The assistant's conversations stay after a reload, and earlier ones open again from **Past conversations**. They are kept in this browser only.
+- **Gramps files** (`.gramps`, and Gramps XML saved as `.xml`) import directly: people, marriages, children, events with godparents and witnesses, notes and sources, and every place with what it is part of, its map point and its older names with their years. An event is written with the name its place had then. Review, merge and undo work as for GEDCOM.
 
 - **One list of AI keys** in Settings → AI: a key is added once, in place, checked with its service first, and the assistant and speech each pick a service and model from it. The owner can pick who answers in the assistant.
 - **Who used what**: requests, tokens and minutes per person this month, and calls per MCP access token. Money is only what the provider stated for each request (OpenRouter does); where a provider states none, the request is counted and the price is shown as unknown, never guessed.

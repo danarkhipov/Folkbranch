@@ -1,0 +1,4 @@
+Place names and points: GeoNames (https://www.geonames.org), licensed under Creative Commons Attribution 4.0
+(https://creativecommons.org/licenses/by/4.0/). Extract of cities500 and alternate names, all countries,
+built 2026-11-17 by scripts/build-gazetteer.mjs. Changes: names limited to Latin and Cyrillic letters and to the
+languages listed in the script, names that read alike dropped, coordinates rounded to four decimals.

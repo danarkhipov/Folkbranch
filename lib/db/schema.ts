@@ -86,6 +86,10 @@ export const persons = sqliteTable('persons', {
   deathDate: text('death_date').notNull().default(''),
   deathYear: integer('death_year'),
   deathPlace: text('death_place').notNull().default(''),
+  // Which record of the Places list the text above means, when the text alone cannot say (two villages of one name).
+  // The text stays as written; a link whose place no longer answers to that text is not used (lib/places.ts).
+  birthPlaceId: text('birth_place_id'),
+  deathPlaceId: text('death_place_id'),
   living: integer('living', { mode: 'boolean' }).notNull().default(true),
   // Kept from readers, guests and read-only agents like the living, whatever the dates say.
   keepPrivate: integer('keep_private', { mode: 'boolean' }).notNull().default(false),
@@ -103,7 +107,7 @@ export const persons = sqliteTable('persons', {
   sources: text('sources').notNull().default('[]'),
   // Versions of a value, each with its source and status.
   claims: text('claims').notNull().default('[]'),
-})
+}, (t) => [index('persons_birth_place').on(t.birthPlaceId), index('persons_death_place').on(t.deathPlaceId)])
 
 // Tracked tables deliberately have no foreign keys: undo re-creates rows in any order,
 // and purgeOrphans() keeps references consistent.
@@ -123,6 +127,7 @@ export const unions = sqliteTable('unions', {
   startDate: text('start_date').notNull().default(''),
   endDate: text('end_date').notNull().default(''),
   place: text('place').notNull().default(''),
+  placeId: text('place_id'),
   certainty: text('certainty').notNull().default('family'),
 }, (t) => [uniqueIndex('unions_pair').on(t.aId, t.bId), index('unions_b').on(t.bId)])
 

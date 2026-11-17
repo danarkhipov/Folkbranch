@@ -13,15 +13,9 @@ const PAD = 0.25
 /** The most pixels one canvas holds: a phone keeps memory and fill low, and fine lines need no more than this. */
 const maxPixels = () => (matchMedia('(pointer: coarse)').matches ? 3e6 : 6e6)
 
-/** A worker that draws a view at a size in device pixels and gives back the picture, or nothing if it cannot. */
-export type RemoteDraw = (view: Omit<View, 'ctx'>, pw: number, ph: number) => Promise<ImageBitmap | null>
-
-export function canvasLayer(L: typeof Leaflet, pane: string, draw: ((v: View) => void) | null, remote?: RemoteDraw, stop?: () => void): CanvasLayer {
+export function canvasLayer(L: typeof Leaflet, pane: string, draw: (v: View) => void): CanvasLayer {
   let map: Leaflet.Map | null = null
   const canvas = document.createElement('canvas')
-  // A picture drawn elsewhere is put in at once, without a copy.
-  const shown = remote ? canvas.getContext('bitmaprenderer')! : null
-  let busy = false, again = false
   canvas.className = 'leaflet-zoom-animated map-canvas'
   canvas.style.pointerEvents = 'none'
   let view: View | null = null
@@ -29,7 +23,7 @@ export function canvasLayer(L: typeof Leaflet, pane: string, draw: ((v: View) =>
   let box = { x0: 0, y0: 0, x1: 0, y1: 0 } // what the canvas covers, in layer points
 
   const paint = () => {
-    if (!view || !draw) return
+    if (!view) return
     view.ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0)
     view.ctx.clearRect(0, 0, view.w, view.h)
     draw(view)
@@ -37,41 +31,21 @@ export function canvasLayer(L: typeof Leaflet, pane: string, draw: ((v: View) =>
   /** Sizes and places the canvas around the view as it is now, then draws. */
   const reset = () => {
     if (!map) return
-    // One picture is asked for at a time; asked again meanwhile, the newest view is drawn once that one is in.
-    if (busy) { again = true; return }
     const size = map.getSize()
     const tl = map.containerPointToLayerPoint([-size.x * PAD, -size.y * PAD]).round()
     const w = Math.round(size.x * (1 + 2 * PAD)), h = Math.round(size.y * (1 + 2 * PAD))
     const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1, Math.sqrt(maxPixels() / (w * h))))
     const pw = Math.round(w * dpr), ph = Math.round(h * dpr)
-    const origin = map.getPixelOrigin(), zoom = map.getZoom(), center = map.getCenter()
-    const at = { scale: 2 ** zoom, ox: tl.x + origin.x, oy: tl.y + origin.y, w, h, dpr }
-    /** The canvas stands where this view is: until then the old picture keeps following the map by transform. */
-    const place = () => {
-      if (canvas.width !== pw || canvas.height !== ph) {
-        canvas.width = pw; canvas.height = ph
-        canvas.style.width = `${w}px`; canvas.style.height = `${h}px`
-      }
-      L.DomUtil.setPosition(canvas, tl)
-      drawnZoom = zoom; drawnCenter = center
-      box = { x0: tl.x, y0: tl.y, x1: tl.x + w, y1: tl.y + h }
+    if (canvas.width !== pw || canvas.height !== ph) {
+      canvas.width = pw; canvas.height = ph
+      canvas.style.width = `${w}px`; canvas.style.height = `${h}px`
     }
-    if (!remote) {
-      place()
-      view = { ctx: canvas.getContext('2d')!, ...at }
-      paint()
-      return
-    }
-    busy = true
-    void remote(at, pw, ph).then((picture) => {
-      busy = false
-      if (!map || !picture) { picture?.close(); return }
-      place()
-      shown!.transferFromImageBitmap(picture)
-      // The map may have moved on while the picture was drawn: it is set where it belongs now.
-      if (map.getZoom() !== zoom || !map.getCenter().equals(center)) fit(map.getCenter(), map.getZoom())
-      if (again) { again = false; reset() }
-    })
+    L.DomUtil.setPosition(canvas, tl)
+    const origin = map.getPixelOrigin()
+    drawnZoom = map.getZoom(); drawnCenter = map.getCenter()
+    box = { x0: tl.x, y0: tl.y, x1: tl.x + w, y1: tl.y + h }
+    view = { ctx: canvas.getContext('2d')!, scale: 2 ** drawnZoom, ox: tl.x + origin.x, oy: tl.y + origin.y, w, h, dpr }
+    paint()
   }
   /** The canvas as drawn, scaled and moved to stand where it belongs at another zoom and centre. */
   const fit = (center: Leaflet.LatLng, zoom: number) => {
@@ -114,8 +88,8 @@ export function canvasLayer(L: typeof Leaflet, pane: string, draw: ((v: View) =>
       watchDensity()
       reset()
     },
-    onRemove() { canvas.remove(); density?.removeEventListener('change', onDensity); density = null; map = null; view = null; stop?.() },
+    onRemove() { canvas.remove(); density?.removeEventListener('change', onDensity); density = null; map = null; view = null },
     getEvents() { return { viewreset: reset, zoom: zooming, zoomend: reset, move: moved, resize: reset, zoomanim } },
   })
-  return { layer: new Layer(), redraw: remote ? reset : paint }
+  return { layer: new Layer(), redraw: paint }
 }

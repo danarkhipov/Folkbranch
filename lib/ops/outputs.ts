@@ -5,7 +5,7 @@ import { z } from 'zod'
 const id = z.string()
 const text = z.string()
 /** A place a write named that the map cannot show; the reply keeps it, so the model can say why and fix it. */
-const placeNote = z.object({ name: text, problem: z.enum(['unknown', 'no-coords']), message: text })
+const placeNote = z.object({ name: text, problem: z.enum(['unknown', 'no-coords', 'ambiguous']), message: text, choices: z.array(z.object({ id, name: text })).optional() })
 const ok = z.object({ ok: z.literal(true), places: z.array(placeNote).optional() })
 
 const brief = z.object({ id, hidden: z.literal(true).optional(), name: text.optional(), years: text.optional(), sex: text.optional(), living: z.boolean().optional(), place: text.optional() })

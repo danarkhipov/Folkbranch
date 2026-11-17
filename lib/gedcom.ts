@@ -1,5 +1,6 @@
 // GEDCOM 5.5.1 and 7.0: a deterministic parser and writer. No model is involved.
-import type { Fact, Graph, Lang, Person, Source } from './types'
+import type { Fact, Graph, Lang, Person, Place, PlaceName, Source } from './types'
+import { findPlace, onMap } from './places'
 import { translatePair } from './i18n'
 import { factWords } from './fact-kinds'
 import { splitPatronymic } from './names'
@@ -18,7 +19,10 @@ export const FACT_TAGS: Record<string, [string, string]> = {
 
 // Spanish and Catalan look the Russian word up in their own table, else take the English.
 const word = (lang: Lang, pair: [string, string] | undefined) => (pair ? translatePair(lang, ...pair) : '')
-const roleWord = (rela: string, lang: Lang) => word(lang, ASSOCIATES[rela.toLowerCase()]) || rela || translatePair(lang, 'Участник', 'Participant')
+export const roleWord = (rela: string, lang: Lang) => word(lang, ASSOCIATES[rela.toLowerCase()]) || rela || translatePair(lang, 'Участник', 'Participant')
+
+/** A kind of event the file gives no name for. */
+export const eventWord = (lang: Lang) => translatePair(lang, 'Событие', 'Event')
 
 /** What ASSO says one person was to another, in the archive's words. */
 const ASSOCIATES: Record<string, [string, string]> = {
@@ -97,6 +101,27 @@ export function toGedDate(v: string, lang: Lang = 'ru'): string {
   return s ? `(${s})` : ''
 }
 
+/**
+ * A point as genealogy programs write it: a hemisphere letter and an absolute value (N55.7558, W0.73585), a signed
+ * decimal (-86.3623), or either with a comma as the decimal mark (N48,6667). Null for anything else, for values out
+ * of range, and for the empty 0,0 point.
+ */
+export function gedCoord(lat: string, lon: string): { lat: number; lon: number } | null {
+  const a = coordAxis(lat, 'NS'), b = coordAxis(lon, 'EW')
+  if (a === null || b === null || Math.abs(a) > 90 || Math.abs(b) > 180 || (a === 0 && b === 0)) return null
+  return { lat: a, lon: b }
+}
+
+/** One axis. `axes` are its two hemisphere letters, the positive one first. */
+function coordAxis(raw: string, axes: string): number | null {
+  const m = raw.trim().toUpperCase().match(/^([NSEW]?)([+-]?)(\d+(?:[.,]\d+)?)$/)
+  if (!m || (m[1] && m[2]) || (m[1] && !axes.includes(m[1]))) return null
+  const value = Number(m[3].replace(',', '.'))
+  const negative = m[1] === axes[1] || m[2] === '-'
+  // Long float tails from some programs (12.280000000000001) are cut to six decimals.
+  return Math.round((negative ? -value : value) * 1e6) / 1e6
+}
+
 export interface ImportedPerson {
   xref: string
   givenName: string
@@ -127,6 +152,25 @@ export interface Imported {
   version: string
   persons: ImportedPerson[]
   families: { husb?: string; wife?: string; children: { xref: string; adopted: boolean }[]; date: string; end: string; place: string; kind: 'marriage' | 'civil'; hasEvent: boolean }[]
+  /**
+   * Every distinct place text that has a point in the file, once each (the first point given for it wins). A Gramps
+   * file gives every place, with or without a point: its own name, kind, the place it is part of and its other names.
+   */
+  places: ImportedPlace[]
+  /** What the file holds that will not come across, when the reader counts it as it parses (Gramps). */
+  unread?: { tag: string; count: number }[]
+}
+
+export interface ImportedPlace {
+  /** The place as events write it: "Village, County, Country". */
+  text: string
+  lat: number | null
+  lon: number | null
+  name?: string
+  kind?: string
+  /** The text of the place it is part of, given earlier in the same list. */
+  parent?: string
+  otherNames?: PlaceName[]
 }
 
 function bestQuality(person: GedLine) {
@@ -266,7 +310,33 @@ export function parseGedcom(text: string, lang: Lang = 'ru'): Imported {
       hasEvent: !!marr,
     }
   })
-  return { version, persons, families }
+  return { version, persons, families, places: readPoints(roots) }
+}
+
+/**
+ * The points a file gives places. Beside an event, under the PLAC line (GEDCOM 5.5.1 and 7; MacFamilyTree, Gramps);
+ * or in a record of its own: _PLAC (RootsMagic, Reunion), _PLAC_DEFN (Legacy, Family Historian) and _LOC (webtrees).
+ */
+function readPoints(roots: GedLine[]): Imported['places'] {
+  const points = new Map<string, Imported['places'][number]>()
+  const pointOf = (l: GedLine) => { const mp = child(l, 'MAP'); return mp ? gedCoord(val(mp, 'LATI'), val(mp, 'LONG')) : null }
+  const add = (text: string, point: { lat: number; lon: number } | null) => {
+    const name = text.trim(), key = name.toLowerCase()
+    if (point && name && !points.has(key)) points.set(key, { text: name, ...point })
+  }
+  const inEvents = (l: GedLine) => {
+    for (const c of l.children) {
+      if (c.tag === 'PLAC') add(longText(c), pointOf(c))
+      inEvents(c)
+    }
+  }
+  for (const r of roots) {
+    if (r.tag === 'INDI' || r.tag === 'FAM') inEvents(r)
+    else if (r.tag === '_PLAC') add(r.value, pointOf(r))
+    else if (r.tag === '_PLAC_DEFN') add(val(r, 'PLAC'), pointOf(r))
+    else if (r.tag === '_LOC') add(val(r, 'NAME'), pointOf(r))
+  }
+  return [...points.values()]
 }
 
 /** Families with no parent in the file and children who still need a link: the import adds one card "?" so they stay siblings. */
@@ -281,7 +351,18 @@ function textLines(level: number, tag: string, text: string) {
   return [`${level} ${tag} ${first}`, ...rest.map((l) => `${level + 1} CONT ${l}`)]
 }
 
-function factLines(f: Fact, lang: Lang, xrefOf?: (id: string) => string | undefined) {
+/** GEDCOM writes a point as a hemisphere letter and an absolute value: N55.7558, W0.73585. */
+const coordText = (v: number, pos: string, neg: string) => `${v < 0 ? neg : pos}${Math.abs(v).toFixed(6).replace(/\.?0+$/, '')}`
+
+/** A place as written. When it has a point on the map, the point follows under it as MAP (GEDCOM 5.5.1 and 7 layout). */
+function placeLines(level: number, text: string, placeId: string | null | undefined, places?: Place[]) {
+  const lines = [`${level} PLAC ${text}`]
+  const place = places ? findPlace(text, places, placeId) : null
+  if (onMap(place)) lines.push(`${level + 1} MAP`, `${level + 2} LATI ${coordText(place.lat, 'N', 'S')}`, `${level + 2} LONG ${coordText(place.lon, 'E', 'W')}`)
+  return lines
+}
+
+function factLines(f: Fact, lang: Lang, xrefOf?: (id: string) => string | undefined, places?: Place[]) {
   // A Spanish or Catalan archive keeps the kind in its own words ("Censo"), as its import wrote it.
   const tag = Object.entries(FACT_TAGS).find(([, names]) => names.includes(f.kind) || translatePair(lang, ...names) === f.kind)?.[0]
   // GEDCOM has no place for a unit or a godparent without a card here, so they ride in the note, as words.
@@ -290,22 +371,22 @@ function factLines(f: Fact, lang: Lang, xrefOf?: (id: string) => string | undefi
   note.slice(1).forEach((l) => lines.push(`2 CONT ${l}`))
   if (!tag && f.kind) lines.push(`2 TYPE ${f.kind}`)
   if (f.date) lines.push(`2 DATE ${toGedDate(f.date, lang)}`)
-  if (f.place) lines.push(`2 PLAC ${f.place}`)
+  if (f.place) lines.push(...placeLines(2, f.place, f.placeId, places))
   if (f.source) lines.push(...textLines(2, 'SOUR', f.source))
   for (const x of f.people ?? []) if (x.personId && xrefOf?.(x.personId)) lines.push(`2 ASSO ${xrefOf(x.personId)}`, `3 ROLE OTHER`, `4 PHRASE ${x.role}`)
   return lines
 }
 
 /** `lang` is the archive's: a Spanish or Catalan one has its own words for dates and kinds of fact. */
-export function writeGedcom(graph: Graph, opts: { hideLiving: boolean; source: string; pageWord?: string; lang?: Lang }): string {
+export function writeGedcom(graph: Graph, opts: { hideLiving: boolean; source: string; pageWord?: string; lang?: Lang; places?: Place[] }): string {
   const lang = opts.lang ?? 'ru'
   const out = ['0 HEAD', `1 SOUR ${opts.source}`, '1 GEDC', '2 VERS 5.5.1', '2 FORM LINEAGE-LINKED', '1 CHAR UTF-8']
   const hide = (p: Person) => opts.hideLiving && (p.living || !!p.keepPrivate)
   const xref = new Map(graph.persons.map((p, i) => [p.id, `@I${i + 1}@`]))
   const people = new Map(graph.persons.map((p) => [p.id, p]))
-  const fams = new Map<string, { a?: string; b?: string; children: { id: string; adopted: boolean }[]; start: string; end?: string; place?: string; kind?: string }>()
+  const fams = new Map<string, { a?: string; b?: string; children: { id: string; adopted: boolean }[]; start: string; end?: string; place?: string; placeId?: string | null; kind?: string }>()
   const famKey = (a: string, b?: string) => (b ? [a, b].sort().join('|') : a)
-  for (const u of graph.unions) fams.set(famKey(u.aId, u.bId), { a: u.aId, b: u.bId, children: [], start: u.startDate, end: u.endDate, place: u.place, kind: u.kind })
+  for (const u of graph.unions) fams.set(famKey(u.aId, u.bId), { a: u.aId, b: u.bId, children: [], start: u.startDate, end: u.endDate, place: u.place, placeId: u.placeId, kind: u.kind })
   const byChild = new Map<string, typeof graph.parentChild>()
   for (const l of graph.parentChild) byChild.set(l.childId, [...(byChild.get(l.childId) ?? []), l])
   for (const [child, links] of byChild) {
@@ -335,14 +416,14 @@ export function writeGedcom(graph: Graph, opts: { hideLiving: boolean; source: s
       if (p.birthDate || p.birthPlace) {
         out.push('1 BIRT')
         if (p.birthDate) out.push(`2 DATE ${toGedDate(p.birthDate, lang)}`)
-        if (p.birthPlace) out.push(`2 PLAC ${p.birthPlace}`)
+        if (p.birthPlace) out.push(...placeLines(2, p.birthPlace, p.birthPlaceId, opts.places))
       }
       if (!p.living) {
         out.push(p.deathDate || p.deathPlace ? '1 DEAT' : '1 DEAT Y')
         if (p.deathDate) out.push(`2 DATE ${toGedDate(p.deathDate, lang)}`)
-        if (p.deathPlace) out.push(`2 PLAC ${p.deathPlace}`)
+        if (p.deathPlace) out.push(...placeLines(2, p.deathPlace, p.deathPlaceId, opts.places))
       }
-      for (const f of p.facts) out.push(...factLines(f, lang, (id) => { const q = people.get(id); return q && !hide(q) ? xref.get(id) : undefined }))
+      for (const f of p.facts) out.push(...factLines(f, lang, (id) => { const q = people.get(id); return q && !hide(q) ? xref.get(id) : undefined }, opts.places))
       for (const s of p.sources) {
         out.push(...textLines(1, 'SOUR', s.title))
         const page = [s.ref, s.page && `${opts.pageWord ?? 'л.'} ${s.page}`].filter(Boolean).join(', ')
@@ -367,7 +448,7 @@ export function writeGedcom(graph: Graph, opts: { hideLiving: boolean; source: s
     if (f.kind === 'marriage') {
       out.push('1 MARR')
       if (f.start) out.push(`2 DATE ${toGedDate(f.start, lang)}`)
-      if (f.place) out.push(`2 PLAC ${f.place}`)
+      if (f.place) out.push(...placeLines(2, f.place, f.placeId, opts.places))
     }
     if (f.end) {
       out.push('1 DIV')

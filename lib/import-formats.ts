@@ -4,7 +4,7 @@
 import { serializeNameLine, setResidences, type Residence } from './textformat'
 import { yearOf } from './types'
 
-export type ImportKind = 'gedcom' | 'table' | 'xlsx' | 'json' | 'text'
+export type ImportKind = 'gedcom' | 'gramps' | 'table' | 'xlsx' | 'json' | 'text'
 export type ColumnField = '' | 'id' | 'name' | 'given' | 'patronymic' | 'surname' | 'maiden' | 'sex' | 'birthDate' | 'birthPlace' | 'deathDate' | 'deathPlace' | 'residencePlace' | 'residenceDate' | 'residencePlace2' | 'residenceDate2' | 'residencePlace3' | 'residenceDate3' | 'father' | 'mother' | 'spouse'
 export type Mapping = ColumnField[]
 
@@ -20,9 +20,14 @@ export const COLUMN_FIELDS: [ColumnField, string][] = [
 /** A table may give a move as a place and a year, or as a period in one year column: all three pairs are offered. */
 const RESIDENCE_FIELDS: [ColumnField, ColumnField][] = [['residencePlace', 'residenceDate'], ['residencePlace2', 'residenceDate2'], ['residencePlace3', 'residenceDate3']]
 
+/** Gramps XML, whatever the file was called: its root is <database> in Gramps' namespace. */
+export const isGrampsXml = (text: string) => /^﻿?\s*(<\?xml[^>]*>\s*)?(<!DOCTYPE\s+database[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*<database\b[^>]*gramps-project\.org/.test(text.slice(0, 2000))
+
 export function detectKind(fileName: string, head: string): ImportKind {
   const ext = fileName.toLowerCase().split('.').pop() ?? ''
   if (ext === 'xlsx') return 'xlsx'
+  // Gramps' own export: .gramps is gzipped XML (or plain XML, if saved unpacked), and it may be saved as .xml.
+  if (ext === 'gramps' || isGrampsXml(head)) return 'gramps'
   if (ext === 'ged' || ext === 'gedcom' || /^﻿?\s*0\s+HEAD/.test(head)) return 'gedcom'
   if (ext === 'json') return 'json'
   if (ext === 'csv' || ext === 'tsv') return 'table'

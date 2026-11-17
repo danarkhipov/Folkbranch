@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE database PUBLIC "-//Gramps//DTD Gramps XML 1.7.1//EN"
+"http://gramps-project.org/xml/1.7.1/grampsxml.dtd">
+<database xmlns="http://gramps-project.org/xml/1.7.1/">
+  <header>
+    <created date="2026-11-17" version="5.2.3"/>
+    <researcher><resname>Invented Example</resname></researcher>
+  </header>
+  <events>
+    <event handle="_e1" change="1" id="E0001">
+      <type>Birth</type>
+      <dateval val="1885-04-02"/>
+      <place hlink="_p1"/>
+      <citationref hlink="_c1"/>
+    </event>
+    <event handle="_e2" change="1" id="E0002">
+      <type>Death</type>
+      <dateval val="1950" type="about"/>
+      <place hlink="_p3"/>
+    </event>
+    <event handle="_e3" change="1" id="E0003">
+      <type>Birth</type>
+      <daterange start="1888" stop="1889"/>
+    </event>
+    <event handle="_e4" change="1" id="E0004">
+      <type>Marriage</type>
+      <dateval val="1910-06"/>
+      <place hlink="_p1"/>
+    </event>
+    <event handle="_e5" change="1" id="E0005">
+      <type>Birth</type>
+      <dateval val="1912-01-15"/>
+      <place hlink="_p3"/>
+    </event>
+    <event handle="_e6" change="1" id="E0006">
+      <type>Baptism</type>
+      <dateval val="1912-01-20"/>
+      <place hlink="_p3"/>
+      <description>in the cathedral</description>
+    </event>
+    <event handle="_e7" change="1" id="E0007">
+      <type>Occupation</type>
+      <description>Miller &amp; baker</description>
+    </event>
+  </events>
+  <people>
+    <person handle="_i1" change="1" id="I0001">
+      <gender>M</gender>
+      <name type="Birth Name">
+        <first>Тихон</first>
+        <surname>Мельников</surname>
+        <surname prim="0" derivation="Patronymic">Саввич</surname>
+        <nick>Тиша</nick>
+      </name>
+      <eventref hlink="_e1" role="Primary"/>
+      <eventref hlink="_e2" role="Primary"/>
+      <eventref hlink="_e7" role="Primary"/>
+      <eventref hlink="_e6" role="Godfather"/>
+      <parentin hlink="_f1"/>
+      <noteref hlink="_n1"/>
+    </person>
+    <person handle="_i2" change="1" id="I0002">
+      <gender>F</gender>
+      <name type="Birth Name">
+        <first>Агафья</first>
+        <surname>Зорина</surname>
+      </name>
+      <name alt="1" type="Married Name">
+        <first>Агафья</first>
+        <surname>Мельникова</surname>
+      </name>
+      <eventref hlink="_e3" role="Primary"/>
+      <parentin hlink="_f1"/>
+      <attribute type="Nickname" value="Ганя"/>
+    </person>
+    <person handle="_i3" change="1" id="I0003">
+      <gender>F</gender>
+      <name type="Birth Name">
+        <first>Ульяна</first>
+        <surname>Мельникова</surname>
+      </name>
+      <eventref hlink="_e5" role="Primary"/>
+      <eventref hlink="_e6" role="Primary"/>
+      <childof hlink="_f1"/>
+    </person>
+  </people>
+  <families>
+    <family handle="_f1" change="1" id="F0001">
+      <rel type="Married"/>
+      <father hlink="_i1"/>
+      <mother hlink="_i2"/>
+      <eventref hlink="_e4" role="Family"/>
+      <childref hlink="_i3"/>
+    </family>
+  </families>
+  <citations>
+    <citation handle="_c1" change="1" id="C0001">
+      <page>л. 12 об.</page>
+      <confidence>3</confidence>
+      <sourceref hlink="_s1"/>
+    </citation>
+  </citations>
+  <sources>
+    <source handle="_s1" change="1" id="S0001">
+      <stitle>Метрическая книга Ольховки</stitle>
+      <reporef hlink="_r1" medium="Book"/>
+    </source>
+  </sources>
+  <places>
+    <placeobj handle="_p1" change="1" id="P0001" type="Village">
+      <pname value="Ольховка"/>
+      <coord long="40.5" lat="N51.25"/>
+      <placeref hlink="_p2"/>
+    </placeobj>
+    <placeobj handle="_p2" change="1" id="P0002" type="County">
+      <pname value="Тихореченский уезд"/>
+    </placeobj>
+    <placeobj handle="_p3" change="1" id="P0003" type="City">
+      <pname value="Новоречье"/>
+      <pname value="Старореченск">
+        <daterange start="1780" stop="1925"/>
+      </pname>
+      <coord long="41°30'00&quot;E" lat="52°15'00&quot;N"/>
+      <placeref hlink="_p2"/>
+    </placeobj>
+  </places>
+  <repositories>
+    <repository handle="_r1" change="1" id="R0001">
+      <rname>Выдуманный архив</rname>
+      <type>Archive</type>
+    </repository>
+  </repositories>
+  <notes>
+    <note handle="_n1" change="1" id="N0001" type="Person Note">
+      <text>Держал мельницу на реке.</text>
+    </note>
+  </notes>
+</database>

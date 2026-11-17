@@ -3,17 +3,26 @@ import { parseGedcom, placeholders, unreadTags, writeGedcom } from '../gedcom'
 import type { Certainty, Fact, Source } from '../types'
 import { yearOf } from '../types'
 import { peopleWords } from '../names'
-import { Actor, dropStoriesAboutNobody, mutate, OpError, requireRole, seesOnlyPublic } from './core'
+import { Actor, type Changes, dropStoriesAboutNobody, mutate, newId, OpError, requireRole, seesOnlyPublic } from './core'
 import { addParent, addUnion, getGraph, insertPerson, normalize } from './people'
 import { accountsLetGo, matchPeople, matchReport } from './gedcom-match'
 import { getDb, schema } from '../db'
 import { insertPage } from './pages'
 import { archiveLang, say, tell } from './settings'
+import { findPlace, onMap, placeMatches } from '../places'
+import { listPlaces, toPlace } from './places'
+import type { Imported } from '../gedcom'
+import { isGrampsXml, parseGramps } from '../gramps'
+import type { Lang } from '../types'
+
+/** A GEDCOM file or Gramps' own XML: both arrive as text and are read into one shape. */
+const readTree = (text: string, lang?: Lang) => (isGrampsXml(text) ? parseGramps(text, lang) : parseGedcom(text, lang))
+const pointCount = (g: Imported) => g.places.filter((p) => p.lat !== null && p.lon !== null).length
 
 
 export function previewGedcom(actor: Actor, text: string) {
   requireRole(actor, 'editor')
-  const g = parseGedcom(text)
+  const g = readTree(text)
   const known = new Set(getGraph(actor).persons.map((p) => `${p.givenName} ${p.surname}`.toLowerCase()))
   return {
     version: g.version,
@@ -22,7 +31,10 @@ export function previewGedcom(actor: Actor, text: string) {
     families: g.families.length,
     sample: g.persons.slice(0, 6).map((p) => [p.givenName, p.surname].filter(Boolean).join(' ')),
     existing: g.persons.filter((p) => known.has(`${p.givenName} ${p.surname}`.toLowerCase())).length,
-    unread: unreadTags(text),
+    unread: g.unread ?? unreadTags(text),
+    // Places the file gives a point for: they will be on the map without anyone typing it.
+    points: pointCount(g),
+    format: isGrampsXml(text) ? 'gramps' : 'gedcom',
     people: g.persons.map((p) => ({ xref: p.xref, name: [p.givenName, p.patronymic, p.surname].filter(Boolean).join(' '), year: yearOf(p.birthDate) })),
     media: g.persons.flatMap((p) => p.media.map((m) => ({ xref: p.xref, ...m }))),
     ...matchReport(g),
@@ -45,7 +57,8 @@ function certaintyOf(quality: number | null): Certainty {
 
 export function importGedcom(actor: Actor, text: string, mode: ImportMode = 'add') {
   requireRole(actor, mode === 'replace' ? 'owner' : 'editor')
-  const g = parseGedcom(text, archiveLang())
+  const g = readTree(text, archiveLang())
+  const gramps = isGrampsXml(text)
   // A truncated download or the wrong file has no INDI at all: replacing with it would empty the archive.
   if (mode === 'replace' && !g.persons.length) throw new OpError(400, tell('В файле нет ни одного человека: замена опустошила бы архив'))
   // Two records with one id would make every link point at whichever came last, with no warning.
@@ -58,7 +71,7 @@ export function importGedcom(actor: Actor, text: string, mode: ImportMode = 'add
   }
   if (repeated.size) throw new OpError(400, `${tell('В файле повторяются номера записей')}: ${[...repeated].join(', ')}`)
   const db = getDb()
-  const verb = mode === 'replace' ? 'Заменить дерево файлом' : mode === 'merge' ? 'Объединить с файлом' : 'Импорт GEDCOM'
+  const verb = mode === 'replace' ? 'Заменить дерево файлом' : mode === 'merge' ? 'Объединить с файлом' : gramps ? 'Импорт Gramps' : 'Импорт GEDCOM'
   const found = mode === 'merge' ? matchPeople(g) : new Map()
   // A family without parents gains a card "?" so its children stay siblings; it is new like the rest.
   const total = g.persons.length + placeholders(g)
@@ -70,7 +83,8 @@ export function importGedcom(actor: Actor, text: string, mode: ImportMode = 'add
       ? ` · ${say('новых')}: ${total - found.size} · ${say('обновлено')}: ${found.size}`
       : ` · ${say('новых')}: ${total}`
   const personIds: string[] = []
-  return mutate(actor, { summary: `${say(verb)}: ${peopleWords(total, archiveLang())}${counts}`, personIds }, (c) => {
+  const points = pointCount(g) ? ` · ${say('точек мест из файла')}: ${pointCount(g)}` : ''
+  return mutate(actor, { summary: `${say(verb)}: ${peopleWords(total, archiveLang())}${counts}${points}`, personIds }, (c) => {
     const ids = new Map<string, string>()
     if (mode === 'replace') {
       for (const [table, rows] of [
@@ -143,12 +157,61 @@ export function importGedcom(actor: Actor, text: string, mode: ImportMode = 'add
         if (b) safe(() => addParent(c, b, cid, ch.adopted ? 'adopted' : 'birth', 'family'))
       }
     }
-    return { persons: total, families: g.families.length, merged: found.size, ids: Object.fromEntries(ids) }
+    const placed = filePoints(c, g.places, say(gramps ? 'Точка из файла Gramps' : 'Точка из файла GEDCOM'))
+    return { persons: total, families: g.families.length, merged: found.size, ids: Object.fromEntries(ids), places: placed }
   })
+}
+
+/**
+ * The points a file gives its places, written to the archive's place records in the same change as the people, so one
+ * undo takes both back. A record with no point gets the file's; a place with no record gets one; a point already in the
+ * archive is kept, since someone chose it here; a text two records answer to is left for a person to settle.
+ * A Gramps file also gives places without a point, what each is part of and its other names: a new record takes them,
+ * and one already here gains the names it lacks and a parent where it has none.
+ */
+function filePoints(c: Changes, points: Imported['places'], credit: string) {
+  const all = getDb().select().from(schema.places).all().map(toPlace)
+  const out = { filled: 0, created: 0, kept: 0, ambiguous: 0 }
+  // The record each text of the file came to mean, so a place finds its parent even when the name is common.
+  const recordOf = new Map<string, string>()
+  for (const pt of points) {
+    const hasPoint = pt.lat !== null && pt.lon !== null
+    const parentId = pt.parent ? recordOf.get(pt.parent) ?? null : null
+    const place = findPlace(pt.text, all)
+    if (place) {
+      recordOf.set(pt.text, place.id)
+      const known = new Set([place.name, ...place.otherNames.map((n) => n.name)].map((n) => n.toLowerCase()))
+      const names = (pt.otherNames ?? []).filter((n) => !known.has(n.name.toLowerCase()))
+      const more = {
+        ...(names.length ? { otherNames: JSON.stringify([...place.otherNames, ...names].slice(0, 30)) } : {}),
+        ...(!place.parentId && parentId && parentId !== place.id ? { parentId } : {}),
+      }
+      if (onMap(place) || !hasPoint) {
+        if (hasPoint) out.kept++
+        if (Object.keys(more).length) { c.update('places', place.id, { ...more, updatedAt: Date.now() }); Object.assign(place, { ...more, otherNames: [...place.otherNames, ...names] }) }
+        continue
+      }
+      c.update('places', place.id, { ...more, lat: pt.lat, lon: pt.lon, note: [place.note, credit].filter(Boolean).join('\n').slice(0, 2000), updatedAt: Date.now() })
+      out.filled++
+      continue
+    }
+    if (placeMatches(pt.text, all).length > 1) { if (hasPoint) out.ambiguous++; continue }
+    const row = {
+      id: newId(), name: (pt.name ?? pt.text).slice(0, 160), kind: (pt.kind ?? '').slice(0, 60), parentId,
+      otherNames: JSON.stringify((pt.otherNames ?? []).slice(0, 30)), lat: pt.lat, lon: pt.lon, note: hasPoint ? credit : '', updatedAt: Date.now(),
+    }
+    c.insert('places', row)
+    recordOf.set(pt.text, row.id)
+    // Two texts of the file may name one new record: "Anson" and "Anson, Somerset" find the first one made.
+    all.push(toPlace(row))
+    out.created++
+  }
+  return out
 }
 
 export function exportGedcom(actor: Actor, hideLiving: boolean) {
   const graph = getGraph(actor)
   // Readers never get living relatives, whatever the checkbox says.
-  return writeGedcom(graph, { hideLiving: hideLiving || seesOnlyPublic(actor), source: 'Folkbranch', pageWord: say('л.'), lang: archiveLang() })
+  // Points go out with the places they belong to, as GEDCOM's MAP, so Gramps, webtrees or RootsMagic draw them too.
+  return writeGedcom(graph, { hideLiving: hideLiving || seesOnlyPublic(actor), source: 'Folkbranch', pageWord: say('л.'), lang: archiveLang(), places: listPlaces(actor) })
 }

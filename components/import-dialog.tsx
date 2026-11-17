@@ -13,12 +13,19 @@ import { parseFamilyText, planFamilyText } from '@/lib/textformat'
 import { MiniGraph, PlanSummary } from './text-dialog'
 import { Select } from '@/components/ui/select'
 
-const KIND_LABEL: Record<ImportKind, string> = { gedcom: 'GEDCOM', table: 'таблица CSV', xlsx: 'таблица Excel', json: 'JSON', text: 'текстовый формат' }
+const KIND_LABEL: Record<ImportKind, string> = { gedcom: 'GEDCOM', gramps: 'Gramps XML', table: 'таблица CSV', xlsx: 'таблица Excel', json: 'JSON', text: 'текстовый формат' }
 
 type Loaded =
-  | { kind: 'gedcom'; name: string; text: string; preview: { version: string; persons: number; families: number; sample: string[]; existing: number; unread: { tag: string; count: number }[]; inArchive: number; matched: number; added: number; newLinks: number; knownLinks: number; people: FilePerson[]; media: FileLink[]; pairs: { xref: string; file: string; fileYear: number | null; card: string; cardYear: number | null }[] } }
+  | { kind: 'gedcom'; name: string; text: string; format?: 'gramps'; preview: { version: string; format?: 'gedcom' | 'gramps'; persons: number; families: number; sample: string[]; existing: number; unread: { tag: string; count: number }[]; points?: number; inArchive: number; matched: number; added: number; newLinks: number; knownLinks: number; people: FilePerson[]; media: FileLink[]; pairs: { xref: string; file: string; fileYear: number | null; card: string; cardYear: number | null }[] } }
   | { kind: 'text'; name: string; text: string }
   | { kind: 'table' | 'xlsx' | 'json'; name: string; headers: string[]; rows: string[][] }
+
+/** A .gramps file is gzipped XML; one saved unpacked is read as it is. */
+async function grampsText(f: File) {
+  const head = new Uint8Array(await f.slice(0, 2).arrayBuffer())
+  if (head[0] !== 0x1f || head[1] !== 0x8b) return f.text()
+  return new Response(f.stream().pipeThrough(new DecompressionStream('gzip'))).text()
+}
 
 /** One way in for every format: pick or drop a file, see what will change, then decide. */
 const TAG_WORDS: Record<string, string> = { OBJE: 'ссылки на файлы', ASSO: 'связи с другими людьми', ALIA: 'другие записи о человеке', SUBM: 'сведения об авторе' }
@@ -57,6 +64,11 @@ export function ImportDialog({ open, files, onOpenChange }: { open: boolean; fil
         setMapping(guessMapping(sheet[0]))
         return setLoaded({ kind, name: f.name, headers: sheet[0], rows: sheet.slice(1) })
       }
+      if (kind === 'gramps') {
+        // Unpacked here, so the server gets the same XML either way.
+        const text = await grampsText(f)
+        return setLoaded({ kind: 'gedcom', format: 'gramps', name: f.name, text, preview: await api('gedcom/preview', { method: 'POST', body: text }) })
+      }
       const text = await f.text()
       if (kind === 'gedcom') return setLoaded({ kind, name: f.name, text, preview: await api('gedcom/preview', { method: 'POST', body: text }) })
       if (kind === 'text') return setLoaded({ kind, name: f.name, text })
@@ -75,7 +87,7 @@ export function ImportDialog({ open, files, onOpenChange }: { open: boolean; fil
     const { tree, rest } = splitDropped(list)
     if (tree) { void read(tree); setExtra(rest); return }
     if (loaded?.kind === 'gedcom') setExtra((e) => [...e, ...list])
-    else setError(t('Нет файла с деревом: добавьте GEDCOM, таблицу или текст'))
+    else setError(t('Нет файла с деревом: добавьте GEDCOM, Gramps, таблицу или текст'))
   }
   useEffect(() => { if (open && files?.length) take(files) }, [open, files]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -169,14 +181,14 @@ export function ImportDialog({ open, files, onOpenChange }: { open: boolean; fil
           >
             <Upload size={22} className="text-ink-soft" />
             <span className="font-medium">{t('Перетащите файлы сюда или выберите их')}</span>
-            <span className="text-ink-soft">{t('Файл дерева (GEDCOM, таблица, текст) и, если есть, фотографии и документы к нему')}</span>
+            <span className="text-ink-soft">{t('Файл дерева (GEDCOM, Gramps, таблица, текст) и, если есть, фотографии и документы к нему')}</span>
           </button>
         )}
 
         {loaded && (
           <p className="flex flex-wrap items-center gap-2">
             <b className="font-medium truncate max-w-[60%]">{loaded.name}</b>
-            <span className="rounded-full bg-muted px-2 text-xs text-ink-soft">{t(KIND_LABEL[loaded.kind])}</span>
+            <span className="rounded-full bg-muted px-2 text-xs text-ink-soft">{t(KIND_LABEL[loaded.kind === 'gedcom' && loaded.format ? loaded.format : loaded.kind])}</span>
             <button className="pick text-xs text-ink-soft underline hover:text-ink" onClick={reset}>{t('Другой файл')}</button>
           </p>
         )}
@@ -270,7 +282,7 @@ function GedcomPlan({ preview: p, mode, onMode, withFiles }: { preview: Preview;
   if (me.role === 'owner') modes.push(['replace', 'Заменить всё', 'Нынешнее дерево удалится, останется то, что в файле.'])
   return (
     <div className="rounded-lg bg-muted p-3 flex flex-col gap-2">
-      <p>{t('В файле')}: <b>{peopleWords(p.persons, lang)}</b>, <b>{familyWords(p.families, lang)}</b> <span className="text-ink-faint">(GEDCOM {p.version})</span>
+      <p>{t('В файле')}: <b>{peopleWords(p.persons, lang)}</b>, <b>{familyWords(p.families, lang)}</b> <span className="text-ink-faint">({p.format === 'gramps' ? p.version : `GEDCOM ${p.version}`})</span>
         {!empty && <> · {t('В архиве сейчас')}: <b>{peopleWords(p.inArchive, lang)}</b></>}</p>
       <p className="text-xs text-ink-soft truncate">{p.sample.join(', ')}</p>
       {!empty && (
@@ -307,6 +319,7 @@ function GedcomPlan({ preview: p, mode, onMode, withFiles }: { preview: Preview;
           {mode === 'replace' && <p className="text-xs text-destructive">{t('Все нынешние карточки, связи и тексты о людях удалятся. Фотографии останутся, но без отметок. Аккаунты отвяжутся от карточек. Отменить можно сразу после.')}</p>}
         </>
       )}
+      {!!p.points && <p className="text-xs text-ink-soft">{t('Точек на карте для мест')}: {p.points}. {t('Места без точки в архиве получат их; уже поставленные точки не меняются.')}</p>}
       {p.unread.filter((u) => !(withFiles && u.tag === 'OBJE')).length > 0 && <p className="text-xs text-rust">⚠ {t('Не перенесётся')}: {p.unread.filter((u) => !(withFiles && u.tag === 'OBJE')).map((u) => `${TAG_WORDS[u.tag] ? t(TAG_WORDS[u.tag]) : u.tag} (${u.count})`).join(', ')}</p>}
     </div>
   )

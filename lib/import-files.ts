@@ -46,8 +46,8 @@ export function matchFiles(files: { name: string; path?: string }[], people: Fil
 }
 
 /** Which of the dropped files is the tree: the others are what goes with it. */
-const TREE = /\.(ged|gedcom|csv|tsv|xlsx|json|txt|md)$/i
+const TREE = /\.(ged|gedcom|gramps|csv|tsv|xlsx|json|txt|md|xml)$/i
 export function splitDropped(files: File[]) {
-  const tree = files.find((f) => /\.(ged|gedcom)$/i.test(f.name)) ?? files.find((f) => TREE.test(f.name))
+  const tree = files.find((f) => /\.(ged|gedcom|gramps)$/i.test(f.name)) ?? files.find((f) => TREE.test(f.name))
   return { tree: tree ?? null, rest: files.filter((f) => f !== tree) }
 }

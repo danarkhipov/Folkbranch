@@ -328,8 +328,8 @@ aside.panel:focus { outline: none; }
 .show-bars { position: absolute; inset: 0; display: none; }
 .main-bar.folded .show-bars { display: block; border-radius: 11px; }
 .main-bar.folded .show-bars:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
-.view-bar, .view-tools { transition: transform .34s cubic-bezier(.3, .7, .2, 1), opacity .22s, left .2s; }
-.view-bar.folded, .view-tools.folded { transform: translateY(24px); opacity: 0; visibility: hidden; transition: transform .34s, opacity .22s, visibility 0s .34s; }
+.view-bar { transition: transform .34s cubic-bezier(.3, .7, .2, 1), opacity .22s, left .2s; }
+.view-bar.folded { transform: translateY(24px); opacity: 0; visibility: hidden; transition: transform .34s, opacity .22s, visibility 0s .34s; }
 .panel header .grow-text { min-height: 24px; }
 .nav-label { display: none; }
 .main-bar:not(.compact) .nav-label { display: inline; }
@@ -345,11 +345,7 @@ aside.panel:focus { outline: none; }
   .main-bar .bar-btn { flex: 1 1 0; flex-direction: column; gap: 2px; height: 48px; min-width: 0; padding: 0 1px; font-size: 14px; line-height: 1.3; text-align: center; }
   .main-bar .nav-label { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .main-bar .hide-bars { display: none; }
-  .bottom-row { left: 8px !important; bottom: 72px; }
-  /* A phone is zoomed with fingers; tree or map waits top right, clear of the bars at the bottom, as on map apps. */
-  .view-tools { top: 8px; bottom: auto; right: 8px !important; }
-  .view-tools .view-zoom { display: none; }
-  .view-tools.folded { transform: translateY(-24px); }
+  .view-bar { left: 8px !important; bottom: 72px; }
   .chart-hint { display: none; }
   .panel { bottom: 68px; }
   .panel.full { bottom: 68px; }
@@ -358,7 +354,7 @@ aside.panel:focus { outline: none; }
 /* Fingers need room: everything that can be tapped is at least 40 px. */
 @media (pointer: coarse) {
   .panel summary { padding-block: 8px; }
-  .panel button, .side-sheet button, [role=dialog] button, [role=dialog] select, .view-bar button, .view-tools button, .main-bar button, .panel select, [data-slot=popover-content] button { min-height: 44px; min-width: 44px; }
+  .panel button, .side-sheet button, [role=dialog] button, [role=dialog] select, .view-bar button, .main-bar button, .panel select, [data-slot=popover-content] button { min-height: 44px; min-width: 44px; }
   .composer [data-align="block-end"] button { height: 44px; width: 44px; }
   /* A switch keeps its own shape; stretched to 44 px it turned into a circle. Its row is the larger target. */
   .panel button[role=switch], [role=dialog] button[role=switch] { min-height: 0; min-width: 0; }
@@ -409,15 +405,13 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
 /* The button to hide the bars moves down here on a phone, to leave the labels room; fingers zoom without buttons. */
 .view-bar .hide-here { display: none; }
 @media (max-width: 640px) { .view-bar .hide-here { display: inline-flex; } }
+@media (max-width: 640px) and (pointer: coarse) { .view-bar .zoom-btn { display: none; } }
 @media (max-width: 360px) {
   .main-bar .bar-btn { font-size: 10.5px; }
   .panel-tabs [role=tab] { font-size: 12.5px; }
 }
 
 /* The map: what a mark says when pressed, and the numbers of one life's stops. */
-/* The map waits unseen until its first view of the family is set, then comes in at once in place. */
-.family-map { transition: opacity .15s; }
-.family-map.map-waiting { opacity: 0; }
 .family-map.leaflet-container { background: color-mix(in srgb, var(--paper-dot) 75%, var(--ink-faint) 6%); font-family: var(--font-serif); overscroll-behavior: none; }
 /* Our own canvases (atlas, trails) sit in Leaflet panes; the bar lifts the map's buttons where they would meet. */
 .family-map .leaflet-bottom { bottom: var(--map-lift, 0px); }
@@ -491,23 +485,6 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
 .map-bar { bottom: 12px; }
 /* With the person card open beside it, the bar centres in the room left of the card. */
 .map-bar { left: calc((100vw - var(--map-card, 0px)) / 2); max-width: calc(100vw - 16px - var(--map-card, 0px)); }
-/* The view's corner (zoom, tree or map) holds the bottom right; the timeline stays centred on the screen where that
-   clears the corner, otherwise it moves left of it. The map's own zoom is pressed from the corner and stays hidden; the
-   map's credit sits above the corner. */
-@media (min-width: 641px) {
-  .map-bar {
-    left: min(calc((100vw - var(--map-card, 0px)) / 2), calc(100vw - var(--map-card, 0px) - var(--view-tools-w, 0px) - 12px - min(960px, 100vw - var(--view-tools-w, 0px) - 20px - var(--map-card, 0px)) / 2));
-    max-width: calc(100vw - var(--view-tools-w, 0px) - 20px - var(--map-card, 0px));
-  }
-  .family-map .leaflet-bottom.leaflet-right { bottom: calc(16px + var(--view-tools-h, 0px)); }
-}
-.family-map .leaflet-control-zoom { display: none; }
-/* Where room is short the count of people on the map gives its room to the controls; the map itself shows them. */
-@media (min-width: 641px) and (max-width: 1099px) { .map-bar .map-count { display: none; } }
-@media (min-width: 641px) and (max-width: 759px) {
-  .map-bar { padding-inline: 8px; }
-  .map-bar .map-show button { padding-inline: 6px; }
-}
 /* Who is followed, over the track: face, name and years, then Open and the way out. */
 .map-chip { padding: 2px 4px 4px; margin-bottom: 2px; border-bottom: 1px solid var(--border); }
 .map-chip-mode button { white-space: nowrap; }

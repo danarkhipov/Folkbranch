@@ -51,7 +51,7 @@ export function SetupGuide({ onImport, onFirstPerson, onGo }: { onImport?: () =>
     <div className="flex min-w-0 flex-col gap-2 text-sm">
       <UpdateNotice />
       <Step title="Ваша семья" state={s.people ? 'done' : 'todo'} open={open === 'family'} onToggle={toggle('family')}>
-        <p className="text-ink-soft">{s.people ? `${t('Людей в архиве')}: ${s.people}.` : t('Добавьте первого человека или загрузите файл GEDCOM, Excel, CSV либо обычный текст.')}</p>
+        <p className="text-ink-soft">{s.people ? `${t('Людей в архиве')}: ${s.people}.` : t('Добавьте первого человека или загрузите файл GEDCOM, Gramps, Excel, CSV либо обычный текст.')}</p>
         <div className="flex flex-wrap gap-2">
           {onFirstPerson && <button type="button" className="add-btn" onClick={onFirstPerson}><UserPlus size={14} /> {t('Добавить человека')}</button>}
           {onImport && <button type="button" className="add-btn" onClick={onImport}><Upload size={14} /> {t('Загрузить файл')}</button>}

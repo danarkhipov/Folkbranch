@@ -8,14 +8,18 @@ import * as people from '@/lib/ops/people'
 import * as settings from '@/lib/ops/settings'
 import * as views from '@/lib/ops/views'
 import * as places from '@/lib/ops/places'
+import { applyPointGuess, placePointGuesses } from '@/lib/ops/place-guesses'
 import { getContacts, saveContacts } from '@/lib/ops/contacts'
-import { human, op, open, type Route } from '../router'
+import { get, human, op, open, type Route } from '../router'
 
 export const familyRoutes: Route[] = [
   open('places', 'Places with what they belong to and their other names', ({ actor }) => places.listPlaces(actor)),
   human('POST', 'places', 'Add a place', async ({ actor, body }) => places.savePlace(actor, null, await body())),
   human('PUT', 'places/:id', 'Change a place', async ({ actor, params, body }) => places.savePlace(actor, params.id, await body())),
   human('DELETE', 'places/:id', 'Delete a place; what was inside it moves up', ({ actor, params }) => places.deletePlace(actor, params.id)),
+  human('POST', 'places/:id/merge', 'Merge another record of the same place into this one', async ({ actor, params, body }) => places.mergePlaces(actor, params.id, String(((await body()) as { from?: unknown })?.from ?? ''))),
+  get('place-guesses', 'Places without a map point, each with up to three candidates from the GeoNames extract shipped with the app (matched on this server; editors only)', ({ actor }) => placePointGuesses(actor)),
+  human('POST', 'place-guesses', 'Set a place\'s point from a GeoNames candidate: { placeId or text, geonameId }', async ({ actor, body }) => applyPointGuess(actor, await body())),
   open('repositories', 'Archives and other places sources are kept', ({ actor }) => places.listRepositories(actor)),
   human('POST', 'repositories', 'Add an archive', async ({ actor, body }) => places.saveRepository(actor, null, await body())),
   human('PUT', 'repositories/:id', 'Change an archive', async ({ actor, params, body }) => places.saveRepository(actor, params.id, await body())),
