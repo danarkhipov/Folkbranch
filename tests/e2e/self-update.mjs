@@ -84,8 +84,15 @@ try {
   ok('the previous version was cleared away after a good start', !fs.existsSync(path.join(dir, 'app.old')))
 
   const after = await api('GET', 'graph')
-  const byId = (g) => JSON.stringify([...g.persons].sort((a, b) => a.id.localeCompare(b.id)).map(({ updatedAt, ...p }) => p))
-  ok('still signed in, and every person is the same', after.persons?.length === before.persons.length && byId(after) === byId(before), `${after.persons?.length} vs ${before.persons.length}`)
+  // Every field the previous release had must be the same; a newer release may add fields, which must be empty for old data.
+  const strip = ({ updatedAt, ...p }) => p
+  const byId = (g, like) => JSON.stringify([...g.persons].sort((a, b) => a.id.localeCompare(b.id)).map((p) => {
+    const q = strip(p), base = like?.persons.find((x) => x.id === p.id)
+    return base ? Object.fromEntries(Object.keys(strip(base)).map((k) => [k, q[k]])) : q
+  }))
+  ok('still signed in, and every person is the same', after.persons?.length === before.persons.length && byId(after, before) === byId(before), `${after.persons?.length} vs ${before.persons.length}`)
+  const added = after.persons.flatMap((p) => { const base = before.persons.find((x) => x.id === p.id) ?? {}; return Object.keys(p).filter((k) => !(k in base)).map((k) => [k, p[k]]) })
+  ok('a field this version added is empty for what the old version wrote', added.every(([, v]) => v == null || v === '' || (Array.isArray(v) && !v.length)), JSON.stringify(added.filter(([, v]) => !(v == null || v === '')).slice(0, 3)))
   ok('every link is the same', JSON.stringify(after.parentChild.length + after.unions.length) === JSON.stringify(before.parentChild.length + before.unions.length))
   const copy = new Database(copyFile, { readonly: true })
   const integrity = copy.pragma('integrity_check', { simple: true })
