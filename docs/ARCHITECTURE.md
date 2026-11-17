@@ -177,33 +177,3 @@ A value is never cut, at any length. The editing field is `GrowText`: a textarea
 ## Merging cards
 
 `lib/ops/merge-people.ts`. Everything beyond facts and links goes through `Changes`, so undo restores the database exactly: `tests/merge-people.test.ts` checks this on 500 random pairs. The check for whether a merge is possible (`whyNot`) computes kinship as if the cards were already one, and repeats inside the write along with comparing `updatedAt`. Accounts, invitations, views and waiting drafts are not part of history: they follow the person and do not come back after undo. A new table that refers to a person has to go into both `REFERENCES` and `movePeopleLinks`/`moveContent`.
-
-## The family map
-
-The **Map** button in the main bar swaps the chart for `components/map-view.tsx` (loaded on first use, kept in the address as `?view=map`, with `&y=` for the year, `&p=` for a person followed and `&line=` for a line of descent). It is computed in the browser from the graph and the places the page already has: no table, operation or route was added, so a reader's map is built from a reader's graph.
-
-**Who appears.** A person stands on the map from their first event that has both a year and a place with coordinates in **Places** (the place on the card is matched by name or old name, as on the Places screen). Before their first such event they stand at its place, after the last at the last, from birth to death; with one end missing, 90 years from the other. Everything that cannot be placed is listed in the "Not on the map" corner with the reason: no place, a place without coordinates, no year, or a fact outside the person's life.
-
-**Privacy.** The map draws only what the page received, and masked people (`hidden`) are skipped whole: no face, name, route or line in the corner list. So readers, reader tokens and view links never see the living or anyone kept private, and a link to a branch shows only that branch. A marriage to a hidden partner is not a stop either, as in `listPlaces` and the life in order. Owners and editors see living relatives on the map, as on the chart. `tests/e2e/map.mjs` checks this as a reader.
-
-**How it is put together.** Pure modules decide, components draw:
-
-- `lib/map-timeline.ts`: each person's dated, placed stops (`mapTimeline`), their journeys (`trackLegs`), where they are at a fractional year (`positionAt`), their route (`routeStops`, `routePoints`).
-- `lib/map-motion.ts`: Web Mercator, a great circle for legs over 800 km and a gentle bow for shorter ones, eased by arc length.
-- `lib/map-pacing.ts`: how long each year lasts when playing; busy years get time, empty stretches pass quickly. The slider always shows true years.
-- `lib/map-camera.ts`: when the camera may move: it widens only when someone would leave the safe part of the screen, and closes in only when everyone sits in a small part of it.
-- `lib/map-layout.ts`: which towns share a stack of faces, and which labels fit without touching.
-- `lib/map-scrub.ts`: the histogram over the slider, its ticks, previous and next event, the caption, the generation bands' words.
-- `lib/map-line.ts`: a line of descent: the chain (`descentLine`), the thread it draws (`lineThread`), who carries it at a moment (`bearerAt`).
-
-`components/map-clock.ts` is the one story clock: a fractional year held outside React and moved by animation frames. Play, drag, keys and the event buttons all set it, so the same moment always shows the same picture; React redraws only once a year. On the Leaflet map, our own canvases draw the base map (`map-atlas.ts`) and the trails and event rings (`map-trails.ts`); faces are markers made once and only moved (`map-people.ts`). The camera (`map-follow.ts`) never chases a moving person frame by frame; any pan or zoom by hand stops it until **Follow** is pressed.
-
-**A line of descent.** When the person followed is an ancestor of the reader's own card (`me.personId`), or else of the person the tree's view is narrowed to, the chip offers **Line to you** (or "Line → name"), kept in the address as `&line=<ancestor id>`. The chain is the shortest parent → child path; among equally short ones, the one through fewest hidden people, then the one with most people on the map, then the first parent written. It draws one thread: each bearer's own route from their birth until the next in line is born (the handover, numbered on the map; handovers in one town share a mark), then the child's from their birthplace. What a bearer did after handing over is a quiet side branch. Where the archive does not say how the thread got from one place to the next (the parent lived elsewhere at the birth, or a bearer has nothing placed), the join is assumed and drawn dashed; links run only between documented points, and no position is made up. The slider gets a band per generation, and previous / next step through the line's events, a handover reading "1918 · Birth · John Whitlock · Salem".
-
-A hidden person in the chain has no stretch, mark, band, name or line in any list; the numbering still counts them, so a reader can tell a generation is missing but not who. A line is never offered to a hidden end. `tests/e2e/map.mjs` checks both as a reader, including a line asked for by address from a hidden parent.
-
-**The base map** is bundled: `public/atlas/*.json`, about 820 KB, fetched from the app only when the map opens. It is Natural Earth 1:50m v5.1.2, public domain (`public/atlas/LICENSE.txt`), simplified and rounded to 0.01°. `node scripts/build-atlas.mjs` rebuilds it (it needs the network once and runs `npx mapshaper@0.6`). No tile server is used, so the map needs no consent and nothing beyond `'self'` in the Content-Security-Policy, which is unchanged. The Places screen keeps its own OpenStreetMap map.
-
-`lib/places.ts` has `lifeStops` for the Places map; the timeline does not reuse it, because it needs what that leaves out: why an event cannot be placed, each visit kept apart, event kinds and the life-span rules.
-
-**Limits.** A date is free text: the first year in it is used, and there are no end dates, so "lived there until" is only implied by the next event. Several places in one year share that year, in the order written, since no month is read. Finished routes are kept on their own canvas and the moving ones are drawn each frame; it was tried on the 27-person demo family, not on thousands. There is no route for the timeline in the API or MCP.

@@ -1,3 +1,4 @@
+import { OpError } from '@/lib/ops/core'
 import { headers } from 'next/headers'
 import { fromOurPages } from '@/lib/same-origin'
 import { z } from 'zod'
@@ -5,7 +6,8 @@ import { assistantRefusal } from '@/lib/agent/agent'
 import { overLimit, takeRun } from '@/lib/agent/limits'
 import { assistantResponse } from '@/lib/agent/respond'
 import { getActor, hasBearer } from '@/lib/api-auth'
-import { say } from '@/lib/ops/settings'
+import { langOfRequest, withViewerLang } from '@/lib/ops/app-config'
+import { tell } from '@/lib/ops/settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +16,11 @@ const MAX_BODY = 4 * 1024 * 1024
 /** For people in the app only. Agents with tokens bring their own model and use /api/mcp. */
 export async function POST(req: Request) {
   const h = await headers()
+  // Every message of this answer, refusals included, reads in the person's chosen language.
+  return withViewerLang(langOfRequest(h), () => answer(req, h))
+}
+
+async function answer(req: Request, h: Headers) {
   if (hasBearer(h)) return Response.json({ error: 'not available to tokens' }, { status: 403 })
   if (!fromOurPages(h)) return Response.json({ error: 'bad origin' }, { status: 403 })
   if (h.get('transfer-encoding')?.includes('chunked')) return Response.json({ error: 'length required' }, { status: 411 })
@@ -25,7 +32,7 @@ export async function POST(req: Request) {
   const limited = overLimit(actor.userId)
   if (limited) return Response.json({ error: limited, plain: true }, { status: 429 })
   const release = takeRun(actor.userId)
-  if (!release) return Response.json({ error: say('Ассистент сейчас отвечает на другой запрос. Подождите немного и повторите.'), plain: true }, { status: 429 })
+  if (!release) return Response.json({ error: tell('Ассистент сейчас отвечает на другой запрос. Подождите немного и повторите.'), plain: true }, { status: 429 })
   req.signal.addEventListener('abort', release, { once: true })
   try {
     const res = await assistantResponse(actor, await req.json(), { abortSignal: req.signal })
@@ -34,6 +41,7 @@ export async function POST(req: Request) {
   } catch (e) {
     release()
     if (e instanceof z.ZodError || e instanceof SyntaxError) return Response.json({ error: 'bad request' }, { status: 400 })
+    if (e instanceof OpError) return Response.json({ error: e.message, plain: true }, { status: e.status })
     console.error(e)
     return Response.json({ error: 'server error' }, { status: 500 })
   }

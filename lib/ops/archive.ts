@@ -14,7 +14,7 @@ import { DATA_DIR, getDb, MEDIA_DIR } from '../db'
 import { PENDING } from '../db/restore'
 import { publicUrl } from '../public-url'
 import { Actor, OpError, requireRole } from './core'
-import { say } from './settings'
+import { tell } from './settings'
 
 const FORMAT = 1
 const STAGING = 'restore-staging'
@@ -32,7 +32,7 @@ interface ManifestFile { path: string; size: number; sha256: string }
 interface Manifest { format: number; createdAt: string; schema: number; files: ManifestFile[] }
 
 const inData = (...p: string[]) => path.join(/*turbopackIgnore: true*/ DATA_DIR, ...p)
-const refuse = (text: string, status = 400) => new OpError(status, say(text))
+const refuse = (text: string, status = 400) => new OpError(status, tell(text))
 
 /** The newest database change this version of the app knows. */
 async function latestMigration() {
@@ -61,7 +61,9 @@ export async function archiveStream(actor: Actor): Promise<{ stream: Readable; f
     await getDb().$client.backup(snapshot)
     const copy = new Database(snapshot)
     // A session in the file could sign someone in on this very server. Vacuum, or the pages would keep them.
-    copy.exec('delete from session; delete from verification; vacuum;')
+    // Keys travel nowhere: those to AI services, sign-in methods and cloud speech and faces stay on this server,
+    // even sealed, so a copy that leaks leaks no key. After a restore they are added again.
+    copy.exec("delete from session; delete from verification; delete from settings where key in ('aiKeys', 'agentKey', 'sttConfig', 'faceConfig') or key like 'signIn:%'; vacuum;")
     copy.close()
     const zip = new yazl.ZipFile()
     const out = new PassThrough()
@@ -69,8 +71,9 @@ export async function archiveStream(actor: Actor): Promise<{ stream: Readable; f
     const files: ManifestFile[] = []
     const queue: { name: string; file: string }[] = [{ name: 'family.db', file: snapshot }]
     for (const f of await fs.readdir(MEDIA_DIR)) {
-      // Avatars are cut again on demand, and a .part is an unfinished write.
-      if (!f.includes('.avatar.') && !f.endsWith('.part')) queue.push({ name: `media/${f}`, file: path.join(/*turbopackIgnore: true*/ MEDIA_DIR, f) })
+      // Avatars are cut again on demand, and a .part is an unfinished write. The same rule restore uses:
+      // a name this app would not accept must not go in, or the copy could never be read back.
+      if (isMediaFileName(f) && !f.includes('.avatar.') && !f.endsWith('.part')) queue.push({ name: `media/${f}`, file: path.join(/*turbopackIgnore: true*/ MEDIA_DIR, f) })
     }
     const schema = await latestMigration()
     // One at a time: the sums go into the manifest, which is written last.
@@ -160,7 +163,7 @@ async function extract(zip: yauzl.ZipFile, entry: yauzl.Entry, expected: Manifes
 }
 
 /** Only what this app could have written, and not from a newer version of it. Gives a one-time way back in for the owner. */
-async function inspectDatabase(file: string, newestKnown: number) {
+async function inspectDatabase(file: string, newestKnown: number, inCopy: Set<string>) {
   let db: Database.Database
   try {
     db = new Database(file)
@@ -178,6 +181,8 @@ async function inspectDatabase(file: string, newestKnown: number) {
     // A file name from the copy is later joined to the media folder: it must not lead out of it.
     const names = db.prepare('select filename from media').pluck().all() as string[]
     if (names.some((n) => !isMediaFileName(n))) throw refuse('В файле копии есть лишние файлы')
+    // A photo the database names but the copy leaves out would be gone for good after the swap.
+    if (names.some((n) => !inCopy.has(`media/${n}`))) throw refuse('В копии не хватает файлов, которые называет база')
     const count = (t: string) => db.prepare(`select count(*) from ${t}`).pluck().get() as number
     const owner = db.prepare("select id, name from user where role = 'owner' limit 1").get() as { id: string; name: string } | undefined
     let login: string | null = null
@@ -227,7 +232,7 @@ export async function stageRestore(zipFile: string) {
     await roomFor(manifest.files.reduce((n, f) => n + f.size, 0))
     await fs.mkdir(path.join(/*turbopackIgnore: true*/ stage, 'media'), { recursive: true })
     for (const e of body) await extract(zip, e, promised.get(e.fileName)!, path.join(/*turbopackIgnore: true*/ stage, e.fileName))
-    const report = await inspectDatabase(path.join(/*turbopackIgnore: true*/ stage, 'family.db'), newest)
+    const report = await inspectDatabase(path.join(/*turbopackIgnore: true*/ stage, 'family.db'), newest, new Set(names))
     await fs.rm(inData(PENDING), { recursive: true, force: true })
     await fs.rename(stage, inData(PENDING))
     return report

@@ -82,7 +82,7 @@ export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { pe
   const [width, setWidth] = useStoredSize('person-panel-width', 480, (w) => Math.round(Math.max(360, Math.min(w, window.innerWidth - 80))))
   const [height, setHeight] = useStoredSize('person-panel-height', 560, (h) => Math.round(Math.max(240, Math.min(h, window.innerHeight - 16))))
   const app = useApp()
-  const { t, canEdit, me, family, lang, graph, byId, notify } = app
+  const { t, canEdit, me, family, lang, archiveLang, graph, byId, notify } = app
   const present = useContext(Presence)
   const hereToo = present.filter((o) => o.focusId === person.id).map((o) => o.name)
   const [full, setFull] = useState(false)
@@ -119,7 +119,7 @@ export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { pe
     if (fieldId) setTimeout(() => document.getElementById(fieldId)?.focus(), 60)
   }
   const father = graph.parentChild.filter((l) => l.childId === person.id && l.kind === 'birth').map((l) => byId.get(l.parentId)).find((p) => p?.sex === 'M')
-  const suggested = canEdit && lang === 'ru' && !person.patronymic && father ? patronymicFrom(father.givenName, person.sex) : ''
+  const suggested = canEdit && archiveLang === 'ru' && !person.patronymic && father ? patronymicFrom(father.givenName, person.sex) : ''
   const toMe = me.personId && me.personId !== person.id ? family.relation(me.personId, person.id, lang) : null
   const ro = !canEdit
   const [addPatronymic, setAddPatronymic] = useState(false)
@@ -168,8 +168,8 @@ export function PersonPanel({ person, hit, onClearHit, onClose, onDelete }: { pe
           </div>
           <div className="flex flex-wrap items-center gap-x-2 text-xs text-ink-soft [&>button]:whitespace-nowrap">
             {(person.maidenName || (!ro && person.sex === 'F')) && <Field fit readOnly={ro} value={person.maidenName} placeholder={t('девичья фамилия')} onSave={saveName('maidenName')} />}
-            {!person.patronymic && !addPatronymic && !ro && lang === 'ru' && !suggested && <button className="pick !px-0 hover:text-ink" onClick={() => { setAddPatronymic(true); setTimeout(() => document.getElementById('f-patronymic')?.focus(), 30) }}>{t('Добавить отчество')}</button>}
-            {!person.patronymic && !ro && lang === 'ru' && suggested && <button className="pick !px-0 underline underline-offset-2 hover:text-ink" title={t('Подставить отчество по имени отца')} onClick={() => patch.mutate({ patronymic: suggested })}>{t('Добавить отчество')} «{suggested}»</button>}
+            {!person.patronymic && !addPatronymic && !ro && archiveLang === 'ru' && !suggested && <button className="pick !px-0 hover:text-ink" onClick={() => { setAddPatronymic(true); setTimeout(() => document.getElementById('f-patronymic')?.focus(), 30) }}>{t('Добавить отчество')}</button>}
+            {!person.patronymic && !ro && archiveLang === 'ru' && suggested && <button className="pick !px-0 underline underline-offset-2 hover:text-ink" title={t('Подставить отчество по имени отца')} onClick={() => patch.mutate({ patronymic: suggested })}>{t('Добавить отчество')} «{suggested}»</button>}
             {toMe && <span className="text-rust">{yourTerm(toMe.label, person.sex, lang)}</span>}
             {me.personId === person.id && <span className="text-rust">{t('Это вы')}</span>}
             {hereToo.length > 0 && <span className="whitespace-nowrap">{t('Здесь также')}: {hereToo.join(', ')}</span>}

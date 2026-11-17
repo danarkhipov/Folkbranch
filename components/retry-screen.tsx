@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { langOf } from '@/lib/languages'
+import { isLang, langFromCookie, matchLanguage } from '@/lib/languages'
 import type { Lang } from '@/lib/types'
 
 // Its own words, beside the code: this screen shows when the server cannot send anything, the tables included.
@@ -13,10 +13,19 @@ const WORDS: Record<'ru' | 'en', Words> & Partial<Record<Lang, Words>> = {
   ca: { title: "L'arxiu s'està actualitzant o no s'hi pot accedir", text: "Triga menys d'un minut. La pàgina es tornarà a obrir sola; les teves dades no s'han perdut.", again: 'Obre ara' },
 }
 
+/** The viewer's language: their cookie, then the browser, then the archive this page was drawn for. */
+function pickLang(): Lang {
+  if (typeof document === 'undefined') return 'ru'
+  const archive = document.documentElement.dataset.archiveLang
+  return langFromCookie(document.cookie)
+    ?? matchLanguage(navigator.languages?.join(',') ?? navigator.language, isLang(archive) ? archive : 'en')
+}
+
 /** What a person sees when the page cannot be drawn, usually for the moments a new version is being put in place. It asks the server until it answers, then reloads. */
 export function RetryScreen({ onRetry }: { onRetry?: () => void }) {
-  const [lang] = useState<Lang>(() => (typeof document === 'undefined' ? 'ru' : langOf(document.documentElement.lang || navigator.language)))
+  const [lang] = useState<Lang>(pickLang)
   const w = WORDS[lang] ?? WORDS.en
+  useEffect(() => { document.documentElement.lang = lang }, [lang])
   useEffect(() => {
     let stop = false
     const ask = async () => {

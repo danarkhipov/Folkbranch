@@ -1,5 +1,5 @@
 // Several people, and the assistant, working on one archive at once.
-import { beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import type { Actor } from '../lib/ops/core'
 import { mergeList, reconcile } from '../lib/ops/merge'
 
@@ -123,27 +123,34 @@ describe('the shared graph', () => {
 })
 
 describe('the assistant beside people', () => {
-  const assistant = async () => {
-    await new Promise((r) => setTimeout(r, 3))
-    return { ...(await import('../lib/agent/agent')).assistantActor(anna, Date.now()) }
-  }
+  // A controlled clock: the assistant reads the archive at one tick, someone edits at the next. No
+  // real sleeping, and two writes can never share a millisecond by accident.
+  const assistant = async () => ({ ...(await import('../lib/agent/agent')).assistantActor(anna, Date.now()) })
   it('does not write over an edit it has not read, and passes after looking again', async () => {
-    const { id } = create('Агент')
-    const a = await assistant()
-    await new Promise((r) => setTimeout(r, 3))
-    await reg.dispatch(petr, 'update_person', { id, patch: { birthPlace: 'Рига' } })
-    await expect(reg.dispatch(a, 'update_person', { id, patch: { birthPlace: 'Пермь' } })).rejects.toMatchObject({ status: 409 })
-    await new Promise((r) => setTimeout(r, 3))
-    await reg.dispatch(a, 'update_person', { id, patch: { birthPlace: 'Пермь' } })
-    expect(people.getGraph(anna).persons.find((p) => p.id === id)!.birthPlace).toBe('Пермь')
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(1_000)
+      const { id } = create('Агент')
+      const a = await assistant()
+      vi.advanceTimersByTime(1)
+      await reg.dispatch(petr, 'update_person', { id, patch: { birthPlace: 'Рига' } })
+      await expect(reg.dispatch(a, 'update_person', { id, patch: { birthPlace: 'Пермь' } })).rejects.toMatchObject({ status: 409 })
+      // The refusal moves the assistant's mark to now, so its second look is allowed.
+      await reg.dispatch(a, 'update_person', { id, patch: { birthPlace: 'Пермь' } })
+      expect(people.getGraph(anna).persons.find((p) => p.id === id)!.birthPlace).toBe('Пермь')
+    } finally { vi.useRealTimers() }
   })
   it('does not trip over its own edits', async () => {
-    const { id } = create('Своё')
-    const a = await assistant()
-    await new Promise((r) => setTimeout(r, 3))
-    await reg.dispatch(a, 'update_person', { id, patch: { birthPlace: 'Рига' } })
-    await new Promise((r) => setTimeout(r, 3))
-    await reg.dispatch(a, 'update_person', { id, patch: { deathPlace: 'Пермь' } })
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(1_000)
+      const { id } = create('Своё')
+      const a = await assistant()
+      vi.advanceTimersByTime(1)
+      await reg.dispatch(a, 'update_person', { id, patch: { birthPlace: 'Рига' } })
+      vi.advanceTimersByTime(1)
+      await reg.dispatch(a, 'update_person', { id, patch: { deathPlace: 'Пермь' } })
+    } finally { vi.useRealTimers() }
   })
   it('answers run one per person and a few at a time', async () => {
     const { takeRun } = await import('../lib/agent/limits')

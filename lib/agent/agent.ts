@@ -3,10 +3,13 @@
 import { pruneMessages, stepCountIs, tool, ToolLoopAgent, type LanguageModel, type ModelMessage, type ToolSet } from 'ai'
 import { z } from 'zod'
 import { Actor, OpError, withHistoryScope } from '../ops/core'
-import { archiveLang, getSetting, say } from '../ops/settings'
+import { archiveLang, getSetting, say, tell } from '../ops/settings'
 import { CORE_TOOLS, TOOL_GROUPS, toolsFor, type ToolDef } from '../ops/tools'
 import type { AssistantState, Lang } from '../types'
 import { currentProvider } from './provider-key'
+import type { ActiveProvider } from './provider'
+import { countTokens } from './limits'
+import { recordUse } from '../ai/usage'
 
 const MAX_STEPS = 25
 /** A model that keeps failing stops and explains, instead of paying for the same refusal again. */
@@ -32,7 +35,7 @@ Otherwise just call the tool: the app asks the person when needed. If they decli
 
 Search once before adding anyone, and do not search again for what you know. If nobody fits, add them without asking. For several people use one import_text call, with id: for those already in the archive, never many create_person calls. A profession or other fact goes in afterwards with update_person.
 
-When told to change or correct a value, use update_person. A value from a source, or called another version, goes in with add_version. After a change, say briefly what you did; anything can be undone with undo.
+When told to change or correct a value, use update_person. A value from a source, or called another version, goes in with add_version. Before each change, write one short line saying what you are about to change, so the person sees the work as it goes; after it, say briefly what you did. Anything can be undone with undo.
 
 A scanned record or letter already in the archive is read with view_photo, found through list_photos. A biography is a page written only from what the archive and its sources say, naming the source of each fact.
 
@@ -65,9 +68,9 @@ export function assistantState(actor: Actor): AssistantState {
 
 /** Why this person cannot use the assistant, or null when they can. */
 export function assistantRefusal(actor: Actor) {
-  if (getSetting('assistantEnabled') !== '1') return 'the assistant is turned off'
-  if (!currentProvider()) return 'the assistant has no API key or model set on the server'
-  if (actor.role === 'reader' && getSetting('assistantForReaders') !== '1') return 'the assistant is not available to readers'
+  if (getSetting('assistantEnabled') !== '1') return tell('Ассистент выключен владельцем архива.')
+  if (!currentProvider()) return tell('Ассистент не настроен: на сервере нет ключа API или модели.')
+  if (actor.role === 'reader' && getSetting('assistantForReaders') !== '1') return tell('Ассистент недоступен читателям.')
   return null
 }
 
@@ -169,9 +172,9 @@ export function approvalFor(risk: ToolDef['risk'] | undefined, trustWrites: bool
   return 'user-approval' as const
 }
 
-export function buildAgent(person: Actor, opts: { model?: LanguageModel; trustWrites?: boolean; focusId?: string | null; hasFiles?: boolean; since?: number; sees?: boolean | null } = {}) {
+export function buildAgent(person: Actor, opts: { model?: LanguageModel; provider?: ActiveProvider | null; trustWrites?: boolean; focusId?: string | null; hasFiles?: boolean; since?: number; sees?: boolean | null } = {}) {
   const actor = assistantActor(person, opts.since)
-  const provider = opts.model ? null : currentProvider()
+  const provider = opts.model ? null : opts.provider ?? currentProvider()
   if (!opts.model && !provider) throw new OpError(503, 'no AI provider is set up')
   // A model the provider says cannot take pictures is not offered the tool that shows it one.
   const defs = new Map(toolsFor(actor, 'assistant').filter((d) => opts.sees !== false || d.name !== 'view_photo').map((d) => [d.name, d]))
@@ -199,7 +202,7 @@ export function buildAgent(person: Actor, opts: { model?: LanguageModel; trustWr
       let status = approvalFor(def?.risk, !!opts.trustWrites)
       // A link written into the archive or fetched by the server can carry data out, so a person always sees it.
       const outward = status === 'not-applicable' && def?.risk === 'read' ? [] : externalLinks(toolCall.input)
-      if (outward.length) return { type: 'user-approval' as const, reason: [def?.describe?.(actor, toolCall.input), `${say('Внешние ссылки')}: ${outward.join(', ')}`].filter(Boolean).join('\n') }
+      if (outward.length) return { type: 'user-approval' as const, reason: [def?.describe?.(actor, toolCall.input), `${tell('Внешние ссылки')}: ${outward.join(', ')}`].filter(Boolean).join('\n') }
       if (status === 'not-applicable' && def?.risk === 'write' && ((toolCall.toolName.startsWith('update_') && changesWhoIsLiving(toolCall.input)) || ++unasked > MAX_UNASKED_WRITES)) status = 'user-approval'
       // The reason reaches the person's confirmation card, not the model.
       return status === 'user-approval' ? { type: status, reason: def?.describe?.(actor, toolCall.input) ?? '' } : status
@@ -207,6 +210,14 @@ export function buildAgent(person: Actor, opts: { model?: LanguageModel; trustWr
     stopWhen: stepCountIs(MAX_STEPS),
     prepareStep: ({ messages, steps, stepNumber }) => ({ messages: trimHistory(messages, !!provider?.keepReasoning), ...(process.env.AGENT_ALL_TOOLS === '1' ? {} : { activeTools: activeToolNames(new Set(defs.keys()), messages, !!opts.hasFiles) as never }), ...(mustFinish(steps, stepNumber) ? { toolChoice: 'none' as const } : {}) }),
     maxOutputTokens: 16_000,
+    // Counted per call, so an answer stopped halfway still shows what it cost.
+    onStepEnd: (step) => {
+      const cost = (step.providerMetadata?.openrouter as { usage?: { cost?: number } } | undefined)?.usage?.cost
+      // Money only as the provider states it: a list price would be a guess, and the owner asked for real figures.
+      const stated = typeof cost === 'number' ? cost : null
+      countTokens(step.usage.totalTokens ?? (step.usage.inputTokens ?? 0) + (step.usage.outputTokens ?? 0))
+      recordUse('assistant', person.userId, { requests: 1, tokens: step.usage.totalTokens ?? (step.usage.inputTokens ?? 0) + (step.usage.outputTokens ?? 0), dollars: stated })
+    },
     providerOptions: (provider?.options ?? {}) as never,
   })
 }

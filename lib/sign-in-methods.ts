@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb, schema } from './db'
 import { type Actor, OpError, requireRole } from './ops/core'
-import { getSetting, say, setSetting } from './ops/settings'
+import { getSetting, tell, setSetting } from './ops/settings'
 import { publicUrl } from './public-url'
 import { seal, unseal } from './sealed'
 
@@ -113,7 +113,7 @@ const INPUT: Record<MethodId, z.ZodType<Values>> = {
 async function telegramBot(token: string) {
   const r = await fetch(`https://api.telegram.org/bot${token}/getMe`, { signal: AbortSignal.timeout(10_000) }).catch(() => null)
   const body = r ? await r.json().catch(() => null) : null
-  if (!body?.ok) throw new OpError(400, say('Telegram не узнал этот токен. Скопируйте его из @BotFather ещё раз'))
+  if (!body?.ok) throw new OpError(400, tell('Telegram не узнал этот токен. Скопируйте его из @BotFather ещё раз'))
   return String(body.result.username)
 }
 
@@ -127,16 +127,16 @@ async function checkMail(v: Values) {
     await mailer(v).verify()
   } catch (e) {
     const { responseCode, code } = e as { responseCode?: number; code?: string }
-    if (responseCode === 535 || responseCode === 534) throw new OpError(400, say('Почтовый сервер не принял логин или пароль. Нужен пароль приложения, а не пароль от почты'))
-    if (code && ['ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNECTION', 'ESOCKET', 'EDNS'].includes(code)) throw new OpError(400, say('Почтовый сервер не отвечает. Проверьте адрес сервера и порт'))
-    throw new OpError(400, `${say('Не получилось подключиться к почтовому серверу')}: ${(e as Error).message}`)
+    if (responseCode === 535 || responseCode === 534) throw new OpError(400, tell('Почтовый сервер не принял логин или пароль. Нужен пароль приложения, а не пароль от почты'))
+    if (code && ['ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNECTION', 'ESOCKET', 'EDNS'].includes(code)) throw new OpError(400, tell('Почтовый сервер не отвечает. Проверьте адрес сервера и порт'))
+    throw new OpError(400, `${tell('Не получилось подключиться к почтовому серверу')}: ${(e as Error).message}`)
   }
 }
 
 /** Nothing is stored until it is checked where it can be: Telegram and the mail server are asked first. */
 export async function saveMethod(actor: Actor, id: MethodId, raw: unknown) {
   requireRole(actor, 'owner')
-  if (fromEnv(id)) throw new OpError(409, say('Этот способ входа задан в настройках сервера'))
+  if (fromEnv(id)) throw new OpError(409, tell('Этот способ входа задан в настройках сервера'))
   const parsed = INPUT[id].safeParse(raw)
   if (!parsed.success) throw new OpError(400, parsed.error.issues.map((i) => i.message).join('; '))
   const values: Values = { ...parsed.data }
@@ -152,21 +152,21 @@ export async function saveMethod(actor: Actor, id: MethodId, raw: unknown) {
 
 export function removeMethod(actor: Actor, id: MethodId) {
   requireRole(actor, 'owner')
-  if (fromEnv(id)) throw new OpError(409, say('Этот способ входа задан в настройках сервера'))
+  if (fromEnv(id)) throw new OpError(409, tell('Этот способ входа задан в настройках сервера'))
   getDb().delete(schema.settings).where(eq(schema.settings.key, settingKey(id))).run()
   changed()
   return methodsStatus(actor)
 }
 
-/** A sign-in code by mail, in the archive's language. */
-export async function sendCode(to: string, code: string) {
+/** A code by mail, in the archive's language: to sign in, or to confirm an address someone adds to their account. */
+export async function sendCode(to: string, code: string, purpose: 'sign-in' | 'confirm' = 'sign-in') {
   const v = methodConfig('email')
-  if (!v) throw new OpError(409, say('Вход по почте не настроен'))
-  const family = getSetting('familyName') || say('Семейный архив')
+  if (!v) throw new OpError(409, tell('Вход по почте не настроен'))
+  const family = getSetting('familyName') || tell('Семейный архив')
   await mailer(v).sendMail({
     from: v.from || v.user,
     to,
-    subject: `${say('Код для входа')}: ${code}`,
-    text: `${say('Код для входа в архив')} «${family}»: ${code}\n\n${say('Он действует 10 минут. Если вы не просили код, ничего делать не нужно.')}`,
+    subject: purpose === 'sign-in' ? `${tell('Код для входа')}: ${code}` : `${tell('Код подтверждения адреса')}: ${code}`,
+    text: `${purpose === 'sign-in' ? tell('Код для входа в архив') : tell('Код, чтобы подтвердить этот адрес в архиве')} «${family}»: ${code}\n\n${tell('Он действует 10 минут. Если вы не просили код, ничего делать не нужно.')}`,
   })
 }

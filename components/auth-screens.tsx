@@ -2,7 +2,7 @@
 import { startTransition, useEffect, useRef, useState } from 'react'
 import { translate } from '@/lib/i18n'
 import { useTable } from '@/lib/i18n-load'
-import { LANG_NAMES } from '@/lib/languages'
+import { LANG_NAMES, setLangCookie } from '@/lib/languages'
 import type { Lang } from '@/lib/types'
 import { MailCode, OAuthButtons, TelegramButton, authPost } from './sign-in-buttons'
 import type { SignInMethods } from '@/lib/sign-in-methods'
@@ -47,7 +47,7 @@ export function SetupScreen({ needsCode, initialCode = '', initialLang, wrongAdd
         {wrongAddress && <p role="alert" className="rounded-lg bg-muted px-3 py-2 text-sm text-destructive break-anywhere">{t('Вы открыли не тот адрес, что указан в настройках, и вход работать не будет. В настройках')}: <b>{wrongAddress}</b>. {t('Откройте этот адрес или поменяйте BETTER_AUTH_URL.')}</p>}
         <div className="flex gap-1">
           {/* A transition: the old words stay on screen while a Spanish or Catalan table arrives. */}
-          {(['en', 'ru', 'es', 'ca'] as const).map((l) => <button type="button" key={l} onClick={() => startTransition(() => setLang(l))} className={lang === l ? 'bar-btn on' : 'bar-btn'}>{LANG_NAMES[l]}</button>)}
+          {(['en', 'ru', 'es', 'ca'] as const).map((l) => <button type="button" key={l} onClick={() => { setLangCookie(l); startTransition(() => setLang(l)) }} className={lang === l ? 'bar-btn on' : 'bar-btn'}>{LANG_NAMES[l]}</button>)}
         </div>
         <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Ваше имя')}<input required autoFocus className={field} value={name} onChange={(e) => setName(e.target.value)} /></label>
         <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Название семьи')}<input required className={field} value={familyName} onChange={(e) => setFamilyName(e.target.value)} /></label>

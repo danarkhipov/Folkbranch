@@ -52,7 +52,8 @@ describe('chart conventions', () => {
     const cards = [...l.cards.values()]
     for (const a of cards) for (const b of cards) if (a !== b && a.y === b.y) expect(Math.abs(a.x - b.x)).toBeGreaterThanOrEqual(CARD_W - 0.01)
     const dot = l.unions.find((u) => u.union.aId === 'wife')!
-    expect(Math.abs(dot.x - x('gr'))).toBeLessThan(CARD_W)
+    // The dot for the couple sits over their only child, not merely within a card's width of it.
+    expect(dot.x).toBeCloseTo(x('gr'), 5)
   })
 
   it('tells children of different marriages apart', () => {

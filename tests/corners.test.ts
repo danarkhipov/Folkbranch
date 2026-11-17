@@ -225,14 +225,24 @@ describe('odd data', () => {
   it('a chart with a loop of ancestors already in the data still draws', () => {
     const p = (id: string) => ({ id, givenName: id, surname: '', sex: 'U', tags: [], facts: [], sources: [], claims: [] })
     const g = { persons: ['a', 'b', 'c'].map(p), parentChild: [['a', 'b'], ['b', 'c'], ['c', 'a'], ['a', 'a'], ['a', 'gone']].map(([parentId, childId], i) => ({ id: `e${i}`, parentId, childId, kind: 'birth', certainty: 'family' })), unions: [] }
-    expect(layoutFamily(g as never).cards ?? true).toBeTruthy()
+    const l = layoutFamily(g as never)
+    expect(l.cards).toBeInstanceOf(Map)
+    expect([...l.cards.keys()].sort()).toEqual(['a', 'b', 'c'])
   })
 
   it('a broken GEDCOM changes nothing or imports cleanly, never half', () => {
     const count = () => getDb().select().from(schema.persons).all().length
     const before = count()
     const r = (() => { try { return importGedcom(owner, '0 HEAD\n0 @I1@ INDI\n1 NAME Иван /Угол/\n1 BIRT\n2 DATE ???\n0 @F1@ FAM\n1 HUSB @I1@\n1 CHIL @I404@\n1 WIFE @I1@\n0 TRLR') } catch (e) { return e } })()
-    expect(count() === before || !(r instanceof Error)).toBe(true)
+    if (r instanceof Error) {
+      expect(count()).toBe(before)
+    } else {
+      const rows = getDb().select().from(schema.persons).all()
+      expect(rows.length).toBe(before + 1)
+      const ivan = rows.find((p) => p.givenName === 'Иван')!
+      expect(ivan).toBeTruthy()
+      expect(getDb().select().from(schema.parentChild).all().filter((l) => l.childId === ivan.id || l.parentId === ivan.id)).toEqual([])
+    }
   })
 
   it('page nesting cannot make a loop, and a deleted parent page takes its children back on undo', () => {

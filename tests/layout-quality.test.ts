@@ -12,12 +12,13 @@ describe('lines on the chart', () => {
   }
 
   // These fell from 4, 20, 248 and 809 when the search for the order was written; they must not creep back. Seeds 4 and 6 gave up two and seven crossings when rows began to follow birth years, and seed 4 two more for keeping branches together.
+  // The 1500-person case is the slowest in the suite; it is kept once and given room to finish.
   it.each([[3, 40, 4], [4, 150, 9], [6, 600, 56], [7, 1500, 254]])('keeps crossings down in a random family (seed %i, %i people)', (seed, size, most) => {
     const g = randomFamily(seed, size)
     const q = quality(layoutFamily(g), g)
     expect(q.crossings).toBeLessThanOrEqual(most)
     expect(q.tight).toBe(0)
-  })
+  }, 30_000)
 
   // Lines of different families kept apart enough to follow, and relatives kept in one stretch of their row.
   it.each([[3, 40, 0, 4], [4, 150, 2, 30], [6, 600, 8, 1140]])('keeps lines apart and branches together (seed %i, %i people)', (seed, size, nearMost, intrusionsMost) => {
@@ -66,10 +67,10 @@ describe('lines on the chart', () => {
   })
 
   it('gives the same chart every time', () => {
+    // Same input, twice: every card id and position must be identical. A size-only comparison let
+    // a non-deterministic order pass.
     const g = randomFamily(4, 150)
-    const a = layoutFamily(g), b = layoutFamily({ ...g, persons: g.persons.map((p) => ({ ...p, birthYear: (p.birthYear ?? 0) + 1 })) }), c = layoutFamily(g)
-    expect(b.cards.size).toBe(a.cards.size)
-    expect([...c.cards.values()]).toEqual([...a.cards.values()])
+    expect([...layoutFamily(g).cards.entries()]).toEqual([...layoutFamily(g).cards.entries()])
   })
 
   it('keeps a line through a row clear of everyone in that row', () => {

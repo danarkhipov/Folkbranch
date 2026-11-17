@@ -6,7 +6,7 @@ import { translate } from '../lib/i18n'
 
 // These do not reach a screen as they are: each has its own English path, or is matched against what people typed.
 // The Spanish and Catalan tables are checked by i18n-tables.test.ts instead.
-const OWN_ENGLISH = new Set(['lib/i18n.ts', 'lib/i18n-es.ts', 'lib/i18n-ca.ts', 'lib/demo.ts', 'lib/kinship.ts', 'lib/names.ts', 'lib/agent/labels.ts', 'lib/import-formats.ts', 'lib/search/words.ts', 'lib/search/dates.ts', 'lib/search/engine.ts', 'lib/textformat.ts', 'lib/gedcom.ts', 'lib/markdown.ts', 'lib/ops/registry.ts'])
+const OWN_ENGLISH = new Set(['lib/i18n.ts', 'lib/i18n-errors.ts', 'lib/i18n-es.ts', 'lib/i18n-ca.ts', 'lib/demo.ts', 'lib/kinship.ts', 'lib/names.ts', 'lib/agent/labels.ts', 'lib/import-formats.ts', 'lib/search/words.ts', 'lib/search/dates.ts', 'lib/search/engine.ts', 'lib/textformat.ts', 'lib/gedcom.ts', 'lib/markdown.ts', 'lib/ops/registry.ts'])
 // The language's own name; a letter folded in searches; a word beside its own English branch in side-panels.tsx.
 const NOT_WORDS = new Set(['Русский', 'е', 'для'])
 const cyrillic = /[А-Яа-яЁё]/

@@ -9,7 +9,7 @@ import { Actor, newId, OpError, requireRole } from './core'
 import * as media from './media'
 import { getPersonRow } from './people'
 import { enqueue } from './proposals'
-import { getSetting, say } from './settings'
+import { getSetting, say, tell } from './settings'
 
 const DAY = 24 * 3600 * 1000
 /** Enough for a long talk in many parts, not enough to fill the disk if a link goes astray. */
@@ -67,8 +67,8 @@ export function requestInfo(token: string) {
 
 export async function submitRecording(token: string, file: { buf: Buffer; name: string }, seconds: number | null, topic: number | null = null) {
   const r = byToken(token)
-  if (!live(r)) throw new OpError(404, say('Ссылка недействительна'))
-  if (r.received >= MAX_PER_LINK) throw new OpError(429, say('По этой ссылке уже много записей. Попросите новую.'))
+  if (!live(r)) throw new OpError(404, tell('Ссылка недействительна'))
+  if (r.received >= MAX_PER_LINK) throw new OpError(429, tell('По этой ссылке уже много записей. Попросите новую.'))
   const person = getPersonRow(r.personId)
   // Its own author, so one link's recordings wait together and can be told from anyone else's.
   const actor: Actor = { userId: `request:${r.id}`, name: r.tellerName || say('Запись по ссылке'), role: 'reader', personId: null }
@@ -76,8 +76,10 @@ export async function submitRecording(token: string, file: { buf: Buffer; name: 
   try {
     // Only a question the link asks can name the story: anything else from the page is ignored.
     const asked = questionsOf(r.question)
-    const title = (topic !== null && asked[topic]) || asked[0] || ''
-    enqueue(actor, [{ op: 'create_story', args: { title, body: '', tellerName: r.tellerName, about: [person.id], toldOn: '', durationSec: seconds, audio, createdBy: actor.name }, details: [] }] as never)
+    // A question may be longer than a story title, and a story has to stay editable.
+    const title = ((topic !== null && asked[topic]) || asked[0] || '').slice(0, 200)
+    const durationSec = seconds !== null && seconds >= 0 && seconds <= 86400 ? Math.round(seconds) : null
+    enqueue(actor, [{ op: 'create_story', args: { title, body: '', tellerName: r.tellerName, about: [person.id], toldOn: '', durationSec, audio, createdBy: actor.name }, details: [] }] as never)
   } catch (e) {
     await media.discardUpload(audio.id)
     throw e

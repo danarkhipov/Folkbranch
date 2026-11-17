@@ -2,7 +2,7 @@
 import { Baby, CalendarDays, Cloud, FileUp, GitMerge, History, Lightbulb, Link2, Map, Mic, MousePointer2, Printer, ScanFace, Share2, Smartphone, Sparkles, Terminal, UsersRound, type LucideIcon } from 'lucide-react'
 import { useApp } from '@/lib/client'
 
-export type GuideSection = 'speech' | 'setup' | 'account' | 'smart' | 'general' | 'people' | 'signin' | 'assistant' | 'agents' | 'data'
+export type GuideSection = 'speech' | 'faces' | 'setup' | 'account' | 'smart' | 'general' | 'people' | 'signin' | 'assistant' | 'agents' | 'data'
 
 interface Feature { icon: LucideIcon; title: string; text: string; go?: { section: GuideSection; label: string; owner?: boolean } }
 
@@ -13,6 +13,7 @@ const FEATURES: Feature[] = [
   { icon: ScanFace, title: 'Лица на фото', text: 'Назовите человека на одном снимке, и программа предложит его на остальных, даже в другом возрасте. Всё считается на вашем устройстве, фото никуда не уходят.', go: { section: 'smart', label: 'Включить' } },
   { icon: Mic, title: 'Голос в текст', text: 'Запишите, как бабушка рассказывает историю, и она станет текстом. Модель можно скачать на устройство. Или владелец один раз подключает облачный сервис и платит, а остальным ничего ставить не нужно.', go: { section: 'smart', label: 'Выбрать способ' } },
   { icon: Cloud, title: 'Расшифровка в облаке', text: 'Один сервис распознавания речи на всех: Groq, OpenAI, Mistral, OpenRouter, китайский SiliconFlow или ваш собственный сервер. Ключ вводится один раз, у месяца есть предел расхода.', go: { section: 'speech', label: 'Подключить', owner: true } },
+  { icon: ScanFace, title: 'Лица в облаке', text: 'Один сервис распознавания лиц на всех: Amazon Rekognition, Face++, Luxand.cloud или свой CompreFace. Ключ вводится один раз, у месяца есть предел расхода, а модель на устройство скачивать не нужно.', go: { section: 'faces', label: 'Подключить', owner: true } },
   { icon: Baby, title: 'Попросить родных рассказать', text: 'Ссылка для одного человека, который не станет регистрироваться: открыть на телефоне, нажать большую кнопку и говорить. Рассказ придёт вам на проверку.', go: { section: 'people', label: 'Создать ссылку', owner: true } },
   { icon: FileUp, title: 'Дерево вместе с фото', text: 'Загрузите файл дерева (GEDCOM, таблицу или текст) и сразу все фотографии. Файлы сами найдут своих людей по тому, что написано в дереве и в названиях файлов.', go: { section: 'data', label: 'Загрузить' } },
   { icon: Map, title: 'Карта мест', text: 'Где жила семья и куда переезжала. На карточке человека места идут по порядку жизни.' },

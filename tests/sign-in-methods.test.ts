@@ -52,6 +52,7 @@ describe('the owner switches ways on and off', () => {
     expect(m.signInMethods().google).toBe(true)
   })
   it('stores nothing readable in the database', async () => {
+    await m.saveMethod(owner, 'google', { clientId: '1-abc.apps.googleusercontent.com', clientSecret: 'GOCSPX-very-secret-1234' })
     const { getSetting } = await import('../lib/ops/settings')
     expect(getSetting('signIn:google')).not.toContain('very-secret')
   })

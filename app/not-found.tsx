@@ -1,11 +1,14 @@
 import Link from 'next/link'
 import { headers } from 'next/headers'
 import { Logo } from '@/components/logo'
-import { langFromHeader, translate } from '@/lib/i18n'
+import { translate } from '@/lib/i18n'
+import { viewerLang } from '@/lib/languages'
+import { archiveLang } from '@/lib/ops/settings'
 import '@/lib/i18n-server'
 
 export default async function NotFound() {
-  const lang = langFromHeader((await headers()).get('accept-language'))
+  const h = await headers()
+  const lang = viewerLang(h.get('cookie'), h.get('accept-language'), archiveLang())
   const t = (key: string) => translate(lang, key)
   return (
     <main className="flex min-h-dvh items-center justify-center bg-paper p-6">

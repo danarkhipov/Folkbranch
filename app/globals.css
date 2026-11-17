@@ -199,6 +199,10 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .menu-item { display: flex; width: 100%; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 6px; text-align: left; color: var(--ink); cursor: pointer; }
 .menu-item:hover, .menu-item:focus-visible { background: #efe9dc; outline: none; }
 .bar-btn.on { background: var(--ink); color: #fffdf8; }
+/* A button that cannot be pressed yet looks it, here and in every dialog that uses this button. */
+.bar-btn:disabled { opacity: 0.45; cursor: default; }
+.bar-btn:disabled:hover { background: transparent; }
+.bar-btn.on:disabled:hover { background: var(--ink); }
 kbd { font: 14px var(--font-sans); color: var(--ink-faint); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
 
 [cmdk-input]:focus-visible { outline: none; }
@@ -310,16 +314,20 @@ textarea.inline-input:hover, textarea.inline-input:focus { box-shadow: 0 1px 0 v
 .skip-link { position: fixed; left: 12px; top: -60px; z-index: 60; }
 .skip-link:focus { top: 12px; }
 aside.panel:focus { outline: none; }
-/* Folding: the bar itself narrows to a square around its logo, which does not move. Its edge stays showing behind, so it is plain there is more to open. */
-.main-bar { overflow: hidden; transition: width .42s cubic-bezier(.45, 0, .2, 1); }
+/* Folding: the bar itself narrows to a small pill around its logo and a chevron, so it reads as one folded control. */
+/* clip, not hidden: a focused button at the end must not scroll the folded bar's logo out of sight. */
+.main-bar { overflow: clip; transition: width .42s cubic-bezier(.45, 0, .2, 1), background-color .18s, box-shadow .18s; }
 .bar-logo { margin-left: 7px; margin-right: 7px; }
+/* The arrow stands out of the flow, so the bar's content never moves; it fades in once the bar has folded. */
+.bar-open { position: absolute; left: 36px; top: 50%; margin-top: -7px; color: var(--ink-soft); opacity: 0; transform: translateX(-4px); pointer-events: none; transition: opacity .12s, transform .12s; }
+.main-bar.folded .bar-open { opacity: 1; transform: none; transition: opacity .2s .4s, transform .2s .4s; }
+.main-bar.folded:hover, .main-bar.folded:active { background: #f5f0e4; box-shadow: 0 1px 2px rgb(60 45 20 / .08), 0 10px 28px rgb(60 45 20 / .12); }
+.main-bar.folded:hover .bar-open { color: var(--ink); }
 .bar-rest { flex: none; transition: opacity .3s; }
 .main-bar.folded .bar-rest { opacity: 0; }
 .show-bars { position: absolute; inset: 0; display: none; }
-.main-bar.folded .show-bars { display: block; }
-.bar-peek { z-index: 9; width: 58px; height: 36px; margin-top: 5px; background: #f3eee2; border: 1px solid var(--border); border-radius: 12px; opacity: 0; transform: translateX(-12px); pointer-events: none; transition: opacity .1s, transform .15s; }
-.bar-peek.folded { opacity: 1; transform: none; transition: opacity .15s .36s, transform .2s .36s; }
-.bar-peek:has(+ .main-bar.folded:hover) { transform: translateX(4px); transition: transform .12s; }
+.main-bar.folded .show-bars { display: block; border-radius: 11px; }
+.main-bar.folded .show-bars:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 .view-bar { transition: transform .34s cubic-bezier(.3, .7, .2, 1), opacity .22s, left .2s; }
 .view-bar.folded { transform: translateY(24px); opacity: 0; visibility: hidden; transition: transform .34s, opacity .22s, visibility 0s .34s; }
 .panel header .grow-text { min-height: 24px; }
@@ -334,7 +342,6 @@ aside.panel:focus { outline: none; }
   .main-bar .family-name, .main-bar .sep, .main-bar:not(.folded) .bar-logo { display: none; }
   .main-bar .bar-rest { flex: 1; min-width: 0; justify-content: space-around; }
   .main-bar.folded { justify-content: flex-start; }
-  .bar-peek { top: auto; bottom: 8px; left: 8px; margin: 0 0 5px; }
   .main-bar .bar-btn { flex: 1 1 0; flex-direction: column; gap: 2px; height: 48px; min-width: 0; padding: 0 1px; font-size: 14px; line-height: 1.3; text-align: center; }
   .main-bar .nav-label { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .main-bar .hide-bars { display: none; }
@@ -349,6 +356,8 @@ aside.panel:focus { outline: none; }
   .panel summary { padding-block: 8px; }
   .panel button, .side-sheet button, [role=dialog] button, [role=dialog] select, .view-bar button, .main-bar button, .panel select, [data-slot=popover-content] button { min-height: 44px; min-width: 44px; }
   .composer [data-align="block-end"] button { height: 44px; width: 44px; }
+  /* A switch keeps its own shape; stretched to 44 px it turned into a circle. Its row is the larger target. */
+  .panel button[role=switch], [role=dialog] button[role=switch] { min-height: 0; min-width: 0; }
 }
 
 .panel-tabs { height: 36px; padding: 4px; flex: none; }
@@ -403,115 +412,6 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
 }
 
 /* The map: what a mark says when pressed, and the numbers of one life's stops. */
-.family-map.leaflet-container { background: color-mix(in srgb, var(--paper-dot) 75%, var(--ink-faint) 6%); font-family: var(--font-serif); }
-/* Our own canvases (atlas, trails) sit in Leaflet panes; the bar lifts the map's buttons where they would meet. */
-.family-map .leaflet-bottom { bottom: var(--map-lift, 0px); }
-/* A face: centred on its spot, moved within a stack or ring by --dx/--dy, its name beside it on the side that was free. */
-.map-face { overflow: visible; }
-.map-face-in { position: absolute; left: 12px; top: 12px; width: 0; height: 0; transform: translate(var(--dx, 0px), var(--dy, 0px)); }
-.map-face-in img { position: absolute; left: -12px; top: -12px; width: 24px; height: 24px; max-width: none; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 1.5px var(--ink), 0 0 0 3px var(--paper); filter: grayscale(.6) sepia(.35) contrast(.95); background: var(--paper); cursor: pointer; }
-/* On the way: the one accent on the map, a ring in the app's rust. */
-.map-face-in.moving img { box-shadow: 0 0 0 2px var(--accent), 0 0 0 3.5px var(--paper); filter: grayscale(.35) sepia(.25); }
-.map-face-in.hidden-face { display: none; }
-.map-face.map-yield { pointer-events: none !important; }
-/* A finger needs more than a 24 px face: an unseen 44 px circle around it takes the tap. */
-@media (pointer: coarse) { .map-face-in::before { content: ''; position: absolute; left: -22px; top: -22px; width: 44px; height: 44px; border-radius: 50%; } }
-.map-name { position: absolute; top: 0; white-space: nowrap; font: 11px/1.4 var(--font-serif); color: var(--ink); background: color-mix(in srgb, var(--paper) 88%, transparent); border-radius: 3px; padding: 0 4px; cursor: pointer; }
-.map-name strong { font-weight: 500; }
-.map-name:not([data-side]), .map-name.collide { display: none; }
-.map-name[data-side=right] { left: 15px; transform: translateY(-50%); }
-.map-name[data-side=left] { right: 15px; transform: translateY(-50%); }
-.map-name[data-side=above] { left: 0; transform: translate(-50%, calc(-100% - 15px)); }
-.map-name[data-side=below] { left: 0; transform: translate(-50%, 15px); }
-.map-name > span { display: none; }
-/* Hovered: the name always shows, with where and when. */
-.map-face-in.open .map-name { display: block; }
-.map-face-in.open .map-name:not([data-side]) { left: 15px; transform: translateY(-50%); }
-.map-face-in.open .map-name > span { display: block; color: var(--ink-soft); }
-.map-event { overflow: visible; color: var(--ink); cursor: pointer; }
-.map-event-in { position: absolute; left: 0; top: 0; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; transform: translate(calc(var(--gx, 0px) - 8px), calc(var(--gy, 27px) - 8px)); transition: opacity .3s; }
-.map-event-in b { display: inline-grid; place-items: center; width: 16px; height: 16px; border: 1px solid var(--ink); border-radius: 50%; background: var(--paper); font: 600 11px/1 var(--font-serif); }
-.map-event-in > span { font: italic 10.5px/1.2 var(--font-serif); color: var(--ink-soft); text-shadow: 0 0 2px var(--paper), 0 0 2px var(--paper); }
-.map-event-in > span.off { display: none; }
-/* Reached by the keyboard: the same ring as hovering, a little stronger. */
-.map-face-in:focus { outline: none; }
-.map-face-in:focus-visible img { box-shadow: 0 0 0 2px var(--ink), 0 0 0 4.5px var(--paper), 0 0 0 6px var(--ink); }
-/* Following one person: their face in the accent ring and on top, everyone else quieter but still there to press. */
-.focusing .map-face-in:not(.focused):not(.open):not(.kin) { opacity: .5; }
-.focusing .map-face-in:not(.focused):not(.kin) .map-name { color: var(--ink-soft); }
-/* A line of descent: everyone in it bright, in their own ink ring; the one who carries it now wears the accent. */
-.map-face-in.kin:not(.focused) img { filter: grayscale(.4) sepia(.3); }
-/* Two rings, so the person followed is not taken for a traveller (one ring). */
-.map-face-in.focused img { box-shadow: 0 0 0 2.5px var(--accent), 0 0 0 4.5px var(--paper), 0 0 0 5.5px var(--accent); filter: grayscale(.25) sepia(.2); }
-.focusing .map-event:not(.mine) { opacity: .4; }
-/* Their route's stops: small numbered circles in order of time, with the year and place where there is room. */
-.map-stop { overflow: visible; pointer-events: none; }
-.map-stop-in { position: absolute; left: 0; top: 0; width: 0; height: 0; transform: translate(var(--ox, 0px), var(--oy, 0px)); }
-.map-stop-in b { position: absolute; left: 0; top: 0; translate: -50% -50%; min-width: 16px; height: 16px; padding: 0 4px; display: grid; place-items: center; border-radius: 8px; background: var(--ink); color: var(--paper); font: 600 10.5px/1 var(--font-serif); font-variant-numeric: tabular-nums; box-shadow: 0 0 0 1.5px var(--paper); }
-.map-stop-in > span { position: absolute; top: 0; white-space: nowrap; font: 500 11px/1.4 var(--font-serif); color: var(--ink); background: color-mix(in srgb, var(--paper) 88%, transparent); border-radius: 3px; padding: 0 4px; }
-.map-stop-in > span:not([data-side]) { display: none; }
-/* A generation mark: an open ring with its number, quieter than a route's stops, so the faces stay the eye's first stop. */
-.map-gen b { background: var(--paper); color: var(--ink); box-shadow: 0 0 0 1.25px var(--ink), 0 0 0 3px var(--paper); }
-.map-gen > span { font-style: italic; }
-.map-stop-in > span[data-side=right] { left: var(--g, 10px); transform: translateY(-50%); }
-.map-stop-in > span[data-side=left] { right: var(--g, 10px); transform: translateY(-50%); }
-.map-stop-in > span[data-side=above] { left: 0; transform: translate(-50%, calc(-100% - var(--g, 10px))); }
-.map-stop-in > span[data-side=below] { left: 0; transform: translate(-50%, var(--g, 10px)); }
-.map-place-face { width: 28px; height: 28px; flex: none; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 1.5px var(--ink); filter: grayscale(.6) sepia(.35) contrast(.95); background: var(--paper); }
-.atlas-label { width: auto !important; height: auto !important; white-space: nowrap; transform-origin: center; translate: -50% -50%; pointer-events: none; color: var(--ink-soft); font-family: var(--font-serif); text-shadow: 0 0 2px var(--paper), 0 0 2px var(--paper); }
-.atlas-country { font-size: 10px; letter-spacing: .18em; text-transform: uppercase; opacity: .75; }
-.atlas-city { font-size: 11px; font-style: italic; opacity: .8; }
-/* The bar under the map: the track (a quiet histogram of the family's events, the line, decade ticks, labels every
-   50 years), then the controls. On a phone it sits above the app's own bar, with room for fingers. */
-.map-bar { bottom: 12px; }
-/* With the person card open beside it, the bar centres in the room left of the card. */
-.map-bar { left: calc((100vw - var(--map-card, 0px)) / 2); max-width: calc(100vw - 16px - var(--map-card, 0px)); }
-/* Who is followed, over the track: face, name and years, then Open and the way out. */
-.map-chip { padding: 2px 4px 4px; margin-bottom: 2px; border-bottom: 1px solid var(--border); }
-.map-chip-mode button { white-space: nowrap; }
-/* A phone: the choice takes its own row under the name, its two halves sharing the width. */
-@media (max-width: 640px) {
-  .map-chip-mode { order: 3; flex: 1 1 100%; }
-  .map-chip-mode button { flex: 1 1 0; }
-}
-.map-track { position: relative; height: 46px; margin: 0 6px; cursor: pointer; touch-action: none; outline: none; --at: 0; }
-.map-track:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
-.map-hist { position: absolute; left: 0; right: 0; top: 2px; width: 100%; height: 20px; overflow: visible; }
-.map-hist-all { fill: var(--ink); opacity: .2; }
-.map-hist-moves { fill: var(--ink); opacity: .42; }
-.map-band { fill: var(--accent); opacity: .12; }
-/* A line's generations, two quiet tints in turn, each named where its name fits. */
-.map-band-a { opacity: .16; }
-.map-band-b { fill: var(--ink); opacity: .07; }
-.map-band-name { position: absolute; top: 1px; padding-left: 4px; overflow: hidden; white-space: nowrap; font: italic 12px/14px var(--font-serif); color: var(--ink-soft); text-shadow: 0 0 2px var(--paper), 0 0 2px var(--paper); pointer-events: none; }
-.map-line { position: absolute; left: 0; right: 0; top: 24px; height: 2px; border-radius: 1px; background: color-mix(in srgb, var(--ink) 18%, transparent); }
-.map-played { height: 100%; width: calc(var(--at) * 100%); border-radius: 1px; background: var(--ink); }
-.map-ticks { position: absolute; left: 0; right: 0; top: 27px; width: 100%; height: 5px; }
-.map-tick, .map-tick-major { fill: none; vector-effect: non-scaling-stroke; }
-.map-tick { stroke: var(--ink-faint); stroke-width: 1; opacity: .5; }
-.map-tick-major { stroke: var(--ink-soft); stroke-width: 1; }
-.map-ticks-focus { position: absolute; left: 0; right: 0; top: 17px; width: 100%; height: 15px; }
-.map-ticks-focus path { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
-.map-axis { position: absolute; top: 31px; translate: -50% 0; font: 12px/14px var(--font-serif); color: var(--ink-faint); pointer-events: none; font-variant-numeric: tabular-nums; }
-.map-handle { position: absolute; top: 25px; left: calc(var(--at) * 100%); width: 14px; height: 14px; translate: -50% -50%; border-radius: 50%; background: var(--paper); box-shadow: 0 0 0 2px var(--ink), 0 1px 3px rgb(60 45 20 / .25); pointer-events: none; }
-.map-track.dragging .map-handle, .map-track:focus-visible .map-handle { box-shadow: 0 0 0 2.5px var(--ink), 0 0 0 6px color-mix(in srgb, var(--ink) 12%, transparent); }
-.map-bubble { position: absolute; bottom: calc(100% - 2px); left: calc(var(--at) * 100%); translate: -50% 0; padding: 1px 7px; border-radius: 6px; background: var(--ink); color: var(--paper); font: 500 14px/20px var(--font-serif); font-variant-numeric: tabular-nums; pointer-events: none; white-space: nowrap; }
-.map-now-inline { display: none; }
-@media (max-width: 640px) { .map-now-inline { display: inline; } }
-.map-bar .bar-btn:disabled { opacity: .35; cursor: default; background: none; }
-@media (max-width: 640px) {
-  .map-bar { bottom: 72px; }
-  .map-bar .map-controls { flex-wrap: wrap; }
-  .map-bar .map-count { display: none; }
-  .map-bar .map-show { margin-left: auto; }
-  .map-bar .map-caption { order: 9; flex: 1 1 100%; padding: 0 4px 2px; }
-  .map-bar .map-now { display: none; }
-  .map-bar { padding-inline: 8px; }
-  .map-bar .map-controls { column-gap: 2px; }
-  .map-bar .map-show { margin-left: auto; }
-  .map-bar .map-show button { padding-inline: 6px; }
-}
-@media (pointer: coarse) { .map-bar button { min-height: 44px; min-width: 44px; } .map-track { height: 48px; } }
 .map-card { display: flex; flex-direction: column; gap: 4px; max-width: 240px; font-size: 14px; line-height: 1.35; color: var(--ink); }
 .map-card div:last-child { display: flex; flex-wrap: wrap; gap: 2px 10px; }
 .map-card button { text-decoration: underline; text-underline-offset: 2px; text-align: left; }
@@ -524,8 +424,28 @@ button[aria-busy='true']:not([data-slot='button'])::before { content: ''; width:
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* A line the glow runs along: drawn over the quiet line from one end to the other. */
-.flow { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; stroke-dasharray: 1; animation: flow-draw .32s cubic-bezier(.3, .7, .3, 1) var(--wd, 0ms) backwards; }
+.flow { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; stroke-dasharray: 1; animation: flow-draw .26s cubic-bezier(.4, .1, .6, .9) var(--wd, 0ms) backwards; }
+@media (prefers-reduced-motion: reduce) { .flow { animation: none; } }
 .flow.union-flow { stroke-width: 3; }
 .flow.rev { animation-name: flow-draw-rev; }
 @keyframes flow-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @keyframes flow-draw-rev { from { stroke-dashoffset: -1; } to { stroke-dashoffset: 0; } }
+
+/* The assistant at work: three dots that breathe while it thinks, and its steps in one fold. */
+.thinking-dots { display: inline-flex; gap: 3px; }
+.thinking-dots i { width: 5px; height: 5px; border-radius: 999px; background: currentColor; opacity: .25; animation: thinking-dot 1.2s ease-in-out infinite; }
+.thinking-dots i:nth-child(2) { animation-delay: .15s; }
+.thinking-dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes thinking-dot { 0%, 80%, 100% { opacity: .25; transform: translateY(0); } 40% { opacity: .9; transform: translateY(-2px); } }
+@media (prefers-reduced-motion: reduce) { .thinking-dots i { animation: none; opacity: .6; } }
+.tool-steps-line { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-soft); }
+.tool-steps > summary { list-style: none; cursor: pointer; }
+.tool-steps > summary::-webkit-details-marker { display: none; }
+.tool-steps > summary:hover { color: var(--ink); }
+.tool-steps .chev { transition: transform .15s; opacity: .6; }
+.tool-steps[open] .chev { transform: rotate(180deg); }
+
+/* A card that just changed (by anyone, the assistant included) glows once where it stands. */
+.pcard.just-changed .avatar, .pcard.just-changed > :first-child { animation: just-changed 2.4s ease-out 1; }
+@keyframes just-changed { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent, #a4502e) 70%, transparent); } 25% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--accent, #a4502e) 25%, transparent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .pcard.just-changed .avatar, .pcard.just-changed > :first-child { animation: none; outline: 2px solid var(--accent, #a4502e); outline-offset: 2px; } }

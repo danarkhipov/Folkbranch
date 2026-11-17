@@ -1,4 +1,5 @@
 'use client'
+import { useChangedCards } from './chart-changes'
 import { useEffect, forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { ArrowUpDown, Baby, FileUp, Maximize2, Search, Trash2, UserPlus, UserRound, Users, Heart } from 'lucide-react'
 import { layoutFamily, CARD_W } from '@/lib/graph/layout'
@@ -57,6 +58,7 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
     const { sel, setSel, selIds, selEdges, selUnion, hoverIds, setHoverIds, pick, removeSelected, patchSelected } = useLineSelection(layout, () => setTip(null))
 
     const { moving, startMove } = useCardMove(layout, scope.pins, view.zoom, scope.pin)
+    const changed = useChangedCards(graph)
 
     // Said once for a few seconds: it covers people's names, and after that everyone knows.
     const [hintSeen, setHintSeen] = useState(false)
@@ -132,7 +134,7 @@ export const GraphCanvas = forwardRef<CanvasHandle, { pathIds: string[] | null; 
                 top={c.y}
                 wait={wave?.depth.get(p.id)}
                 selected={p.id === focusId}
-                className={cn('pcard', `sex-${p.sex}`, !p.living && 'dead', p.certainty === 'assumed' && 'assumed', p.hidden && 'hidden-p', p.id === focusId && 'focus', p.id === me.personId && 'isme', active && !isActive && 'dim', draft?.target === p.id && 'drop-target', moving?.id === p.id && 'moving')}
+                className={cn('pcard', `sex-${p.sex}`, !p.living && 'dead', p.certainty === 'assumed' && 'assumed', p.hidden && 'hidden-p', p.id === focusId && 'focus', p.id === me.personId && 'isme', active && !isActive && 'dim', draft?.target === p.id && 'drop-target', moving?.id === p.id && 'moving', changed.has(p.id) && 'just-changed')}
                 folded={scope.folded.get(p.id)}
                 label={label}
                 mine={!label && mine ? yourTerm(mine.label, p.sex, lang) : undefined}

@@ -4,6 +4,30 @@ All notable changes are listed here, newest first. Versions follow [Semantic Ver
 
 ## Unreleased
 
+### Added
+- **History** says what each change did: which people were added, changed (old → new) or removed, and for an import how many came in new and how many were updated or replaced. An entry about the whole archive opens in place instead of opening a card. The owner can **roll back to this point**, taking back that change and every later one, and take back one person of an import alone.
+- **Ctrl+Z** (⌘Z) takes back your last change, **Ctrl+Shift+Z** or **Ctrl+Y** brings it back. In a text field the keys stay the field's own.
+- The interface speaks the viewer's language: invitations, sign-in and setup follow the browser, and each person can pick their own interface language in their account settings. The archive's language still sets the language of the data.
+- The assistant's conversations stay after a reload, and earlier ones open again from **Past conversations**. They are kept in this browser only.
+
+- **One list of AI keys** in Settings → AI: a key is added once, in place, checked with its service first, and the assistant and speech each pick a service and model from it. The owner can pick who answers in the assistant.
+- **Who used what**: requests, tokens and minutes per person this month, and calls per MCP access token. Money is only what the provider stated for each request (OpenRouter does); where a provider states none, the request is counted and the price is shown as unknown, never guessed.
+- **The chart as a picture**: the whole family, what the chart shows, or one person's ancestors, descendants or close family, as a sharp PNG to send or print, or as a PDF, with the Folkbranch mark and the family's name.
+- Each AI, speech and face service says how it keeps data, with its source and the date it was read. The data page says where everything is kept and what happens with time.
+
+### Changed
+- Server messages read in the language the person chose in the app, then their browser's, then the archive's.
+- Yandex is told in every request not to log it or train on it; speech through OpenRouter asks for providers that do not collect data, as the assistant already did.
+- The full archive copy no longer carries keys to AI services, sign-in methods or cloud speech and faces: after a restore they are added again.
+- An API error from a malformed request is now a sentence in `error`; the details stay in `issues` (without the rejected input).
+- The assistant says it is thinking as soon as a message is sent and whenever it is quiet between steps, with the seconds. Its steps read as one quiet line between its sentences ("Searching people · Reading a card") that opens to the list, and it says what it is about to change before each edit.
+- A card glows for a moment where a change lands, whoever made it, the assistant included.
+- Hovering a person, the glow runs down their line a generation at a time.
+- The folded top bar is one small control with the logo and an arrow.
+
+### Updating from 1.6.0
+Nothing to do. The assistant's key and a speech setup that used it move into the new list of keys by themselves, the old copy is kept so going back to 1.6.0 still works, and this month's transcription minutes still count toward the monthly limit. Spending recorded by 1.6.0 mixed stated prices and estimates, so it is not carried over as money.
+
 ## 1.6.0 - 2026-11-16
 
 ### Added
@@ -12,9 +36,6 @@ All notable changes are listed here, newest first. Versions follow [Semantic Ver
 - Spanish and Catalan as archive languages, in Settings → General and on the first screen. A word not yet translated shows in English, never in Russian. Dates such as "12 de marzo de 1890" and "5 d'abril de 1931" are read in search, birthdays and GEDCOM export, a search finds García as Garcia and understands "la esposa de Iván" and "la dona de l'Ivan", and the assistant and speech recognition take the archive's language. The fictional demo family is in English for both for now.
 - **Settings → AI and models**: one screen that shows what is connected (the assistant, cloud transcription, faces and voice on the device, stories by link), and one settings file for all of it. Download it, or load it into another archive: it holds no keys, says what it applied and what it could not and why.
 - `OWNER_EMAIL` in the server's environment puts the owner's address on their account, so "Sign in with Google" opens it with no link to open first. No other Google account gets in.
-- **Map**, beside the AI assistant in the main bar: the family on a map, year by year. Press Play and people move between the places of their births, marriages, moves and deaths, or drag through the years, or step from one event to the next. Pick someone to see their whole life as a numbered route; press a town to see who lives there in that year. Pick an ancestor and choose **Line to you** to follow the family's line down the generations to you: one thread passed from parent to child, numbered at each handover, with each generation's years marked under the map. The map itself comes with the app, so nothing is asked of another server and no permission is needed. A corner list says which events are missing a place, coordinates or a year.
-- The demo family has its towns as places with a point on the map, and a few lives that move: study, work, the war, marriages, a few years at a shipyard across the country and a job abroad, and where people died, in both languages.
-- A person's life in order shows where each event happened, also on the printed page, and a fact read on the card says "Date unknown" or "Place unknown" instead of leaving a blank.
 - A check that no commit names an AI assistant as author or co-author: a `commit-msg` and a `pre-push` hook in `.githooks`, and a CI job.
 
 ### Changed

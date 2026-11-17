@@ -9,6 +9,7 @@ import { readDevice, type Device, type Tier } from '@/lib/smart/device'
 import { cancelVariant, choose, downloadVariant, recommended, removeVariant, useChosen, useVariant, variantSize, variantsFor, type Pack, type Variant } from '@/lib/smart/models'
 import { useSmart } from '@/lib/smart/settings'
 import { useCloud } from '@/lib/smart/cloud'
+import { useFaceCloud } from '@/lib/smart/face-cloud'
 
 const TIER: Record<Tier, string> = { weak: 'Слабое устройство: берите только нужное, работать будет медленнее', normal: 'Обычное устройство: всё будет работать, без спешки', strong: 'Мощное устройство: подойдут и самые точные модели' }
 const mb = (n: number) => Math.ceil(n / 1024 / 1024)
@@ -59,6 +60,7 @@ function Feature({ feature, title, about }: { feature: Pack; title: string; abou
 export function SmartSettings() {
   const { t } = useApp()
   const cloud = useCloud()
+  const faces = useFaceCloud()
   const [device, setDevice] = useState<Device | null>(null)
   useEffect(() => { setDevice(readDevice()) }, [])
   const facts = device && [device.cores && `${t('ядер')}: ${device.cores}`, device.memoryGB && `${t('память')}: ${device.memoryGB}${device.memoryGB >= 8 ? '+' : ''} ${t('ГБ')}`, device.saveData && t('включена экономия трафика')].filter(Boolean).join(' · ')
@@ -72,7 +74,12 @@ export function SmartSettings() {
       )}
       {cloud.enabled && (
         <Section title={t('Расшифровка в облаке')} description={t('Владелец архива подключил сервис распознавания речи и платит за него сам. Скачивать ничего не нужно, работает на любом устройстве и обычно точнее.')}>
-          <SwitchRow title={t('Расшифровывать в облаке на этом устройстве')} description={`${t('Запись уйдёт на сервер архива и дальше в')} ${cloud.info?.where}. ${t('Если выключено, голос остаётся на устройстве и читается моделью ниже.')}`} checked={cloud.chosen} onChange={cloud.set} />
+          <SwitchRow title={t('Расшифровывать в облаке на этом устройстве')} description={`${t('Запись уйдёт на сервер архива и дальше в')} ${t(cloud.info?.where ?? '')}. ${t('Если выключено, голос остаётся на устройстве и читается моделью ниже.')}`} checked={cloud.chosen} onChange={cloud.set} />
+        </Section>
+      )}
+      {faces.enabled && (
+        <Section title={t('Распознавание лиц в облаке')} description={t('Владелец архива подключил сервис распознавания лиц и платит за него сам. Скачивать модель не нужно, работает на любом устройстве.')}>
+          <SwitchRow title={t('Искать и узнавать лица в облаке на этом устройстве')} description={`${t('Фото уйдёт на сервер архива и дальше в')} ${t(faces.info?.where ?? '')}. ${faces.info?.keeps ? t(faces.info.keeps) : ''} ${t('Если выключено, лица остаются на устройстве и читаются моделью ниже.')}`.replace(/\s+/g, ' ').trim()} checked={faces.chosen} onChange={faces.set} />
         </Section>
       )}
       <Section title={t('Модели на этом устройстве')} description={t('Ничего не скачивается само. Модели работают в этом браузере, а фото и голос остаются у вас. На другом устройстве модели скачиваются отдельно.')}>

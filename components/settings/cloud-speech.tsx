@@ -1,4 +1,6 @@
 'use client'
+import { DataTerms } from './data-terms'
+import { formatMoney } from '@/lib/ai/format'
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { FlaskConical, KeyRound, Trash2 } from 'lucide-react'
@@ -13,7 +15,7 @@ interface Status {
   presets: SttPreset[]
   current: { provider: SttId; model: string; baseUrl: string | null; source: 'server' | 'app'; keyEnding: string | null; sameKey: boolean; limitMinutes: number } | null
   assistant: string | null
-  usage: { month: string; minutes: number; dollars: number; requests: number }
+  usage: { month: string; minutes: number; dollars: number; requests: number; unpriced: number }
 }
 
 const input = 'h-9 w-full rounded-lg border border-input bg-white px-3 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring/40'
@@ -21,10 +23,10 @@ const hour = (p: SttPreset['models'][number], t: (k: string) => string) => (p.pe
 
 /** Where the owner connects one speech service for everyone and pays for it. Editors only use it. */
 export function CloudSpeech() {
-  const { t, confirm: ask } = useApp()
+  const { t, confirm: ask, lang } = useApp()
   const qc = useQueryClient()
   const { data } = useQuery({ queryKey: ['stt'], queryFn: () => api<Status>('transcription') })
-  const [provider, setProvider] = useState<SttId>('groq')
+  const [provider, setProvider] = useState<SttId | ''>('')
   const [model, setModel] = useState('')
   const [key, setKey] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
@@ -36,46 +38,55 @@ export function CloudSpeech() {
   const cur = data?.current ?? null
   useEffect(() => {
     if (!cur) return
-    setProvider(cur.provider); setModel(cur.model); setBaseUrl(cur.baseUrl ?? ''); setSame(cur.sameKey); setLimit(String(cur.limitMinutes))
+    setProvider(cur.provider); setModel(cur.model === 'auto' ? '' : cur.model); setBaseUrl(cur.baseUrl ?? ''); setSame(cur.sameKey); setLimit(String(cur.limitMinutes))
   }, [cur?.provider, cur?.model, cur?.baseUrl, cur?.sameKey, cur?.limitMinutes]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!data) return null
-  const preset = sttPreset(provider)!
+  const preset = provider ? sttPreset(provider)! : null
   const locked = cur?.source === 'server'
   const refresh = () => qc.invalidateQueries({ queryKey: ['stt'] }).then(() => qc.invalidateQueries({ queryKey: ['stt-info'] }))
   const run = async (what: string, fn: () => Promise<unknown>, done: string) => {
     setBusy(what); setMessage(null)
     try { await fn(); await refresh(); setKey(''); setMessage({ text: t(done), bad: false }) } catch (e) { setMessage({ text: (e as Error).message, bad: true }) } finally { setBusy('') }
   }
-  const save = () => run('save', () => api('transcription', { method: 'PUT', json: { provider, model: model || preset.models[0].id, ...(provider === 'custom' ? { baseUrl } : {}), ...(same ? { sameKey: true } : { key: key || undefined }), limitMinutes: Number(limit) || 0 } }), 'Сохранено. Ключ проверен: этот запрос ничего не стоил')
-  const canBorrow = !!preset.assistantKey && data.assistant === preset.assistantKey
+  const save = () => preset && run('save', () => api('transcription', { method: 'PUT', json: { provider, model: model || 'auto', ...(provider === 'custom' ? { baseUrl } : {}), ...(same ? { sameKey: true } : { key: key || undefined }), limitMinutes: Number(limit) || 0 } }), 'Сохранено. Ключ проверен: этот запрос ничего не стоил')
+  // The key already on the list for this service, or the assistant's for the same service, can be used again.
+  const canBorrow = (cur?.provider === provider && cur.sameKey) || (!!preset?.assistantKey && data.assistant === preset.assistantKey)
   return (
     <div className="flex min-w-0 flex-col gap-7 text-sm">
       <Section title={t('Расшифровка в облаке')} description={t('Вы подключаете один сервис распознавания речи и платите за него сами. Все редакторы архива пользуются им без своих ключей, а запись идёт через ваш сервер и нигде в архиве не хранится. Кто не хочет отправлять голос наружу, остаётся с моделями на своём устройстве.')}>
+        {/* What answers now, in one line on top, before anything that could be mistaken for it. */}
+        <div className="rounded-xl border border-border bg-white px-4 py-3" role="status">
+          <div className="text-xs text-ink-faint">{t('Сейчас используется')}</div>
+          <div className="font-medium">{cur ? `${t(sttPreset(cur.provider)!.label)} · ${cur.model === 'auto' ? t('самая новая проверенная') : cur.model}` : t('На этом устройстве, бесплатно')}</div>
+          {!cur && <div className="text-xs text-ink-soft">{t('Каждое устройство распознаёт речь само, моделью из «Модели на этом устройстве». Ничего не уходит наружу.')}</div>}
+        </div>
         {cur ? (
-          <p className="rounded-lg bg-muted px-3 py-2 text-xs text-ink-soft" role="status">
+          <p className="rounded-lg bg-muted px-3 py-2 text-xs text-ink-soft">
             {t('Подключено')}: {t(sttPreset(cur.provider)!.label)}, {cur.model}{cur.keyEnding ? `, ${t('ключ')} …${cur.keyEnding}` : cur.sameKey ? `, ${t('ключ ассистента')}` : ''}{locked ? `. ${t('Задано в настройках сервера')}` : ''}.
-            {' '}{t('Этот месяц')}: {data.usage.minutes} {t('мин')}, {data.usage.requests} {t('запросов')}, ≈ ${data.usage.dollars}{cur.limitMinutes ? ` · ${t('предел')} ${cur.limitMinutes} ${t('мин')}` : ''}
+            {' '}{t('Этот месяц')}: {data.usage.minutes} {t('мин')}, {data.usage.requests} {t('запросов')}, {data.usage.dollars === 0 && data.usage.unpriced > 0 ? t('цена неизвестна') : formatMoney(data.usage.dollars, lang)}{cur.limitMinutes ? ` · ${t('предел')} ${cur.limitMinutes} ${t('мин')}` : ''}
           </p>
-        ) : <p className="text-xs text-ink-soft">{t('Пока не подключено: расшифровка работает только на устройствах, моделями из «Лица и голос».')}</p>}
+        ) : null}
         {!locked && (
           <>
-            <PayChoice value={pay} onChange={(v) => { setPay(v); if (v === 'free' && !preset.free) { const first = STT_PRESETS.find((p) => p.free); if (first) { setProvider(first.id); setModel('') } } }} />
+            <h3 className="text-[15px] font-semibold">{cur ? t('Сменить сервис') : t('Подключить сервис в облаке')}</h3>
+            <PayChoice value={pay} onChange={(v) => { setPay(v); if (v === 'free' && !preset?.free) { const first = STT_PRESETS.find((p) => p.free); if (first) { setProvider(first.id); setModel('') } } }} />
             <div role="radiogroup" aria-label={t('Сервис')} className="grid gap-2 sm:grid-cols-2">
               {STT_PRESETS.filter((p) => pay !== 'free' || p.free).map((p) => (
-                <button key={p.id} role="radio" aria-checked={provider === p.id} type="button" onClick={() => { setProvider(p.id); setModel(''); setSame(false); setMessage(null) }} className={`rounded-lg border p-2.5 text-left transition-colors ${provider === p.id ? 'border-ink bg-white' : 'border-border hover:border-ink-faint'}`}>
+                <button key={p.id} role="radio" aria-checked={provider === p.id} type="button" onClick={() => { setProvider(p.id); setModel(''); setSame(!!cur && cur.provider === p.id && cur.sameKey); setMessage(null) }} className={`rounded-lg border p-2.5 text-left transition-colors ${provider === p.id ? 'border-ink bg-white' : 'border-border hover:border-ink-faint'}`}>
                   <b className="block font-medium">{t(p.label)}</b>
                   <span className="block text-xs text-ink-soft">{t(p.pitch)}</span>
                   <PlanLines free={p.free} show={pay} />
                 </button>
               ))}
             </div>
+            {!preset ? <p className="text-xs text-ink-soft">{t('Выберите сервис выше, чтобы указать модель и ключ.')}</p> : <>
             {preset.id === 'custom' ? (
               <label className="flex flex-col gap-1 text-xs text-ink-soft">
               {t('Модель')}
               {preset.id === 'custom' ? <input className={`${input} font-mono`} aria-label={t('Модель')} value={model} placeholder="whisper-1" onChange={(e) => setModel(e.target.value)} /> : (
-                <Select aria-label={t('Модель')} value={model || preset.models[0].id} onChange={setModel} options={preset.models.map((m) => ({ value: m.id, label: `${t(m.label)}${hour(m, t) ? ` · ${hour(m, t)}` : ''}` }))} />
+                <Select aria-label={t('Модель')} value={model} onChange={setModel} options={[...(preset.id === 'custom' ? [] : [{ value: '', label: t('самая новая проверенная') }]), ...preset.models.map((m) => ({ value: m.id, label: `${t(m.label)}${hour(m, t) ? ` · ${hour(m, t)}` : ''}` }))]} />
               )}
-              {preset.models.find((m) => m.id === (model || preset.models[0].id))?.note && <span>{t(preset.models.find((m) => m.id === (model || preset.models[0].id))!.note!)}</span>}
+              {preset.models.find((m) => m.id === model)?.note && <span>{t(preset.models.find((m) => m.id === model)!.note!)}</span>}
             </label>
             ) : (
               <details>
@@ -84,8 +95,8 @@ export function CloudSpeech() {
                   <p className="text-xs text-ink-soft">{t('Если не выбирать, берётся проверенная модель, а новую из той же линейки приложение подхватит само.')}</p>
                   <label className="flex flex-col gap-1 text-xs text-ink-soft">
               {t('Модель')}
-              <Select aria-label={t('Модель')} value={model || preset.models[0].id} onChange={setModel} options={preset.models.map((m) => ({ value: m.id, label: `${t(m.label)}${hour(m, t) ? ` · ${hour(m, t)}` : ''}` }))} />
-              {preset.models.find((m) => m.id === (model || preset.models[0].id))?.note && <span>{t(preset.models.find((m) => m.id === (model || preset.models[0].id))!.note!)}</span>}
+              <Select aria-label={t('Модель')} value={model} onChange={setModel} options={[{ value: '', label: t('самая новая проверенная') }, ...preset.models.map((m) => ({ value: m.id, label: `${t(m.label)}${hour(m, t) ? ` · ${hour(m, t)}` : ''}` }))]} />
+              {preset.models.find((m) => m.id === model)?.note && <span>{t(preset.models.find((m) => m.id === model)!.note!)}</span>}
             </label>
                 </div>
               </details>
@@ -104,11 +115,13 @@ export function CloudSpeech() {
               <input className={`${input} max-w-40`} inputMode="numeric" aria-label={t('Предел в месяц')} value={limit} onChange={(e) => setLimit(e.target.value.replace(/\D/g, ''))} />
             </label>
             <p className="text-xs text-ink-faint">{t('Запись уйдёт в')}: {t(preset.where)}. {t('Цены сервисов меняются: смотрите их страницы.')} {['openrouter', 'groq'].includes(preset.id) ? t('Проверен.') : t('Не проверен.')}</p>
+            <DataTerms service={preset.id} open />
             <div className="flex flex-wrap gap-2">
               <Button type="button" loading={busy === 'save'} onClick={save}><KeyRound /> {cur ? t('Сохранить') : t('Подключить')}</Button>
               {cur && <Button type="button" variant="outline" loading={busy === 'test'} onClick={() => run('test', () => api('transcription/test', { method: 'POST', json: {} }), 'Работает: сервис принял пробную запись. Она стоила доли цента')}><FlaskConical /> {t('Проверить на записи тишины')}</Button>}
               {cur && <Button type="button" variant="danger" onClick={async () => { if (await ask(t('Отключить расшифровку в облаке?'), t('Отключить'), t('Редакторы вернутся к моделям на своих устройствах.'))) run('remove', () => api('transcription', { method: 'DELETE' }), 'Отключено') }}><Trash2 /> {t('Отключить')}</Button>}
             </div>
+            </>}
           </>
         )}
         {message && <p role={message.bad ? 'alert' : 'status'} className={`text-xs ${message.bad ? 'text-destructive' : 'text-ink-soft'}`}>{message.text}</p>}

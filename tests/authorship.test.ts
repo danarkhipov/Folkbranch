@@ -3,7 +3,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 const script = path.resolve(__dirname, '../scripts/authorship.sh')
 let repo = ''
@@ -20,6 +20,7 @@ beforeAll(() => {
   git('init', '-q', '-b', 'main')
   commit('chore: the first commit')
 })
+afterAll(() => { fs.rmSync(repo, { recursive: true, force: true }) })
 
 describe('a commit message', () => {
   const msg = (text: string) => { const f = path.join(repo, 'MSG'); fs.writeFileSync(f, text); return check('message', f) }

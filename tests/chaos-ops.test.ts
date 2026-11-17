@@ -1,7 +1,9 @@
 // The same odd input, but through the archive itself: what people type, import and upload. Whatever happens,
 // the archive keeps answering: an operation may refuse in words (OpError), but nothing may crash or hang.
+import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import sharp from 'sharp'
+import { MEDIA_DIR } from '../lib/db'
 import { OpError, type Actor } from '../lib/ops/core'
 import { exportGedcom, importGedcom, previewGedcom, type ImportMode } from '../lib/ops/gedcom'
 import { storeUpload } from '../lib/ops/media'
@@ -27,7 +29,7 @@ describe('people typed in with odd text', () => {
         const pid = (id as { id?: string }).id ?? String(id)
         updatePerson(owner, pid, { givenName: pick(ODD), birthDate: pick(ODD) } as never)
       } catch (e) {
-        expect(refusal(e) || (e as Error).name === 'ZodError').toBe(true)
+        expect(refusal(e), (e as Error).message).toBe(true)
       }
     }
   })
@@ -65,9 +67,14 @@ describe('files people bring', () => {
   })
   it('an upload of any bytes is stored as a picture or refused in words, never half-stored', async () => {
     const bad = [Buffer.alloc(0), Buffer.from('not an image'), Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 1, 2, 3]), Buffer.alloc(2000, 0x89), Buffer.from('<svg onload=alert(1)>'), Buffer.from('%PDF-1.4 broken')]
+    const files = () => fs.readdirSync(MEDIA_DIR)
     for (const b of bad) {
       for (const name of ['a.jpg', '', '../../x.png', 'x'.repeat(400) + '.jpg', 'a\0.jpg', 'ё😀.heic']) {
-        try { await storeUpload(b, name, 'u-chaos') } catch (e) { expect(refusal(e) || e instanceof Error, String(e)).toBe(true) }
+        const before = new Set(files())
+        try { await storeUpload(b, name, 'u-chaos') } catch (e) {
+          expect(refusal(e), String(e)).toBe(true)
+          expect(files().filter((f) => !before.has(f)), `${name}: refused but left a file`).toEqual([])
+        }
       }
     }
     const png = await sharp({ create: { width: 3, height: 3, channels: 3, background: '#fff' } }).png().toBuffer()

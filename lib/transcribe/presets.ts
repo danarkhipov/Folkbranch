@@ -51,14 +51,18 @@ export const STT_PRESETS: SttPreset[] = [
     id: 'mistral', label: 'Mistral (Voxtral)', where: 'Mistral AI (Франция)', base: 'https://api.mistral.ai/v1', style: 'openai', keysUrl: 'https://console.mistral.ai/api-keys',
     free: { data: 'trains', note: 'Бесплатно, но компания использует ваши записи.' },
     pitch: 'Недорогой европейский сервис',
-    models: [{ id: 'voxtral-mini-transcribe-latest', label: 'Voxtral Mini Transcribe', perMinute: 0.0035 }],
+    // Mistral's docs list voxtral-mini-transcribe-3 and voxtral-small-transcribe-3; the old -latest id is gone.
+    models: [
+      { id: 'voxtral-mini-transcribe-3', label: 'Voxtral Mini Transcribe 3', perMinute: 0.0035 },
+      { id: 'voxtral-small-transcribe-3', label: 'Voxtral Small Transcribe 3', perMinute: 0.004, note: 'Точнее, дороже' },
+    ],
   },
   {
     id: 'siliconflow', label: 'SiliconFlow (Китай)', where: 'SiliconFlow (Китай, Сингапур)', base: 'https://api.siliconflow.com/v1', style: 'openai', keysUrl: 'https://cloud.siliconflow.com/account/ak',
     free: { data: 'unknown', note: 'Бесплатно, но условия неясны.' },
     pitch: 'Китайский сервис с бесплатными моделями',
+    // SiliconFlow's API reference lists only these two models for /audio/transcriptions.
     models: [
-      { id: 'Qwen/Qwen3-ASR-1.7B', label: 'Qwen3-ASR 1.7B (Alibaba)', perMinute: 0, note: 'Много языков, бесплатно' },
       { id: 'FunAudioLLM/SenseVoiceSmall', label: 'SenseVoice Small', perMinute: 0, note: 'Китайский, английский, японский, корейский' },
       { id: 'TeleAI/TeleSpeechASR', label: 'TeleSpeech ASR', perMinute: 0, note: 'Китайский и диалекты' },
     ],

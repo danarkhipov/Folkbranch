@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import { parseGedcom, unreadTags, writeGedcom } from '../gedcom'
+import { parseGedcom, placeholders, unreadTags, writeGedcom } from '../gedcom'
 import type { Certainty, Fact, Source } from '../types'
 import { yearOf } from '../types'
 import { peopleWords } from '../names'
@@ -8,7 +8,7 @@ import { addParent, addUnion, getGraph, insertPerson, normalize } from './people
 import { accountsLetGo, matchPeople, matchReport } from './gedcom-match'
 import { getDb, schema } from '../db'
 import { insertPage } from './pages'
-import { archiveLang, say } from './settings'
+import { archiveLang, say, tell } from './settings'
 
 
 export function previewGedcom(actor: Actor, text: string) {
@@ -17,7 +17,8 @@ export function previewGedcom(actor: Actor, text: string) {
   const known = new Set(getGraph(actor).persons.map((p) => `${p.givenName} ${p.surname}`.toLowerCase()))
   return {
     version: g.version,
-    persons: g.persons.length,
+    // A family with no parent in the file gains a card "?", and the count says so before the import.
+    persons: g.persons.length + placeholders(g),
     families: g.families.length,
     sample: g.persons.slice(0, 6).map((p) => [p.givenName, p.surname].filter(Boolean).join(' ')),
     existing: g.persons.filter((p) => known.has(`${p.givenName} ${p.surname}`.toLowerCase())).length,
@@ -45,9 +46,31 @@ function certaintyOf(quality: number | null): Certainty {
 export function importGedcom(actor: Actor, text: string, mode: ImportMode = 'add') {
   requireRole(actor, mode === 'replace' ? 'owner' : 'editor')
   const g = parseGedcom(text, archiveLang())
+  // A truncated download or the wrong file has no INDI at all: replacing with it would empty the archive.
+  if (mode === 'replace' && !g.persons.length) throw new OpError(400, tell('В файле нет ни одного человека: замена опустошила бы архив'))
+  // Two records with one id would make every link point at whichever came last, with no warning.
+  const xrefs = new Set<string>()
+  const repeated = new Set<string>()
+  for (const p of g.persons) {
+    if (!p.xref) continue
+    if (xrefs.has(p.xref)) repeated.add(p.xref)
+    xrefs.add(p.xref)
+  }
+  if (repeated.size) throw new OpError(400, `${tell('В файле повторяются номера записей')}: ${[...repeated].join(', ')}`)
   const db = getDb()
   const verb = mode === 'replace' ? 'Заменить дерево файлом' : mode === 'merge' ? 'Объединить с файлом' : 'Импорт GEDCOM'
-  return mutate(actor, { summary: `${say(verb)}: ${peopleWords(g.persons.length, archiveLang())}` }, (c) => {
+  const found = mode === 'merge' ? matchPeople(g) : new Map()
+  // A family without parents gains a card "?" so its children stay siblings; it is new like the rest.
+  const total = g.persons.length + placeholders(g)
+  const oldCount = mode === 'replace' ? db.select({ id: schema.persons.id }).from(schema.persons).all().length : 0
+  // Whether the cards came in new, merged into existing ones or replaced the whole tree, and how many of each.
+  const counts = mode === 'replace'
+    ? ` · ${say('Удалено')}: ${oldCount} · ${say('новых')}: ${total}`
+    : mode === 'merge'
+      ? ` · ${say('новых')}: ${total - found.size} · ${say('обновлено')}: ${found.size}`
+      : ` · ${say('новых')}: ${total}`
+  const personIds: string[] = []
+  return mutate(actor, { summary: `${say(verb)}: ${peopleWords(total, archiveLang())}${counts}`, personIds }, (c) => {
     const ids = new Map<string, string>()
     if (mode === 'replace') {
       for (const [table, rows] of [
@@ -58,11 +81,10 @@ export function importGedcom(actor: Actor, text: string, mode: ImportMode = 'add
         ['storyPeople', db.select({ id: schema.storyPeople.id }).from(schema.storyPeople).all()],
         ['contacts', db.select({ id: schema.contacts.id }).from(schema.contacts).all()],
         ['persons', db.select({ id: schema.persons.id }).from(schema.persons).all()],
-      ] as const) for (const r of rows) c.remove(table, r.id)
+      ] as const) for (const r of rows) { c.remove(table, r.id); if (table === 'persons') personIds.push(r.id) }
       dropStoriesAboutNobody(c)
-      accountsLetGo()
+      accountsLetGo(c)
     }
-    const found = mode === 'merge' ? matchPeople(g) : new Map()
     for (const p of g.persons) {
       const same = found.get(p.xref)
       if (same) {
@@ -74,9 +96,10 @@ export function importGedcom(actor: Actor, text: string, mode: ImportMode = 'add
         const names = unite(row.otherNames ? row.otherNames.split(', ') : [], p.otherNames ? p.otherNames.split(', ') : [], (x) => x.toLowerCase()).join(', ')
         c.update('persons', row.id, {
           ...normalize({ ...gaps, otherNames: names, facts: unite(list<Fact>(row.facts), p.facts, sameFact), sources: unite(list<Source>(row.sources), p.sources, sameSource) }),
-          ...(gaps.deathDate ? { living: false } : {}),
+          ...(gaps.deathDate || p.dead ? { living: false } : {}),
         })
         ids.set(p.xref, row.id)
+        personIds.push(row.id)
         const blocks = p.notes.flatMap((n) => n.split('\n').filter(Boolean).map(paragraph))
         const hasBio = db.select({ id: schema.pages.id }).from(schema.pages).where(eq(schema.pages.personId, row.id)).all().length > 0
         if (blocks.length && !hasBio) insertPage(c, { personId: row.id, title: say('Биография'), content: blocks })
@@ -89,6 +112,7 @@ export function importGedcom(actor: Actor, text: string, mode: ImportMode = 'add
         living, certainty: certaintyOf(p.quality),
       })
       ids.set(p.xref, id)
+      personIds.push(id)
       // Notes have no field of their own, so they become a page.
       const blocks = [
         ...p.notes.flatMap((n) => n.split('\n').filter(Boolean).map(paragraph)),
@@ -96,7 +120,6 @@ export function importGedcom(actor: Actor, text: string, mode: ImportMode = 'add
       if (blocks.length) insertPage(c, { personId: id, title: say('Биография'), content: blocks })
     }
     // Godparents and witnesses named by their place in the file now point at their cards.
-    const xrefs = new Set(g.persons.map((p) => p.xref))
     const mapId = (x: string | null | undefined) => (x ? ids.get(x) ?? (xrefs.has(x) ? null : x) : null)
     for (const p of g.persons) {
       if (!p.facts.some((f) => f.people?.some((x) => x.personId))) continue
@@ -109,7 +132,7 @@ export function importGedcom(actor: Actor, text: string, mode: ImportMode = 'add
       const b = f.wife && ids.get(f.wife)
       // Exports with hidden people can drop both parents; a placeholder keeps the children siblings.
       const placeholder = !a && !b && f.children.length > 1
-      if (placeholder) a = insertPerson(c, { givenName: '?', living: false, certainty: 'assumed' })
+      if (placeholder) { a = insertPerson(c, { givenName: '?', living: false, certainty: 'assumed' }); personIds.push(a) }
       if (a && b) addUnion(c, a, b, f.kind, f.date, f.end, f.place)
       for (const ch of f.children) {
         const cid = ids.get(ch.xref)
@@ -120,7 +143,7 @@ export function importGedcom(actor: Actor, text: string, mode: ImportMode = 'add
         if (b) safe(() => addParent(c, b, cid, ch.adopted ? 'adopted' : 'birth', 'family'))
       }
     }
-    return { persons: g.persons.length, families: g.families.length, merged: found.size, ids: Object.fromEntries(ids) }
+    return { persons: total, families: g.families.length, merged: found.size, ids: Object.fromEntries(ids) }
   })
 }
 

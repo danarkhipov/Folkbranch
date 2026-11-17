@@ -26,9 +26,11 @@ describe('daily copies', () => {
   })
 
   it('keeps only the newest few', async () => {
-    for (let d = 0; d < backup.KEEP + 3; d++) await backup.runAutoBackup({ force: true, now: Date.UTC(2026, 1, 1 + d, 3) })
-    expect(fs.readdirSync(dir)).toHaveLength(backup.KEEP)
-    expect(fs.readdirSync(dir).sort()[0]).toBe('2026-02-04T03-00')
+    const days = Array.from({ length: backup.KEEP + 3 }, (_, d) => Date.UTC(2026, 1, 1 + d, 3))
+    for (const now of days) await backup.runAutoBackup({ force: true, now })
+    const nameOf = (t: number) => new Date(t).toISOString().slice(0, 16).replace(':', '-')
+    // The folder names come from the same timestamps, so a change to KEEP cannot leave a stale literal.
+    expect(fs.readdirSync(dir).sort()).toEqual(days.slice(-backup.KEEP).map(nameOf))
   })
 
   it('tells the owner, and nobody else', async () => {

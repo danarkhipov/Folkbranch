@@ -87,7 +87,7 @@ contract('Catalan', CA, CATALAN, (T) => {
   expect([T.your("esposa de l'oncle", 'F'), T.your("cosí germà de l'esposa", 'M')]).toEqual(["l'esposa del teu oncle", 'el cosí germà de la teva esposa'])
 })
 
-describe('a Spanish or Catalan archive before its terms are filled', () => {
+describe('a Spanish or Catalan archive names relatives in its own words, never in Russian', () => {
   const graph = {
     persons: [{ id: 'me', sex: 'M' }, { id: 'mum', sex: 'F' }, { id: 'gran', sex: 'F' }] as Person[],
     parentChild: [{ id: '1', parentId: 'mum', childId: 'me', kind: 'birth' }, { id: '2', parentId: 'gran', childId: 'mum', kind: 'birth' }],
@@ -95,10 +95,10 @@ describe('a Spanish or Catalan archive before its terms are filled', () => {
   } as unknown as Graph
   const f = new Family(graph)
 
-  it('names relatives in its own words or in English, never in Russian', () => {
+  it('dispatches to the language table, and the word is never Russian', () => {
     for (const [lang, T] of [['es', ES], ['ca', CA]] as const) {
       const label = f.relation('me', 'gran', lang)!.label
-      expect(label).toBe(T ? T.blood(2, 0, 'F', false) : 'grandmother')
+      expect(label).toBe(T.blood(2, 0, 'F', false))
       expect(yourTerm(label, 'F', lang)).not.toMatch(/[а-яё]/i)
     }
   })

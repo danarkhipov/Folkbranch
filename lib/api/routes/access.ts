@@ -1,6 +1,6 @@
 import { exportAiSettings, importAiSettings } from '@/lib/ops/ai-config'
 import { z } from 'zod'
-import { chooseModel, connectProvider, modelChoices, currentProvider, disconnectProvider, providerStatus } from '@/lib/agent/provider-key'
+import { chooseModel, connectProvider, modelChoices, currentProvider, disconnectProvider, keyBalance, providerStatus, answerChoices } from '@/lib/agent/provider-key'
 import { requireRole } from '@/lib/ops/core'
 import { acceptProposal, listProposals, myProposals, rejectProposal, removeProposalOp } from '@/lib/ops/proposals'
 import * as settings from '@/lib/ops/settings'
@@ -12,6 +12,8 @@ import { applyUpdate, installKind, updateHow, updateRunning } from '@/lib/self-u
 import * as tokens from '@/lib/ops/tokens'
 import { get, human, role, type Route } from '../router'
 import { backupNow, backupStatus } from '@/lib/ops/auto-backup'
+import { addKey, listServices, removeKey } from '@/lib/ai/services'
+import { usageReport } from '@/lib/ai/usage'
 import { METHODS, methodsStatus, removeMethod, saveMethod } from '@/lib/sign-in-methods'
 
 const method = (id: string) => z.enum(METHODS).parse(id)
@@ -59,6 +61,12 @@ export const accessRoutes: Route[] = [
   human('GET', 'ai-settings', 'Everything chosen about the AI, as a file with no keys in it', ({ actor }) => exportAiSettings(actor)),
   human('PUT', 'ai-settings', 'Apply such a file: what can be applied is, and the rest is named', async ({ actor, body }) => importAiSettings(actor, await body())),
   human('GET', 'assistant/provider', 'Which AI provider is connected', ({ actor }) => providerStatus(actor)),
+  human('GET', 'assistant/choices', 'Services and models the owner added, to pick one for an answer', ({ actor }) => (actor.role === 'owner' ? answerChoices() : [])),
+  human('GET', 'ai/usage', 'Who used which AI function this month, from real figures only', ({ actor }) => usageReport(actor)),
+  human('GET', 'ai/keys', 'Keys to AI services, and which functions use each', ({ actor }) => listServices(actor)),
+  human('PUT', 'ai/keys', 'Add a key to an AI service, checked with it first', async ({ actor, body }) => addKey(actor, await body())),
+  human('DELETE', 'ai/keys/:service', 'Remove a key, and switch off what used it', ({ actor, params }) => removeKey(actor, params.service)),
+  human('GET', 'assistant/provider/balance', 'What is left on the key, where the provider says it', ({ actor }) => keyBalance(actor)),
   human('PUT', 'assistant/provider', 'Connect an AI provider with a key', async ({ actor, body }) => connectProvider(actor, await body())),
   human('GET', 'assistant/provider/models', 'Models the connected key can use, newest first, with what each can do', ({ actor }) => modelChoices(actor)),
   human('PATCH', 'assistant/provider', 'Choose another model', async ({ actor, body }) => chooseModel(actor, await body())),

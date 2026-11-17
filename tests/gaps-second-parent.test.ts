@@ -25,6 +25,8 @@ describe('the second parent', () => {
     expect(missingOf(kid.id)).not.toContain('secondParent')
   })
   it('goes away once the mother is added', () => {
+    // It must be there first, or this test passes even if the gap is never reported at all.
+    expect(missingOf(ilya.id)).toContain('secondParent')
     linkPeople(owner, 'mother', ilya.id, elena.id)
     expect(missingOf(ilya.id)).not.toContain('secondParent')
   })

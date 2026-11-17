@@ -9,6 +9,7 @@ import * as media from '../lib/ops/media'
 import * as people from '../lib/ops/people'
 import { acceptProposal, listProposals, queuedAudio, rejectProposal } from '../lib/ops/proposals'
 import { createShare, guestFromCookie, openShare } from '../lib/ops/share'
+import { listHistory } from '../lib/ops/settings'
 import * as stories from '../lib/ops/stories'
 import { addStory } from '../lib/ops/suggest'
 import { toolsFor } from '../lib/ops/tools'
@@ -66,7 +67,7 @@ describe('stories', () => {
     const { id } = await addStory(owner, about(other), voice()) as { id: string }
     stories.deleteStory(owner, id)
     expect(list(owner, other).some((x) => x.id === id)).toBe(false)
-    const [last] = getDb().select().from(schema.history).all().slice(-1)
+    const last = listHistory(owner)[0]
     core.undo(owner, last.id, 'undo')
     expect(list(owner, other).find((x) => x.id === id)?.hasAudio).toBe(true)
     expect(stories.storyAudio(owner, id).mime).toBe('audio/webm')
@@ -77,7 +78,7 @@ describe('stories', () => {
     const { id } = await addStory(owner, about(lone), voice()) as { id: string }
     people.deletePerson(owner, lone)
     expect(getDb().select().from(schema.stories).where(eq(schema.stories.id, id)).get()).toBeUndefined()
-    const [last] = getDb().select().from(schema.history).all().slice(-1)
+    const last = listHistory(owner)[0]
     core.undo(owner, last.id, 'undo')
     expect(list(owner, lone).find((x) => x.id === id)?.hasAudio).toBe(true)
   })

@@ -38,8 +38,11 @@ describe('what a provider might answer one day', () => {
     const line = { match: /^gpt-(\d+(?:\.\d+)*)-luna$/, floor: 'gpt-6-luna', status: 'tested' as const }
     expect(newestOfLine([...ODD, 'gpt-99999999999999999999-luna', 'gpt-7-luna'], line)).toBe('gpt-99999999999999999999-luna')
   })
-  it('every preset has models, prices and no leftover of a removed one', () => {
-    for (const p of PRESETS) expect(p.models.length).toBeGreaterThan(0)
+  it('every preset has models with prices', () => {
+    for (const p of PRESETS) {
+      expect(p.models.length).toBeGreaterThan(0)
+      expect(p.models.every((m) => m.id && m.label && m.price)).toBe(true)
+    }
   })
 })
 

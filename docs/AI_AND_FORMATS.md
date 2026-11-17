@@ -86,11 +86,27 @@ The owner can connect one speech service for the whole archive under **Settings 
 | OpenRouter | mistralai/voxtral-mini-transcribe | $0.003 a minute; the exact cost of each request comes back; the assistant's OpenRouter key can be reused | OpenRouter |
 | Groq | whisper-large-v3-turbo | about $0.04 an hour, free allowance; about 4.6% wrong words in English | USA |
 | OpenAI | gpt-transcribe | $0.0045 a minute; about 3.3% wrong words in English | USA |
-| Mistral | voxtral-mini-transcribe-latest | $0.0035 a minute | France |
-| SiliconFlow | Qwen/Qwen3-ASR-1.7B | free models with limits; a Chinese service | China, Singapore |
+| Mistral | voxtral-mini-transcribe-3 | $0.0035 a minute (Small, $0.004, is more accurate) | France |
+| SiliconFlow | FunAudioLLM/SenseVoiceSmall | free models with limits; a Chinese service | China, Singapore |
 | Your own server | any | anything that answers like OpenAI's `/audio/transcriptions`, such as faster-whisper | where you put it |
 
-Our own check, 9 November 2026, 20 English clips (LibriSpeech test-other, 546 words) and 20 Russian clips (bond005/sova_rudevices, 161 words): OpenRouter's Voxtral Mini Transcribe got 2.2% of the English words wrong and 14.3% of the Russian, for about 1.3 cents in all; Groq's Whisper large-v3 turbo 2.7% and 19.3% on the free plan, which allows 20 requests a minute (the Russian run hit that limit at first and was repeated with a pause). On the device, Whisper turbo got 2.2% and 20.8% on a smaller subset. The others (OpenAI, Mistral directly, SiliconFlow) were not run, and the app says so. Prices and word-error figures are the services' own and independent comparisons as of 8 November 2026, a guide that changes. A key is checked by reading the service's model list, which costs nothing; the test button sends two seconds of silence, a fraction of a cent. A monthly limit (600 minutes unless changed) and eight recordings a minute per person keep one stuck button from spending the owner's money. The same can be set in the server's environment (`STT_PROVIDER`, `STT_API_KEY`, `STT_MODEL`, `STT_BASE_URL`, `STT_LIMIT_MINUTES`), and then it wins over the app. Alibaba's own DashScope service takes audio only as a link, so it is not offered directly; its Qwen3-ASR models are reachable through SiliconFlow.
+Our own check, 9 November 2026, 20 English clips (LibriSpeech test-other, 546 words) and 20 Russian clips (bond005/sova_rudevices, 161 words): OpenRouter's Voxtral Mini Transcribe got 2.2% of the English words wrong and 14.3% of the Russian, for about 1.3 cents in all; Groq's Whisper large-v3 turbo 2.7% and 19.3% on the free plan, which allows 20 requests a minute (the Russian run hit that limit at first and was repeated with a pause). On the device, Whisper turbo got 2.2% and 20.8% on a smaller subset. The others (OpenAI, Mistral directly, SiliconFlow) were not run, and the app says so. Prices and word-error figures are the services' own and independent comparisons as of 8 November 2026, a guide that changes. A key is checked by reading the service's model list, which costs nothing; the test button sends two seconds of silence, a fraction of a cent. A monthly limit (600 minutes unless changed) and eight recordings a minute per person keep one stuck button from spending the owner's money. The same can be set in the server's environment (`STT_PROVIDER`, `STT_API_KEY`, `STT_MODEL`, `STT_BASE_URL`, `STT_LIMIT_MINUTES`), and then it wins over the app. Alibaba's own DashScope service takes audio only as a link, so it is not offered directly. SiliconFlow's transcription endpoint currently lists SenseVoiceSmall and TeleSpeechASR.
+
+## Cloud faces
+
+The owner can connect one face service for the whole archive under **Settings → Cloud faces**. It is the owner's key and the owner's bill. Editors then find faces and get suggestions of who they are without downloading a model to the device: the photo and a few already-tagged faces go to this server, which forwards them to the service and keeps nothing of it. A device may still choose the models it downloads under **Settings → Faces and voice**.
+
+| Service | What it does | About | Where the photo goes |
+|---|---|---|---|
+| Amazon Rekognition | DetectFaces and CompareFaces | $0.001 a call, free allowance in the first year; AWS signature with a key and a secret | Amazon Web Services |
+| Face++ (Megvii) | Detect and Compare | Free key with request limits; a key and a secret | China |
+| Luxand.cloud | Detect and Verify | 500 requests a month free; Verify needs a stored reference, so the server creates it for one comparison and deletes it at once | USA |
+| CompreFace | Detect and vectors | Open source, self-hosted: nothing leaves your server | your own server |
+| Microsoft Azure Face | — | Not offered: detection alone is open, but identification and verification are Limited Access, only for Microsoft-managed customers after a vetting process ([docs](https://learn.microsoft.com/en-us/azure/foundry/responsible-ai/computer-vision/limited-access-identity)) | Microsoft |
+
+Only public services with an HTTP API are listed. A key is checked without sending a real photo: hosted services answer a read-only request, and CompreFace is self-hosted and free. The test button sends a blank 64×64 picture, a fraction of a cent. A monthly limit (1000 provider requests unless changed) and at most six scans a minute per person keep one stuck button from spending the owner's money. At most twelve tagged people are compared in one scan. The same can be set in the server's environment (`FACE_PROVIDER`, `FACE_API_KEY`, `FACE_API_SECRET`, `FACE_BASE_URL`, `FACE_LIMIT_REQUESTS`), and then it wins over the app. Readers never trigger it; only editors and the owner can scan.
+
+The request and response shapes of each service live in `lib/faces/presets.ts`, next to its parser, with a sample from the service's documentation in `tests/faces-presets.test.ts`.
 
 ## Models on the device and their licences
 

@@ -183,7 +183,9 @@ export interface HistoryEntry {
   byAgent: boolean
   summary: string
   /** What exactly changed, in words. Not sent to readers. */
-  details?: { label: string; before: string | null; after: string | null }[]
+  details?: { label: string; before: string | null; after: string | null; personId?: string }[]
+  /** The people this entry added, changed or removed. Not sent to readers. */
+  people?: { id: string; name: string; change: 'added' | 'updated' | 'removed' }[]
   personIds: string[]
   undoOf: string | null
   undoneAt: number | null
@@ -204,7 +206,10 @@ let serverOpenEnd: (() => string) | null = null
 export const setOpenEnd = (f: () => string) => { serverOpenEnd = f }
 /** The page's own word for it: this file cannot reach the tables. The server's word comes from "н. в." ("now") in them. A language not here reads 'now'. */
 const OPEN_END: Partial<Record<Lang, string>> = { ru: 'н. в.', en: 'now', es: 'hoy', ca: 'avui' }
-const openEnd = () => (typeof document !== 'undefined' ? (OPEN_END[document.documentElement.lang.slice(0, 2) as Lang] ?? 'now') : serverOpenEnd?.() ?? 'н. в.')
+// Dates belong to the archive's data, so they keep its language even when the interface is read in another.
+const openEnd = () => (typeof document !== 'undefined'
+  ? (OPEN_END[(document.documentElement.dataset.archiveLang ?? document.documentElement.lang).slice(0, 2) as Lang] ?? 'now')
+  : serverOpenEnd?.() ?? 'н. в.')
 
 export function lifeYears(p: Person, unknown = '?', open: string = openEnd()): string {
   const b = p.birthDate || (p.birthYear ? String(p.birthYear) : '')

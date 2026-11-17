@@ -1,6 +1,7 @@
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { tokenActor } from '@/lib/api-auth'
 import { buildMcpServer } from '@/lib/mcp'
+import { recordUse } from '@/lib/ai/usage'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,6 +12,8 @@ async function handle(req: Request) {
   // Stateless: nothing to keep between calls, and the host may sleep between them.
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true })
   await buildMcpServer(actor).connect(transport)
+  const calls = await req.clone().json().then((b) => (Array.isArray(b) ? b : [b]).filter((m) => m?.method === 'tools/call').length).catch(() => 0)
+  if (calls && actor.tokenId) recordUse('mcp', actor.tokenId, { requests: calls })
   return transport.handleRequest(req)
 }
 

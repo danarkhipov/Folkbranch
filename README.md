@@ -82,7 +82,6 @@ Backups, updates and servers: the [self-hosting guide](docs/SELF_HOSTING.md). It
 - See how two people are related, and the path between them.
 - An ancestor fan for anyone: the whole line in one picture.
 - Places with what they were part of, their old names and a point on a map, so a search for "Tsaritsyn" finds people from Volgograd.
-- The family on a map, year by year: press Play and people move between the places of their lives, follow one person's whole route, or the line from an ancestor down to you. The map comes with the app, so it asks nothing of another server.
 - Dates and numbers: birthdays and anniversaries of the coming two months, the family in figures, and a file for the calendar on a phone.
 - Save views of a branch. Print the chart to PDF on one sheet or across several.
 - Right-click the chart: on a person to open, add a parent, a spouse or a child, or delete; on an empty place to add someone there or load a file. Hover a person and their whole line lights up.
@@ -144,7 +143,7 @@ Folkbranch is for a family keeping its history together on a server of its own. 
 | **Where they go further** | | | |
 | Charts | Whole family on one screen, or a person's ancestors or descendants. Ancestor fan, relationship path, PDF | ✓ Ancestors, descendants, hourglass, fan, relationships | ✓ Fan, hourglass, relationships and more |
 | Reports and books | The chart and a person's page in PDF. The assistant drafts a life story from the sources, for you to review | ✓ Many reports | ✓ Many reports |
-| Maps and timelines | ✓ The family on a map through the years, people moving between the places of their lives, and each life's places in order. That map comes with the app; the Places map shows once this device allows OpenStreetMap | ✓ Maps and timelines | ✓ Maps and timelines |
+| Maps and timelines | ✓ The family's places on a map, and each life's places in order. The map shows once this device allows OpenStreetMap | ✓ Maps and timelines | ✓ Maps and timelines |
 | Reading documents | ✓ The assistant reads scans, handwriting included, and proposes what they show with the document as the source. Needs a model that sees pictures | ✓ Tesseract on the server | ✗ |
 | DNA | ✗ | ✓ Matches, chromosome browser, Y-DNA | Stores DNA notes only |
 
@@ -207,7 +206,7 @@ Yes, if the service exports GEDCOM. Folkbranch shows what the file holds before 
 Only people you invite. The site is closed to search engines, photos need a sign-in, and readers do not see living relatives.
 
 **Does anything leave my server?**
-Not by itself. Connecting an AI provider sends what the assistant reads to that provider, and the app says so first. Cloud speech, if the owner connects it, sends each recording to that service. A model for faces or speech downloads to the browser only when you press its button. The family map comes with the app and asks no other server. The map on the Places screen comes from OpenStreetMap once a device allows it, which then sees the part of the world on screen, not names or dates.
+Not by itself. Connecting an AI provider sends what the assistant reads to that provider, and the app says so first. Cloud speech, if the owner connects it, sends each recording to that service. A model for faces or speech downloads to the browser only when you press its button. The map's pictures come from OpenStreetMap once a device allows it, which then sees the part of the world on screen, not names or dates.
 
 **What does it need to run?**
 A Mac or Linux computer, or any Linux server with 512 MB of memory. The app itself stays near 130 MB with a family of a thousand and twenty people looking.

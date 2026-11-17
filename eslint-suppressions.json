@@ -224,7 +224,7 @@
   },
   "tests/agent-files.test.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 12
+      "count": 9
     }
   },
   "tests/agent-guards.test.ts": {

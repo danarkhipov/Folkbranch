@@ -1,4 +1,5 @@
 import { headers } from 'next/headers'
+import { langOfRequest, withViewerLang } from '@/lib/ops/app-config'
 import { OpError } from '@/lib/ops/core'
 import { submitRecording } from '@/lib/ops/story-requests'
 import { fromOurPages } from '@/lib/same-origin'
@@ -13,16 +14,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   if (!fromOurPages(h)) return Response.json({ error: 'bad origin' }, { status: 403 })
   if (Number(h.get('content-length') ?? 0) > MAX_BYTES + 1024 * 1024) return Response.json({ error: 'too large' }, { status: 413 })
   const { token } = await params
-  try {
-    const form = await req.formData()
-    const file = form.get('audio')
-    if (!(file instanceof File)) return Response.json({ error: 'file required' }, { status: 400 })
-    const seconds = Number(form.get('seconds'))
-    const topic = Number(form.get('topic'))
-    return Response.json(await submitRecording(token, { buf: Buffer.from(await file.arrayBuffer()), name: file.name }, Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds) : null, Number.isInteger(topic) && topic >= 0 ? topic : null))
-  } catch (e) {
-    if (e instanceof OpError) return Response.json({ error: e.message }, { status: e.status })
-    console.error(e)
-    return Response.json({ error: 'server error' }, { status: 500 })
-  }
+  return withViewerLang(langOfRequest(h), async () => {
+    try {
+      const form = await req.formData()
+      const file = form.get('audio')
+      if (!(file instanceof File)) return Response.json({ error: 'file required' }, { status: 400 })
+      const seconds = Number(form.get('seconds'))
+      const topic = Number(form.get('topic'))
+      return Response.json(await submitRecording(token, { buf: Buffer.from(await file.arrayBuffer()), name: file.name }, Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds) : null, Number.isInteger(topic) && topic >= 0 ? topic : null))
+    } catch (e) {
+      if (e instanceof OpError) return Response.json({ error: e.message }, { status: e.status })
+      console.error(e)
+      return Response.json({ error: 'server error' }, { status: 500 })
+    }
+  })
 }

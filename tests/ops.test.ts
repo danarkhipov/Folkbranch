@@ -10,9 +10,10 @@ let pages: typeof import('../lib/ops/pages')
 let media: typeof import('../lib/ops/media')
 let settings: typeof import('../lib/ops/settings')
 let core: typeof import('../lib/ops/core')
+let db: typeof import('../lib/db')
 
 beforeAll(async () => {
-  ;[people, pages, media, settings, core] = await Promise.all([import('../lib/ops/people'), import('../lib/ops/pages'), import('../lib/ops/media'), import('../lib/ops/settings'), import('../lib/ops/core')])
+  ;[people, pages, media, settings, core, db] = await Promise.all([import('../lib/ops/people'), import('../lib/ops/pages'), import('../lib/ops/media'), import('../lib/ops/settings'), import('../lib/ops/core'), import('../lib/db')])
 })
 
 const lastEntry = () => settings.listHistory(owner)[0]
@@ -141,5 +142,7 @@ describe('invites', () => {
     expect(settings.findInvite(token)?.name).toBe('Тётя')
     expect(settings.findInvite(token)?.tokenHash).not.toBe(token)
     expect(settings.findInvite('wrong')).toBeNull()
+    db.getDb().update(db.schema.invites).set({ expiresAt: new Date(Date.now() - 1000) }).run()
+    expect(settings.findInvite(token)).toBeNull()
   })
 })

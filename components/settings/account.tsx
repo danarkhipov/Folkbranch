@@ -1,13 +1,16 @@
 'use client'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronsUpDown, LogOut, MonitorX, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Section } from '@/components/ui/section'
+import { Select } from '@/components/ui/select'
 import { api, useApp } from '@/lib/client'
 import { draftsLeft } from '@/lib/autosave'
 import { signOut } from '@/lib/sign-out'
-import { personName } from '@/lib/types'
+import { LANG_NAMES, LANGS, setLangCookie } from '@/lib/languages'
+import { personName, type Lang } from '@/lib/types'
 import type { SignInMethods } from '@/lib/sign-in-methods'
 import { MailCode, OAuthButtons, TelegramButton, authPost } from '../sign-in-buttons'
 import { PersonPopover } from '../person-pickers'
@@ -15,8 +18,14 @@ import { roleHelp, roleName } from './roles'
 
 /** Who I am here: my card on the chart, how I get back in, where I am signed in. */
 export function Account({ providers }: { providers: SignInMethods }) {
-  const { t, me, byId, notify, confirm } = useApp()
+  const { t, me, byId, notify, confirm, lang } = useApp()
+  const router = useRouter()
   const mine = me.personId ? byId.get(me.personId) : null
+  const chooseLang = (next: Lang) => {
+    setLangCookie(next)
+    document.documentElement.lang = next
+    router.refresh()
+  }
   const claim = async (personId: string | null) => {
     try {
       await api('me', { method: 'PATCH', json: { personId } })
@@ -28,6 +37,9 @@ export function Account({ providers }: { providers: SignInMethods }) {
   return (
     <div className="flex min-w-0 flex-col gap-7 text-sm">
       <Section title={`${me.name} · ${t(roleName[me.role])}`} description={t(roleHelp[me.role])} />
+      <Section title={t('Язык интерфейса')} description={t('Только для вас на этом устройстве. Язык архива остаётся прежним.')}>
+        <Select aria-label={t('Язык интерфейса')} value={lang} onChange={(next) => chooseLang(next as Lang)} options={LANGS.map((l) => ({ value: l, label: LANG_NAMES[l] }))} />
+      </Section>
       {me.role !== 'reader' && (
         <Section title={t('Моя карточка на схеме')} description={t('Выберите себя, и схема покажет, кем вам приходится каждый человек. Подойдёт только живой человек.')}>
           <div className="flex flex-wrap items-center gap-2">

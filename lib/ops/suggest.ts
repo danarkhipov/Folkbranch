@@ -4,7 +4,7 @@ import { Actor, newId, OpError } from './core'
 import { personFor, personInput } from './op-defs'
 import * as media from './media'
 import { enqueue, pendingOps, pendingVoices } from './proposals'
-import { say } from './settings'
+import { say, tell } from './settings'
 import { createStory, newStory } from './stories'
 
 /** A reader's voices wait on the volume until someone looks at them. */
@@ -28,9 +28,9 @@ export function suggest(actor: Actor, raw: unknown) {
   const person = personFor(actor, personId) as unknown as Record<string, string>
   const changed = Object.fromEntries(Object.entries(patch).filter(([k, v]) => (v ?? '').trim() !== (person[k] ?? '')).map(([k, v]) => [k, (v ?? '').trim()]))
   const fields = Object.keys(changed)
-  if (!fields.length && !text) throw new OpError(400, say('Нечего предлагать'))
-  if (pendingOps(actor) >= MAX_PENDING) throw new OpError(429, say('Слишком много предложений ждут проверки. Подождите, пока их посмотрят.'))
-  const from = note ? [`${say('Откуда это известно')}: ${note}`] : []
+  if (!fields.length && !text) throw new OpError(400, tell('Нечего предлагать'))
+  if (pendingOps(actor) >= MAX_PENDING) throw new OpError(429, tell('Слишком много предложений ждут проверки. Подождите, пока их посмотрят.'))
+  const from = note ? [`${tell('Откуда это известно')}: ${note}`] : []
   return enqueue(actor, [
     // `seen`: the values as they stand now, so an accepted suggestion cannot overwrite what someone wrote in between.
     ...(fields.length ? [{ op: 'update_person', args: { id: personId, patch: changed, seen: Object.fromEntries(fields.map((k) => [k, person[k]])) }, details: from }] : []),
@@ -44,10 +44,10 @@ export async function addStory(actor: Actor, raw: unknown, file: { buf: Buffer; 
   const x = newStory.parse(raw)
   // A reader cannot put anyone hidden from them into a story, as its subject or as its teller.
   for (const id of [...x.about, ...(x.tellerId ? [x.tellerId] : [])]) personFor(actor, id)
-  if (!x.body && !file) throw new OpError(400, say('Нужна запись голоса или текст'))
+  if (!x.body && !file) throw new OpError(400, tell('Нужна запись голоса или текст'))
   const reader = actor.role === 'reader'
-  if (reader && pendingOps(actor) >= MAX_PENDING) throw new OpError(429, say('Слишком много предложений ждут проверки. Подождите, пока их посмотрят.'))
-  if (reader && file && pendingVoices(actor) >= MAX_PENDING_VOICES) throw new OpError(429, say('Слишком много записей ждут проверки. Подождите, пока их посмотрят.'))
+  if (reader && pendingOps(actor) >= MAX_PENDING) throw new OpError(429, tell('Слишком много предложений ждут проверки. Подождите, пока их посмотрят.'))
+  if (reader && file && pendingVoices(actor) >= MAX_PENDING_VOICES) throw new OpError(429, tell('Слишком много записей ждут проверки. Подождите, пока их посмотрят.'))
   const audio = file ? await media.storeAudio(file.buf, file.name || 'voice', actor.userId) : null
   try {
     if (!reader) return createStory(actor, { ...x, audio })

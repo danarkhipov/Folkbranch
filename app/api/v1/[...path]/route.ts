@@ -6,13 +6,16 @@ import { match, openApi } from '@/lib/api/router'
 import { accessRoutes } from '@/lib/api/routes/access'
 import { contentRoutes } from '@/lib/api/routes/content'
 import { speechRoutes } from '@/lib/api/routes/speech'
+import { faceRoutes } from '@/lib/api/routes/faces'
 import { exchangeRoutes } from '@/lib/api/routes/exchange'
 import { familyRoutes } from '@/lib/api/routes/family'
+import { langOfRequest, withViewerLang } from '@/lib/ops/app-config'
+import { errorFor } from '@/lib/i18n-errors'
 import { OpError } from '@/lib/ops/core'
 
 export const dynamic = 'force-dynamic'
 
-const routes = [...familyRoutes, ...contentRoutes, ...exchangeRoutes, ...accessRoutes, ...speechRoutes]
+const routes = [...familyRoutes, ...contentRoutes, ...exchangeRoutes, ...accessRoutes, ...speechRoutes, ...faceRoutes]
 
 /** The largest upload, as base64, with room for its envelope. */
 const MAX_BODY = 60 * 1024 * 1024
@@ -30,18 +33,25 @@ async function handle(req: Request, ctx: { params: Promise<{ path: string[] }> }
   if (Number(req.headers.get('content-length') ?? 0) > MAX_BODY) return Response.json({ error: 'file too large' }, { status: 413 })
   try {
     const h = await headers()
-    // Cookies travel on their own, so writes with a cookie must come from our own pages.
-    if (!hasBearer(h) && req.method !== 'GET' && !fromOurPages(h)) return Response.json({ error: 'bad origin' }, { status: 403 })
-    const actor = (await getActor(h)) ?? guestActor(h)
-    if (!actor) return Response.json({ error: 'unauthorized' }, { status: 401 })
-    if (actor.guest && !found.route.guest) return Response.json({ error: 'not available with a link' }, { status: 403 })
-    if (actor.tokenId && found.route.human) return Response.json({ error: 'not available to tokens' }, { status: 403 })
-    const result = await found.route.handler({ actor, params: found.params, req, query: new URL(req.url).searchParams, body: () => req.json() })
-    if (result instanceof Response) return result
-    return Response.json(result ?? { ok: true }, { status: (result as { status?: string } | null)?.status === 'pending_review' ? 202 : 200 })
+    return await withViewerLang(langOfRequest(h), async () => {
+      // Cookies travel on their own, so writes with a cookie must come from our own pages.
+      if (!hasBearer(h) && req.method !== 'GET' && !fromOurPages(h)) return Response.json({ error: 'bad origin' }, { status: 403 })
+      const actor = (await getActor(h)) ?? guestActor(h)
+      if (!actor) return Response.json({ error: 'unauthorized' }, { status: 401 })
+      if (actor.guest && !found.route.guest) return Response.json({ error: 'not available with a link' }, { status: 403 })
+      if (actor.tokenId && found.route.human) return Response.json({ error: 'not available to tokens' }, { status: 403 })
+      const result = await found.route.handler({ actor, params: found.params, req, query: new URL(req.url).searchParams, body: () => req.json() })
+      if (result instanceof Response) return result
+      return Response.json(result ?? { ok: true }, { status: (result as { status?: string } | null)?.status === 'pending_review' ? 202 : 200 })
+    })
   } catch (e) {
-    if (e instanceof OpError) return Response.json({ error: e.message }, { status: e.status })
-    if (e instanceof z.ZodError) return Response.json({ error: e.issues }, { status: 400 })
+    if (e instanceof OpError) {
+      // A person reads the short protocol errors in their language; a program with a token keeps the English it matches on.
+      const h = await headers()
+      return Response.json({ error: hasBearer(h) ? e.message : errorFor(e.message, langOfRequest(h)) }, { status: e.status })
+    }
+    // Words for the person, the details for programs; an array in `error` showed up as "[object Object]".
+    if (e instanceof z.ZodError) return Response.json({ error: e.issues.map((i) => (i.path.length ? `${i.path.join('.')}: ${i.message}` : i.message)).join('; '), issues: e.issues.map((i) => ({ path: i.path, code: i.code, message: i.message })) }, { status: 400 })
     if (e instanceof SyntaxError) return Response.json({ error: 'invalid JSON' }, { status: 400 })
     if (isDiskFull(e)) return Response.json({ error: 'the server disk is full' }, { status: 507 })
     console.error(e)

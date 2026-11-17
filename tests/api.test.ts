@@ -31,7 +31,7 @@ function issue(role: 'reader' | 'editor', review = true) {
 }
 
 describe('tokens', () => {
-  it('are stored hashed, stop working when revoked, and never become owners', () => {
+  it('are stored hashed, stop working when revoked or expired, and never become owners', () => {
     const { id, token } = tokens.createToken(owner, { name: 'x', role: 'editor', review: true })
     expect(token.startsWith('fb_')).toBe(true)
     expect(JSON.stringify(db.getDb().select().from(db.schema.apiTokens).all())).not.toContain(token)
@@ -41,6 +41,10 @@ describe('tokens', () => {
     expect(() => tokens.createToken(actor, { name: 'z', role: 'editor', review: false })).toThrow('forbidden')
     tokens.revokeToken(owner, id)
     expect(tokens.actorFromToken(token)).toBeNull()
+    const past = tokens.createToken(owner, { name: 'past', role: 'reader', review: true, expiresInDays: 1 })
+    expect(tokens.actorFromToken(past.token)).toBeTruthy()
+    db.getDb().update(db.schema.apiTokens).set({ expiresAt: Date.now() - 1000 }).where(eq(db.schema.apiTokens.id, past.id)).run()
+    expect(tokens.actorFromToken(past.token)).toBeNull()
     expect(tokens.actorFromToken('fb_wrong')).toBeNull()
   })
 
@@ -132,12 +136,12 @@ describe('review queue', () => {
   it('a queued upload leaves no files behind when rejected', async () => {
     const bot = issue('editor')
     const png = await sharp({ create: { width: 30, height: 30, channels: 3, background: '#777' } }).png().toBuffer()
-    const r = await reg.dispatch(bot, 'upload_photo', { base64: png.toString('base64'), filename: 'a.png' })
     const dir = path.join(process.env.DATA_DIR!, 'media')
-    const count = () => fs.readdirSync(dir).length
-    const withFiles = count()
+    const before = new Set(fs.readdirSync(dir))
+    const r = await reg.dispatch(bot, 'upload_photo', { base64: png.toString('base64'), filename: 'a.png' })
+    expect(fs.readdirSync(dir).some((f) => !before.has(f))).toBe(true)
     await reg.rejectProposal(owner, r.proposalId)
-    expect(count()).toBeLessThan(withFiles)
+    expect(fs.readdirSync(dir).filter((f) => !before.has(f))).toEqual([])
   })
 
   it('refuses outside images and script links from a token', async () => {
@@ -235,19 +239,6 @@ describe('markdown', () => {
     expect(blocks.map((b) => b.type)).toEqual(['heading', 'paragraph', 'bulletListItem', 'numberedListItem', 'numberedListItem', 'quote', 'divider', 'image'])
     expect(blocks[1].content.find((c: any) => c.type === 'mention').props).toEqual({ personId: 'abc', label: 'Иван' })
     expect(blocksToMarkdown(blocks)).toBe(md)
-  })
-})
-
-describe('tokens', () => {
-  it('stop working when they expire or are revoked', () => {
-    const live = tokens.createToken(owner, { name: 'live', role: 'reader', review: true, expiresInDays: 30 })
-    expect(tokens.actorFromToken(live.token)).toBeTruthy()
-    const past = tokens.createToken(owner, { name: 'past', role: 'reader', review: true, expiresInDays: 1 })
-    db.getDb().update(db.schema.apiTokens).set({ expiresAt: Date.now() - 1000 }).where(eq(db.schema.apiTokens.id, past.id)).run()
-    expect(tokens.actorFromToken(past.token)).toBeNull()
-    tokens.revokeToken(owner, live.id)
-    expect(tokens.actorFromToken(live.token)).toBeNull()
-    expect(tokens.actorFromToken('fb_made_up')).toBeNull()
   })
 })
 

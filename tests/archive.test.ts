@@ -1,6 +1,6 @@
 // A copy of the archive, and what a file from elsewhere must not get away with.
 import { createHash } from 'node:crypto'
-import { createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { pipeline } from 'node:stream/promises'
@@ -65,9 +65,11 @@ describe('making a copy', () => {
     await expect(archiveStream(editor)).rejects.toThrow()
   })
 
-  it('holds no session, not even in leftover pages of the file', async () => {
+  it('holds no session and no key, not even in leftover pages of the file', async () => {
+    for (const key of ['aiKeys', 'agentKey', 'sttConfig', 'faceConfig', 'signIn:google']) getDb().$client.prepare('insert or replace into settings (key, value) values (?, ?)').run(key, `SECRET-KEY-OF-${key}`)
     const zip = readFileSync(await saved())
     expect(zip.includes('SECRET-SESSION-TOKEN')).toBe(false)
+    expect(zip.includes('SECRET-KEY-OF')).toBe(false)
     expect(zip.includes('Проверкина')).toBe(true)
   })
 
@@ -80,9 +82,9 @@ describe('making a copy', () => {
 
   it('leaves nothing behind', async () => {
     await saved()
-    await new Promise((r) => setTimeout(r, 50))
     await sweepArchiveLeftovers()
     expect(existsSync(path.join(DATA_DIR, PENDING))).toBe(false)
+    expect(readdirSync(DATA_DIR).filter((n) => n.startsWith('.archive-'))).toEqual([])
   })
 })
 
@@ -186,5 +188,25 @@ describe('someone on a photo without a card', () => {
     expect(() => media.addTag(owner, 'photo1', {}, null)).toThrow()
     media.removeTag(owner, tag.id)
     expect(media.getMedia(owner, 'photo1').tags).toEqual([])
+  })
+})
+
+describe('restoring twice', () => {
+  it('keeps the archive each restore replaced, and the copy from an earlier restore too', () => {
+    const dir = path.join(work, `twice-${Date.now()}`)
+    const put = (p: string, text: string) => { mkdirSync(path.dirname(p), { recursive: true }); writeFileSync(p, text) }
+    // An earlier restore left its copy; now the live archive has a photo of its own, and a new copy waits.
+    put(path.join(dir, 'backups/before-restore/family.db'), 'archive before the first restore')
+    put(path.join(dir, 'family.db'), 'live archive')
+    put(path.join(dir, 'media/photo-live.jpg'), 'live photo')
+    put(path.join(dir, `${PENDING}/family.db`), 'restored archive')
+    put(path.join(dir, `${PENDING}/media/photo-new.jpg`), 'restored photo')
+    expect(applyPendingRestore(dir)).toBe(true)
+    expect(readFileSync(path.join(dir, 'family.db'), 'utf8')).toBe('restored archive')
+    expect(readFileSync(path.join(dir, 'backups/before-restore/family.db'), 'utf8')).toBe('live archive')
+    expect(readFileSync(path.join(dir, 'backups/before-restore/media/photo-live.jpg'), 'utf8')).toBe('live photo')
+    const older = readdirSync(path.join(dir, 'backups')).filter((n) => n.startsWith('before-restore-'))
+    expect(older).toHaveLength(1)
+    expect(readFileSync(path.join(dir, 'backups', older[0], 'family.db'), 'utf8')).toBe('archive before the first restore')
   })
 })

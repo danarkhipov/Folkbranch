@@ -7,7 +7,7 @@ import { normal } from '../search/words'
 import { placeWords } from '../places'
 import { personName, shownTags, type Person, type Place, type Sex } from '../types'
 import { listPlaces } from './places'
-import { archiveLang, say } from './app-config'
+import { archiveLang, tell, viewerLangNow } from './app-config'
 import { seesOnlyPublic, type Actor } from './core'
 import { listAllMedia } from './media'
 import { readablePages } from './pages'
@@ -21,7 +21,7 @@ const plain = (markdown: string) => noLinks(markdown.replace(/!?\[([^\]]*)\]\([^
 function personFields(p: Person, places: Place[]): SearchField[] {
   const field = (key: string, label: string, raw: string, weight: number, target?: string, refId?: string): SearchField[] => {
     const text = noLinks(raw)
-    return text ? [{ key, label: say(label), text, tab: 'details', weight, target, refId }] : []
+    return text ? [{ key, label: tell(label), text, tab: 'details', weight, target, refId }] : []
   }
   const shown = new Set([p.givenName, p.surname, p.patronymic, p.maidenName, p.birthDate, p.birthPlace, p.deathDate, p.deathPlace].map(normal))
   return [
@@ -50,14 +50,14 @@ function buildDocs(actor: Actor): SearchDoc[] {
   for (const page of readablePages(actor)) {
     const doc = docs.get(page.personId)
     if (!doc) continue
-    if (page.title) doc.fields.push({ key: 'pageTitle', label: say('Биография'), text: page.title, tab: 'pages', weight: 0.6, refId: page.id })
+    if (page.title) doc.fields.push({ key: 'pageTitle', label: tell('Биография'), text: page.title, tab: 'pages', weight: 0.6, refId: page.id })
     const text = plain(blocksToMarkdown(JSON.parse(page.content)))
-    if (text) doc.fields.push({ key: 'page', label: say('Биография'), text, tab: 'pages', weight: 0.5, refId: page.id })
+    if (text) doc.fields.push({ key: 'page', label: tell('Биография'), text, tab: 'pages', weight: 0.5, refId: page.id })
   }
   for (const m of listAllMedia(actor, 100_000)) {
     const text = noLinks([m.caption, m.date, m.place].filter(Boolean).join(', '))
     if (!text) continue
-    for (const t of m.tags) docs.get(t.personId ?? '')?.fields.push({ key: 'photo', label: say('Фото'), text, tab: 'photos', weight: 0.5, refId: m.id })
+    for (const t of m.tags) docs.get(t.personId ?? '')?.fields.push({ key: 'photo', label: tell('Фото'), text, tab: 'photos', weight: 0.5, refId: m.id })
   }
   // Someone's own words stay among people, as they do in the card.
   if (!actor.tokenId && !actor.assistant) {
@@ -68,7 +68,7 @@ function buildDocs(actor: Actor): SearchDoc[] {
       if (!doc) continue
       for (const s of listStories(actor, id)) {
         const text = noLinks([s.title, s.body, s.tellerName, s.toldOn].filter(Boolean).join('. '))
-        if (text) doc.fields.push({ key: 'story', label: say('Рассказы'), text, tab: 'stories', weight: 0.5, refId: s.id })
+        if (text) doc.fields.push({ key: 'story', label: tell('Рассказы'), text, tab: 'stories', weight: 0.5, refId: s.id })
       }
     }
   }
@@ -83,10 +83,12 @@ const NAME_KEYS = new Set(['givenName', 'surname', 'patronymic', 'maidenName', '
 function indexFor(actor: Actor): Indexes {
   const stamp = dataStamp()
   const full = !seesOnlyPublic(actor) && !actor.guest && !actor.tokenId && !actor.assistant
-  if (full && stamp && shared.__folkbranchSearch?.stamp === stamp) return shared.__folkbranchSearch
+  // The field labels read in the viewer's language, so a kept index belongs to one language too.
+  const key = stamp && `${stamp}:${viewerLangNow()}`
+  if (full && key && shared.__folkbranchSearch?.stamp === key) return shared.__folkbranchSearch
   const docs = buildDocs(actor)
   const indexes = { index: buildIndex(docs), names: buildIndex(docs.map((d) => ({ id: d.id, fields: d.fields.filter((f) => NAME_KEYS.has(f.key)) }))) }
-  if (full && stamp) shared.__folkbranchSearch = { stamp, ...indexes }
+  if (full && key) shared.__folkbranchSearch = { stamp: key, ...indexes }
   return indexes
 }
 
@@ -148,8 +150,8 @@ function byRelation(actor: Actor, names: SearchIndex, query: string): SearchResu
     for (const id of related[kind](base.personId)) {
       const p = people.get(id)
       if (!p || (sex && p.sex !== sex) || out.has(id)) continue
-      const text = `${say(word)}: ${baseName}`
-      out.set(id, { personId: id, score: 3 + base.score, partial: false, terms: [baseName], matches: [{ key: 'relation', label: say('Семья'), tab: 'family', text, ranges: [[0, text.length]] }] })
+      const text = `${tell(word)}: ${baseName}`
+      out.set(id, { personId: id, score: 3 + base.score, partial: false, terms: [baseName], matches: [{ key: 'relation', label: tell('Семья'), tab: 'family', text, ranges: [[0, text.length]] }] })
     }
   }
   return [...out.values()]

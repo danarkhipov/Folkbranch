@@ -42,7 +42,9 @@ const PROVIDERS: Record<ProviderId, Provider> = {
   // Services that speak the OpenAI protocol under their own address, in Russia and China, where the big three are hard to pay for.
   yandex: {
     label: 'Yandex AI Studio', keyEnv: 'YANDEX_API_KEY', defaultModel: 'yandexgpt/latest', keepReasoning: true,
-    create: (apiKey, model, folder = '') => createOpenAICompatible({ name: 'yandex', baseURL: 'https://ai.api.cloud.yandex.net/v1', headers: { authorization: `Api-Key ${apiKey}`, 'openai-project': folder } })(`gpt://${folder}/${model}`),
+    // Yandex logs every request and may train on it unless each request says no: family data never goes in its logs.
+    // https://aistudio.yandex.ru/en/docs/ai-studio/operations/disable-logging
+    create: (apiKey, model, folder = '') => createOpenAICompatible({ name: 'yandex', baseURL: 'https://ai.api.cloud.yandex.net/v1', headers: { authorization: `Api-Key ${apiKey}`, 'openai-project': folder, 'x-data-logging-enabled': 'false' } })(`gpt://${folder}/${model}`),
   },
   cloudru: { label: 'Cloud.ru', keyEnv: 'CLOUDRU_API_KEY', defaultModel: 'GigaChat/GigaChat-3-Pro', keepReasoning: true, create: (apiKey, model) => createOpenAICompatible({ name: 'cloudru', baseURL: 'https://foundation-models.api.cloud.ru/v1', apiKey })(model) },
   deepseek: { label: 'DeepSeek', keyEnv: 'DEEPSEEK_API_KEY', defaultModel: 'deepseek-flash', keepReasoning: true, create: (apiKey, model) => createOpenAICompatible({ name: 'deepseek', baseURL: 'https://api.deepseek.com', apiKey })(model) },

@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import { ArrowUpDown, CalendarDays, GitFork, Map as MapIcon, CircleHelp, ClipboardCheck, EyeOff, Clock, Minus, Plus, Printer, Search, Settings, Tags } from 'lucide-react'
+import { ArrowUpDown, CalendarDays, ChevronRight, CircleHelp, ClipboardCheck, EyeOff, Clock, Minus, Plus, Printer, Search, Settings, Tags } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useApp } from '@/lib/client'
 import { useLiveConnected, type Present } from '@/lib/use-live'
@@ -13,13 +13,13 @@ import { ViewMenu } from './chart-view-menu'
 import { Legend } from './graph-parts'
 import { Logo } from './logo'
 
-/** The bar's height: folded, it is a square. */
-const FOLDED_WIDTH = 46
+/** The folded bar holds its logo and a chevron, so it stays a small pill rather than a bare square. */
+const FOLDED_WIDTH = 58
 
 export type Side = 'history' | 'review' | 'assistant' | null
 
 /**
- * One and the same bar narrows to a square around its logo and opens again, so nothing is swapped and nothing jumps.
+ * One and the same bar narrows to a small control around its logo and opens again, so nothing is swapped and nothing jumps.
  * A width can only be animated between numbers, so it is measured first.
  */
 function useFoldWidth(navRef: RefObject<HTMLElement | null>, folded: boolean) {
@@ -51,22 +51,21 @@ function useFoldWidth(navRef: RefObject<HTMLElement | null>, folded: boolean) {
   }, [navRef, folded])
 }
 
-export function MainBar({ folded, onHide, onShow, guest, familyName, present, mode, navRef, side, draftOps, onSearch, onSide, onAssistant, onSettings, mapOn = false, onMap }: { mapOn?: boolean; onMap?: () => void; folded: boolean; onHide: () => void; onShow: () => void;  guest: boolean; familyName: string; present: Present[]; mode: 'full' | 'no-name' | 'compact'; navRef: RefObject<HTMLElement | null>; side: Side; draftOps: number; onSearch: () => void; onSide: (next: Side) => void; onAssistant: () => void; onSettings: () => void }) {
+export function MainBar({ folded, onHide, onShow, guest, familyName, present, mode, navRef, side, draftOps, onSearch, onSide, onAssistant, onSettings }: { folded: boolean; onHide: () => void; onShow: () => void;  guest: boolean; familyName: string; present: Present[]; mode: 'full' | 'no-name' | 'compact'; navRef: RefObject<HTMLElement | null>; side: Side; draftOps: number; onSearch: () => void; onSide: (next: Side) => void; onAssistant: () => void; onSettings: () => void }) {
   const { t, canEdit, me } = useApp()
   // The owner sees a dot on Settings when a newer release is out; nobody else is asked about it.
   const newer = useUpdate(me.role === 'owner').data?.newer
   useFoldWidth(navRef, folded)
   return (
     <>
-      <span className={cn('bar-peek fixed left-3 top-3', folded && 'folded')} aria-hidden="true" />
       <nav aria-label={t('Главное меню')} ref={navRef} className={cn('float main-bar fixed left-3 top-3 z-10 flex items-center p-1', mode !== 'full' && mode, folded && 'folded')}>
         <Logo size={22} className="bar-logo flex-none" />
+        <ChevronRight size={14} className="bar-open" aria-hidden="true" />
         <button className="show-bars" inert={!folded} title={t('Показать панели')} data-hint={t('Вернуть панели управления.')} aria-label={t('Показать панели')} onClick={onShow} />
         <div className="bar-rest flex items-center gap-0.5" inert={folded}>
         <span className="family-name font-serif font-medium text-base px-2.5 max-w-[220px] truncate">{familyName}</span>
         {present.length > 0 && <span className="presence" title={`${t('Сейчас в архиве')}: ${present.map((o) => o.name).join(', ')}`} aria-label={`${t('Сейчас в архиве')}: ${present.map((o) => o.name).join(', ')}`} role="img">{present.slice(0, 3).map((o) => <span key={o.id}>{o.name.slice(0, 1).toUpperCase()}</span>)}{present.length > 3 && <span>+{present.length - 3}</span>}</span>}
         <span className="sep w-px h-5 bg-border mx-0.5" />
-        {onMap && <button className="bar-btn" title={t(mapOn ? 'Показать схему' : 'Показать семью на карте')} data-hint={t(mapOn ? 'Вернуться к схеме семьи.' : 'Кто где жил, год за годом.')} aria-label={t(mapOn ? 'Схема' : 'Карта')} onClick={onMap}>{mapOn ? <GitFork size={16} className="rotate-180" /> : <MapIcon size={16} />} <span className="nav-label">{t(mapOn ? 'Схема' : 'Карта')}</span></button>}
         {!guest && <button className={side === 'assistant' ? 'bar-btn on' : 'bar-btn'} title={t('ИИ-ассистент')} data-hint={t('Спросите о семье или попросите внести правки. Откроется чат.')} aria-label={t('ИИ-ассистент')} onClick={onAssistant}><AssistantIcon /> <span className="nav-label"><span className="max-sm:hidden">{t('ИИ-ассистент')}</span><span className="sm:hidden">{t('ИИ')}</span></span></button>}
         <button className="bar-btn" title={t('Поиск людей')} data-hint={t('Найти человека по имени и показать на схеме.')} aria-label={t('Поиск людей')} onClick={onSearch}><Search size={16} /> <span className="nav-label">{t('Поиск')}</span></button>
         {!guest && canEdit && <button className={side === 'review' ? 'bar-btn on relative' : 'bar-btn relative'} title={t('Правки на подтверждение, незаполненные карточки и похожие люди.')} data-hint={t('Правки на подтверждение, незаполненные карточки и похожие люди.')} aria-label={t('Проверка')} onClick={() => onSide(side === 'review' ? null : 'review')}><ClipboardCheck size={16} /> <span className="nav-label">{t('Проверка')}</span>{draftOps > 0 && <span className="absolute right-1 top-1 min-w-4 rounded-full bg-rust px-1 text-center text-xs leading-4 text-white">{draftOps}</span>}</button>}
@@ -105,7 +104,7 @@ export function ViewBar({ folded, onHide, onOverview, onPrint, scope, canvas, ro
           </Popover>
         )}
         <button className="bar-btn" title={t('Даты, места и архивы')} data-hint={t('Ближайшие памятные дни, семья в цифрах, места и архивы.')} aria-label={t('Даты, места и архивы')} onClick={onOverview}><CalendarDays size={15} /></button>
-        <button className="bar-btn" title={t('Печать схемы')} data-hint={t('На одном листе или склеить из нескольких.')} aria-label={t('Печать схемы')} onClick={onPrint}><Printer size={15} /></button>
+        <button className="bar-btn" title={t('Печать и картинка')} data-hint={t('На одном листе, из нескольких листов или картинкой, чтобы отправить.')} aria-label={t('Печать и картинка')} onClick={onPrint}><Printer size={15} /></button>
         <Popover>
           <PopoverTrigger asChild><button className="bar-btn" title={t('Как читать схему')} data-hint={t('Что значат линии, рамки и цвета.')} aria-label={t('Как читать схему')}><CircleHelp size={15} /></button></PopoverTrigger>
           <PopoverContent side="top" align="start" collisionPadding={8} className="w-80 max-w-[calc(100vw-16px)] max-h-[min(70dvh,560px)] overflow-y-auto text-sm"><Legend /></PopoverContent>

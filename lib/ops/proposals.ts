@@ -6,7 +6,7 @@ import { personName } from '../types'
 import { Actor, mutateGroup, newId, OpError, requireRole,  } from './core'
 import * as media from './media'
 import * as people from './people'
-import { say } from './settings'
+import { say, tell } from './settings'
 import { type Ctx, type Def, nameOfReal } from './op-defs'
 import { announceChange } from '../live'
 import { OPS } from './registry'
@@ -42,7 +42,7 @@ export function describeOp(actor: Actor, name: string, raw: unknown): string {
     if (d.expand) {
       const ops = d.expand(actor, args)
       const lines = ops.slice(0, 8).map((o) => line(OPS[o.op].describe(o.args, { name: (id) => String((o.args as any)?.person?.givenName ?? nameInDraft(String(id), [])) })))
-      return [`${say('Операций')}: ${ops.length}`, ...lines, ...(ops.length > 8 ? ['…'] : [])].join('\n')
+      return [`${tell('Операций')}: ${ops.length}`, ...lines, ...(ops.length > 8 ? ['…'] : [])].join('\n')
     }
     return line(d.describe(args, ctx()))
   } catch {

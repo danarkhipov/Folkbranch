@@ -27,7 +27,7 @@ function ProviderSettings() {
     }
   }
   const remove = async () => {
-    if (!await ask(t('Удалить ключ сервиса?'), t('Удалить ключ'), t('Ассистент перестанет отвечать, пока вы не добавите новый.'))) return
+    if (!await ask(t('Отключить ассистента от сервиса?'), t('Отключить'), t('Ключ останется в списке провайдеров на странице ИИ: там сервис можно выбрать снова, не вставляя ключ.'))) return
     await api('assistant/provider', { method: 'DELETE' })
     await qc.invalidateQueries({ queryKey: ['provider'] })
     location.reload()
@@ -51,7 +51,7 @@ function ProviderSettings() {
       {data.source !== 'server' && (changing || !data.connected ? <ProviderForm onDone={() => setChanging(false)} /> : (
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" onClick={() => setChanging(true)}><KeyRound /> {t('Сменить ключ')}</Button>
-          <Button type="button" variant="danger" onClick={remove}><Trash2 /> {t('Удалить ключ')}</Button>
+          <Button type="button" variant="outline" onClick={remove}><Trash2 /> {t('Отключить')}</Button>
         </div>
       ))}
     </Section>

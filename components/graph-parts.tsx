@@ -36,8 +36,9 @@ type Acts = RefObject<ChartActions>
 
 export type Wave = { depth: Map<string, number>; pairs: Map<string, { d: number; up: boolean }> }
 /** How long each step of the glow waits for the one before it. */
-export const WAVE_STEP = 70
-const waitFor = (d: number) => `${Math.min(d, 9) * WAVE_STEP}ms`
+/** One generation's line is drawn in this long, and the next starts where it ends: the glow runs down like roots. */
+export const WAVE_STEP = 260
+const waitFor = (d: number) => `${Math.max(0, Math.min(d, 10) - 1) * WAVE_STEP}ms`
 
 export const Lines = memo(function Lines({ families, unions, active, hotPairs, lightMode, selIds, hoverIds, wave }: { families: [string, EdgePos[]][]; unions: UnionItem[]; active: Set<string> | null; hotPairs: Set<string>; lightMode: LightMode; selIds: Set<string>; hoverIds: string[]; wave: Wave | null }) {
   /** A line is lit when both ends are in the highlighted set; a path is lit pair by pair. */
@@ -84,7 +85,7 @@ export const PersonCard = memo(function PersonCard({ p, left, top, wait, classNa
     <div
       data-person={p.id}
       className={className}
-      style={wait === undefined ? { left, top } : { left, top, '--wd': waitFor(wait) } as React.CSSProperties}
+      style={wait === undefined ? { left, top } : { left, top, '--wd': waitFor(wait + 1) } as React.CSSProperties}
       onClick={open}
       onMouseEnter={() => acts.current.hover(p.id)}
       onMouseLeave={() => acts.current.hover(null)}

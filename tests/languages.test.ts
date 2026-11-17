@@ -2,10 +2,9 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { eq } from 'drizzle-orm'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { getDb, schema } from '../lib/db'
-import { addTable, english, hasTable, translate, translatePair } from '../lib/i18n'
-import { loadTable } from '../lib/i18n-load'
+import { addTable, english, translate, translatePair } from '../lib/i18n'
 import { LANG_NAMES, LANGS, langOf } from '../lib/languages'
 import { say, setSetting } from '../lib/ops/app-config'
 import { readableSummary } from '../lib/ops/history-text'
@@ -34,12 +33,19 @@ describe('a language that is not finished', () => {
   })
 
   it('loads its table once, and a finished language at once', async () => {
-    await loadTable('ca')
-    expect(hasTable('ca')).toBe(true)
-    expect(loadTable('ca')).toBe(loadTable('ca'))
+    // A fresh module graph: the server imports i18n-server elsewhere, which fills every table, so
+    // without this the lazy import below would never run.
+    vi.resetModules()
+    const fresh = await import('../lib/i18n')
+    const { loadTable: loadFresh } = await import('../lib/i18n-load')
+    expect(fresh.hasTable('es')).toBe(false)
+    await loadFresh('es')
+    expect(fresh.hasTable('es')).toBe(true)
+    expect(fresh.translate('es', 'Удалить')).toBe('Eliminar')
+    expect(loadFresh('es')).toBe(loadFresh('es'))
     // Marked as done, so React reads it without waiting.
-    expect(loadTable('ru')).toMatchObject({ status: 'fulfilled' })
-    expect(loadTable('ca')).toMatchObject({ status: 'fulfilled' })
+    expect(loadFresh('ru')).toMatchObject({ status: 'fulfilled' })
+    expect(loadFresh('es')).toMatchObject({ status: 'fulfilled' })
   })
 
   it('gives a pair kept beside its code the English one until the table has the Russian', () => {

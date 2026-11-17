@@ -10,8 +10,8 @@ import { getDb, schema } from '../db'
 import { listMediaFiles, mediaFile, removeMediaFiles, writeAtomic } from '../storage'
 import type { Box, Media } from '../types'
 import { Actor, Changes, mutate, newId, OpError, requireRole, seesOnlyPublic } from './core'
-import { hiddenPeople } from './people'
-import { say } from './settings'
+import { hiddenPeople, getPersonRow } from './people'
+import { say, tell } from './settings'
 
 const MAX_SIZE = 40 * 1024 * 1024
 /** About three hours of speech as a browser records it. */
@@ -135,10 +135,10 @@ export function audioUsed() {
 
 /** Kept exactly as recorded. Nothing here plays it or converts it. */
 export async function storeAudio(buf: Buffer, originalName: string, uploadedBy: string) {
-  if (buf.length > MAX_AUDIO) throw new OpError(413, say('Запись слишком большая: можно до 50 МБ'))
+  if (buf.length > MAX_AUDIO) throw new OpError(413, tell('Запись слишком большая: можно до 50 МБ'))
   const type = soundType(buf)
-  if (!type) throw new OpError(400, say('Этот файл не похож на звукозапись'))
-  if (audioUsed() + buf.length > audioLimit()) throw new OpError(507, say('Место для записей голоса закончилось'))
+  if (!type) throw new OpError(400, tell('Этот файл не похож на звукозапись'))
+  if (audioUsed() + buf.length > audioLimit()) throw new OpError(507, tell('Место для записей голоса закончилось'))
   const id = newId()
   const filename = `${id}.voice${type.ext}`
   await writeAtomic(mediaFile(filename), buf)
@@ -149,6 +149,8 @@ export type StoredUpload = Awaited<ReturnType<typeof storeUpload>>
 
 export function commitUpload(actor: Actor, r: StoredUpload, personId?: string | null) {
   requireRole(actor, 'editor')
+  // The person may have been deleted while the draft waited: a tag must not point at nobody.
+  if (personId) getPersonRow(personId)
   mutate(actor, { summary: `${say('Загрузить фото')}: ${r.originalName}`, personIds: personId ? [personId] : [] }, (c) => {
     c.insert('media', r)
     if (personId) c.insert('mediaTags', { id: newId(), mediaId: r.id, personId })
@@ -288,6 +290,9 @@ export function deleteMedia(actor: Actor, id: string) {
   const db = getDb()
   const r = row(id)
   if (r.kind === 'audio') throw new OpError(400, 'a voice is removed with its story')
+  // A biography that still shows this photo would be left with a broken picture.
+  const shown = db.select({ id: schema.pages.id }).from(schema.pages).where(sql`instr(${schema.pages.content}, ${`/media/${id}/`}) > 0`).limit(1).get()
+  if (shown) throw new OpError(409, tell('Фото стоит на странице. Сначала уберите его оттуда'))
   // Files stay on disk so the deletion can be rolled back.
   const tags = db.select().from(schema.mediaTags).where(eq(schema.mediaTags.mediaId, id)).all()
   mutate(actor, { summary: `${say('Удалить')}: ${r.originalName}`, personIds: tags.flatMap((t) => t.personId ?? []) }, (c: Changes) => {
@@ -304,6 +309,8 @@ export function addTag(actor: Actor, mediaId: string, who: { personId?: string |
   const personId = who.personId || null
   const label = who.label?.trim() || null
   if (!personId && !label) throw new OpError(400, 'who is on the photo?')
+  // A typo or a stale id would leave a mark that names nobody.
+  if (personId) getPersonRow(personId)
   const db = getDb()
   return mutate(actor, { summary: `${say('Фото')}: ${r.originalName}`, personIds: personId ? [personId] : [] }, (c) => {
     // Replace the frameless tag from upload rather than listing the person twice.

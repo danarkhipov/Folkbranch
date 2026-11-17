@@ -20,7 +20,7 @@ import { OUTPUTS } from './outputs'
 import { describeOp, dispatch, myProposals } from './proposals'
 import { OPS } from './registry'
 import { findPeople, queryPeople, queryInput, searchArchive } from './search'
-import { archiveLang, createInvite, getSetting, say, listHistory, listInvites, listUsers, revokeInvite, setSetting, setUserRole } from './settings'
+import { archiveLang, createInvite, getSetting, tell, listHistory, listInvites, listUsers, revokeInvite, setSetting, setUserRole } from './settings'
 
 /**
  * read and ui run on their own; write asks unless the person allowed it for this conversation;
@@ -215,7 +215,7 @@ const ASSISTANT_ONLY: Omit<ToolDef, 'output'>[] = [
   { name: 'get_settings', risk: 'read', minRole: 'reader', surfaces: ['assistant'], description: "The archive's name and language.", input: z.object({}),
     run: () => ({ familyName: getSetting('familyName') ?? '', language: archiveLang() }) },
   { name: 'update_settings', risk: 'admin', minRole: 'owner', surfaces: ['assistant'], description: "Rename the archive or change its language.", input: z.object({ familyName: z.string().min(1).max(120).optional(), language: z.enum(['ru', 'en', 'es', 'ca']).optional() }),
-    describe: (_a, x) => [x.familyName && `${say('Название')}: ${x.familyName}`, x.language && `${say('Язык')}: ${x.language}`].filter(Boolean).join(', '),
+    describe: (_a, x) => [x.familyName && `${tell('Название')}: ${x.familyName}`, x.language && `${tell('Язык')}: ${x.language}`].filter(Boolean).join(', '),
     run: (_a, x) => {
       Object.entries(x).forEach(([k, v]) => setSetting(k, v as string))
       return { ok: true }

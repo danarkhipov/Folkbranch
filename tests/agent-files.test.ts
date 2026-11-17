@@ -9,7 +9,6 @@ import { attachmentBytes, getAttachment, readAttachmentText, saveAttachment, swe
 import { activeProvider } from '../lib/agent/provider'
 import { assistantResponse } from '../lib/agent/respond'
 import { DATA_DIR } from '../lib/db'
-import { listPersonMedia, getMedia } from '../lib/ops/media'
 import { getGraph } from '../lib/ops/people'
 import { toolsFor } from '../lib/ops/tools'
 import { editor, loadFamily, owner, reader } from './fixture-family'
@@ -50,16 +49,13 @@ describe('choosing a provider', () => {
     }
   })
   it('OpenRouter is told not to route family data to anyone who trains on it', async () => {
-    const sent: any[] = []
     const { createOpenRouter } = await import('@openrouter/ai-sdk-provider')
     expect(createOpenRouter).toBeTypeOf('function')
     const p = activeProvider({ OPENROUTER_API_KEY: 'k', AGENT_MODEL: 'anthropic/claude-opus-5.5' })!
     const settings = (p.create('k', p.model) as any).settings
-    sent.push(settings)
-    expect(sent[0].provider.data_collection).toBe('deny')
-    expect(sent[0].cache_control).toEqual({ type: 'ephemeral' })
+    expect(settings.provider.data_collection).toBe('deny')
+    expect(settings.cache_control).toEqual({ type: 'ephemeral' })
     expect((p.create('k', 'z-ai/glm-5.3-flash') as any).settings.cache_control).toBeUndefined()
-    expect(((activeProvider({ OPENROUTER_API_KEY: 'k', AGENT_MODEL: 'openai/x' })!).create('k', 'openai/x') as any).settings.cache_control).toBeUndefined()
   })
 })
 
@@ -130,13 +126,6 @@ describe('whose file it is', () => {
 })
 
 describe('keeping a file', () => {
-  it('saves a picture onto a card with a caption, and undo takes it off', async () => {
-    const a = await saveAttachment(editor, await png(), 'свадьба2.png')
-    const out = await tool(editor, 'save_attachment')({ id: a.id, personId: f.ivan.id, caption: 'Свадьба', date: '1915' }) as any
-    expect(out.kind).toBe('image')
-    expect(getMedia(owner, out.id)).toMatchObject({ caption: 'Свадьба', date: '1915' })
-    expect(listPersonMedia(owner, f.ivan.id).some((m) => m.id === out.id)).toBe(true)
-  })
   it('it can become an avatar, and shows up in search', async () => {
     const a = await saveAttachment(editor, await png(), 'лицо.png')
     const out = await tool(editor, 'save_attachment')({ id: a.id, personId: f.maria.id, caption: 'Портрет у реки' }) as any

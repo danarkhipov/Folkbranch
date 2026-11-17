@@ -7,6 +7,7 @@ import { headers } from 'next/headers'
 import { nanoid } from 'nanoid'
 import { getActor, hasBearer } from '@/lib/api-auth'
 import { DATA_DIR } from '@/lib/db'
+import { langOfRequest, withViewerLang } from '@/lib/ops/app-config'
 import { archiveStream, stageRestore } from '@/lib/ops/archive'
 import { OpError } from '@/lib/ops/core'
 import { hasUsers } from '@/lib/ops/settings'
@@ -32,8 +33,10 @@ export async function GET() {
   const actor = await getActor(h)
   if (!actor) return Response.json({ error: 'unauthorized' }, { status: 401 })
   try {
-    const { stream, filename } = await archiveStream(actor)
-    return new Response(Readable.toWeb(stream) as ReadableStream, { headers: { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${filename}"`, 'Cache-Control': 'no-store' } })
+    return await withViewerLang(langOfRequest(h), async () => {
+      const { stream, filename } = await archiveStream(actor)
+      return new Response(Readable.toWeb(stream) as ReadableStream, { headers: { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${filename}"`, 'Cache-Control': 'no-store' } })
+    })
   } catch (e) {
     return failure(e)
   }
@@ -54,11 +57,13 @@ export async function POST(req: Request) {
   if (!req.body) return Response.json({ error: 'file required' }, { status: 400 })
   const upload = path.join(/*turbopackIgnore: true*/ DATA_DIR, `.restore-${nanoid(8)}.zip`)
   try {
-    await fs.mkdir(DATA_DIR, { recursive: true })
-    await pipeline(Readable.fromWeb(req.body as never), createWriteStream(upload))
-    const report = await stageRestore(upload)
-    setTimeout(() => process.exit(1), RESTART_AFTER_MS).unref()
-    return Response.json(report)
+    return await withViewerLang(langOfRequest(h), async () => {
+      await fs.mkdir(DATA_DIR, { recursive: true })
+      await pipeline(Readable.fromWeb(req.body as never), createWriteStream(upload))
+      const report = await stageRestore(upload)
+      setTimeout(() => process.exit(1), RESTART_AFTER_MS).unref()
+      return Response.json(report)
+    })
   } catch (e) {
     return failure(e)
   } finally {

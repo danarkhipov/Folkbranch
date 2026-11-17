@@ -1,29 +1,48 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Архив · Archive</title>
+<title>Archive</title>
 <style>
   body { margin: 0; min-height: 100dvh; display: flex; align-items: center; justify-content: center; background: #f7f3ea; color: #2a241c; font: 16px/1.45 Georgia, 'Times New Roman', serif; padding: 24px; box-sizing: border-box; }
   main { max-width: 26rem; text-align: center; }
   h1 { font-size: 1.35rem; font-weight: 500; margin: 0 0 .4rem; }
   p { margin: 0 0 1rem; color: #5d5446; font-size: .95rem; }
-  hr { border: 0; border-top: 1px solid #d9d0bd; margin: 1.2rem 0; }
   a { display: inline-block; padding: .55rem 1rem; border: 1px solid #b9ae98; border-radius: 8px; color: inherit; text-decoration: none; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Архив обновляется или нет связи</h1>
-  <p>Страница откроется сама, как только архив ответит. Если долго ничего не происходит, проверьте интернет. Ваши данные на месте: они хранятся на сервере.</p>
-  <a href="/">Открыть ещё раз</a>
-  <hr>
-  <h1>The archive is updating or unreachable</h1>
-  <p>This page opens by itself as soon as the archive answers. If nothing happens for long, check your connection. Your data is safe on the server.</p>
-  <a href="/">Open again</a>
+  <h1 id="title">The archive is updating or unreachable</h1>
+  <p id="text">This page opens by itself as soon as the archive answers. If nothing happens for long, check your connection. Your data is safe on the server.</p>
+  <a id="again" href="/">Open again</a>
 </main>
 <script>
+  // One language, chosen as everywhere in the app: the person's own choice (the folkbranch-lang cookie), then the
+  // browser's languages, then the archive's language last seen on this device, then English.
+  ;(function () {
+    var WORDS = {
+      ru: ['Архив обновляется или нет связи', 'Страница откроется сама, как только архив ответит. Если долго ничего не происходит, проверьте интернет. Ваши данные на месте: они хранятся на сервере.', 'Открыть ещё раз', 'Архив'],
+      en: ['The archive is updating or unreachable', 'This page opens by itself as soon as the archive answers. If nothing happens for long, check your connection. Your data is safe on the server.', 'Open again', 'Archive'],
+      es: ['El archivo se está actualizando o no responde', 'Esta página se abrirá sola en cuanto el archivo responda. Si no pasa nada durante un rato, revisa tu conexión. Tus datos están a salvo en el servidor.', 'Abrir de nuevo', 'Archivo'],
+      ca: ["L'arxiu s'està actualitzant o no respon", "Aquesta pàgina s'obrirà sola tan bon punt l'arxiu respongui. Si no passa res durant una estona, comprova la connexió. Les teves dades són segures al servidor.", 'Obre de nou', 'Arxiu'],
+    }
+    function pick() {
+      var m = document.cookie.match(/(?:^|;\s*)folkbranch-lang=([a-z]{2})/)
+      if (m && WORDS[m[1]]) return m[1]
+      var list = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || '']
+      for (var i = 0; i < list.length; i++) { var two = String(list[i]).slice(0, 2).toLowerCase(); if (WORDS[two]) return two }
+      try { var a = localStorage.getItem('folkbranch-archive-lang'); if (a && WORDS[a]) return a } catch (e) {}
+      return 'en'
+    }
+    var lang = pick(), w = WORDS[lang]
+    document.documentElement.lang = lang
+    document.title = w[3]
+    document.getElementById('title').textContent = w[0]
+    document.getElementById('text').textContent = w[1]
+    document.getElementById('again').textContent = w[2]
+  })()
   // Asks the server until it answers, then opens the archive: the moments of an update pass without anyone pressing anything.
   ;(function () {
     if (location.pathname === '/offline.html') return

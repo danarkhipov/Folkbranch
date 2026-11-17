@@ -82,15 +82,18 @@ export function toGedDate(v: string, lang: Lang = 'ru'): string {
   if (/^[<>]/.test(s)) return `${s[0] === '<' ? 'BEF' : 'AFT'} ${toGedDate(s.slice(1), lang)}`
   let m = s.match(/^(\d{1,2})\.(\d{2})\.(\d{4})$/)
   const names = Object.keys(MONTHS)
-  if (m) return `${+m[1]} ${names[+m[2] - 1]} ${m[3]}`
+  if (m && +m[2] >= 1 && +m[2] <= 12) return `${+m[1]} ${names[+m[2] - 1]} ${m[3]}`
   m = s.match(/^(\d{2})\.(\d{4})$/)
-  if (m) return `${names[+m[1] - 1]} ${m[2]}`
+  if (m && +m[1] >= 1 && +m[1] <= 12) return `${names[+m[1] - 1]} ${m[2]}`
   m = s.match(/^~\s*(.+)$/)
   if (m) return `ABT ${toGedDate(m[1], lang)}`
   if (/^\d{3,4}$/.test(s)) return s
   // In a Spanish or Catalan archive, a date written out in words, alone in the field: "12 de marzo de 1890".
   const d = lang === 'es' || lang === 'ca' ? datesIn(s) : []
   if (d.length === 1 && d[0].month && d[0].start === 0 && d[0].end === s.length) return [d[0].day, names[d[0].month - 1], d[0].year].filter(Boolean).join(' ')
+  // Brackets are this writer's way of marking free text. Keeping the ones already there stops them growing
+  // by a pair on every export and import.
+  if (/^\(.*\)$/.test(s)) return s
   return s ? `(${s})` : ''
 }
 
@@ -264,6 +267,12 @@ export function parseGedcom(text: string, lang: Lang = 'ru'): Imported {
     }
   })
   return { version, persons, families }
+}
+
+/** Families with no parent in the file and children who still need a link: the import adds one card "?" so they stay siblings. */
+export function placeholders(g: Imported): number {
+  const known = new Set(g.persons.map((p) => p.xref))
+  return g.families.filter((f) => !(f.husb && known.has(f.husb)) && !(f.wife && known.has(f.wife)) && f.children.length > 1).length
 }
 
 /** A tag with a text that may run over several lines. */

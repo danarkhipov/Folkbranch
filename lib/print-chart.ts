@@ -2,20 +2,17 @@
 // server and nothing on the server has to hold the pictures in memory. Loaded only when someone prints.
 import fontkit from '@pdf-lib/fontkit'
 import { clip, closePath, type Color, endPath, lineTo, moveTo, PDFDocument, type PDFFont, type PDFImage, popGraphicsState, pushGraphicsState, rgb } from 'pdf-lib'
-import { avatarUrl } from './client'
 import { AVATAR_CY } from './graph/layout'
 import type { Layout } from './graph/layout'
+import { FIRST, SECOND } from './brand'
+import { AVATAR, COLORS, NAME_PX, RINGS as SHARED_RINGS, squarePortrait, TEXT_MAX, wrapText, YEARS_PX } from './chart-style'
 import type { PrintPlan } from './graph/print-plan'
 import { lifeYears, personName, type Person } from './types'
 
-const INK = rgb(0.165, 0.149, 0.125)
-const SOFT = rgb(0.361, 0.337, 0.29)
-const LINE = rgb(0.45, 0.42, 0.36)
-const RINGS: Record<string, ReturnType<typeof rgb>> = { M: rgb(0.361, 0.478, 0.51), F: rgb(0.706, 0.412, 0.31), U: rgb(0.541, 0.51, 0.447) }
-const AVATAR = 30
-const NAME_PX = 15
-const YEARS_PX = 13
-const TEXT_MAX = 120
+// The same colours as the picture, in pdf-lib's terms.
+const hex = (h: string) => rgb(parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255)
+const INK = hex(COLORS.ink), SOFT = hex(COLORS.soft), LINE = hex(COLORS.line), ACCENT = hex(COLORS.accent)
+const RINGS = Object.fromEntries(Object.entries(SHARED_RINGS).map(([k, v]) => [k, hex(v)])) as Record<string, ReturnType<typeof rgb>>
 const DPI = 200
 const MAX_PX = 320
 
@@ -25,41 +22,8 @@ const fetchBytes = async (url: string) => {
   return new Uint8Array(await r.arrayBuffer())
 }
 
-function wrap(text: string, font: PDFFont, size: number, max: number) {
-  const lines: string[] = []
-  let line = ''
-  for (const word of text.split(/\s+/).filter(Boolean)) {
-    const next = line ? `${line} ${word}` : word
-    if (line && font.widthOfTextAtSize(next, size) > max) {
-      lines.push(line)
-      line = word
-    } else line = next
-    // A word wider than a card is cut with a hyphen.
-    while (font.widthOfTextAtSize(line, size) > max) {
-      let n = line.length - 1
-      while (n > 1 && font.widthOfTextAtSize(`${line.slice(0, n)}-`, size) > max) n--
-      lines.push(`${line.slice(0, n)}-`)
-      line = line.slice(n)
-    }
-  }
-  if (line) lines.push(line)
-  return lines
-}
-
 /** A square portrait at the size paper needs: more would only make the file heavy. */
-async function portrait(p: Person, px: number) {
-  const img = new Image()
-  img.src = avatarUrl(p)
-  await img.decode()
-  const c = document.createElement('canvas')
-  c.width = c.height = px
-  const x = c.getContext('2d')!
-  const side = Math.min(img.naturalWidth || px, img.naturalHeight || px)
-  x.fillStyle = '#e7dfcd'
-  x.fillRect(0, 0, px, px)
-  x.drawImage(img, ((img.naturalWidth || px) - side) / 2, ((img.naturalHeight || px) - side) / 2, side, side, 0, 0, px, px)
-  return c.toDataURL('image/jpeg', 0.86)
-}
+const portrait = async (p: Person, px: number) => (await squarePortrait(p, px)).toDataURL('image/jpeg', 0.86)
 
 /** Text in a font's own letters: anything it lacks is left out rather than stopping the whole print. */
 const printable = (font: PDFFont, text: string) => {
@@ -141,7 +105,7 @@ export async function chartToPdf({ layout, persons, plan, title, sheetLabel, hid
       let y = c.y + AVATAR_CY + AVATAR + 13
       const text: { line: string; y: number; size: number; font: PDFFont; color: Color }[] = []
       const add = (value: string, font: PDFFont, px: number, leading: number, color: Color) => {
-        for (const line of wrap(value, font, px, TEXT_MAX)) {
+        for (const line of wrapText(value, TEXT_MAX, (t) => font.widthOfTextAtSize(t, px))) {
           y += px * leading
           text.push({ line, y, size: px * s, font, color })
         }
@@ -157,8 +121,13 @@ export async function chartToPdf({ layout, persons, plan, title, sheetLabel, hid
     page.pushOperators(popGraphicsState())
 
     // What this sheet is, and where to glue it.
+    // The app's mark before the family's name, so a sheet on the wall says whose it is and where it came from.
     const label = printable(sans, total > 1 ? sheetLabel(index + 1, total, sheet.row + 1, sheet.col + 1) : title)
-    page.drawText(label, { x: plan.marginPt, y: plan.marginPt / 3, size: 7, font: sans, color: SOFT })
+    // One sheet carries the name large, in the serif; a sheet of many only needs to say where it goes.
+    const one = total === 1, mark = one ? 16 : 10, size = one ? 12 : 7, at = plan.marginPt / 3
+    page.drawSvgPath(FIRST, { x: plan.marginPt, y: at + mark * 0.8, scale: mark / 64, color: INK })
+    page.drawSvgPath(SECOND, { x: plan.marginPt, y: at + mark * 0.8, scale: mark / 64, color: ACCENT })
+    page.drawText(one ? printable(serif, label) : label, { x: plan.marginPt + mark + 5, y: at, size, font: one ? serif : sans, color: one ? INK : SOFT })
     if (total > 1) {
       const tick = 8
       for (const [cx, cy] of [[left, top], [right, top], [left, bottom], [right, bottom]] as const) {

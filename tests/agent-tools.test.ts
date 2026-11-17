@@ -1,14 +1,14 @@
 import sharp from 'sharp'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { assistantActor, approvalFor } from '../lib/agent/agent'
-import { TOOL_NAMES, toolLabel } from '../lib/agent/labels'
+import { stepLabel, TOOL_NAMES, toolLabel } from '../lib/agent/labels'
 import { getDb, schema } from '../lib/db'
 import { uploadMedia } from '../lib/ops/media'
 import { getPage } from '../lib/ops/pages'
 import { getPersonRow } from '../lib/ops/people'
 import { getSetting,  } from '../lib/ops/settings'
 import { TOOLS, toolsFor } from '../lib/ops/tools'
-import type { Actor } from '../lib/ops/core'
+import { OpError, type Actor } from '../lib/ops/core'
 import { editor, loadFamily, owner, reader, SECRETS } from './fixture-family'
 
 let f: Awaited<ReturnType<typeof loadFamily>>
@@ -161,6 +161,8 @@ describe('who may do what', () => {
   })
   it('a reader gets no way to write', () => {
     expect(toolsFor(reader, 'assistant').filter((t) => !['read', 'ui'].includes(t.risk))).toEqual([])
+    expect(names(reader)).toContain('search_archive')
+    for (const t of ['create_person', 'delete_person', 'update_settings', 'undo']) expect(names(reader)).not.toContain(t)
   })
   it('the assistant has every tool a person has on the graph', () => {
     for (const t of TOOLS.filter((x) => x.surfaces.includes('mcp') && x.name !== 'my_proposals')) expect(names(owner), t.name).toContain(t.name)
@@ -204,19 +206,29 @@ describe('labels in the chat', () => {
     expect(all).toEqual(toolsFor(owner, 'assistant').map((t) => t.name).sort())
     expect([...TOOL_NAMES.write].sort()).toEqual(toolsFor(owner, 'assistant').filter((t) => t.risk === 'write').map((t) => t.name).sort())
     expect(toolLabel('delete_person', 'en')).toBe('Delete a person')
+    // While it runs, an edit reads as being done; on its card it reads as the question.
+    for (const name of [...TOOL_NAMES.write, ...TOOL_NAMES.careful]) expect(stepLabel(name, 'ru'), name).not.toBe(toolLabel(name, 'ru'))
+    expect(stepLabel('delete_person', 'ru')).toBe('Удаляет человека')
   })
 })
 
 describe('a reader and living relatives', () => {
-  const asks = (): [string, Record<string, unknown>][] => [
-    ['get_overview', {}], ['find_gaps', { limit: 200 }], ['search_people', { query: '', limit: 500 }], ['search_people', { query: 'Живинская' }], ['get_person', { id: f.living.id }], ['get_person', { id: f.pyotr.id }],
-    ['get_relatives', { id: f.pyotr.id }], ['how_related', { from: f.pyotr.id, to: f.living.id }], ['list_photos', {}],
-    ['export_text', {}], ['get_history', { limit: 200 }], ['query_people', { limit: 500 }], ['query_people', { name: 'Живинская' }], ['query_people', { living: true }], ['query_people', { groupBy: 'surname', limit: 0 }], ['query_people', { groupBy: 'birthPlace', limit: 0 }],
-    ['search_archive', { query: 'Живинская' }], ['search_archive', { query: 'Тайнопись' }], ['search_archive', { query: 'Тайноград' }], ['search_archive', { query: 'родилась поздно' }], ['focus_person', { id: f.living.id }], ['show_branch', { id: f.living.id, scope: 'near' }], ['show_path', { from: f.pyotr.id, to: f.living.id }], ['list_places', {}], ['view_photo', { id: f.photo.id }],
+  // Every read must actually return something, except where a hidden person is named: there a
+  // controlled refusal is the answer. A tool that always throws fails the first group.
+  const asks = (): [string, Record<string, unknown>, 'ok' | 'refused'][] => [
+    ['get_overview', {}, 'ok'], ['find_gaps', { limit: 200 }, 'ok'], ['search_people', { query: '', limit: 500 }, 'ok'], ['search_people', { query: 'Живинская' }, 'ok'], ['get_person', { id: f.living.id }, 'refused'], ['get_person', { id: f.pyotr.id }, 'ok'],
+    ['get_relatives', { id: f.pyotr.id }, 'ok'], ['how_related', { from: f.pyotr.id, to: f.living.id }, 'refused'], ['list_photos', {}, 'ok'],
+    ['export_text', {}, 'ok'], ['get_history', { limit: 200 }, 'ok'], ['query_people', { limit: 500 }, 'ok'], ['query_people', { name: 'Живинская' }, 'ok'], ['query_people', { living: true }, 'ok'], ['query_people', { groupBy: 'surname', limit: 0 }, 'ok'], ['query_people', { groupBy: 'birthPlace', limit: 0 }, 'ok'],
+    ['search_archive', { query: 'Живинская' }, 'ok'], ['search_archive', { query: 'Тайнопись' }, 'ok'], ['search_archive', { query: 'Тайноград' }, 'ok'], ['search_archive', { query: 'родилась поздно' }, 'ok'], ['focus_person', { id: f.living.id }, 'refused'], ['show_branch', { id: f.living.id, scope: 'near' }, 'refused'], ['show_path', { from: f.pyotr.id, to: f.living.id }, 'refused'], ['list_places', {}, 'ok'], ['view_photo', { id: f.photo.id }, 'ok'],
   ]
   it.each([['a reader', reader]] as const)('no tool shows them to the model for %s', async (_n, person) => {
-    for (const [name, args] of asks()) {
-      const text = await call(person, name, args).then((r) => (typeof r === 'string' ? r : JSON.stringify(r))).catch((e) => e.message)
+    for (const [name, args, expected] of asks()) {
+      const text = expected === 'ok'
+        ? await call(person, name, args).then((r) => (typeof r === 'string' ? r : JSON.stringify(r)))
+        : await call(person, name, args).then(() => { throw new Error(`${name} should refuse a hidden person`) }, (e) => {
+          expect(e, `${name} must refuse in words`).toBeInstanceOf(OpError)
+          return String(e.message)
+        })
       for (const word of SECRETS) expect(text, `${name} ${JSON.stringify(args)} shows ${word}`).not.toContain(word)
     }
   })

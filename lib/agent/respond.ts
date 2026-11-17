@@ -2,14 +2,17 @@ import { createAgentUIStreamResponse, validateUIMessages, type LanguageModel, ty
 import { z } from 'zod'
 import type { Actor } from '../ops/core'
 import { assistantActor, assistantTools, buildAgent, ToolRefusal } from './agent'
-import { countTokens } from './limits'
-import { modelSees, providerFailure, replaceMissingModel } from './provider-key'
+import { modelSees, providerFailure, providerFor, replaceMissingModel } from './provider-key'
+import { OpError } from '../ops/core'
+import { tell } from '../ops/settings'
 import { attachmentBytes, attachmentIdFromUrl, attachmentView, getAttachment, readAttachmentText } from './attachments'
 
 export const chatInput = z.object({
   messages: z.array(z.record(z.string(), z.unknown())).min(1).max(400),
   trustWrites: z.boolean().default(false),
   focusId: z.string().nullish(),
+  /** One answer from another service or model of the owner's list; anything not on it is refused. */
+  choice: z.object({ provider: z.string().max(40), model: z.string().max(160) }).nullish(),
 })
 
 /**
@@ -51,10 +54,14 @@ const lastAnswerAt = (messages: UIMessage[]) => {
 export async function assistantResponse(person: Actor, body: unknown, opts: { model?: LanguageModel; abortSignal?: AbortSignal } = {}) {
   const input = chatInput.parse(body)
   const messages = await validateUIMessages<UIMessage>({ messages: input.messages, tools: assistantTools(assistantActor(person)) as never })
-  if (!opts.model) await replaceMissingModel()
-  const sees = opts.model ? null : await modelSees()
+  // Only the owner sends the archive to another of their services: a key added for speech is not a consent for chat.
+  if (input.choice && person.role !== 'owner') throw new OpError(403, tell('Другую модель для ответа выбирает только владелец'))
+  const picked = input.choice && !opts.model ? providerFor(input.choice.provider, input.choice.model) : null
+  if (input.choice && !opts.model && !picked) throw new OpError(400, tell('Эта модель больше недоступна. Выберите другую в списке «Кто отвечает»'))
+  if (!opts.model && !picked) await replaceMissingModel()
+  const sees = opts.model ? null : await modelSees(picked ?? undefined)
   return createAgentUIStreamResponse({
-    agent: buildAgent(person, { sees, model: opts.model, trustWrites: input.trustWrites, focusId: input.focusId, since: lastAnswerAt(messages), hasFiles: messages.some((m) => m.parts.some((p) => p.type === 'file')) }),
+    agent: buildAgent(person, { sees, model: opts.model, provider: picked, trustWrites: input.trustWrites, focusId: input.focusId, since: lastAnswerAt(messages), hasFiles: messages.some((m) => m.parts.some((p) => p.type === 'file')) }),
     // Instructions come from the server alone.
     uiMessages: await withAttachments(person, messages.filter((m) => m.role !== 'system'), sees),
     abortSignal: opts.abortSignal,
@@ -63,7 +70,6 @@ export async function assistantResponse(person: Actor, body: unknown, opts: { mo
     messageMetadata: ({ part }) => {
       if (part.type === 'start') return { at: Date.now() }
       if (part.type !== 'finish') return undefined
-      countTokens(part.totalUsage.totalTokens ?? 0)
       return { usage: part.totalUsage }
     },
   })

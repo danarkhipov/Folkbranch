@@ -49,7 +49,7 @@ describe('the copy before an update', () => {
   })
   it('keeps the last five', async () => {
     for (let i = 0; i < 7; i++) await backupBeforeUpdate(`1.6.${i}`)
-    expect(fs.readdirSync(path.join(DATA_DIR, 'backups', 'before-update')).length).toBeLessThanOrEqual(5)
+    expect(fs.readdirSync(path.join(DATA_DIR, 'backups', 'before-update'))).toHaveLength(5)
   })
 })
 

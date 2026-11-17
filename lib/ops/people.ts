@@ -1,4 +1,4 @@
-import { and, eq, or } from 'drizzle-orm'
+import { and, eq, isNull, or } from 'drizzle-orm'
 import { dataStamp, getDb, schema } from '../db'
 import type { Certainty, Claim, Fact, Graph, ParentKind, Person, Sex, Source, UnionKind } from '../types'
 import { personName, yearOf } from '../types'
@@ -11,6 +11,12 @@ import { hiddenFor, hiddenIn, isPrivate, maskPerson } from './privacy'
 export { hiddenFor }
 
 const label = (p: { givenName: string; surname: string } | undefined) => (p && personName(p)) || say('Без названия')
+
+/** A chart that shows a death before a birth lies, whichever way the card was saved. */
+export function assertDates(birth?: string | null, death?: string | null) {
+  const b = yearOf(birth ?? ''), d = yearOf(death ?? '')
+  if (b && d && d < b) throw new OpError(400, `death year ${d} is before birth year ${b}`)
+}
 
 function isLikelyLiving(birthYear: number | null, deathDate: string, deathYear: number | null) {
   if (deathDate || deathYear) return false
@@ -147,6 +153,11 @@ export function createPerson(
   requireRole(actor, 'editor')
   const name = [input.givenName, input.surname].filter(Boolean).join(' ')
   const personIds = relation ? [relation.to] : []
+  if (relation) {
+    // The other end must exist, or the chart and the kinship walk carry a link to nobody.
+    if (!relation.to.startsWith('tmp_')) getPersonRow(relation.to)
+    if (relation.otherParentId && !relation.otherParentId.startsWith('tmp_')) getPersonRow(relation.otherParentId)
+  }
   return mutate(actor, { summary: `${say('Добавить')}: ${name}`, personIds }, (c) => {
     const sex: Sex | undefined = relation?.type === 'father' || relation?.type === 'son' ? 'M' : relation?.type === 'mother' || relation?.type === 'daughter' ? 'F' : undefined
     const id = insertPerson(c, { ...input, sex: input.sex ?? sex })
@@ -195,6 +206,8 @@ export function addParent(c: Changes, parentId: string, childId: string, kind: P
 }
 
 export function addUnion(c: Changes, aId: string, bId: string, kind: UnionKind = 'marriage', startDate = '', endDate = '', place = '', certainty?: Certainty) {
+  // One person is never a couple with themself, whatever the file says.
+  if (aId === bId) return
   const db = getDb()
   const s = schema.unions
   // A marriage never joins siblings, or a parent and their child: the chart would draw a couple dot between them.
@@ -216,6 +229,8 @@ export function updatePerson(actor: Actor, id: string, input: PersonInput, seen?
   return mutate(actor, { summary: `${label(p)}: ${Object.keys(input).map((k) => say(FIELD[k] ?? k)).join(', ')}`, personIds: [id], key: `person:${id}` }, (c) => {
     // Read here, inside the write: nothing can slip in between the comparison and the change.
     const row = normalize(seen ? reconcile(getPersonRow(id), input as Record<string, unknown>, seen) as PersonInput : input)
+    // Only an edit of a date is checked: a card saved wrong by an older version can still have its other fields fixed.
+    if ('birthDate' in row || 'deathDate' in row) assertDates((row.birthDate ?? p.birthDate) as string, (row.deathDate ?? p.deathDate) as string)
     if (input.deathDate && input.living === undefined) row.living = false
     return c.update('persons', id, row)
   }) as Person
@@ -229,12 +244,23 @@ export function deletePerson(actor: Actor, id: string) {
     for (const r of db.select().from(schema.parentChild).where(or(eq(schema.parentChild.parentId, id), eq(schema.parentChild.childId, id))).all()) c.remove('parentChild', r.id)
     for (const r of db.select().from(schema.unions).where(or(eq(schema.unions.aId, id), eq(schema.unions.bId, id))).all()) c.remove('unions', r.id)
     for (const r of db.select().from(schema.mediaTags).where(eq(schema.mediaTags.personId, id)).all()) c.remove('mediaTags', r.id)
-    for (const r of db.select().from(schema.pages).where(eq(schema.pages.personId, id)).all()) c.remove('pages', r.id)
+    for (const r of db.select().from(schema.pages).where(eq(schema.pages.personId, id)).all()) {
+      // A page of another person nested below goes to the top level, rather than pointing at a page that is gone.
+      for (const ch of db.select().from(schema.pages).where(eq(schema.pages.parentPageId, r.id)).all())
+        if (ch.personId !== id) c.update('pages', ch.id, { parentPageId: null })
+      c.remove('pages', r.id)
+    }
     for (const r of db.select().from(schema.storyPeople).where(eq(schema.storyPeople.personId, id)).all()) c.remove('storyPeople', r.id)
     for (const r of db.select().from(schema.contacts).where(eq(schema.contacts.personId, id)).all()) c.remove('contacts', r.id)
     dropStoriesAboutNobody(c)
     c.remove('persons', id)
   })
+  // As a merge and a replacing import do: accounts and invitations let go of the card, and a link asking for
+  // a story about this person is closed, so nothing points at a card that is gone. An undo brings the card back,
+  // and the owner links the account again.
+  db.update(schema.user).set({ personId: null }).where(eq(schema.user.personId, id)).run()
+  db.update(schema.invites).set({ personId: null }).where(eq(schema.invites.personId, id)).run()
+  db.update(schema.storyRequests).set({ revokedAt: Date.now() }).where(and(eq(schema.storyRequests.personId, id), isNull(schema.storyRequests.revokedAt))).run()
 }
 
 export function updateRelation(actor: Actor, type: 'parent' | 'union', id: string, patch: Record<string, string>) {

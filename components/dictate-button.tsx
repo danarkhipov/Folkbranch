@@ -12,7 +12,7 @@ const NO_MIC = { insecure: 'Запись голоса работает толь�
 
 /** Writes what is said into the field of the form it stands in: it reads on this device, and the person sends it. */
 export function DictateButton() {
-  const { t, lang, notify } = useApp()
+  const { t, archiveLang, notify } = useApp()
   const [on] = useSmart('speech')
   const model = useModel('speech')
   const cloud = useCloud()
@@ -39,7 +39,7 @@ export function DictateButton() {
       field.focus()
     }
     import('@/lib/smart/speech')
-      .then(({ transcribe }) => transcribe(blob, lang, () => {}, stop.signal))
+      .then(({ transcribe }) => transcribe(blob, archiveLang, () => {}, stop.signal))
       .then((text) => { if (text.trim()) write(text.trim()); else notify(t('В записи не удалось разобрать речь')) })
       .catch((e) => { if (e.name !== 'AbortError') { console.error(e); notify(e instanceof CloudError ? e.message : t('Не удалось расшифровать запись.')) } })
       .finally(() => setReading(false))

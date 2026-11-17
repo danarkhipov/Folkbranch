@@ -1,13 +1,13 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { and, desc, eq, inArray, isNull, like, ne, or } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, like, ne, or, sql } from 'drizzle-orm'
 import { getDb, schema } from '../db'
 import { personName, setOpenEnd, type HistoryEntry, type Role } from '../types'
 import { Actor, newId, OpError, requireRole, seesOnlyPublic } from './core'
-import { say } from './app-config'
-import { changeDetails, readableSummary } from './history-text'
+import { say, tell } from './app-config'
+import { changeDetails, changedPeople, readableSummary } from './history-text'
 import { getGraph, hiddenPeople } from './people'
 
-export { archiveLang, getSetting, say, setSetting } from './app-config'
+export { archiveLang, getSetting, say, tell, setSetting } from './app-config'
 
 export const hasUsers = () => !!getDb().select({ id: schema.user.id }).from(schema.user).limit(1).get()
 
@@ -20,7 +20,7 @@ const isAlive = (personId: string) => {
 }
 
 function assertAlive(personId: string | null | undefined) {
-  if (personId && !isAlive(personId)) throw new OpError(400, say('Выбрать можно только живого человека'))
+  if (personId && !isAlive(personId)) throw new OpError(400, tell('Выбрать можно только живого человека'))
 }
 
 /** A card stops being someone's when its person turns out to have died; an undo brings the link back. */
@@ -83,13 +83,32 @@ export function listUsers(actor: Actor) {
 export function setUserRole(actor: Actor, id: string, role: Role) {
   requireRole(actor, 'owner')
   if (id === actor.userId) throw new OpError(400, 'cannot change your own role')
-  getDb().update(schema.user).set({ role }).where(eq(schema.user.id, id)).run()
+  const db = getDb()
+  db.transaction(() => {
+    if (role !== 'owner') keepAnOwner(id)
+    db.update(schema.user).set({ role }).where(eq(schema.user.id, id)).run()
+    // A reader's agent cannot keep writing: the person's editing tokens go with the right to edit.
+    if (role === 'reader') db.update(schema.apiTokens).set({ revokedAt: Date.now() }).where(and(eq(schema.apiTokens.createdBy, id), eq(schema.apiTokens.role, 'editor'), isNull(schema.apiTokens.revokedAt))).run()
+  })
+}
+
+/** Two owners removing each other at once would leave nobody to run the archive: the last owner stays. */
+function keepAnOwner(id: string) {
+  const owners = getDb().select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.role, 'owner')).all()
+  if (owners.length <= 1 && owners.some((o) => o.id === id)) throw new OpError(409, tell('В архиве должен остаться хотя бы один владелец'))
 }
 
 export function removeUser(actor: Actor, id: string) {
   requireRole(actor, 'owner')
   if (id === actor.userId) throw new OpError(400, 'cannot remove yourself')
-  getDb().delete(schema.user).where(eq(schema.user.id, id)).run()
+  const db = getDb()
+  // Closing access also ends the keys this person handed out and the links that would sign them back in.
+  db.transaction(() => {
+    keepAnOwner(id)
+    db.update(schema.apiTokens).set({ revokedAt: Date.now() }).where(eq(schema.apiTokens.createdBy, id)).run()
+    db.delete(schema.invites).where(eq(schema.invites.userId, id)).run()
+    db.delete(schema.user).where(eq(schema.user.id, id)).run()
+  })
 }
 
 export function setMyPerson(actor: Actor, personId: string | null) {
@@ -104,13 +123,13 @@ export function listHistory(actor: Actor, limit = 100, personId?: string): Histo
   const h = schema.history
   // A person's id is in the entry itself or, for older ones, in what the entry changed.
   const about = personId ? or(like(h.personIds, `%"${personId}"%`), like(h.changes, `%"${personId}"%`)) : undefined
-  const rows = db.select({ id: h.id, at: h.at, actorName: h.actorName, userId: h.userId, tokenId: h.tokenId, summary: h.summary, personIds: h.personIds, changes: h.changes, undoOf: h.undoOf, undoneAt: h.undoneAt }).from(h).where(about).orderBy(desc(h.at)).limit(limit).all()
+  const rows = db.select({ id: h.id, at: h.at, actorName: h.actorName, userId: h.userId, tokenId: h.tokenId, summary: h.summary, personIds: h.personIds, changes: h.changes, undoOf: h.undoOf, undoneAt: h.undoneAt }).from(h).where(about).orderBy(desc(h.at), desc(sql`rowid`)).limit(limit).all()
   const hidden = hiddenPeople(actor)
   const reader = seesOnlyPublic(actor)
   // From the graph already in memory: a person this actor may not see has no name here either.
   const graph = getGraph(actor)
   const names = new Map(graph.persons.map((p) => [p.id, personName(p)]))
-  const nameOf = (id: string) => names.get(id) || say('Без названия')
+  const nameOf = (id: string) => names.get(id) || tell('Без названия')
   const relations = new Map([
     ...graph.parentChild.map((r): [string, string[]] => [r.id, [r.parentId, r.childId]]),
     ...graph.unions.map((r): [string, string[]] => [r.id, [r.aId, r.bId]]),
@@ -123,13 +142,18 @@ export function listHistory(actor: Actor, limit = 100, personId?: string): Histo
     return relationEnds(changes.find((c) => c.table === 'parentChild' || c.table === 'unions')?.id ?? '')
   }
   const undone = rows.map((r) => r.undoOf).filter((id): id is string => !!id)
-  const originals = new Map(undone.length ? db.select({ id: h.id, summary: h.summary, changes: h.changes }).from(h).where(inArray(h.id, undone)).all().map((o) => [o.id, readableSummary(o.summary, JSON.parse(o.changes), nameOf, undefined, relationEnds)]) : [])
+  // An undo names what it took back; undoing an undo brings that change back and says so with the change's own name.
+  const firstOf = (ids: string[]) => (ids.length ? db.select({ id: h.id, summary: h.summary, changes: h.changes, undoOf: h.undoOf }).from(h).where(inArray(h.id, ids)).all() : [])
+  const level1 = firstOf(undone)
+  const level2 = new Map(firstOf(level1.map((o) => o.undoOf).filter((id): id is string => !!id)).map((o) => [o.id, readableSummary(o.summary, JSON.parse(o.changes), nameOf, undefined, relationEnds)]))
+  const originals = new Map(level1.map((o) => [o.id, o.undoOf && level2.has(o.undoOf) ? { redo: level2.get(o.undoOf)! } : readableSummary(o.summary, JSON.parse(o.changes), nameOf, undefined, relationEnds)]))
   return rows
     .map((r) => {
       const changes = JSON.parse(r.changes)
       const original = r.undoOf ? originals.get(r.undoOf) : undefined
-      const details = reader || r.undoOf ? undefined : changeDetails(changes)
-      const summary = reader ? r.summary : readableSummary(r.summary, changes, nameOf, original, relationEnds)
+      const details = reader || r.undoOf ? undefined : changeDetails(changes, nameOf, relationEnds)
+      const changed = reader || r.undoOf ? undefined : changedPeople(changes, nameOf)
+      const summary = reader ? r.summary : typeof original === 'object' ? `${tell('Возвращено')}: ${original.redo}` : readableSummary(r.summary, changes, nameOf, original, relationEnds)
       // The lines below say which fields changed, so the first line need not list them too.
       const person = details?.length && changes.every((c: { table: string }) => c.table === 'persons') ? summary.split(': ')[0] : summary
       return {
@@ -137,6 +161,7 @@ export function listHistory(actor: Actor, limit = 100, personId?: string): Histo
         // Readers get only the entries about people they can see, and never the values.
         summary: person,
         ...(details ? { details } : {}),
+        ...(changed?.length ? { people: changed } : {}),
       }
     })
     // Summaries contain names, so a reader sees only entries about people visible to them

@@ -3,7 +3,7 @@ import { listWriter } from '../lib/list-writes'
 
 const server = () => {
   const saved: { facts: string[] }[] = []
-  return { saved, send: async (p: { facts?: string[] }) => { await new Promise((r) => setTimeout(r, 5)); saved.push({ facts: p.facts! }) } }
+  return { saved, send: async (p: { facts?: string[] }) => { saved.push({ facts: p.facts! }) } }
 }
 
 describe('listWriter', () => {
@@ -16,12 +16,19 @@ describe('listWriter', () => {
   })
   it('sends in order, even when the first request is slower', async () => {
     const order: string[] = []
+    let releaseFirst = () => {}
+    let startedFirst = () => {}
+    const firstStarted = new Promise<void>((r) => { startedFirst = r })
     const w = listWriter({ facts: [] as string[] }, async (p) => {
-      await new Promise((r) => setTimeout(r, p.facts![0] === 'first' ? 20 : 1))
+      if (p.facts![0] === 'first') { startedFirst(); await new Promise<void>((r) => { releaseFirst = r }) }
       order.push(p.facts![0])
     })
     w.write({ facts: ['first'] })
-    await w.write({ facts: ['second'] })
+    const second = w.write({ facts: ['second'] })
+    await firstStarted
+    // Let the first finish only after the second is already waiting behind it.
+    releaseFirst()
+    await second
     expect(order).toEqual(['first', 'second'])
   })
   it('goes on after a failed request', async () => {

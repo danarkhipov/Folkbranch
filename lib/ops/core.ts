@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { getDb, schema } from '../db'
 import { announceChange } from '../live'
@@ -48,6 +48,10 @@ export const TRACKED = {
   places: schema.places,
   repositories: schema.repositories,
   contacts: schema.contacts,
+  // What pointed at a card when the tree was replaced: an undo puts the accounts, invitations and views back too.
+  user: schema.user,
+  invites: schema.invites,
+  views: schema.views,
 } as const
 export type Tracked = keyof typeof TRACKED
 
@@ -107,7 +111,9 @@ export class Changes {
 export const newId = () => nanoid(12)
 
 const pick = (row: Row, fields: string[]) => Object.fromEntries(fields.map((k) => [k, row[k]])) as Row
-const changedFields = (before: Row, after: Row) => Object.keys(before).filter((k) => before[k] !== after[k])
+/** Two readings of one timestamp are two dates; only the moment they hold says whether the field changed. */
+const sameValue = (a: unknown, b: unknown) => a === b || (a instanceof Date && b instanceof Date && a.getTime() === b.getTime())
+const changedFields = (before: Row, after: Row) => Object.keys(before).filter((k) => !sameValue(before[k], after[k]))
 /** Two people can be linked once, so a link cannot return when it was made again meanwhile. */
 function pairTaken(table: Tracked, row: Row) {
   const db = getDb()
@@ -260,33 +266,138 @@ export function purgeOrphans(c: Changes) {
     if (r.avatarMediaId && !known.media.has(r.avatarMediaId)) c.update('persons', r.id, { avatarMediaId: null, avatarCrop: null })
 }
 
+type HistoryRow = typeof schema.history.$inferSelect
+
+/** Puts back only what a change touched, and refuses when somebody has changed it since. */
+function revertChanges(db: ReturnType<typeof getDb>, changes: Change[], c: Changes) {
+  // Pages this entry removes. A child written after them, and not removed itself, goes to the top
+  // level rather than pointing at a page that is no longer there.
+  const removedPages = new Set(changes.filter((ch) => ch.table === 'pages' && !ch.before).map((ch) => ch.id))
+  for (const ch of [...changes].reverse()) {
+    if (!ch.before) {
+      if (ch.table === 'pages') {
+        for (const child of db.select({ id: schema.pages.id }).from(schema.pages).where(eq(schema.pages.parentPageId, ch.id)).all())
+          if (!removedPages.has(child.id)) c.update('pages', child.id, { parentPageId: null })
+      }
+      c.remove(ch.table, ch.id)
+    } else if (!ch.after) {
+      const exists = db.select({ id: TRACKED[ch.table].id }).from(TRACKED[ch.table]).where(eq(TRACKED[ch.table].id, ch.id)).get()
+      if (!exists && !pairTaken(ch.table, ch.before)) c.insert(ch.table, ch.before)
+    } else {
+      const now = db.select().from(TRACKED[ch.table]).where(eq(TRACKED[ch.table].id, ch.id)).get() as Row | undefined
+      if (!now) throw new OpError(409, 'changed later: undo the newer edit first')
+      // Only what this entry changed goes back, and only if nobody has changed it since.
+      // A value already back at its old one was taken back by an earlier partial undo: leave it.
+      const fields = changedFields(ch.before, ch.after).filter((k) => k !== 'updatedAt')
+      const atAfter = fields.every((k) => now[k] === ch.after![k])
+      const atBefore = fields.every((k) => now[k] === ch.before![k])
+      if (!atAfter && !atBefore) throw new OpError(409, 'changed later: undo the newer edit first')
+      if (atAfter && fields.length) c.update(ch.table, ch.id, { ...pick(ch.before, fields), ...('updatedAt' in now && typeof now.updatedAt === 'number' ? { updatedAt: Math.max(Date.now(), now.updatedAt + 1) } : {}) })
+    }
+  }
+}
+
+/** Takes back one stored entry. Runs inside the caller's transaction. */
+function undoEntry(actor: Actor, entry: HistoryRow, summary: string) {
+  const db = getDb()
+  if (entry.undoneAt) throw new OpError(409, 'already undone')
+  // A token may take back its own changes, never a person's.
+  if (actor.tokenId && entry.tokenId !== actor.tokenId) throw new OpError(403, 'a token can undo only its own changes')
+  const c = new Changes()
+  revertChanges(db, JSON.parse(entry.changes) as Change[], c)
+  purgeOrphans(c)
+  db.update(schema.history).set({ undoneAt: Date.now() }).where(eq(schema.history.id, entry.id)).run()
+  // Undoing a rollback puts the entry it took back into effect again.
+  if (entry.undoOf) db.update(schema.history).set({ undoneAt: null }).where(eq(schema.history.id, entry.undoOf)).run()
+  writeHistory(actor, { summary, personIds: JSON.parse(entry.personIds) }, c.list, entry.id)
+}
+
 export function undo(actor: Actor, historyId: string, summary: string) {
   const db = getDb()
   db.transaction(() => {
     const entry = db.select().from(schema.history).where(eq(schema.history.id, historyId)).get()
     if (!entry) throw new OpError(404, 'not found')
-    if (entry.undoneAt) throw new OpError(409, 'already undone')
-    // A token may take back its own changes, never a person's.
-    if (actor.tokenId && entry.tokenId !== actor.tokenId) throw new OpError(403, 'a token can undo only its own changes')
-    const c = new Changes()
-    const changes = JSON.parse(entry.changes) as Change[]
-    for (const ch of [...changes].reverse()) {
-      if (!ch.before) c.remove(ch.table, ch.id)
-      else if (!ch.after) {
-        const exists = db.select({ id: TRACKED[ch.table].id }).from(TRACKED[ch.table]).where(eq(TRACKED[ch.table].id, ch.id)).get()
-        if (!exists && !pairTaken(ch.table, ch.before)) c.insert(ch.table, ch.before)
-      } else {
-        const now = db.select().from(TRACKED[ch.table]).where(eq(TRACKED[ch.table].id, ch.id)).get() as Row | undefined
-        if (!now) continue
-        // Only what this entry changed goes back, and only if nobody has changed it since.
-        const fields = changedFields(ch.before, ch.after).filter((k) => k !== 'updatedAt')
-        if (fields.some((k) => now[k] !== ch.after![k])) throw new OpError(409, 'changed later: undo the newer edit first')
-        if (fields.length) c.update(ch.table, ch.id, { ...pick(ch.before, fields), ...('updatedAt' in now ? { updatedAt: Math.max(Date.now(), (now.updatedAt as number) + 1) } : {}) })
-      }
-    }
-    purgeOrphans(c)
-    db.update(schema.history).set({ undoneAt: Date.now() }).where(eq(schema.history.id, historyId)).run()
-    writeHistory(actor, { summary, personIds: JSON.parse(entry.personIds) }, c.list, historyId)
+    undoEntry(actor, entry, summary)
   })
   announceChange()
+}
+
+/** Takes the archive back to just before the chosen entry, newest first. */
+export function rollbackTo(actor: Actor, historyId: string, summary: string) {
+  const db = getDb()
+  const h = schema.history
+  let count = 0
+  db.transaction(() => {
+    // It takes back everyone's later changes, not only the caller's: the owner's call.
+    if (actor.role !== 'owner' || actor.tokenId) throw new OpError(403, 'only the owner can roll the archive back')
+    const target = db.select().from(h).where(eq(h.id, historyId)).get()
+    if (!target) throw new OpError(404, 'not found')
+    if (target.undoneAt) throw new OpError(409, 'already undone')
+    if (target.undoOf) throw new OpError(409, 'a rollback is not a change to roll back to')
+    // Same millisecond entries are ordered by when they were written.
+    const rows = db.select().from(h).where(gte(h.at, target.at)).orderBy(desc(h.at), desc(sql`rowid`)).all()
+    const at = rows.findIndex((r) => r.id === target.id)
+    if (at < 0) throw new OpError(500, 'the chosen change is not in the history')
+    for (const entry of rows.slice(0, at + 1)) {
+      // Already undone changes and their rollback lines have no effect left to take back.
+      if (entry.undoneAt || entry.undoOf) continue
+      undoEntry(actor, entry, summary)
+      count++
+    }
+  })
+  announceChange()
+  return { count }
+}
+
+function endsOf(row: Row | null) {
+  if (!row) return []
+  if ('parentId' in row) return [row.parentId, row.childId].filter((v): v is string => typeof v === 'string')
+  if ('aId' in row) return [row.aId, row.bId].filter((v): v is string => typeof v === 'string')
+  return []
+}
+
+/** Whether taking this change back also means touching that person's card or links. */
+function touchesPerson(db: ReturnType<typeof getDb>, ch: Change, personId: string) {
+  if (ch.table === 'persons') return ch.id === personId
+  const row = (ch.after ?? ch.before) as Row | null
+  if (!row) return false
+  if (ch.table === 'parentChild' || ch.table === 'unions') {
+    const ends = endsOf(row)
+    if (ends.length) return ends.includes(personId)
+    const now = db.select().from(TRACKED[ch.table]).where(eq(TRACKED[ch.table].id, ch.id)).get() as Row | undefined
+    return endsOf(now ?? null).includes(personId)
+  }
+  if ('personId' in row) return row.personId === personId
+  return false
+}
+
+/** Takes back one person's part of a larger entry, such as one card of an import. */
+export function undoPart(actor: Actor, historyId: string, personId: string, summary: string) {
+  const db = getDb()
+  const h = schema.history
+  let left = 0
+  db.transaction(() => {
+    const rid = db.select({ id: sql<number>`rowid` }).from(h).where(eq(h.id, historyId)).get()?.id
+    const entry = db.select().from(h).where(eq(h.id, historyId)).get()
+    if (!entry || rid === undefined) throw new OpError(404, 'not found')
+    if (entry.undoneAt) throw new OpError(409, 'already undone')
+    if (actor.tokenId && entry.tokenId !== actor.tokenId) throw new OpError(403, 'a token can undo only its own changes')
+    const changes = JSON.parse(entry.changes) as Change[]
+    const part = changes.filter((ch) => touchesPerson(db, ch, personId))
+    if (!part.length) throw new OpError(404, 'this change does not touch that person')
+    // A newer change to the same person depends on this one still being there.
+    const newer = db.select({ id: h.id, at: h.at, rid: sql<number>`rowid`, personIds: h.personIds, undoneAt: h.undoneAt, undoOf: h.undoOf }).from(h).where(gte(h.at, entry.at)).all()
+      .some((e) => e.id !== entry.id && !e.undoneAt && !e.undoOf && (e.at > entry.at || e.rid > rid) && JSON.parse(e.personIds).includes(personId))
+    if (newer) throw new OpError(409, 'changed later: undo the newer edit first')
+    const c = new Changes()
+    revertChanges(db, part, c)
+    purgeOrphans(c)
+    // What is left of the entry: changes about nobody taken back yet, by this part or an earlier one.
+    const done = new Set([personId, ...db.select({ personIds: h.personIds }).from(h).where(eq(h.undoOf, historyId)).all().flatMap((e) => JSON.parse(e.personIds) as string[])])
+    left = changes.filter((ch) => ![...done].some((id) => touchesPerson(db, ch, id))).length
+    if (!left) db.update(h).set({ undoneAt: Date.now() }).where(eq(h.id, historyId)).run()
+    writeHistory(actor, { summary, personIds: [personId] }, c.list, historyId)
+  })
+  announceChange()
+  return { undone: !left, left }
 }

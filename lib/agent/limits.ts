@@ -1,20 +1,23 @@
 // Every answer spends the owner's key, whoever asked, so nobody can run it down unnoticed.
-import { getSetting, say, setSetting } from '../ops/settings'
+import { getSetting, tell, setSetting } from '../ops/settings'
 
 // A fast model answers in rounds, a conversation can need many; the benchmark raises this, a family archive never needs to.
 const PER_MINUTE = Number(process.env.AGENT_PER_MINUTE) || 30
 const dayKey = () => `agentTokens:${new Date().toISOString().slice(0, 10)}`
-const dailyLimit = () => Number(process.env.AGENT_DAILY_TOKENS) || 5_000_000
+export const dailyLimit = () => Number(process.env.AGENT_DAILY_TOKENS) || 5_000_000
 const recent = new Map<string, number[]>()
 
 /** What stops this request, in words, or null. */
 export function overLimit(userId: string, now = Date.now()) {
   const kept = (recent.get(userId) ?? []).filter((t) => now - t < 60_000)
-  if (kept.length >= PER_MINUTE) return say('Слишком много запросов подряд. Подождите минуту.')
+  if (kept.length >= PER_MINUTE) return tell('Слишком много запросов подряд. Подождите минуту.')
   recent.set(userId, [...kept, now])
-  if (Number(getSetting(dayKey()) ?? 0) >= dailyLimit()) return say('Дневной лимит ассистента исчерпан. Он заработает завтра, либо владелец может поднять AGENT_DAILY_TOKENS.')
+  if (Number(getSetting(dayKey()) ?? 0) >= dailyLimit()) return tell('Дневной лимит ассистента исчерпан. Он заработает завтра, либо владелец может поднять AGENT_DAILY_TOKENS.')
   return null
 }
+
+/** Tokens the assistant spent today across the archive, for the owner's usage view. */
+export const tokensToday = () => Number(getSetting(dayKey()) ?? 0)
 
 export function countTokens(used: number) {
   if (used > 0) setSetting(dayKey(), String(Number(getSetting(dayKey()) ?? 0) + used))

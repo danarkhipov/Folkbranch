@@ -11,7 +11,7 @@ import type { SpeechProgress } from '@/lib/smart/speech'
 
 /** Turns a recording into text in this browser. The text lands in the field beside it, for a person to correct. */
 export function TranscribeButton({ getAudio, current, onText }: { getAudio: () => Promise<Blob>; current: string; onText: (text: string) => void }) {
-  const { t, lang } = useApp()
+  const { t, archiveLang } = useApp()
   const [on] = useSmart('speech')
   const model = useModel('speech')
   const cloud = useCloud()
@@ -38,7 +38,7 @@ export function TranscribeButton({ getAudio, current, onText }: { getAudio: () =
     setProgress({ stage: 'preparing' })
     try {
       const { transcribe } = await import('@/lib/smart/speech')
-      const text = await transcribe(await getAudio(), lang, (p) => { setProgress(p); if (p.stage === 'reading' && p.text) onText(join(p.text)) }, stop.current.signal)
+      const text = await transcribe(await getAudio(), archiveLang, (p) => { setProgress(p); if (p.stage === 'reading' && p.text) onText(join(p.text)) }, stop.current.signal)
       onText(join(text))
       if (!text.trim()) setProblem(t('В записи не удалось разобрать речь'))
     } catch (e) {

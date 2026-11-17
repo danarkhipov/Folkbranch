@@ -8,6 +8,8 @@ import { chooseModel, connectProvider, currentProvider, disconnectProvider, prov
 import { assistantResponse } from '../lib/agent/respond'
 import { getDb, schema } from '../lib/db'
 import { getSetting, setSetting } from '../lib/ops/settings'
+import { readKeys } from '../lib/ai/keys'
+import { seal } from '../lib/sealed'
 import { editor, owner, reader } from './fixture-family'
 
 const KEY = 'sk-test-secret-key-1234'
@@ -15,11 +17,13 @@ const answer = (status: number, body: unknown = {}) => new Response(JSON.stringi
 const stub = (res: () => Response) => vi.spyOn(globalThis, 'fetch').mockImplementation(async () => res())
 const sent = () => vi.mocked(fetch).mock.calls[0] as [string, { headers: Record<string, string> }]
 const keep: Record<string, string | undefined> = {}
-const ENV = ['ANTHROPIC_API_KEY', 'OPENROUTER_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'AGENT_PROVIDER', 'AGENT_MODEL']
+const ENV = ['ANTHROPIC_API_KEY', 'OPENROUTER_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'YANDEX_API_KEY', 'CLOUDRU_API_KEY', 'DEEPSEEK_API_KEY', 'MOONSHOT_API_KEY', 'AGENT_PROVIDER', 'AGENT_MODEL', 'AGENT_FOLDER', 'AGENT_BASE_URL']
 
 beforeEach(() => {
   for (const k of ENV) { keep[k] = process.env[k]; delete process.env[k] }
   disconnectProvider(owner)
+  // Disconnecting keeps the key on the list; each test starts from an empty one.
+  setSetting('aiKeys', seal('{}', 'ai-keys'))
   setSetting('assistantEnabled', '0')
 })
 afterEach(() => {
@@ -51,10 +55,17 @@ describe('what a person is told', () => {
 })
 
 describe('connecting', () => {
+  it('a Cloud.ru key is refused when it is wrong, though the list of models is open to anyone', async () => {
+    const models = { data: PRESETS.find((p) => p.id === 'cloudru')!.models.map((m) => ({ id: m.id })) }
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => (String(url).endsWith('/chat/completions') ? answer(400, { code: 'InvalidArgument', message: 'invalid api key secret' }) : answer(200, models)))
+    await expect(connectProvider(owner, { provider: 'cloudru', key: KEY })).rejects.toMatchObject({ status: 400 })
+    expect(currentProvider()).toBeNull()
+  })
+
   it('a good key is stored encrypted, turns the assistant on, and is used', async () => {
     stub(() => answer(200, { data: {} }))
     const status = await connectProvider(owner, { provider: 'openrouter', key: `  ${KEY}\n` })
-    expect(status).toEqual({ connected: true, autoPossible: true, auto: true, provider: 'openrouter', label: 'OpenRouter', model: 'openai/gpt-6-luna', source: 'app', keyEnding: '1234' })
+    expect(status).toEqual({ connected: true, autoPossible: true, auto: true, provider: 'openrouter', label: 'OpenRouter', model: 'openai/gpt-6-luna', source: 'app', keyEnding: '1234', tokensToday: 0, dailyLimit: 5_000_000, month: { requests: 0, tokens: 0, seconds: 0, dollars: 0, unpriced: 0 } })
     expect(JSON.stringify(getDb().select().from(schema.settings).all())).not.toContain(KEY)
     expect(getSetting('assistantEnabled')).toBe('1')
     expect(currentProvider()).toMatchObject({ id: 'openrouter', key: KEY })
@@ -87,7 +98,7 @@ describe('connecting', () => {
   it('a refused key is not stored, and the person is told in words', async () => {
     stub(() => answer(401))
     await expect(connectProvider(owner, { provider: 'openrouter', key: KEY })).rejects.toThrow(/не принял этот ключ/)
-    expect(getSetting('agentKey')).toBeNull()
+    expect(JSON.stringify(readKeys())).not.toContain(KEY)
     expect(currentProvider()).toBeNull()
   })
   it('no connection, too many requests and a provider failure each say what happened', async () => {
@@ -95,12 +106,12 @@ describe('connecting', () => {
     await expect(connectProvider(owner, { provider: 'openrouter', key: KEY })).rejects.toThrow(/связаться/)
     await expect(connectProvider(owner, { provider: 'openrouter', key: KEY })).rejects.toThrow(/подождать/)
     await expect(connectProvider(owner, { provider: 'openrouter', key: KEY })).rejects.toThrow(/503/)
-    expect(getSetting('agentKey')).toBeNull()
+    expect(JSON.stringify(readKeys())).not.toContain(KEY)
   })
   it('a model this key cannot use is refused', async () => {
     stub(() => answer(200, { data: [{ id: 'other' }] }))
     await expect(connectProvider(owner, { provider: 'openai', key: KEY })).rejects.toThrow(/gpt-6-luna/)
-    expect(getSetting('agentKey')).toBeNull()
+    expect(JSON.stringify(readKeys())).not.toContain(KEY)
   })
   it('each provider is asked only for what costs nothing, with the key where it belongs', async () => {
     const cases = [
@@ -135,7 +146,7 @@ describe('connecting', () => {
       await connectProvider(owner, { provider, key: KEY, folder: FOLDER })
       expect(sent()[0]).toContain(url)
       expect(currentProvider()).toMatchObject({ id: provider, key: KEY })
-      expect(getSetting('agentFolder')).toBe(provider === 'yandex' ? FOLDER : null)
+      expect(currentProvider()?.folder || null).toBe(provider === 'yandex' ? FOLDER : null)
     }
     expect(currentProvider()!.folder).toBe(FOLDER)
     await expect(connectProvider(owner, { provider: 'yandex', key: KEY })).rejects.toThrow(/каталога/)
@@ -190,7 +201,7 @@ describe('connecting', () => {
   it('a key that can no longer be read counts as no key', async () => {
     stub(() => answer(200, { data: {} }))
     await connectProvider(owner, { provider: 'openrouter', key: KEY })
-    setSetting('agentKey', 'not.a.real-key')
+    setSetting('aiKeys', 'not.a.real-key')
     expect(currentProvider()).toBeNull()
     expect(assistantState(owner)).toMatchObject({ reason: 'no-key' })
   })
@@ -218,11 +229,12 @@ describe('when the provider fails during a conversation', () => {
     delete process.env.OPENROUTER_API_KEY
     expect(providerFailure(failing(404))).toMatch(/подобрали другую/)
   })
-  it('the person gets those words, and never the details', async () => {
+  it.each([[failing(402), /закончились деньги/], [new Error('secret key sk-ant-123 rejected'), /could not answer/]])('the person gets words, never the details (%s)', async (thrown, words) => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const m = new MockLanguageModelV4({ doStream: async () => { throw failing(402) } })
+    const m = new MockLanguageModelV4({ doStream: async () => { throw thrown } })
     const text = await (await assistantResponse(owner, { messages: [{ id: 'u', role: 'user', parts: [{ type: 'text', text: 'Привет' }] }] }, { model: m })).text()
-    expect(text).toContain('закончились деньги')
+    expect(text).toMatch(words)
+    expect(text).not.toContain('sk-ant')
     expect(text).not.toContain('sk-abc')
     spy.mockRestore()
   })

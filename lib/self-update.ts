@@ -8,7 +8,7 @@ import path from 'node:path'
 import Database from 'better-sqlite3'
 import { DATA_DIR, getDb } from './db'
 import { type Actor, OpError, requireRole } from './ops/core'
-import { say } from './ops/settings'
+import { tell } from './ops/settings'
 import { updateStatus } from './update-check'
 
 export type InstallKind = 'local' | 'server' | 'docker' | 'railway' | 'render' | 'fly' | 'other'
@@ -38,10 +38,10 @@ export function updateHow(kind: InstallKind, version: string) {
   switch (kind) {
     case 'local': return { kind, button: process.env.FOLKBRANCH_SELF_UPDATE !== 'off', command: paste }
     case 'server': return { kind, button: false, command: `curl -fsSL ${REPO}/v${version}/install.sh | sudo sh -s -- --server` }
-    case 'docker': return { kind, button: false, command: `${paste}   # ${say('в папке, куда ставили, или')} docker compose pull && docker compose up -d` }
-    case 'railway': return { kind, button: false, steps: say('В Railway: Deployments → Redeploy, или railway up из обновлённой копии репозитория') }
-    case 'render': return { kind, button: false, steps: say('В Render: Manual Deploy → Deploy latest commit') }
-    case 'fly': return { kind, button: false, steps: say('fly deploy из обновлённой копии репозитория') }
+    case 'docker': return { kind, button: false, command: `${paste}   # ${tell('в папке, куда ставили, или')} docker compose pull && docker compose up -d` }
+    case 'railway': return { kind, button: false, steps: tell('В Railway: Deployments → Redeploy, или railway up из обновлённой копии репозитория') }
+    case 'render': return { kind, button: false, steps: tell('В Render: Manual Deploy → Deploy latest commit') }
+    case 'fly': return { kind, button: false, steps: tell('fly deploy из обновлённой копии репозитория') }
     default: return { kind, button: false, command: paste }
   }
 }
@@ -65,7 +65,7 @@ export async function backupBeforeUpdate(version: string) {
   } catch (e) {
     copy.close()
     fs.rmSync(target, { recursive: true, force: true })
-    throw new OpError(500, `${say('Не удалось сделать проверенную копию базы, обновление не начато')}: ${(e as Error).message}`)
+    throw new OpError(500, `${tell('Не удалось сделать проверенную копию базы, обновление не начато')}: ${(e as Error).message}`)
   }
   copy.close()
   const all = fs.readdirSync(backupsDir()).sort()
@@ -81,11 +81,11 @@ export const updateRunning = () => fs.existsSync(lockFile())
 export async function applyUpdate(actor: Actor, run = spawn) {
   requireRole(actor, 'owner')
   const status = await updateStatus(actor)
-  if (!status.newer || !status.latest) throw new OpError(409, say('Новой версии нет'))
+  if (!status.newer || !status.latest) throw new OpError(409, tell('Новой версии нет'))
   const how = updateHow(installKind(), status.latest)
-  if (!how.button) throw new OpError(409, say('Эту установку обновляют не из приложения'))
+  if (!how.button) throw new OpError(409, tell('Эту установку обновляют не из приложения'))
   const lock = lockFile()
-  if (fs.existsSync(lock) && Date.now() - fs.statSync(lock).mtimeMs < 15 * 60_000) throw new OpError(409, say('Обновление уже идёт'))
+  if (fs.existsSync(lock) && Date.now() - fs.statSync(lock).mtimeMs < 15 * 60_000) throw new OpError(409, tell('Обновление уже идёт'))
   const backup = await backupBeforeUpdate(status.latest)
   const dir = installDir()
   fs.mkdirSync(path.join(/*turbopackIgnore: true*/ dir, 'logs'), { recursive: true })

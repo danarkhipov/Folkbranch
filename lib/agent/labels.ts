@@ -77,6 +77,49 @@ const CAREFUL: Record<string, [string, string]> = {
   revoke_invite: ['Отменить приглашение', 'Cancel an invitation'],
 }
 
+/** What an edit is while it runs, for the line of steps; the labels above ask for it, on the confirmation card. */
+const DOING: Record<string, [string, string]> = {
+  save_attachment: ["Сохраняет файл в архив", "Saving the file to the archive"],
+  create_person: ["Добавляет человека", "Adding a person"],
+  update_person: ["Меняет карточку", "Changing a card"],
+  add_relation: ["Добавляет связь", "Adding a link"],
+  update_relation: ["Меняет связь", "Changing a link"],
+  create_page: ["Создаёт страницу", "Creating a page"],
+  update_page: ["Меняет страницу", "Changing a page"],
+  move_page: ["Переносит страницу", "Moving a page"],
+  upload_photo: ["Загружает фото", "Uploading a photo"],
+  update_photo: ["Меняет подпись фото", "Changing a photo caption"],
+  tag_photo: ["Отмечает человека на фото", "Tagging a person in a photo"],
+  set_avatar: ["Меняет аватарку", "Changing an avatar"],
+  create_place: ["Добавляет место", "Adding a place"],
+  update_place: ["Меняет место", "Changing a place"],
+  add_version: ["Добавляет версию факта", "Adding a version of a fact"],
+  choose_version: ["Выбирает версию факта", "Choosing a version of a fact"],
+  restore_version: ["Возвращает версию факта", "Bringing back a version of a fact"],
+  add_source: ["Добавляет источник", "Adding a source"],
+  delete_person: ["Удаляет человека", "Deleting a person"],
+  update_people: ["Меняет сразу нескольких", "Changing several people"],
+  remove_relation: ["Удаляет связь", "Deleting a link"],
+  remove_parent_links: ["Удаляет связи", "Deleting links"],
+  import_gedcom: ["Импортирует GEDCOM", "Importing GEDCOM"],
+  import_kinship_case: ["Добавляет дело из исследования", "Adding a research case"],
+  delete_page: ["Удаляет страницу", "Deleting a page"],
+  delete_photo: ["Удаляет фото", "Deleting a photo"],
+  untag_photo: ["Снимает отметку с фото", "Removing a photo tag"],
+  reject_version: ["Отклоняет версию факта", "Rejecting a version of a fact"],
+  remove_source: ["Удаляет источник", "Deleting a source"],
+  import_gedcom_attachment: ["Импортирует GEDCOM из файла", "Importing GEDCOM from the file"],
+  import_text: ["Вносит текст в архив", "Bringing text into the archive"],
+  undo: ["Отменяет правку", "Undoing an edit"],
+  update_settings: ["Меняет настройки", "Changing settings"],
+  set_user_role: ["Меняет права человека", "Changing a person's access"],
+  create_invite: ["Создаёт приглашение", "Creating an invitation"],
+  revoke_invite: ["Отзывает приглашение", "Revoking an invitation"],
+}
+
+/** The step as it happens: reading in its own words, an edit as being done rather than as a question. */
+export const stepLabel = (name: string, lang: Lang) => { const pair = READ[name] ?? DOING[name]; return pair ? translatePair(lang, ...pair) : toolLabel(name, lang) }
+
 export const TOOL_NAMES = { read: Object.keys(READ), write: Object.keys(WRITE), careful: Object.keys(CAREFUL) }
 export const isOrdinaryEdit = (name: string) => name in WRITE
 /** Whether finishing this tool may have changed what is on screen. */

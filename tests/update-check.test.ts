@@ -28,8 +28,14 @@ describe('update check', () => {
     expect((await updateStatus(owner)).newer).toBe(false)
   })
   it('versions compare as numbers, not as text', async () => {
-    stub(() => release('v1.10.0'))
-    expect((await updateStatus(owner)).newer).toBe(true)
+    // 1.10.0 is newer than 1.9.0, though as text "1.10.0" sorts before "1.9.0". The running version
+    // is set explicitly so the case stays valid whatever package.json says.
+    const had = pkg.version
+    ;(pkg as { version: string }).version = '1.9.0'
+    try {
+      stub(() => release('v1.10.0'))
+      expect((await updateStatus(owner)).newer).toBe(true)
+    } finally { (pkg as { version: string }).version = had }
   })
   it('a pre-release suffix is ignored', async () => {
     stub(() => release(`${bump(2)}-rc.1`))

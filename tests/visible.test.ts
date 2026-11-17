@@ -31,8 +31,15 @@ describe('what stays on the page', () => {
 
   it('zooming out needs more at once, zooming far in lets go of the rest', () => {
     const b = view(0, 0, 1)!
-    expect(view(0, 0, 0.6, b)).not.toBeNull()
-    expect(view(0, 0, 3, b)).not.toBeNull()
+    const area = (r: Box) => (r[2] - r[0]) * (r[3] - r[1])
+    const out = view(0, 0, 0.6, b)!
+    const in_ = view(0, 0, 3, b)!
+    // Zooming out widens the kept box; zooming in drops the far parts and keeps less.
+    expect(area(out)).toBeGreaterThan(area(b))
+    expect(area(in_)).toBeLessThan(area(b))
+    expect(in_[0]).toBeGreaterThan(b[0])
+    expect(in_[2]).toBeLessThan(b[2])
+    expect(out[2]).toBeGreaterThan(b[2])
   })
 
   it('touching includes the shared edge and nothing past it', () => {

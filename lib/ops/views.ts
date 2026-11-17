@@ -5,6 +5,7 @@ import { getDb, schema } from '../db'
 import { announceChange } from '../live'
 import type { Scope } from '../graph/select'
 import { Actor, newId, OpError, requireRole, seesOnlyPublic } from './core'
+import { tell } from './app-config'
 import { hiddenPeople } from './people'
 
 export const MAIN_VIEW = 'main'
@@ -36,6 +37,8 @@ export function listViews(actor: Actor): ChartView[] {
 export function createView(actor: Actor, input: unknown) {
   requireRole(actor, 'editor')
   const v = viewInput.parse(input)
+  // A branch with no person to start from would quietly show everyone.
+  if (v.scope !== 'all' && !v.focusId) throw new OpError(400, tell('Для этой части семьи нужно выбрать человека'))
   const id = newId()
   getDb().insert(schema.views).values({ id, name: v.name, scope: v.scope, focusId: v.focusId, collapsed: JSON.stringify(v.collapsed), pins: JSON.stringify(v.pins ?? {}), createdBy: actor.userId, updatedAt: Date.now() }).run()
   announceChange()

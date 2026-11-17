@@ -51,6 +51,8 @@ describe('placing by hand', () => {
   })
 
   it('letting one go leaves the other, and all can be let go', () => {
+    views.setPin(owner, views.MAIN_VIEW, { personId: dead, x: 100 })
+    views.setPin(owner, views.MAIN_VIEW, { personId: living, x: 200 })
     views.setPin(owner, views.MAIN_VIEW, { personId: living, x: null })
     expect(main()?.pins).toEqual({ [dead]: 100 })
     views.clearPins(owner, views.MAIN_VIEW)

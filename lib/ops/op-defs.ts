@@ -7,7 +7,7 @@ import * as claims from '../claims'
 import { lifeYears, personName, yearOf, type ClaimField, type Person } from '../types'
 import { Actor, newId, OpError } from './core'
 import * as people from './people'
-import { say } from './settings'
+import { tell } from './settings'
 
 export const certainty = z.enum(['documented', 'family', 'assumed'])
 
@@ -108,10 +108,7 @@ export const same = (s: string | null | undefined) => (s ?? '').trim().toLowerCa
 
 export const isTemp = (id: unknown) => typeof id === 'string' && id.startsWith('tmp_')
 
-function assertDates(birth?: string | null, death?: string | null) {
-  const b = yearOf(birth ?? ''), d = yearOf(death ?? '')
-  if (b && d && d < b) throw new OpError(400, `death year ${d} is before birth year ${b}`)
-}
+export const assertDates = people.assertDates
 
 /** People or models would get a chart that lies; better a refusal the model can explain. */
 export function assertLink(a: Actor, type: string, to: string, other: { id?: string; sex?: string; birthDate?: string; name: string }, kind = 'birth') {
@@ -221,6 +218,9 @@ export function withVersions(p: Person, patch: Record<string, any>) {
   let cur = p
   for (const field of [...claims.CLAIM_FIELDS, ...claims.NAME_FIELDS]) {
     if (patch[field] === undefined || !cur.claims.some((c) => c.field === field)) continue
+    // What a document says must not vanish because a model retyped the field: its source keeps a version of its own.
+    const accepted = cur.claims.find((c) => c.field === field && c.status === 'accepted')
+    if (accepted?.sourceId && accepted.value !== patch[field]) cur = { ...cur, claims: [...cur.claims, { ...accepted, id: newId(), status: 'possible' as const, at: Date.now() }] }
     const change = claims.editValue(cur, field, patch[field])
     out = { ...out, ...change }
     cur = { ...cur, ...change } as Person
@@ -272,10 +272,10 @@ const personFull = (p: { givenName: string; patronymic: string; surname: string;
 /** With patronymic and years: on a confirmation card two namesakes must look different. */
 export function nameOfReal(id: string) {
   const p = getDb().select().from(schema.persons).where(eq(schema.persons.id, id)).get()
-  return p ? personFull(p) || say('Без названия') : id
+  return p ? personFull(p) || tell('Без названия') : id
 }
 
 export function pageName(id: string, c: Ctx) {
   if (id.startsWith('tmp_')) return c.name(id)
-  return getDb().select({ title: schema.pages.title }).from(schema.pages).where(eq(schema.pages.id, id)).get()?.title || say('Без названия')
+  return getDb().select({ title: schema.pages.title }).from(schema.pages).where(eq(schema.pages.id, id)).get()?.title || tell('Без названия')
 }

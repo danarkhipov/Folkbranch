@@ -13,6 +13,8 @@ export const exchangeRoutes: Route[] = [
   get('history', 'Recent changes', ({ actor, query }) => settings.listHistory(actor, Math.min(Number(query.get('limit')) || 100, 500))),
   get('persons/:id/history', 'What was changed about one person, by whom and when', ({ actor, params }) => settings.listHistory(actor, 100, params.id)),
   op('POST', 'history/:id/undo', 'undo', ({ params }) => ({ historyId: params.id })),
+  op('POST', 'history/:id/rollback', 'rollback_to', ({ params }) => ({ historyId: params.id })),
+  op('POST', 'history/:id/undo-person', 'undo_person', ({ params }, body) => ({ historyId: params.id, personId: body?.personId })),
 
   get('text/export', 'The graph in the text format', ({ actor }) => new Response(serializeFamilyText(people.getGraph(actor), settings.getSetting('familyName') ?? ''), { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })),
   { method: 'POST', path: 'text/preview', summary: 'What a text import would do, changing nothing', handler: async ({ actor, body }) => {

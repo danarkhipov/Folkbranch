@@ -5,6 +5,7 @@ import { Check, RotateCcw, ScanFace, Square, UserRound, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { api, mediaUrl, useApp } from '@/lib/client'
 import { squareCrop } from '@/lib/faces'
+import { useFaceCloud } from '@/lib/smart/face-cloud'
 import { useModel } from '@/lib/smart/models'
 import { ModelPrompt } from './model-prompt'
 import type { FaceSuggestion } from '@/lib/smart/face-id'
@@ -24,6 +25,8 @@ export function FaceReview() {
   const [failed, setFailed] = useState(false)
   const stop = useRef<AbortController | null>(null)
   const model = useModel('recognize')
+  const cloud = useFaceCloud()
+  const ready = cloud.use || model.status === 'ready'
   useEffect(() => () => stop.current?.abort(), [])
 
   // People with a framed face and no portrait: nothing to recognise, one press away.
@@ -44,18 +47,23 @@ export function FaceReview() {
   const scan = async () => {
     const run = (stop.current = new AbortController())
     setFailed(false)
-    setProgress(t('Готовлю модель узнавания…'))
+    setProgress(cloud.use ? t('Готовлю лица для сравнения…') : t('Готовлю модель узнавания…'))
     try {
-      const { learnFaces, scanPhotos } = await import('@/lib/smart/face-id')
+      const { learnCloudFaces, learnFaces, scanPhotos, scanPhotosCloud } = await import('@/lib/smart/face-id')
       const tags = photos.flatMap((m) => m.tags.map((tag) => ({ tag, mediaId: m.id, url: mediaUrl(m.id) })))
-      const known = (await learnFaces(tags, (p) => setProgress(p.stage === 'model' ? t('Готовлю модель узнавания…') : `${t('Сравниваю с отмеченными лицами')}: ${p.done} ${t('из')} ${p.total}`), run.signal)).filter((k) => byId.has(k.personId))
-      if (!known.length) { setProgress(null); return notify(t('Сначала отметьте лица хотя бы на нескольких фото: приложению не с чем сравнивать.')) }
-      const result = await scanPhotos(photos.map((m) => ({ id: m.id, url: mediaUrl(m.id), tags: m.tags })), known, {
-        limit: PER_RUN,
-        signal: run.signal,
-        onProgress: (done, total) => setProgress(`${t('Просматриваю фото')}: ${done} ${t('из')} ${total}`),
-        onFound: (s) => setFound((all) => (all.some((x) => x.key === s.key) ? all : [...all, s])),
-      })
+      const shots = photos.map((m) => ({ id: m.id, url: mediaUrl(m.id), tags: m.tags }))
+      const progress = (done: number, total: number) => setProgress(`${t('Просматриваю фото')}: ${done} ${t('из')} ${total}`)
+      const onFound = (s: FaceSuggestion) => setFound((all) => (all.some((x) => x.key === s.key) ? all : [...all, s]))
+      let result: { left: number }
+      if (cloud.use) {
+        const references = await learnCloudFaces(shots, byId)
+        if (!references.length) { setProgress(null); return notify(t('Сначала отметьте лица хотя бы на нескольких фото: приложению не с чем сравнивать.')) }
+        result = await scanPhotosCloud(shots, references, { limit: PER_RUN, signal: run.signal, onProgress: progress, onFound })
+      } else {
+        const known = (await learnFaces(tags, (p) => setProgress(p.stage === 'model' ? t('Готовлю модель узнавания…') : `${t('Сравниваю с отмеченными лицами')}: ${p.done} ${t('из')} ${p.total}`), run.signal)).filter((k) => byId.has(k.personId))
+        if (!known.length) { setProgress(null); return notify(t('Сначала отметьте лица хотя бы на нескольких фото: приложению не с чем сравнивать.')) }
+        result = await scanPhotos(shots, known, { limit: PER_RUN, signal: run.signal, onProgress: progress, onFound })
+      }
       setLeft(result.left)
     } catch (e) {
       if ((e as Error).name !== 'AbortError') { console.error(e); setFailed(true) }
@@ -88,7 +96,12 @@ export function FaceReview() {
 
   return (
     <div className="flex flex-1 flex-col gap-3 overflow-auto px-3 pb-3 text-sm">
-      <p className="text-xs text-ink-soft">{t('Приложение ищет на фото уже отмеченных людей. Всё работает в этом браузере, а имя появится только после вашего «Да».')}</p>
+      <p className="text-xs text-ink-soft">
+        {cloud.use
+          ? t('Приложение ищет на фото уже отмеченных людей через сервис, который подключил владелец архива. Фото уходит на сервер архива и дальше в {where}, а в архиве не остаётся. Имя появится только после вашего «Да».').replace('{where}', t(cloud.info?.where ?? ''))
+          : t('Приложение ищет на фото уже отмеченных людей. Всё работает в этом браузере, а имя появится только после вашего «Да».')}
+      </p>
+      {cloud.enabled && !cloud.chosen && <p className="text-xs text-ink-soft">{t('Распознавание лиц в облаке выключено на этом устройстве. Включить его можно в настройках «Лица и голос».')}</p>}
       {noPortrait.length > 0 && (
         <section className="flex flex-col gap-1">
           <h4 className="font-medium">{t('Можно поставить портрет')}</h4>
@@ -103,14 +116,14 @@ export function FaceReview() {
           })}
         </section>
       )}
-      <ModelPrompt pack="recognize">{t('Чтобы приложение узнавало людей на фото, скачайте модель. Она работает в этом браузере, фото никуда не уходят.')}</ModelPrompt>
-      <div hidden={model.status !== 'ready'} className="flex flex-wrap items-center gap-2 [&[hidden]]:hidden">
+      {!cloud.use && <ModelPrompt pack="recognize">{t('Чтобы приложение узнавало людей на фото, скачайте модель. Она работает в этом браузере, фото никуда не уходят.')}</ModelPrompt>}
+      <div hidden={!ready} className="flex flex-wrap items-center gap-2 [&[hidden]]:hidden">
         {progress
           ? <><span role="status" className="text-xs text-ink-soft">{progress}</span><Button variant="outline" size="sm" onClick={() => stop.current?.abort()}><Square /> {t('Остановить')}</Button></>
           : <Button variant="outline" onClick={scan}><ScanFace /> {t(left ? 'Просмотреть ещё' : 'Найти знакомых на фото')}</Button>}
         {!progress && left !== null && <Button variant="ghost" size="sm" onClick={again}><RotateCcw /> {t('Просмотреть всё заново')}</Button>}
       </div>
-      {failed && <p role="alert" className="text-xs text-destructive">{t('Не удалось запустить модель распознавания')}</p>}
+      {failed && <p role="alert" className="text-xs text-destructive">{t('Не удалось запустить распознавание лиц')}</p>}
       {!progress && left !== null && !found.length && <p className="text-xs text-ink-soft">{t(left ? 'Пока никого не узнали. Можно просмотреть ещё.' : 'Новых совпадений нет.')}</p>}
       {found.map((s) => {
         const p = byId.get(s.personId)

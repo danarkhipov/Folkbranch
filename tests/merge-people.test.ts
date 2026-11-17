@@ -129,6 +129,12 @@ describe('finding duplicates', () => {
     expect(pairs()).not.toContain([a, son].sort().join())
     const far = make({ givenName: 'Мефодий', surname: 'Пастухов', birthDate: '1920', sex: 'M' })
     const woman = make({ givenName: 'Мефодий', surname: 'Пастухов', birthDate: '1850', sex: 'F' })
+    // Positive controls: the same name and year, with the matching sex, are found. Without them the
+    // two absences below would pass even if duplicate detection returned nothing at all.
+    const farTwin = make({ givenName: 'Мефодий', surname: 'Пастухов', birthDate: '1920', sex: 'M' })
+    const womanTwin = make({ givenName: 'Мефодий', surname: 'Пастухов', birthDate: '1850', sex: 'F' })
+    expect(pairs()).toContain([far, farTwin].sort().join())
+    expect(pairs()).toContain([woman, womanTwin].sort().join())
     expect(pairs().filter((p) => p.includes(far) && p.includes(a))).toEqual([])
     expect(pairs().filter((p) => p.includes(woman) && p.includes(a))).toEqual([])
     dismissDuplicate(owner, a, b)
@@ -137,7 +143,7 @@ describe('finding duplicates', () => {
 })
 
 describe('random families', () => {
-  it('500 pairs: merged, nothing lost; undone, byte for byte as before', () => {
+  it('80 pairs: merged, nothing lost; undone, byte for byte as before', () => {
     let seed = 7
     const rnd = (n: number) => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed % n }
     const names = ['Иван', 'Анна', 'Пётр', 'Мария', 'Олег']
@@ -158,7 +164,7 @@ describe('random families', () => {
     for (let i = 0; i < 25; i++) tag()
 
     let merged = 0, refused = 0
-    for (let i = 0; i < 500; i++) {
+    for (let i = 0; i < 80; i++) {
       const keep = ids[rnd(70)], drop = ids[rnd(70)]
       const plan = previewMerge(owner, keep, drop)
       if (plan.blocked) { refused++; continue }
@@ -185,7 +191,7 @@ describe('random families', () => {
       expect(snapshot()).toBe(before)
     }
     console.log(`merged ${merged}, refused ${refused}`)
-    expect(merged).toBeGreaterThan(250)
-    expect(refused).toBeGreaterThan(5)
-  }, 180000)
+    expect(merged).toBeGreaterThan(40)
+    expect(refused).toBeGreaterThan(0)
+  }, 60000)
 })

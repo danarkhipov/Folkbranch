@@ -20,7 +20,10 @@ export async function api<T = any>(path: string, init?: { method?: string; json?
 
 export interface AppCtx {
   me: Me
+  /** The language of the interface this person reads. */
   lang: Lang
+  /** The language of the archive's data, chosen by the owner. */
+  archiveLang: Lang
   familyName: string
   canEdit: boolean
   /** Elders at the bottom of the chart, the youngest at the top. */

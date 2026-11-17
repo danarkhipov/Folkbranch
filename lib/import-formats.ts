@@ -22,7 +22,8 @@ export function detectKind(fileName: string, head: string): ImportKind {
   if (ext === 'csv' || ext === 'tsv') return 'table'
   if (/^﻿?\s*[[{]/.test(head)) return 'json'
   const first = head.replace(/^﻿/, '').split(/\r?\n/)[0]
-  if (!/^family\b/i.test(first) && (first.split(/[;\t]/).length > 2 || first.split(',').length > 2) && !/\b(b|d|sex): /.test(first)) return 'table'
+  // The text format names its family as "family Title", with a space. A header such as "family,born" is a table.
+  if (!/^family\s/i.test(first) && (first.split(/[;\t]/).length > 2 || first.split(',').length > 2) && !/\b(b|d|sex): /.test(first)) return 'table'
   return 'text'
 }
 
@@ -130,6 +131,9 @@ export function rowsToText(rows: string[][], mapping: Mapping, title = ''): Tabl
   }
   // A cell may name a relative or give the number of their row.
   const byId = new Map(parsed.filter((p) => p.id).map((p) => [p.id, p.name]))
+  const ids = parsed.map((p) => p.id).filter(Boolean)
+  const repeatedIds = [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))]
+  if (repeatedIds.length) warnings.push({ key: 'Номера строк в файле повторяются: родство может указать не на того', detail: repeatedIds.slice(0, 10).join(', ') })
   const resolve = (v: string) => byId.get(v) ?? v
   const counts = new Map<string, number>()
   for (const p of parsed) counts.set(norm(p.name), (counts.get(norm(p.name)) ?? 0) + 1)

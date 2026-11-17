@@ -1,9 +1,10 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Select } from '@/components/ui/select'
 import { DefaultChatTransport, getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithApprovalResponses, type ToolUIPart, type UIMessage } from 'ai'
-import { ArrowUp, Check, Circle, CircleCheck, CircleX, Copy, FileText, Loader2, Paperclip, Plus, Undo2, X } from 'lucide-react'
+import { ArrowUp, Check, ChevronDown, Circle, CircleCheck, CircleX, Copy, FileText, History, Loader2, Paperclip, Plus, Undo2, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Confirmation, ConfirmationAction, ConfirmationActions, ConfirmationRequest } from '@/components/ai-elements/confirmation'
 import { Conversation, ConversationContent, ConversationScrollButton } from '@/components/ai-elements/conversation'
@@ -11,8 +12,10 @@ import { Message, MessageContent, MessageResponse } from '@/components/ai-elemen
 import { DictateButton } from './dictate-button'
 import { PromptInput, PromptInputBody, PromptInputButton, PromptInputFooter, PromptInputSubmit, PromptInputTextarea, PromptInputTools, usePromptInputAttachments, type PromptInputMessage } from '@/components/ai-elements/prompt-input'
 import { PanelEdge } from './panel-size'
-import { changesData, isOrdinaryEdit, toolLabel } from '@/lib/agent/labels'
+import { changesData, isOrdinaryEdit, stepLabel, toolLabel } from '@/lib/agent/labels'
 import { api, undoFailure, useApp } from '@/lib/client'
+import { forgetChat, loadChats, saveChat, type SavedChat } from '@/lib/chat-store'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { Scope } from '@/lib/graph/select'
 
 /** Told to the model after a person takes an answer back, so it does not build on what is gone. */
@@ -28,20 +31,36 @@ function plainError(e: Error, t: (k: string) => string) {
 const historyIds = (m: UIMessage) => [...new Set(m.parts.flatMap((p) => (isToolUIPart(p) && p.state === 'output-available' && (p.output as { historyId?: string } | null)?.historyId ? [(p.output as { historyId: string }).historyId] : [])))]
 
 export default function AssistantPanel({ open, width, onWidth, onClose, onPath, onDirection, onBranch }: { open: boolean; width: number; onWidth: (w: number) => void; onClose: () => void; onPath: (path: string[]) => void; onDirection: (rootsBelow: boolean) => void; onBranch: (id: string, scope: Scope) => void }) {
-  const { t, focusId, focus, notify } = useApp()
+  const { t, focusId, focus, notify, me } = useApp()
   const qc = useQueryClient()
   const router = useRouter()
   const trust = useRef(false)
   const [trusted, setTrusted] = useState(false)
   const focused = useRef(focusId)
   focused.current = focusId
-  const [transport] = useState(() => new DefaultChatTransport({ api: '/api/agent', body: () => ({ trustWrites: trust.current, focusId: focused.current }) }))
-  const { messages, sendMessage, status, stop, error, regenerate, addToolApprovalResponse, setMessages, clearError } = useChat({ transport, sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses })
+  // Which of the owner's services and models answers: empty is the owner's default.
+  const [pick, setPick] = useState(() => (me.role === 'owner' ? readPick(me.id) : null))
+  const picked = useRef(pick)
+  useEffect(() => { picked.current = pick }, [pick])
+  const [transport] = useState(() => new DefaultChatTransport({ api: '/api/agent', body: () => ({ trustWrites: trust.current, focusId: focused.current, ...(picked.current ? { choice: picked.current } : {}) }) }))
+  // The conversation survives a reload: the last one opens again, and earlier ones are under History.
+  const [last] = useState(() => loadChats(me.id)[0] ?? null)
+  const [chatId, setChatId] = useState(() => last?.id ?? crypto.randomUUID())
+  const { messages, sendMessage, status, stop, error, regenerate, addToolApprovalResponse, setMessages, clearError } = useChat({ transport, messages: last?.messages ?? [], sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses })
   const busy = status === 'submitted' || status === 'streaming'
   const pending = messages.at(-1)?.parts.filter((p): p is ToolUIPart => isToolUIPart(p) && p.state === 'approval-requested') ?? []
 
-  // What a finished tool means for the screen behind the chat.
-  const applied = useRef(new Set<string>())
+  // What a finished tool means for the screen behind the chat. What a reopened conversation did to the screen
+  // (opening a person, showing a branch) is not done again.
+  const seen = (list: UIMessage[]) => new Set(list.flatMap((m) => m.parts.flatMap((p) => (isToolUIPart(p) ? [p.toolCallId] : []))))
+  const applied = useRef<Set<string>>(null as never)
+  applied.current ??= seen(last?.messages ?? [])
+  const openChat = (c: SavedChat) => {
+    for (const id of seen(c.messages)) applied.current.add(id)
+    setChatId(c.id)
+    setMessages(c.messages)
+  }
+  useEffect(() => { if (!busy) saveChat(me.id, chatId, messages) }, [messages, busy, chatId, me.id])
   useEffect(() => {
     for (const m of messages) {
       for (const p of m.parts) {
@@ -70,6 +89,7 @@ export default function AssistantPanel({ open, width, onWidth, onClose, onPath, 
   }
   const restart = () => {
     stop()
+    setChatId(crypto.randomUUID())
     setMessages([])
     clearError()
     forgetEdits()
@@ -110,6 +130,7 @@ export default function AssistantPanel({ open, width, onWidth, onClose, onPath, 
       <PanelEdge width={width} onWidth={onWidth} />
       <header className="flex items-center gap-1 border-b border-border py-1 pl-3 pr-1">
         <h2 className="flex-1 font-serif text-lg font-medium">{t('Ассистент')}</h2>
+        <ChatHistory userId={me.id} current={chatId} onOpen={(c) => { stop(); clearError(); forgetEdits(); openChat(c) }} onForget={(c) => { forgetChat(me.id, c.id); if (c.id === chatId) restart() }} />
         {messages.length > 0 && <button className="bar-btn" onClick={restart}><Plus size={15} /> {t('Новый разговор')}</button>}
         <button className="bar-btn" title={t('Закрыть')} aria-label={t('Закрыть')} onClick={onClose}><X size={15} /></button>
       </header>
@@ -122,7 +143,8 @@ export default function AssistantPanel({ open, width, onWidth, onClose, onPath, 
             return (
               <Message key={m.id} from={m.role}>
                 <MessageContent className="gap-1.5 group-[.is-assistant]:w-full">
-                  {m.parts.map((p, i) => {
+                  {groupSteps(m.parts).map((p, i) => {
+                    if (Array.isArray(p)) return <Steps key={p[0].toolCallId} parts={p} live={!finished} />
                     if (p.type === 'text') {
                       if (m.role === 'user') return <p key={i} className="whitespace-pre-wrap">{p.text}</p>
                       // A picture would be fetched by itself and a link can be clicked: either address could carry family data out.
@@ -141,7 +163,7 @@ export default function AssistantPanel({ open, width, onWidth, onClose, onPath, 
               </Message>
             )
           })}
-          {status === 'submitted' && <p role="status" className="text-xs text-ink-soft">{t('Думает…')}</p>}
+          {busy && !visiblyWorking(messages.at(-1), status) && <Thinking />}
           {error && (
             <div role="alert" className="text-xs text-destructive">
               {plainError(error, t)} <button className="underline" onClick={() => regenerate()}>{t('Повторить')}</button>
@@ -170,11 +192,65 @@ export default function AssistantPanel({ open, width, onWidth, onClose, onPath, 
           <PromptInputTextarea aria-label={t('Сообщение ассистенту')} placeholder={t(pending.length ? 'Сначала ответьте на вопрос выше' : 'Спросите или попросите изменить…')} disabled={pending.length > 0} />
         </PromptInputBody>
         <PromptInputFooter>
-          <PromptInputTools><AttachButton /><DictateButton /></PromptInputTools>
+          <PromptInputTools><AttachButton /><DictateButton /><ModelPick userId={me.id} pick={pick} onPick={setPick} /></PromptInputTools>
           <PromptInputSubmit labels={{ send: t('Отправить'), stop: t('Остановить') }} status={status} onStop={stop} disabled={pending.length > 0} className="size-7 rounded-full">{busy ? undefined : <ArrowUp className="size-4" />}</PromptInputSubmit>
         </PromptInputFooter>
       </PromptInput>
     </aside>
+  )
+}
+
+/** Earlier conversations on this device, newest first. */
+function ChatHistory({ userId, current, onOpen, onForget }: { userId: string; current: string; onOpen: (c: SavedChat) => void; onForget: (c: SavedChat) => void }) {
+  const { t, lang } = useApp()
+  const [open, setOpen] = useState(false)
+  const [chats, setChats] = useState<SavedChat[]>([])
+  const show = (o: boolean) => { if (o) setChats(loadChats(userId)); setOpen(o) }
+  const when = (at: number) => new Date(at).toLocaleString(lang, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return (
+    <Popover open={open} onOpenChange={show}>
+      <PopoverTrigger asChild><button className="bar-btn" title={t('История разговоров')} aria-label={t('История разговоров')}><History size={15} /></button></PopoverTrigger>
+      <PopoverContent align="end" className="w-72 p-1">
+        <p className="px-2 py-1 text-xs text-ink-soft">{t(chats.length ? 'Разговоры хранятся только в этом браузере' : 'Прошлых разговоров пока нет')}</p>
+        <ul className="max-h-80 overflow-y-auto">
+          {chats.map((c) => (
+            <li key={c.id} className="flex items-center gap-1">
+              <button className={`min-w-0 flex-1 rounded px-2 py-1.5 text-left hover:bg-black/5 ${c.id === current ? 'font-medium' : ''}`} onClick={() => { setOpen(false); onOpen(c) }}>
+                <span className="block truncate text-sm">{c.title || t('Без названия')}</span>
+                <span className="block text-xs text-ink-soft">{when(c.at)}</span>
+              </button>
+              <button className="bar-btn !h-7 shrink-0" title={t('Удалить')} aria-label={t('Удалить')} onClick={() => { onForget(c); setChats(loadChats(userId)) }}><X size={13} /></button>
+            </li>
+          ))}
+        </ul>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+const pickKey = (userId: string) => `folkbranch-model:${userId}`
+function readPick(userId: string): { provider: string; model: string } | null {
+  try { return JSON.parse(localStorage.getItem(pickKey(userId)) ?? 'null') } catch { return null }
+}
+
+/** The service and model for the next answers, from those the owner added; shown only when there is a choice. */
+function ModelPick({ userId, pick, onPick }: { userId: string; pick: { provider: string; model: string } | null; onPick: (p: { provider: string; model: string } | null) => void }) {
+  const { t } = useApp()
+  const { data: choices = [] } = useQuery({ queryKey: ['assistant-choices'], queryFn: () => api<{ provider: string; label: string; model: string; modelLabel: string; current: boolean }[]>('assistant/choices'), staleTime: 60_000 })
+  const value = pick ? `${pick.provider}|${pick.model}` : ''
+  // A pick the owner has since removed falls back to the default.
+  const known = !pick || choices.some((c) => `${c.provider}|${c.model}` === value)
+  useEffect(() => { if (choices.length && !known) onPick(null) }, [choices.length, known, onPick])
+  if (choices.length < 2) return null
+  const choose = (v: string) => {
+    const c = choices.find((x) => `${x.provider}|${x.model}` === v)
+    const next = c && !c.current ? { provider: c.provider, model: c.model } : null
+    onPick(next)
+    try { if (next) localStorage.setItem(pickKey(userId), JSON.stringify(next)); else localStorage.removeItem(pickKey(userId)) } catch { /* private mode keeps it for this page only */ }
+  }
+  return (
+    <Select look="quiet" className="max-w-[180px]" aria-label={t('Кто отвечает')} title={t('Кто отвечает')} value={known ? value : ''} onChange={choose}
+      options={[{ value: '', label: t('Как выбрал владелец') }, ...choices.map((c) => ({ value: `${c.provider}|${c.model}`, label: `${t(c.label)} · ${c.modelLabel}` }))]} />
   )
 }
 
@@ -249,6 +325,66 @@ function Plan({ part }: { part: ToolUIPart }) {
         {steps.map((s, i) => <li key={i} className={`flex items-start gap-1.5 ${s.done ? 'text-ink-faint line-through' : ''}`}>{s.done ? <CircleCheck size={13} className="mt-px shrink-0" /> : <Circle size={13} className="mt-px shrink-0 text-ink-faint" />}<span>{s.text}</span></li>)}
       </ol>
     </div>
+  )
+}
+
+const RUNNING: ToolUIPart['state'][] = ['input-streaming', 'input-available', 'approval-responded']
+/** Steps the assistant takes on its own (reading, looking, making an edit it was allowed): shown together, folded. */
+const quiet = (p: UIMessage['parts'][number]): p is ToolUIPart => isToolUIPart(p) && getToolName(p) !== 'set_plan' && p.state !== 'approval-requested' && p.state !== 'output-denied'
+/** The parts of a message with each run of quiet steps in one group, so they fold together and stay out of the answer. */
+function groupSteps(parts: UIMessage['parts']) {
+  const out: (UIMessage['parts'][number] | ToolUIPart[])[] = []
+  for (const p of parts) {
+    const last = out.at(-1)
+    if (quiet(p)) { if (Array.isArray(last)) last.push(p); else out.push([p]) } else out.push(p)
+  }
+  return out
+}
+/** Whether the screen already shows the assistant at work: text arriving or a step running. Otherwise it is thinking. */
+function visiblyWorking(m: UIMessage | undefined, status: string) {
+  if (status === 'submitted' || !m || m.role !== 'assistant') return false
+  const last = m.parts.at(-1)
+  if (!last) return false
+  if (last.type === 'text') return last.state === 'streaming' && last.text.length > 0
+  return isToolUIPart(last) && (RUNNING.includes(last.state) || last.state === 'approval-requested')
+}
+
+/** Said at once after sending and whenever the model is quiet between steps, with the seconds it has been at it. */
+function Thinking() {
+  const { t } = useApp()
+  const [s, setS] = useState(0)
+  useEffect(() => { const i = setInterval(() => setS((n) => n + 1), 1000); return () => clearInterval(i) }, [])
+  return (
+    <p role="status" aria-live="polite" className="thinking flex items-center gap-2 text-sm text-ink-soft">
+      <span className="thinking-dots" aria-hidden><i /><i /><i /></span>
+      <span>{t('Думает…')}{s >= 3 ? ` ${s} ${t('сек')}` : ''}</span>
+    </p>
+  )
+}
+
+/**
+ * A run of steps in one quiet line between the answer's sentences, in the order they were taken: the step under way
+ * with a spinner, or what was done ("Ищет людей · Читает карточку"). More than one step folds open to the list.
+ */
+function Steps({ parts, live }: { parts: ToolUIPart[]; live: boolean }) {
+  const { lang } = useApp()
+  const current = live ? parts.findLast((p) => RUNNING.includes(p.state)) : undefined
+  const failed = parts.some((p) => p.state === 'output-error')
+  const [open, setOpen] = useState(false)
+  // The same step done several times in a row is said once.
+  const names = parts.map((p) => stepLabel(getToolName(p), lang)).filter((n, i, all) => n !== all[i - 1])
+  const line = current ? `${stepLabel(getToolName(current), lang)}…` : names.join(' · ')
+  const icon = current ? <Loader2 size={13} className="shrink-0 animate-spin" /> : failed ? <CircleX size={13} className="shrink-0 text-destructive" /> : <CircleCheck size={13} className="shrink-0 text-ink-faint" />
+  if (parts.length === 1 && !failed) return <p className="tool-steps-line">{icon}<span className="min-w-0 flex-1 truncate">{line}</span></p>
+  return (
+    <details className="tool-steps" open={open || failed} onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
+      <summary className="tool-steps-line">
+        {icon}<span className="min-w-0 flex-1 truncate">{line}</span><ChevronDown size={13} className="chev shrink-0" />
+      </summary>
+      <div className="flex flex-col gap-0.5 border-l border-border pl-3 ml-1.5 mt-0.5">
+        {parts.map((p) => <ToolCall key={p.toolCallId} part={p} onAnswer={() => {}} />)}
+      </div>
+    </details>
   )
 }
 

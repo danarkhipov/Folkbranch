@@ -21,7 +21,15 @@ const fields = {
   keepPrivate: z.boolean().optional(),
 }
 export const newStory = z.object(fields)
-const editStory = z.object({ ...fields, baseUpdatedAt: z.number() })
+// A change mentions only what it changes; a missing key keeps the stored value.
+const editStory = z.object({
+  ...fields,
+  title: fields.title.removeDefault().optional(),
+  body: fields.body.removeDefault().optional(),
+  tellerName: fields.tellerName.removeDefault().optional(),
+  toldOn: fields.toldOn.removeDefault().optional(),
+  baseUpdatedAt: z.number(),
+})
 
 type Row = typeof schema.stories.$inferSelect
 
@@ -53,11 +61,14 @@ export function updateStory(actor: Actor, id: string, raw: unknown) {
   if (baseUpdatedAt !== story.updatedAt) throw new OpError(409, 'the story changed since this copy was read')
   const people = [...new Set(about)].map(getPersonRow)
   if (tellerId) getPersonRow(tellerId)
+  // A change that does not mention the teller keeps the one the story has; null clears it.
+  const links = linksOf([id]).get(id) ?? []
+  const teller = tellerId !== undefined ? tellerId : links.find((l) => l.role === 'teller')?.personId ?? null
   const updatedAt = Math.max(Date.now(), story.updatedAt + 1)
   mutate(actor, { summary: `${personName(people[0])}: ${say('Рассказ')}${patch.title ? ` «${patch.title}»` : ''}`, personIds: people.map((p) => p.id) }, (c) => {
     c.update('stories', id, { ...patch, updatedAt })
     for (const r of db.select({ id: schema.storyPeople.id }).from(schema.storyPeople).where(eq(schema.storyPeople.storyId, id)).all()) c.remove('storyPeople', r.id)
-    linkPeople(c, id, about, tellerId)
+    linkPeople(c, id, about, teller)
   })
   return { updatedAt }
 }

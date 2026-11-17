@@ -67,7 +67,8 @@ describe('a link with several questions', () => {
     expect(requests.requestInfo(many)!.question.split('\n')).toEqual(['Где родились?', 'Как жили?', 'Раз', 'Два', 'Три'])
     await requests.submitRecording(many, { buf: SOUND, name: 'v' }, 5, 1)
     await requests.submitRecording(many, { buf: SOUND, name: 'v' }, 5, 99)
-    for (const draft of proposals.listProposals(owner)) proposals.acceptProposal(owner, draft.id)
+    // Only the drafts this link made: an unrelated pending proposal must not be accepted here.
+    for (const draft of proposals.listProposals(owner)) if (draft.ops.some((o: { op: string }) => o.op === 'create_story')) proposals.acceptProposal(owner, draft.id)
     const titles = stories.listStories(owner, aboutId).map((s) => s.title)
     expect(titles).toEqual(expect.arrayContaining(['Как жили?', 'Где родились?']))
     expect(titles.filter((x) => x === 'Где родились?')).toHaveLength(1)

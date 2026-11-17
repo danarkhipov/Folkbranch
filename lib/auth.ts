@@ -10,6 +10,7 @@ import { and, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb, schema } from './db'
 import { localLoginAllowed } from './local-login'
+import { tell } from './ops/app-config'
 import { findInvite, findOwnerId, hasUsers, isRecoveryToken, setSetting } from './ops/settings'
 import { loadDemo } from './demo'
 import { applyOwnerEmail } from './owner-email'
@@ -47,7 +48,7 @@ const familyAccess = () =>
       }, async (ctx) => {
         if (hasUsers()) throw new APIError('FORBIDDEN', { message: 'already set up' })
         // On a public host, SETUP_TOKEN stops a stranger from claiming the empty instance.
-        if (!setupCodeMatches(ctx.body.code)) throw new APIError('FORBIDDEN', { message: 'wrong setup code' })
+        if (!setupCodeMatches(ctx.body.code)) throw new APIError('FORBIDDEN', { message: tell('Код настройки не подошёл') })
         const u = await createFamilyUser(ctx, ctx.body.name, 'owner', null)
         setSetting('familyName', ctx.body.familyName)
         setSetting('language', ctx.body.language)
@@ -133,7 +134,7 @@ function build() {
         allowedAttempts: 5,
         storeOTP: 'hashed',
         changeEmail: { enabled: true },
-        sendVerificationOTP: ({ email, otp }) => sendCode(email, otp),
+        sendVerificationOTP: ({ email, otp, type }) => sendCode(email, otp, type === 'sign-in' ? 'sign-in' : 'confirm'),
       })]
     : []
   return betterAuth({

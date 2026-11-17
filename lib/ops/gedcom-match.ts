@@ -1,9 +1,9 @@
 // Which people in a file are already in the archive. Cautious on purpose: a wrong match would fold two
 // people into one card, so only a clear, single candidate counts and anything doubtful stays a new card.
-import { eq } from 'drizzle-orm'
 import { getDb, schema } from '../db'
-import type { Imported, ImportedPerson } from '../gedcom'
+import { placeholders, type Imported, type ImportedPerson } from '../gedcom'
 import { personName, yearOf } from '../types'
+import type { Changes } from './core'
 
 type Row = typeof schema.persons.$inferSelect
 const plain = (s: string) => s.trim().toLowerCase().replace(/ё/g, 'е')
@@ -61,7 +61,7 @@ export function matchReport(g: Imported) {
   return {
     inArchive: getDb().select().from(schema.persons).all().length,
     matched: found.size,
-    added: g.persons.length - found.size,
+    added: g.persons.length - found.size + placeholders(g),
     newLinks: links,
     knownLinks: already,
     pairs: [...found].slice(0, 300).map(([xref, m]) => {
@@ -71,10 +71,10 @@ export function matchReport(g: Imported) {
   }
 }
 
-/** Clears the tree for a file that replaces it. Photos and accounts stay; only what pointed at the old cards goes. */
-export function accountsLetGo() {
+/** Clears the tree for a file that replaces it. Photos and accounts stay; only what pointed at the old cards goes, through the changes so an undo brings it back. */
+export function accountsLetGo(c: Changes) {
   const db = getDb()
-  db.update(schema.user).set({ personId: null }).run()
-  db.update(schema.invites).set({ personId: null }).run()
-  for (const v of db.select().from(schema.views).all()) if (v.focusId) db.update(schema.views).set({ focusId: null, pins: '{}', collapsed: '[]' }).where(eq(schema.views.id, v.id)).run()
+  for (const u of db.select().from(schema.user).all()) if (u.personId) c.update('user', u.id, { personId: null })
+  for (const i of db.select().from(schema.invites).all()) if (i.personId) c.update('invites', i.id, { personId: null })
+  for (const v of db.select().from(schema.views).all()) if (v.focusId) c.update('views', v.id, { focusId: null, pins: '{}', collapsed: '[]' })
 }

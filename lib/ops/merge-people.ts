@@ -2,12 +2,12 @@
 // that lost becomes a version, nothing is thrown away, and one undo brings both cards back as they were.
 import { eq, or } from 'drizzle-orm'
 import { z } from 'zod'
-import { mergeClaims } from '../claims'
+import { cardCertainty, mergeClaims } from '../claims'
 import { getDb, schema } from '../db'
 import { personName, yearOf, type Claim, type ClaimField, type Fact, type Source } from '../types'
 import { Actor, Changes, mutate, mutateGroup, newId, OpError, requireRole } from './core'
 import { getPersonRow } from './people'
-import { getSetting, say, setSetting } from './settings'
+import { getSetting, say, tell, setSetting } from './settings'
 
 export const MERGE_FIELDS = ['givenName', 'patronymic', 'surname', 'maidenName', 'birthDate', 'birthPlace', 'deathDate', 'deathPlace', 'sex', 'otherNames'] as const
 export type MergeField = (typeof MERGE_FIELDS)[number]
@@ -45,16 +45,23 @@ function relatives(keepId: string, dropId: string) {
 
 /** Why these two cannot be one person, in words, or null when they can. */
 function whyNot(keepId: string, dropId: string) {
-  if (keepId === dropId) return say('Это одна и та же карточка')
+  if (keepId === dropId) return tell('Это одна и та же карточка')
   const { above, below } = relatives(keepId, dropId)
-  if (above.has(keepId) || below.has(keepId)) return say('Один из них предок другого: человек стал бы своим собственным предком')
-  if ([...above].some((id) => below.has(id))) return say('Человек оказался бы и предком, и потомком одного родственника')
+  if (above.has(keepId) || below.has(keepId)) return tell('Один из них предок другого: человек стал бы своим собственным предком')
+  if ([...above].some((id) => below.has(id))) return tell('Человек оказался бы и предком, и потомком одного родственника')
   const u = schema.unions
   const unions = getDb().select().from(u).where(or(eq(u.aId, keepId), eq(u.bId, keepId), eq(u.aId, dropId), eq(u.bId, dropId))).all()
   const partners = unions.map((x) => ({ a: x.aId === dropId ? keepId : x.aId, b: x.bId === dropId ? keepId : x.bId }))
-  if (partners.some((p) => p.a === p.b)) return say('Они указаны супругами: человек не может быть женат на себе')
+  if (partners.some((p) => p.a === p.b)) return tell('Они указаны супругами: человек не может быть женат на себе')
   const spouses = partners.map((p) => (p.a === keepId ? p.b : p.a))
-  if (spouses.some((id) => above.has(id) || below.has(id))) return say('Супругом человека оказался бы его предок или потомок')
+  if (spouses.some((id) => above.has(id) || below.has(id))) return tell('Супругом человека оказался бы его предок или потомок')
+  const parentsOf = (id: string) => {
+    const pc = schema.parentChild
+    const where = id === keepId ? or(eq(pc.childId, keepId), eq(pc.childId, dropId)) : eq(pc.childId, id)
+    return getDb().select({ p: pc.parentId }).from(pc).where(where).all().map((r) => (r.p === dropId ? keepId : r.p))
+  }
+  const keepParents = new Set(parentsOf(keepId))
+  if (spouses.some((id) => keepParents.has(id) || parentsOf(id).some((p) => p === keepId || keepParents.has(p)))) return tell('После объединения человек оказался бы супругом своего родственника')
   return null
 }
 
@@ -68,6 +75,7 @@ function counts(id: string) {
     pages: db.select({ id: schema.pages.id }).from(schema.pages).where(eq(schema.pages.personId, id)).all().length,
     photos: db.select({ id: schema.mediaTags.id }).from(schema.mediaTags).where(eq(schema.mediaTags.personId, id)).all().length,
     stories: db.select({ id: schema.storyPeople.id }).from(schema.storyPeople).where(eq(schema.storyPeople.personId, id)).all().length,
+    contacts: db.select({ id: schema.contacts.id }).from(schema.contacts).where(eq(schema.contacts.personId, id)).all().length,
   }
 }
 
@@ -79,12 +87,12 @@ export function previewMerge(actor: Actor, keepId: string, dropId: string) {
   const keep = getPersonRow(keepId), drop = getPersonRow(dropId)
   const warnings: string[] = []
   const parents = new Set([...birthParents(keepId), ...birthParents(dropId)])
-  if (parents.size > 2) warnings.push(say('У человека станет больше двух родных родителей. Проверьте их после объединения.'))
-  if (keep.sex !== drop.sex && !blank('sex', keep.sex) && !blank('sex', drop.sex)) warnings.push(say('На карточках разный пол'))
+  if (parents.size > 2) warnings.push(tell('У человека станет больше двух родных родителей. Проверьте их после объединения.'))
+  if (keep.sex !== drop.sex && !blank('sex', keep.sex) && !blank('sex', drop.sex)) warnings.push(tell('На карточках разный пол'))
   const a = keep.birthYear, b = drop.birthYear
-  if (a && b && Math.abs(a - b) > 10) warnings.push(`${say('Годы рождения расходятся на')} ${Math.abs(a - b)}`)
+  if (a && b && Math.abs(a - b) > 10) warnings.push(`${tell('Годы рождения расходятся на')} ${Math.abs(a - b)}`)
   const accounts = getDb().select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.personId, dropId)).all()
-  if (accounts.length) warnings.push(say('К убираемой карточке привязан аккаунт: он перейдёт на оставшуюся'))
+  if (accounts.length) warnings.push(tell('К убираемой карточке привязан аккаунт: он перейдёт на оставшуюся'))
   return {
     blocked: whyNot(keepId, dropId),
     warnings,
@@ -158,6 +166,12 @@ function moveContent(c: Changes, keepId: string, dropId: string) {
     if (told.has(`${x.storyId}:${x.role}`)) c.remove('storyPeople', x.id)
     else c.update('storyPeople', x.id, { personId: keepId })
   }
+  // A living relative's phone and address are kept out of every export, so a merge is the only chance to carry them over.
+  const kept = db.select({ id: schema.contacts.id }).from(schema.contacts).where(eq(schema.contacts.personId, keepId)).get()
+  for (const x of db.select({ id: schema.contacts.id }).from(schema.contacts).where(eq(schema.contacts.personId, dropId)).all()) {
+    if (kept) c.remove('contacts', x.id)
+    else c.update('contacts', x.id, { personId: keepId })
+  }
 }
 
 /** Not facts about the family, so not in the history: they follow the person and stay valid after an undo too. */
@@ -165,6 +179,7 @@ function moveOutsideHistory(keepId: string, dropId: string) {
   const db = getDb()
   db.update(schema.user).set({ personId: keepId }).where(eq(schema.user.personId, dropId)).run()
   db.update(schema.invites).set({ personId: keepId }).where(eq(schema.invites.personId, dropId)).run()
+  db.update(schema.storyRequests).set({ personId: keepId }).where(eq(schema.storyRequests.personId, dropId)).run()
   for (const v of db.select().from(schema.views).all()) {
     const pins = JSON.parse(v.pins) as Record<string, number>
     const collapsed = JSON.parse(v.collapsed) as string[]
@@ -187,7 +202,7 @@ export function mergePeople(actor: Actor, raw: unknown) {
   const { historyId } = mutateGroup(actor, summary, () => mutate(actor, { summary, personIds: [keepId, dropId] }, (c) => {
     // Read inside the write: what was shown for confirmation must still be true.
     const keep = getPersonRow(keepId), drop = getPersonRow(dropId)
-    if (keep.updatedAt !== seen.keep || drop.updatedAt !== seen.drop) throw new OpError(409, say('Карточку только что изменили. Посмотрите сравнение ещё раз.'))
+    if (keep.updatedAt !== seen.keep || drop.updatedAt !== seen.drop) throw new OpError(409, tell('Карточку только что изменили. Посмотрите сравнение ещё раз.'))
     const why = whyNot(keepId, dropId)
     if (why) throw new OpError(409, why)
     const chosen: Record<string, unknown> = {}
@@ -197,17 +212,24 @@ export function mergePeople(actor: Actor, raw: unknown) {
     }
     // Other names are not a choice between two: a card keeps every name it was ever known by.
     chosen.otherNames = [...new Set([keep.otherNames, drop.otherNames].filter(Boolean))].join(', ')
+    const sources = unite(list<Source>(keep.sources), list<Source>(drop.sources), sameSource)
+    const claims = mergeClaims(list<Claim>(keep.claims), list<Claim>(drop.claims), VERSIONED.map((field) => ({ field, keep: String(keep[field] ?? ''), drop: String(drop[field] ?? ''), chosen: String(chosen[field] ?? '') })), newId)
     const row: Record<string, unknown> = {
       ...chosen,
       birthYear: yearOf(String(chosen.birthDate ?? '')),
       deathYear: yearOf(String(chosen.deathDate ?? '')),
       living: keep.living && drop.living && !chosen.deathDate,
+      // Either card's caution stays: a card hidden from readers, or known to have no children, does not become ordinary or unknown.
+      keepPrivate: keep.keepPrivate || drop.keepPrivate,
+      noChildren: keep.noChildren || drop.noChildren,
+      neverMarried: keep.neverMarried || drop.neverMarried,
+      certainty: cardCertainty({ ...keep, ...chosen, sources, claims } as never),
       avatarMediaId: keep.avatarMediaId ?? drop.avatarMediaId,
       avatarCrop: keep.avatarMediaId ? keep.avatarCrop : drop.avatarCrop,
       tags: JSON.stringify([...new Set([...list<string>(keep.tags), ...list<string>(drop.tags)])]),
       facts: JSON.stringify(unite(list<Fact>(keep.facts), list<Fact>(drop.facts), sameFact)),
-      sources: JSON.stringify(unite(list<Source>(keep.sources), list<Source>(drop.sources), sameSource)),
-      claims: JSON.stringify(mergeClaims(list<Claim>(keep.claims), list<Claim>(drop.claims), VERSIONED.map((field) => ({ field, keep: String(keep[field] ?? ''), drop: String(drop[field] ?? ''), chosen: String(chosen[field] ?? '') })), newId)),
+      sources: JSON.stringify(sources),
+      claims: JSON.stringify(claims),
       updatedAt: Math.max(Date.now(), keep.updatedAt + 1),
     }
     movePeopleLinks(c, keepId, dropId)

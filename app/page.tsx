@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { guestActor } from '@/lib/api-auth'
 import { getAuth, signInMethods } from '@/lib/auth'
 import { localLoginAllowed } from '@/lib/local-login'
+import { viewerLang } from '@/lib/languages'
 import { archiveLang, getSetting, hasUsers, ownCard } from '@/lib/ops/settings'
 import { assistantState } from '@/lib/agent/agent'
 import { FamilyApp } from '@/components/family-app'
@@ -13,13 +14,15 @@ export const dynamic = 'force-dynamic'
 export default async function Home() {
   if (!hasUsers()) redirect('/setup')
   const h = await headers()
+  const archive = archiveLang()
+  const lang = viewerLang(h.get('cookie'), h.get('accept-language'), archive)
   const session = await getAuth().api.getSession({ headers: h })
   if (!session) {
     const guest = guestActor(h)
     if (!guest) redirect(localLoginAllowed(h) ? '/api/auth/family/local' : '/login')
-    return <FamilyApp assistant={{ ready: false, reason: 'readers', canFix: false }} me={{ id: guest.userId, name: guest.name, role: 'reader', personId: null, guest: true }} lang={archiveLang()} familyName={getSetting('familyName') ?? ''} providers={{ google: false, yandex: false, vk: false, telegram: null, email: false }} />
+    return <FamilyApp assistant={{ ready: false, reason: 'readers', canFix: false }} me={{ id: guest.userId, name: guest.name, role: 'reader', personId: null, guest: true }} lang={lang} archiveLang={archive} familyName={getSetting('familyName') ?? ''} providers={{ google: false, yandex: false, vk: false, telegram: null, email: false }} />
   }
   const u = session.user as typeof session.user & { role: Role; personId: string | null }
   const me: Me = { id: u.id, name: u.name, role: u.role, personId: ownCard(u.personId) }
-  return <FamilyApp assistant={assistantState({ userId: me.id, name: me.name, role: me.role, personId: me.personId })} me={me} lang={archiveLang()} familyName={getSetting('familyName') ?? ''} providers={signInMethods()} />
+  return <FamilyApp assistant={assistantState({ userId: me.id, name: me.name, role: me.role, personId: me.personId })} me={me} lang={lang} archiveLang={archive} familyName={getSetting('familyName') ?? ''} providers={signInMethods()} />
 }

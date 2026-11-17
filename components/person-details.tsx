@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useApp } from '@/lib/client'
+import { translate } from '@/lib/i18n'
 import { accept, addVersion, editValue, hasConflict, NAME_FIELDS, reject, RELIABILITY, restore, setSource, sourceOf, summary, versions, type ClaimPatch } from '@/lib/claims'
 import { lifeEvents } from '@/lib/family-dates'
 import { listWriter } from '@/lib/list-writes'
@@ -26,11 +27,12 @@ const MergeDialog = dynamic(() => import('./merge-dialog').then((m) => m.MergeDi
 
 /** One dated fact: what happened, when, where, a note and where it is known from. Saved when the field loses focus. */
 function FactRow({ fact, readOnly, fresh, kinds, places, onChange, onRemove }: { fact: Fact; readOnly: boolean; fresh: boolean; kinds: string[]; places: string[]; onChange: (f: Fact) => void; onRemove: () => void }) {
-  const { t } = useApp()
+  const { t, archiveLang } = useApp()
+  const at = (key: string) => translate(archiveLang, key)
   const [f, setF] = useState(fact)
   const [editing, setEditing] = useState<TextKey | null>(null)
   useEffect(() => setF(fact), [fact])
-  const extra = fieldsFor(f.kind, t)
+  const extra = fieldsFor(f.kind, at)
   const commit = (next = f) => { if (JSON.stringify(next) !== JSON.stringify(fact)) onChange(next) }
   const field = (key: TextKey, placeholder: string, cls: string, known?: string[], auto?: boolean) => {
     const value = f[key] ?? ''
@@ -48,8 +50,8 @@ function FactRow({ fact, readOnly, fresh, kinds, places, onChange, onRemove }: {
   if (readOnly) {
     return (
       <div className="min-w-0 border-l-2 border-border pl-2.5 py-0.5 flex flex-col gap-0.5">
-        <span className="break-anywhere font-medium">{f.date || <span className="text-xs italic font-normal text-ink-faint">{t('Дата неизвестна')}</span>}{f.kind && ` · ${f.kind}`}</span>
-        {f.place ? <ReadText value={f.place} className="text-ink-soft" /> : <span className="text-xs italic text-ink-faint">{t('Место неизвестно')}</span>}
+        <span className="break-anywhere font-medium">{[f.date, f.kind].filter(Boolean).join(' · ')}</span>
+        {f.place && <ReadText value={f.place} className="text-ink-soft" />}
         {f.note && <ReadText value={f.note} />}
         {Object.entries(f.fields ?? {}).filter(([, v]) => v).map(([k, v]) => <span key={k} className="break-anywhere"><span className="text-ink-soft">{t(k)}:</span> {v}</span>)}
         {(f.people ?? []).filter((x) => x.name).map((x, i) => <Participant key={i} person={x} />)}
@@ -301,7 +303,6 @@ function LifeLine({ person }: { person: Person }) {
           <li key={i} className="min-w-0">
             <span className="font-medium">{e.date}</span>{e.age !== null && <span className="text-ink-soft"> · {t('возраст')} {e.age}</span>}
             <span className="block break-anywhere">{t(e.title)}{e.note && ': '}{e.otherId ? <button className="pick underline underline-offset-2 hover:text-ink" onClick={() => focus(e.otherId, { center: true })}>{e.note}</button> : e.note}</span>
-            {e.place !== null && (e.place ? <span className="block break-anywhere text-ink-soft">📍 {e.place}</span> : <span className="block text-xs italic text-ink-faint">📍 {t('Место неизвестно')}</span>)}
           </li>
         ))}
       </ol>
@@ -312,7 +313,8 @@ function LifeLine({ person }: { person: Person }) {
 }
 
 export function Details({ person, patch: send }: { person: Person; patch: (p: Partial<Person>) => Promise<unknown> }) {
-  const { t, canEdit, graph, lang, me } = useApp()
+  const { t, canEdit, graph, lang, archiveLang, me } = useApp()
+  const at = (key: string) => translate(archiveLang, key)
   const ro = !canEdit
   // The card itself says when a save fails, with a way to try again.
   const writer = useRef(listWriter({ facts: person.facts, sources: person.sources, tags: person.tags, claims: person.claims }, send, () => {})).current
@@ -328,7 +330,8 @@ export function Details({ person, patch: send }: { person: Person; patch: (p: Pa
   const [sameAs, setSameAs] = useState<string | null>(null)
   const [freshSource, setFreshSource] = useState(-1)
   const places = useMemo(() => [...new Set(graph.persons.flatMap((p) => [p.birthPlace, p.deathPlace, ...p.facts.map((f) => f.place)]).concat(graph.unions.map((u) => u.place)).filter(Boolean))].sort().slice(0, 300), [graph])
-  const kinds = FACT_KINDS.map((k) => t(k))
+  // The kinds of fact are data: they stay in the archive's language, whatever the interface reads in.
+  const kinds = FACT_KINDS.map((k) => at(k))
   const alive = person.living
   const now = new Date().getFullYear()
   const age = person.birthYear ? (alive ? now : person.deathYear) : null

@@ -2,6 +2,7 @@
 import { overlap } from '../faces'
 import type { Box, MediaTag } from '../types'
 import { facePrint, findFaces } from './face-client'
+import { prepareCrop, prepareImage, scanFacesCloud, type PreparedFaceImage } from './face-cloud'
 import { bestMatch, similarity, type Guess } from './face-match'
 
 // Everything here stays in this browser: a face print is not written to the server or sent anywhere.
@@ -118,6 +119,84 @@ export async function scanPhotos(
         if (!g || refused.has(boxKey(photo.id, g.personId))) return
         onFound({ key: boxKey(photo.id, g.personId), mediaId: photo.id, box: faces[j], personId: g.personId, score: g.score, thumb: thumbnail(img, faces[j]), width: img.naturalWidth, height: img.naturalHeight })
       })
+    }
+    await remember(photo.id, 1, 'seen')
+  }
+  return { left: waiting.length - now.length }
+}
+
+/** At most this many people are compared in the cloud: every one of them costs the owner a request. */
+const CLOUD_PEOPLE = 12
+const cloudCrops = new Map<string, PreparedFaceImage>()
+
+/** One already-tagged face for each person: the service compares the new photo with these. */
+export async function learnCloudFaces(
+  photos: { id: string; url: string; tags: MediaTag[] }[],
+  byId: ReadonlyMap<string, { hidden?: boolean }>,
+) {
+  const chosen = new Map<string, { tag: MediaTag; url: string }>()
+  for (const photo of photos) for (const tag of photo.tags) {
+    if (chosen.size >= CLOUD_PEOPLE) break
+    const person = tag.personId ? byId.get(tag.personId) : undefined
+    if (!person || person.hidden || tag.x === null || chosen.has(tag.personId!)) continue
+    chosen.set(tag.personId!, { tag, url: photo.url })
+  }
+  const out: { personId: string; photo: PreparedFaceImage }[] = []
+  for (const [personId, { tag, url }] of chosen) {
+    const cached = cloudCrops.get(tag.id)
+    if (cached) { out.push({ personId, photo: cached }); continue }
+    const img = await loadImage(url).catch(() => null)
+    if (!img) continue
+    const cropped = prepareCrop(img, tag as Box)
+    cloudCrops.set(tag.id, cropped)
+    out.push({ personId, photo: cropped })
+  }
+  return out
+}
+
+/** Goes through photos not yet looked at, a limited number at a time, with the owner's cloud service. */
+export async function scanPhotosCloud(
+  photos: { id: string; url: string; tags: MediaTag[] }[],
+  references: { personId: string; photo: PreparedFaceImage }[],
+  { limit, onProgress, onFound, signal }: { limit: number; onProgress: (done: number, total: number) => void; onFound: (s: FaceSuggestion) => void; signal: AbortSignal },
+) {
+  const seen = await keysOf('seen')
+  const refused = await keysOf('refused')
+  const waiting = photos.filter((p) => !seen.has(p.id))
+  const now = waiting.slice(0, limit)
+  for (let i = 0; i < now.length; i++) {
+    if (signal.aborted) throw new DOMException('Stopped', 'AbortError')
+    onProgress(i, now.length)
+    const photo = now[i]
+    const img = await loadImage(photo.url).catch(() => null)
+    if (img) {
+      const framed = photo.tags.filter((t) => t.x !== null) as (MediaTag & Box)[]
+      const here = new Set(framed.flatMap((t) => t.personId ?? []))
+      const usable = references.filter((r) => !here.has(r.personId))
+      const prepared = usable.length ? await prepareImage(img) : null
+      const result = prepared ? await scanFacesCloud(prepared, usable, signal) : { faces: [], matches: [] }
+      const claimed = new Map<string, { personId: string; score: number; box: Box }>()
+      for (const match of result.matches) {
+        if (!match.box || here.has(match.personId)) continue
+        if (framed.some((t) => overlap(match.box!, t) > 0.3)) continue
+        const box = match.box
+        const key = `${Math.round(box.x * 100)}:${Math.round(box.y * 100)}:${Math.round(box.w * 100)}:${Math.round(box.h * 100)}`
+        const old = claimed.get(key)
+        if (!old || old.score < match.score) claimed.set(key, { personId: match.personId, score: match.score, box })
+      }
+      for (const found of claimed.values()) {
+        if (refused.has(boxKey(photo.id, found.personId))) continue
+        onFound({
+          key: boxKey(photo.id, found.personId),
+          mediaId: photo.id,
+          box: found.box,
+          personId: found.personId,
+          score: found.score,
+          thumb: thumbnail(img, found.box),
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+        })
+      }
     }
     await remember(photo.id, 1, 'seen')
   }
