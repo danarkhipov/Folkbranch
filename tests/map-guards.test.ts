@@ -106,11 +106,10 @@ describe('a stack opens into a ring only where it can be read', () => {
 
 describe('a place is looked up by name, not searched for each event', () => {
   const many = Array.from({ length: 5000 }, (_, i) => place(`x${i}`, `Деревня ${i}`, 50 + (i % 10), 40 + (i % 7)))
-  it('finds a place by any name or spelling, and does not guess between two places of one name', async () => {
+  it('answers as the search did: the first place of a name wins, another name counts, a loose spelling only when it is one', async () => {
     const { findPlace } = await import('../lib/places')
     const two = [place('a', 'Ивановка', 50, 40), place('b', 'Ивановка', 51, 41), { ...place('c', 'Санкт-Петербург', 59.9, 30.3), otherNames: [{ name: 'Ленинград', years: '' }] }]
-    expect(findPlace('Ивановка', two)).toBeNull()
-    expect(findPlace('Ивановка', two, 'b')?.id).toBe('b')
+    expect(findPlace('Ивановка', two)?.id).toBe('a')
     expect(findPlace('Ленинград, СССР', two)?.id).toBe('c')
     expect(findPlace('санкт петербург.', two)?.id).toBe('c')
     expect(findPlace('ИВАНОВКА!', [...two, place('d', 'Ивановка!', 1, 1)])?.id).toBe('d')

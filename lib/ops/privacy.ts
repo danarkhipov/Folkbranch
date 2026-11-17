@@ -13,7 +13,7 @@ export function hiddenFor(actor: Actor, p: { id: string; living: boolean; keepPr
 }
 
 /** The same card with nothing in it that could say who this is. */
-export const maskPerson = (p: Person): Person => ({ ...p, givenName: '', surname: '', maidenName: '', patronymic: '', otherNames: '', birthDate: '', birthYear: null, birthPlace: '', birthPlaceId: null, deathDate: '', deathYear: null, deathPlace: '', deathPlaceId: null, sex: 'U' as Sex, avatarMediaId: null, avatarCrop: null, tags: [], facts: [], sources: [], claims: [], hidden: true })
+export const maskPerson = (p: Person): Person => ({ ...p, givenName: '', surname: '', maidenName: '', patronymic: '', otherNames: '', birthDate: '', birthYear: null, birthPlace: '', deathDate: '', deathYear: null, deathPlace: '', sex: 'U' as Sex, avatarMediaId: null, avatarCrop: null, tags: [], facts: [], sources: [], claims: [], hidden: true })
 
 /** Who is masked for this person, given the graph they were sent. Empty for anyone who sees everyone. */
 export const hiddenIn = (actor: Actor, graph: Graph) => (seesOnlyPublic(actor) ? new Set(graph.persons.filter((p) => p.hidden).map((p) => p.id)) : new Set<string>())

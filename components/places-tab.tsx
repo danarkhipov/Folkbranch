@@ -9,7 +9,7 @@ import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { api, useApp } from '@/lib/client'
 import { isOnLand, loadLand, type Land } from '@/lib/land'
-import { coordinateIssue, findPlace, mapSpots, parseCoords, placeChain, placesInUse, PLACE_KINDS, similarPlaces } from '@/lib/places'
+import { coordinateIssue, findPlace, mapSpots, parseCoords, placeChain, placesInUse, PLACE_KINDS } from '@/lib/places'
 import { personName, type Place, type PlaceName, type Repository } from '@/lib/types'
 import { Segmented } from './person-fields'
 
@@ -129,7 +129,7 @@ export function PlacesTab({ onOpen }: { onOpen: (id: string) => void }) {
   const rows = useMemo(() => {
     const byPlace = new Map<string, { place: Place | null; texts: string[]; people: Set<string> }>()
     for (const u of uses) {
-      const place = findPlace(u.text, places, u.placeId)
+      const place = findPlace(u.text, places)
       const k = place?.id ?? `text:${u.text.toLowerCase()}`
       const row = byPlace.get(k) ?? { place, texts: [], people: new Set<string>() }
       row.texts.push(u.text)
@@ -142,16 +142,6 @@ export function PlacesTab({ onOpen }: { onOpen: (id: string) => void }) {
       .sort((a, b) => b.people.size - a.people.size)
   }, [uses, places, filter])
   const blank = (name: string): Draft => ({ id: null, name: name.split(',')[0].trim(), kind: '', parentId: null, otherNames: [], lat: null, lon: null, note: '' })
-  const twins = useMemo(() => similarPlaces(places), [places])
-  // The one with more said about it (a point, a parent) is kept; the other's names join it.
-  const merge = async (a: Place, b: Place) => {
-    const score = (p: Place) => (p.lat !== null ? 2 : 0) + (p.parentId ? 1 : 0)
-    const [keep, drop] = score(b) > score(a) ? [b, a] : [a, b]
-    if (!(await confirm(t('Объединить «{a}» и «{b}»?').replace('{a}', () => keep.name).replace('{b}', () => drop.name), t('Объединить'), t('Карточки людей не изменятся. Вернуть можно в истории.')))) return
-    await api(`places/${keep.id}/merge`, { method: 'POST', json: { from: drop.id } })
-    await qc.invalidateQueries({ queryKey: ['places'] })
-    qc.invalidateQueries({ queryKey: ['graph'] })
-  }
   const remove = async (p: Place) => {
     if (!(await confirm(t('Удалить сведения о месте «{name}»?').replace('{name}', () => p.name), t('Удалить'), t('Карточки людей не изменятся. Вернуть можно в истории.')))) return
     await api(`places/${p.id}`, { method: 'DELETE' })
@@ -170,23 +160,6 @@ export function PlacesTab({ onOpen }: { onOpen: (id: string) => void }) {
         {canEdit && <Button size="sm" variant="outline" className="flex-none" onClick={() => { setAt('new'); setEditing(blank('')) }}><Plus /> {t('Место')}</Button>}
       </div>
       {editing && at === 'new' && <PlaceForm draft={editing} places={places} onDone={() => setEditing(null)} />}
-      {canEdit && twins.length > 0 && (
-        // Probably one place entered twice: said once, above the list, with a way to make them one.
-        <section className="rounded-md border border-border p-2 text-sm" aria-label={t('Похожие места')}>
-          <h4 className="font-medium">{t('Похожие места')}</h4>
-          <p className="text-xs text-ink-soft">{t('Возможно, одно место записано дважды. Объединение оставит одну запись со всеми названиями; вернуть можно в истории.')}</p>
-          <ul className="mt-1 flex flex-col gap-1">
-            {twins.slice(0, 20).map(([a, b]) => (
-              <li key={`${a.id}|${b.id}`} className="flex flex-wrap items-baseline gap-x-2">
-                <span className="break-anywhere">{placeChain(a, places).map((x) => x.name).join(' → ')}</span>
-                <span className="text-ink-faint">{t('и')}</span>
-                <span className="break-anywhere">{placeChain(b, places).map((x) => x.name).join(' → ')}</span>
-                <button type="button" className="ml-auto text-xs underline underline-offset-2 hover:text-ink" onClick={() => merge(a, b)}>{t('Объединить')}</button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
       {!rows.length && <p className="text-ink-faint">{t('Мест пока нет.')}</p>}
       <ul className="flex flex-col">
         {rows.map((r, i) => {

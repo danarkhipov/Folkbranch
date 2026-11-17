@@ -3,7 +3,7 @@
 // lib/places.ts's lifeStops is the Places map's version of this; it cannot be shared: it drops what has no point or no
 // year without saying why, merges repeat visits, and keeps no kinds, years or life-span rules, which all of this needs.
 import { along, easeInOut, easeInOutInverse, legPath, wrapLon, type Path } from './map-motion'
-import { badCoords, findPlace, onMap, placeMatches } from './places'
+import { badCoords, findPlace, onMap } from './places'
 import { personName, yearOf, type Graph, type Place } from './types'
 
 /** What kind of event, for its small mark on the map. */
@@ -18,7 +18,7 @@ export interface TimedStop {
   until?: number
 }
 export interface Track { personId: string; name: string; born: number | null; died: number | null; living: boolean; stops: TimedStop[] }
-export type Gap = 'no-place' | 'no-coords' | 'bad-coords' | 'unknown-place' | 'ambiguous-place' | 'no-date' | 'outside-span' | 'future' | 'death-before-birth'
+export type Gap = 'no-place' | 'no-coords' | 'bad-coords' | 'unknown-place' | 'no-date' | 'outside-span' | 'future' | 'death-before-birth'
 export interface Unplaced { personId: string; name: string; what: string; date: string; place: string; gap: Gap }
 /** Someone with nowhere to stand: not one event with both a place that has a point and a year. */
 export interface Absent { personId: string; name: string; gaps: Unplaced[] }
@@ -77,31 +77,30 @@ export function mapTimeline(graph: Graph, places: Place[], t: (k: string) => str
     const reversed = born !== null && written !== null && written < born
     const died = reversed ? null : written
     const stops: TimedStop[] = []
-    const add = (text: string, placeId: string | null | undefined, date: string, what: string, fallbackYear: number | null = null, kind: EventKind = 'other', union?: string) => {
+    const add = (text: string, date: string, what: string, fallbackYear: number | null = null, kind: EventKind = 'other', union?: string) => {
       const year = eventYear(date) ?? fallbackYear
       if (!text.trim()) { if (year !== null || what === t('Рождение')) missing.push({ personId: p.id, name, what, date, place: '', gap: 'no-place' }); return }
-      const place = findPlace(text, places, placeId)
+      const place = findPlace(text, places)
       // A place nobody has made a record for is a different gap from a record without a point: the first is a
-      // missing record (or another spelling of its name), the second is a missing coordinate. Two records of one
-      // name and no choice made is a third: the map does not guess which village it was.
-      if (!place) return void missing.push({ personId: p.id, name, what, date, place: text, gap: placeMatches(text, places).length > 1 ? 'ambiguous-place' : 'unknown-place' })
+      // missing record (or another spelling of its name), the second is a missing coordinate.
+      if (!place) return void missing.push({ personId: p.id, name, what, date, place: text, gap: 'unknown-place' })
       if (!onMap(place)) return void missing.push({ personId: p.id, name, what, date, place: text, gap: badCoords(place) ? 'bad-coords' : 'no-coords' })
       if (year === null) return void missing.push({ personId: p.id, name, what, date, place: text, gap: 'no-date' })
       const until = periodEnd(date)
       stops.push({ lat: place.lat, lon: place.lon, place: text.trim(), year, date: date || String(year), what, kind, time: year, ...(union ? { union } : {}), ...(until ? { until } : {}) })
     }
-    add(p.birthPlace, p.birthPlaceId, p.birthDate, t('Рождение'), born, 'birth')
+    add(p.birthPlace, p.birthDate, t('Рождение'), born, 'birth')
     for (const u of graph.unions) {
       if (u.aId !== p.id && u.bId !== p.id) continue
       const other = byId.get(u.aId === p.id ? u.bId : u.aId)
       // A partner hidden from this reader hides the marriage too, as the Places list and the life chronology do.
       if (other?.hidden) continue
       const label = t(u.kind === 'civil' ? 'Союз' : 'Брак')
-      add(u.place, u.placeId, u.startDate, other ? `${label}: ${personName(other)}` : label, null, 'union', u.id)
+      add(u.place, u.startDate, other ? `${label}: ${personName(other)}` : label, null, 'union', u.id)
     }
-    for (const f of p.facts) add(f.place, f.placeId, f.date, t(f.kind), null, factKind(f.kind))
+    for (const f of p.facts) add(f.place, f.date, t(f.kind), null, factKind(f.kind))
     if (reversed) missing.push({ personId: p.id, name, what: t('Смерть'), date: p.deathDate || String(written), place: p.deathPlace, gap: 'death-before-birth' })
-    else if (p.deathPlace || died !== null) add(p.deathPlace, p.deathPlaceId, p.deathDate, t('Смерть'), died, 'death')
+    else if (p.deathPlace || died !== null) add(p.deathPlace, p.deathDate, t('Смерть'), died, 'death')
     // A fact outside this life (more than 90 years before a death with no birth, before a birth, after a death
     // unless it is a burial or a will, or still to come) is a data error: it neither places the person nor stretches
     // the timeline.

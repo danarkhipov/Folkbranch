@@ -10,62 +10,35 @@ export const placeKey = (text: string) => key(text.split(',')[0] ?? '')
  */
 const looseKey = (s: string) => key(s).replace(/[.,;:!?'"«»()]/g, ' ').replace(/[-–—]/g, ' ').replace(/\s+/g, ' ').trim()
 
-/**
- * Every place a text could mean: by its name or any other name, word for word first, then with spelling levelled.
- * Two villages of one name are told apart by what follows a comma, as GEDCOM writes places: "Ivanovka, Tver
- * Governorate" is the Ivanovka that belongs to it.
- */
-export function placeMatches(text: string, places: Place[]): Place[] {
-  if (!text.trim()) return []
-  const { exact, loose } = nameIndex(places)
-  let hits = exact.get(key(text)) ?? exact.get(placeKey(text)) ?? loose.get(looseKey(text)) ?? loose.get(looseKey(placeKey(text))) ?? []
-  const rest = text.split(',').slice(1).map(looseKey).filter(Boolean)
-  if (hits.length > 1 && rest.length) {
-    const above = (p: Place) => placeChain(p, places).slice(1).flatMap((x) => [x.name, ...x.otherNames.map((n) => n.name)]).map(looseKey)
-    const fits = (n: string, r: string) => n === r || n.startsWith(`${r} `) || r.startsWith(`${n} `)
-    const narrowed = hits.filter((p) => rest.every((r) => above(p).some((n) => fits(n, r))))
-    if (narrowed.length) hits = narrowed
-  }
-  return hits
-}
-
-/**
- * The record a place as written means, or null when no record answers to it or several do. A link saved with the
- * text (`id`) settles which of several it is, but only while that place still answers to the text: a text changed
- * since, by hand or by an older version of the app, no longer follows a link made for the old words.
- */
-export function findPlace(text: string, places: Place[], id?: string | null): Place | null {
+/** The record for a place as written, by its name or any of its other names. */
+export function findPlace(text: string, places: Place[]): Place | null {
   if (!text.trim()) return null
-  if (id) {
-    const linked = nameIndex(places).byId.get(id)
-    if (linked && answersTo(text, linked)) return linked
-  }
-  const hits = placeMatches(text, places)
-  return hits.length === 1 ? hits[0] : null
+  const { exact, loose } = nameIndex(places)
+  const hit = exact.get(key(text)) ?? exact.get(placeKey(text))
+  if (hit) return hit
+  // A spelling the record does not carry word for word. Only one place may answer: with two, the choice is a guess.
+  const lone = (k: string) => { const hits = loose.get(k); return hits?.length === 1 ? hits[0] : null }
+  return lone(looseKey(text)) ?? lone(looseKey(placeKey(text)))
 }
-
-/** Whether a place goes by the text written, whole or its first part, in any spelling. */
-const answersTo = (text: string, p: Place) => {
-  const names = [p.name, ...p.otherNames.map((n) => n.name)].map(looseKey)
-  return names.includes(looseKey(text)) || names.includes(looseKey(placeKey(text)))
-}
-
-/** The link to keep beside a place as written: the one record it means, or none while it is unknown or ambiguous. */
-export const placeLink = (text: string, places: Place[], id?: string | null): string | null => findPlace(text, places, id)?.id ?? null
 
 /**
  * Every name of every place, looked up instead of searched: the map asks for each event of each life, and a search
- * through the whole list each time took seconds once an archive had thousands of places. Built once per list.
+ * through the whole list each time took seconds once an archive had thousands of places. Built once per list; the
+ * first place in the list wins an exact name, as the search did.
  */
-const indexes = new WeakMap<Place[], { exact: Map<string, Place[]>; loose: Map<string, Place[]>; byId: Map<string, Place> }>()
+const indexes = new WeakMap<Place[], { exact: Map<string, Place>; loose: Map<string, Place[]> }>()
 function nameIndex(places: Place[]) {
   let ix = indexes.get(places)
   if (ix) return ix
-  ix = { exact: new Map(), loose: new Map(), byId: new Map() }
-  const put = (m: Map<string, Place[]>, k: string, p: Place) => { const list = m.get(k) ?? m.set(k, []).get(k)!; if (!list.includes(p)) list.push(p) }
+  ix = { exact: new Map(), loose: new Map() }
   for (const p of places) {
-    ix.byId.set(p.id, p)
-    for (const n of [p.name, ...p.otherNames.map((o) => o.name)]) { put(ix.exact, key(n), p); put(ix.loose, looseKey(n), p) }
+    for (const n of [p.name, ...p.otherNames.map((o) => o.name)]) {
+      const k = key(n)
+      if (!ix.exact.has(k)) ix.exact.set(k, p)
+      const lk = looseKey(n)
+      const list = ix.loose.get(lk) ?? ix.loose.set(lk, []).get(lk)!
+      if (!list.includes(p)) list.push(p)
+    }
   }
   indexes.set(places, ix)
   return ix
@@ -85,36 +58,31 @@ export function placeChain(place: Place, places: Place[]): Place[] {
 }
 
 /** Every word a place answers to, its own names and those of what it belonged to: for search. */
-export const placeWords = (text: string, places: Place[], id?: string | null) => {
-  // Two villages of one name and no choice made: a search should find the person by either's region.
-  const found = findPlace(text, places, id)
-  const hits = found ? [found] : placeMatches(text, places)
-  return [...new Set(hits.flatMap((p) => placeChain(p, places)))].flatMap((x) => [x.name, ...x.otherNames.map((n) => n.name)]).join(' ')
+export const placeWords = (text: string, places: Place[]) => {
+  const p = findPlace(text, places)
+  return p ? placeChain(p, places).flatMap((x) => [x.name, ...x.otherNames.map((n) => n.name)]).join(' ') : ''
 }
 
-export interface PlaceUse { text: string; people: string[]; /** The record this text was linked to, when one was chosen. */ placeId?: string | null }
+export interface PlaceUse { text: string; people: string[] }
 
-/**
- * The places the archive mentions, as written, with who they are about: births, deaths, facts, marriages. One text
- * linked to two different villages is two uses, so each finds its own record.
- */
+/** The places the archive mentions, as written, with who they are about: births, deaths, facts, marriages. */
 export function placesInUse(graph: Graph): PlaceUse[] {
-  const uses = new Map<string, { text: string; placeId: string | null; people: Set<string> }>()
-  const add = (text: string, placeId: string | null | undefined, id: string) => {
+  const uses = new Map<string, { text: string; people: Set<string> }>()
+  const add = (text: string, id: string) => {
     if (!text.trim()) return
-    const k = `${key(text)}|${placeId ?? ''}`
-    const u = uses.get(k) ?? { text: text.trim(), placeId: placeId ?? null, people: new Set<string>() }
+    const k = key(text)
+    const u = uses.get(k) ?? { text: text.trim(), people: new Set<string>() }
     u.people.add(id)
     uses.set(k, u)
   }
   for (const p of graph.persons) {
     if (p.hidden) continue
-    add(p.birthPlace, p.birthPlaceId, p.id)
-    add(p.deathPlace, p.deathPlaceId, p.id)
-    for (const f of p.facts) add(f.place, f.placeId, p.id)
+    add(p.birthPlace, p.id)
+    add(p.deathPlace, p.id)
+    for (const f of p.facts) add(f.place, p.id)
   }
-  for (const u of graph.unions) { add(u.place, u.placeId, u.aId); add(u.place, u.placeId, u.bId) }
-  return [...uses.values()].map((u) => ({ text: u.text, people: [...u.people], ...(u.placeId ? { placeId: u.placeId } : {}) })).sort((a, b) => b.people.length - a.people.length || a.text.localeCompare(b.text))
+  for (const u of graph.unions) { add(u.place, u.aId); add(u.place, u.bId) }
+  return [...uses.values()].map((u) => ({ text: u.text, people: [...u.people] })).sort((a, b) => b.people.length - a.people.length || a.text.localeCompare(b.text))
 }
 
 /**
@@ -219,17 +187,16 @@ export function coordinateIssue(lat: number | null, lon: number | null, onLand?:
 export interface LifeStop { place: Place & { lat: number; lon: number }; date: string; what: string; withId: string | null }
 
 /** What is written on a life that the little map cannot draw, and why. */
-export interface UnplacedStop { text: string; what: string; date: string; why: 'unknown' | 'no-coords' | 'no-date' | 'ambiguous' }
+export interface UnplacedStop { text: string; what: string; date: string; why: 'unknown' | 'no-coords' | 'no-date' }
 
 /**
  * Why a place as written cannot be put on a map: the archive has no such place, or its point was never
  * filled in. Null when it can be drawn, and for an empty field, which is no place rather than a wrong one.
  */
-export const placeProblem = (text: string, places: Place[], id?: string | null): 'unknown' | 'no-coords' | 'ambiguous' | null => {
+export const placeProblem = (text: string, places: Place[]): 'unknown' | 'no-coords' | null => {
   if (!text.trim()) return null
-  const place = findPlace(text, places, id)
-  // Two records answer and nothing says which: the person picks one, the map does not guess.
-  if (!place) return placeMatches(text, places).length > 1 ? 'ambiguous' : 'unknown'
+  const place = findPlace(text, places)
+  if (!place) return 'unknown'
   return onMap(place) ? null : 'no-coords'
 }
 
@@ -250,21 +217,21 @@ export function placesOffMap(texts: string[], places: Place[]): string[] {
   return out
 }
 
-interface RawStop { text: string; placeId: string | null; date: string; what: string; withId: string | null; order: number; year: number | null }
+interface RawStop { text: string; date: string; what: string; withId: string | null; order: number; year: number | null }
 
 /** Everything written on a life that names a place, in the order the life reads: birth, the rest, death. */
 function lifeRawStops(person: Person, graph: Graph): RawStop[] {
   const byId = new Map(graph.persons.map((p) => [p.id, p]))
   const raw: RawStop[] = []
-  const add = (text: string, placeId: string | null | undefined, date: string, what: string, order: number, withId: string | null = null) => { if (text.trim()) raw.push({ text, placeId: placeId ?? null, date, what, order, withId, year: yearOf(date) }) }
-  add(person.birthPlace, person.birthPlaceId, person.birthDate, 'Рождение', 0)
+  const add = (text: string, date: string, what: string, order: number, withId: string | null = null) => { if (text.trim()) raw.push({ text, date, what, order, withId, year: yearOf(date) }) }
+  add(person.birthPlace, person.birthDate, 'Рождение', 0)
   for (const u of graph.unions) {
     if (u.aId !== person.id && u.bId !== person.id) continue
     const other = byId.get(u.aId === person.id ? u.bId : u.aId)
-    add(u.place, u.placeId, u.startDate, u.kind === 'civil' ? 'Союз' : 'Брак', 1, other && !other.hidden ? other.id : null)
+    add(u.place, u.startDate, u.kind === 'civil' ? 'Союз' : 'Брак', 1, other && !other.hidden ? other.id : null)
   }
-  for (const f of person.facts) add(f.place, f.placeId, f.date, f.kind, 1)
-  add(person.deathPlace, person.deathPlaceId, person.deathDate, 'Смерть', 2)
+  for (const f of person.facts) add(f.place, f.date, f.kind, 1)
+  add(person.deathPlace, person.deathDate, 'Смерть', 2)
   // Birth first and death last whatever their dates; a stop with no date goes just before death.
   const key = (r: RawStop) => (r.order === 0 ? -Infinity : r.order === 2 ? Infinity : r.year ?? Number.MAX_SAFE_INTEGER)
   return raw.sort((a, b) => key(a) - key(b))
@@ -280,7 +247,7 @@ const undated = (r: RawStop) => r.order === 1 && r.year === null
 export function lifeStops(person: Person, graph: Graph, places: Place[]): LifeStop[] {
   const out: LifeStop[] = []
   for (const r of lifeRawStops(person, graph)) {
-    const place = findPlace(r.text, places, r.placeId)
+    const place = findPlace(r.text, places)
     if (!onMap(place)) continue
     // A move with no year has no place in the order of a life: the map with a clock leaves it out, so this one does
     // too, rather than guessing it in just before the death. The card lists it with the reason.
@@ -300,7 +267,7 @@ export function unplacedStops(person: Person, graph: Graph, places: Place[]): Un
   // An undated stop at a place the route reaches anyway is no missing place: the town is on the map.
   const drawn = new Set(lifeStops(person, graph, places).map((s) => s.place.id))
   for (const r of lifeRawStops(person, graph)) {
-    const why = placeProblem(r.text, places, r.placeId) ?? (undated(r) && !drawn.has(findPlace(r.text, places, r.placeId)!.id) ? 'no-date' : null)
+    const why = placeProblem(r.text, places) ?? (undated(r) && !drawn.has(findPlace(r.text, places)!.id) ? 'no-date' : null)
     if (!why) continue
     const text = r.text.trim()
     if (out.some((u) => u.text.toLowerCase() === text.toLowerCase() && u.why === why)) continue
@@ -315,7 +282,7 @@ export interface MapSpot { place: Place & { lat: number; lon: number }; people: 
 export function mapSpots(graph: Graph, places: Place[]): MapSpot[] {
   const spots = new Map<string, MapSpot>()
   for (const use of placesInUse(graph)) {
-    const place = findPlace(use.text, places, use.placeId)
+    const place = findPlace(use.text, places)
     if (!onMap(place)) continue
     const spot = spots.get(place.id) ?? { place, people: [] }
     for (const id of use.people) if (!spot.people.includes(id)) spot.people.push(id)
@@ -323,36 +290,6 @@ export function mapSpots(graph: Graph, places: Place[]): MapSpot[] {
   }
   for (const p of places) if (onMap(p) && !spots.has(p.id)) spots.set(p.id, { place: p, people: [] })
   return [...spots.values()].sort((a, b) => b.people.length - a.people.length)
-}
-
-/** How far apart two points may be and still be one place written twice, in kilometres. */
-const SAME_SPOT_KM = 2
-
-/**
- * Records that are probably one place entered twice: one name (in any spelling) under the same parent, or two
- * points closer than 2 km with a shared name. Offered to be merged; never merged without a person saying so.
- */
-export function similarPlaces(all: Place[]): [Place, Place][] {
-  const loose = (s: string) => s.toLowerCase().replace(/ё/g, 'е').replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
-  const names = (p: Place) => new Set([p.name, ...p.otherNames.map((n) => n.name)].map(loose))
-  const km = (a: Place, b: Place) => {
-    if (a.lat === null || a.lon === null || b.lat === null || b.lon === null) return Infinity
-    const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r
-    return 6371 * 2 * Math.asin(Math.sqrt(Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) ** 2))
-  }
-  const out: [Place, Place][] = []
-  const byName = new Map<string, Place[]>()
-  for (const p of all) for (const n of names(p)) byName.set(n, [...(byName.get(n) ?? []), p])
-  const seen = new Set<string>()
-  for (const group of byName.values()) {
-    for (let i = 0; i < group.length; i++) for (let j = i + 1; j < group.length; j++) {
-      const [a, b] = group[i].id < group[j].id ? [group[i], group[j]] : [group[j], group[i]]
-      const k = `${a.id}|${b.id}`
-      if (seen.has(k)) continue
-      if (a.parentId === b.parentId || km(a, b) < SAME_SPOT_KM) { seen.add(k); out.push([a, b]) }
-    }
-  }
-  return out
 }
 
 export const PLACE_KINDS = ['Деревня', 'Село', 'Посёлок', 'Город', 'Приход', 'Волость', 'Уезд', 'Губерния', 'Район', 'Область', 'Страна']

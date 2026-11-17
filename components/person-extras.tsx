@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, useApp } from '@/lib/client'
-import { findPlace, onMap, placeChain, placeMatches, placeProblem } from '@/lib/places'
+import { findPlace, onMap, placeChain, placeProblem } from '@/lib/places'
 import { DATE_PROBLEM_TEXT, dateProblem } from '@/lib/date-checks'
 import { yearOf, type Contacts, type Person } from '@/lib/types'
 import { GrowText } from './person-fields'
@@ -13,40 +13,18 @@ import { usePlaces } from './places-tab'
  * A place the archive does not know, or one with no point, is said out loud: without it the event never
  * reaches the map, and nobody would guess why from the empty field alone.
  */
-export function PlaceHint({ text, placeId, onPick }: { text: string; placeId?: string | null; onPick?: (placeId: string) => void }) {
-  const { t, canEdit, notify } = useApp()
-  const qc = useQueryClient()
+export function PlaceHint({ text }: { text: string }) {
+  const { t } = useApp()
   const { data: places = [] } = usePlaces()
-  const problem = placeProblem(text, places, placeId)
-  if (problem === 'ambiguous') {
-    // Two villages of one name: which one is the person's call, made here, once; the text stays as written.
-    const choices = placeMatches(text, places)
-    return (
-      <span className="text-xs text-ink-soft break-anywhere">
-        {t('несколько мест с таким названием, какое из них?')}
-        {choices.map((p) => (
-          <button key={p.id} type="button" disabled={!onPick} className="ml-1.5 underline underline-offset-2 hover:text-ink disabled:no-underline" onClick={() => onPick?.(p.id)}>
-            {placeChain(p, places).map((x) => x.name).join(' → ')}
-          </button>
-        ))}
-      </span>
-    )
-  }
+  const problem = placeProblem(text, places)
   if (problem) {
-    const add = async () => {
-      try {
-        await api('places', { method: 'POST', json: { name: text.split(',')[0].trim() } })
-        await qc.invalidateQueries({ queryKey: ['places'] })
-      } catch { notify(t('Не сохранилось. Написанное осталось на этом экране. Проверьте интернет и повторите.'), [], true) }
-    }
     return (
       <span className="text-xs text-ink-soft break-anywhere">
         {t(problem === 'unknown' ? 'нет в списке мест' : 'у места нет координат')} · {t('событие не попадёт на карту')}
-        {problem === 'unknown' && canEdit && onPick && <> · <button type="button" className="underline underline-offset-2 hover:text-ink" onClick={add}>{t('добавить место')}</button></>}
       </span>
     )
   }
-  const place = findPlace(text, places, placeId)
+  const place = findPlace(text, places)
   if (!onMap(place)) return null
   const up = placeChain(place, places).slice(1).map((p) => p.name)
   const also = place.otherNames.map((n) => n.name).filter((n) => n.toLowerCase() !== text.trim().toLowerCase())

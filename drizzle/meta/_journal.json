@@ -106,13 +106,6 @@
       "when": 1794123079295,
       "tag": "0014_places_archives_contacts",
       "breakpoints": true
-    },
-    {
-      "idx": 15,
-      "version": "6",
-      "when": 1794898772853,
-      "tag": "0015_place_links",
-      "breakpoints": true
     }
   ]
 }

@@ -19,9 +19,6 @@ export interface Person {
   deathDate: string
   deathYear: number | null
   deathPlace: string
-  /** Which records of the Places list the birth and death places mean, when the text alone cannot say. */
-  birthPlaceId?: string | null
-  deathPlaceId?: string | null
   living: boolean
   /** Hidden from readers like the living. */
   keepPrivate?: boolean
@@ -85,8 +82,6 @@ export interface Fact {
   kind: string
   date: string
   place: string
-  /** The record of the Places list the place above means, when its text alone cannot say. */
-  placeId?: string | null
   note: string
   source?: string
   /** What the kind asks for besides: a unit and a rank, a height. Keys are those in lib/fact-kinds. */
@@ -118,7 +113,6 @@ export interface Union {
   startDate: string
   endDate: string
   place: string
-  placeId?: string | null
   certainty: Certainty
 }
 
