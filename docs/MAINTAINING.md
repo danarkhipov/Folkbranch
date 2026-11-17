@@ -82,3 +82,9 @@ gh api -X PUT repos/OWNER/REPO/branches/develop/protection --input protection.js
 ```
 
 Replace `OWNER` and `REPO` with the repository's owner and name. `protection.json` holds the required checks and the review rule in the form the branch protection endpoint expects. Check the result in the web interface before relying on it.
+
+## Audit exceptions
+
+`pnpm.auditConfig.ignoreGhsas` in `package.json` lists advisories that `pnpm audit` skips. Keep it empty when possible. An entry needs a reason here and a removal condition.
+
+- `GHSA-fc5q-39xc-vjpf` (picomatch ReDoS, 17 Nov 2026): no patched version exists. The package is reached only through `better-auth` → `vitest` → `vite`, test tooling that the running app never loads. Remove the entry when picomatch publishes a fix above 4.0.7 and the lockfile takes it.

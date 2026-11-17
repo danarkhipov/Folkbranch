@@ -45,6 +45,11 @@
     "i18n:gaps": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/i18n-gaps.mjs"
   },
   "pnpm": {
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-fc5q-39xc-vjpf"
+      ]
+    },
     "onlyBuiltDependencies": [
       "better-sqlite3",
       "sharp",
