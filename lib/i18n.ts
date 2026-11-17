@@ -36,7 +36,7 @@ const en: Record<string, string> = {
   'с': 'since',
   'такого дня в календаре нет': 'there is no such day in the calendar',
   'в дате нет года: карта и возраст её не учтут': 'this date has no year: the map and ages will not count it',
-  'Заменить дерево? Удалится: {n}': 'Replace the tree? To be deleted: {n}',
+  'Заменить дерево? Удалится: {n}': 'Replace the tree? {n} will be deleted.',
   'Останется то, что в файле. Вернуть можно в разделе «История».': 'Only what is in the file will remain. You can bring it back in History.',
   'Связь снята': 'Link removed',
   'Не сохранено': 'Not saved',

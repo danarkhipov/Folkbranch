@@ -38,3 +38,11 @@ describe.each([['es', es], ['ca', ca]] as const)('the %s table', (_, table) => {
     expect(lines.filter(([key, value]) => edge(value) !== edge(all.get(key) ?? '')).map(([key, value]) => `${key} → ${value}`)).toEqual([])
   })
 })
+
+// Every phrase the app shows has a Spanish and a Catalan line: a new one without them fails here, as one without
+// English fails in i18n-coverage.test.ts, so no screen shows English inside a Spanish or Catalan interface.
+describe.each([['es', es], ['ca', ca]] as const)('the %s table is complete', (_, table) => {
+  it('has a line for every phrase the app shows', () => {
+    expect([...all.keys()].filter((key) => !(key in table))).toEqual([])
+  })
+})
