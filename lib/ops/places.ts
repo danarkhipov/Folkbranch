@@ -145,7 +145,8 @@ export function mergePlaces(actor: Actor, keepId: string, dropId: string) {
   const merged: Place = {
     ...keep, otherNames: names.slice(0, 30),
     lat: keep.lat ?? drop.lat, lon: keep.lat === null ? drop.lon : keep.lon,
-    parentId: keep.parentId ?? (drop.parentId === keepId ? null : drop.parentId), kind: keep.kind || drop.kind,
+    // A kept place that sat inside the dropped one moves up to where the dropped one was, not under a record now gone.
+    parentId: keep.parentId && keep.parentId !== dropId ? keep.parentId : (drop.parentId === keepId ? null : drop.parentId), kind: keep.kind || drop.kind,
     note: [keep.note, drop.note].filter(Boolean).join('\n\n').slice(0, 2000),
   }
   const after = [...before.filter((p) => p.id !== keepId && p.id !== dropId), merged]

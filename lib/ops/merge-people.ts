@@ -139,6 +139,7 @@ function movePeopleLinks(c: Changes, keepId: string, dropId: string) {
     // The same marriage twice becomes one, and what only the second one knew stays.
     const fill: Record<string, string> = {}
     for (const k of ['startDate', 'endDate', 'place'] as const) if (!twin[k] && x[k]) fill[k] = x[k]
+    if (fill.place && x.placeId) fill.placeId = x.placeId
     c.remove('unions', x.id)
     if (Object.keys(fill).length) c.update('unions', twin.id, fill)
   }
@@ -209,6 +210,11 @@ export function mergePeople(actor: Actor, raw: unknown) {
     for (const f of MERGE_FIELDS) {
       const pick = choose[f] ?? (blank(f, keep[f]) ? 'drop' : 'keep')
       chosen[f] = pick === 'drop' && !blank(f, drop[f]) ? drop[f] : keep[f]
+    }
+    // A chosen place keeps the record it was linked to on its own card, so a village of a common name stays itself.
+    for (const [text, link] of [['birthPlace', 'birthPlaceId'], ['deathPlace', 'deathPlaceId']] as const) {
+      const from = chosen[text] === drop[text] && chosen[text] !== keep[text] ? drop : keep
+      chosen[link] = chosen[text] === from[text] ? from[link] ?? null : null
     }
     // Other names are not a choice between two: a card keeps every name it was ever known by.
     chosen.otherNames = [...new Set([keep.otherNames, drop.otherNames].filter(Boolean))].join(', ')

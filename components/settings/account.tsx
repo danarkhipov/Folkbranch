@@ -34,6 +34,19 @@ export function Account({ providers }: { providers: SignInMethods }) {
       notify((e as Error).message)
     }
   }
+  const canLink = !me.guest && !!(providers.google || providers.yandex || providers.vk || providers.telegram || providers.email)
+  const leave = async () => {
+    if (draftsLeft().length && !(await confirm(t('На этом устройстве есть текст, который ещё не дошёл до сервера. После выхода его не будет.'), t('Выйти')))) return
+    // Someone who came in by an invitation link and linked no other way has no road back but a new link.
+    const [accounts, session] = await Promise.all([
+      fetch('/api/auth/list-accounts').then((r) => r.json()).catch(() => null) as Promise<unknown[] | null>,
+      fetch('/api/auth/get-session').then((r) => r.json()).catch(() => null) as Promise<{ user?: { email?: string } } | null>,
+    ])
+    const mail = session?.user?.email ?? ''
+    const noWayBack = Array.isArray(accounts) && !accounts.length && (!mail || mail.endsWith('.invalid'))
+    if (noWayBack && !(await confirm(t('Вы вошли по приглашению и не привязали почту или аккаунт. После выхода войти снова можно будет только по новой ссылке от владельца.'), t('Всё равно выйти'), canLink ? t('Привязать почту или аккаунт можно выше, в разделе «Вход без ссылки».') : undefined))) return
+    await signOut()
+  }
   return (
     <div className="flex min-w-0 flex-col gap-7 text-sm">
       <Section title={`${me.name} · ${t(roleName[me.role])}`} description={t(roleHelp[me.role])} />
@@ -50,11 +63,11 @@ export function Account({ providers }: { providers: SignInMethods }) {
           </div>
         </Section>
       )}
-      {!me.guest && (providers.google || providers.yandex || providers.vk || providers.telegram || providers.email) && <SignInWays providers={providers} />}
+      {canLink && <SignInWays providers={providers} />}
       <Section title={t('Устройства')} description={t('Если потеряли телефон или входили на чужом компьютере, выйдите на других устройствах. Вернуться можно по новой ссылке или через привязанный аккаунт.')}>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" onClick={async () => { await fetch('/api/auth/revoke-other-sessions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); notify(t('Другие устройства отключены')) }}><MonitorX /> {t('Выйти на других устройствах')}</Button>
-          <Button type="button" variant="outline" onClick={async () => { if (!draftsLeft().length || await confirm(t('На этом устройстве есть текст, который ещё не дошёл до сервера. После выхода его не будет.'), t('Выйти'))) await signOut() }}><LogOut /> {t('Выйти с этого устройства')}</Button>
+          <Button type="button" variant="outline" onClick={leave}><LogOut /> {t('Выйти с этого устройства')}</Button>
         </div>
       </Section>
     </div>

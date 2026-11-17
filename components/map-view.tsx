@@ -72,14 +72,19 @@ const isTouchStep = (e: WheelEvent) => e.deltaMode === 0 && Math.abs(e.deltaY) <
 
 /** Touch steps take the pinch path; a wheel notch keeps Leaflet's own one-level animated zoom. */
 function smoothTouchZoom(L: typeof import('leaflet'), m: import('leaflet').Map) {
-  type Inner = import('leaflet').Map & { _moveStart: (zoom: boolean, noMove: boolean) => void; _move: (c: import('leaflet').LatLng, z: number, o: object) => void; _animateZoom: (c: import('leaflet').LatLng, z: number, start: boolean, noUpdate: boolean) => void; _limitZoom: (z: number) => number }
+  type Inner = import('leaflet').Map & { _moveStart: (zoom: boolean, noMove: boolean) => void; _move: (c: import('leaflet').LatLng, z: number, o: object) => void; _moveEnd: (zoomChanged: boolean) => void }
   const map = m as Inner
   const wheel = (m as unknown as { scrollWheelZoom: { _onWheelScroll: (e: WheelEvent) => void; removeHooks: () => void; addHooks: () => void } }).scrollWheelZoom
   const own = wheel._onWheelScroll
   let zoom: number | null = null, center = m.getCenter(), frame = 0, done = 0
+  // The gesture ends where the fingers left it: snapping to the nearest zoom step would zoom on by itself and slide the
+  // map, since the centre was worked out for the zoom the fingers chose. Leaflet is told the move is over, so the
+  // family is laid out again.
   const finish = () => {
     if (zoom === null) return
-    map._animateZoom(center, map._limitZoom(zoom), true, false)
+    cancelAnimationFrame(frame)
+    map._move(center, zoom, { pinch: true, round: false })
+    map._moveEnd(true)
     zoom = null
   }
   wheel.removeHooks()
@@ -325,9 +330,13 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
     let gone = false
     void import('leaflet').then(async (L) => {
       if (gone || !box.current) return
-      const m = L.map(box.current, { zoomControl: false, attributionControl: true, maxZoom: MAX_ZOOM, zoomSnap: 0.25, zoomDelta: 1, wheelPxPerZoomLevel: wheelPx(L), wheelDebounceTime: 10, bounceAtZoomLimits: false, maxBoundsViscosity: 1, worldCopyJump: false, maxBounds: [[-85, -200], [85, 200]] }).setView([40, 0], 3)
+      // No zoom steps: a pinch on a phone ends where the fingers left it, as the trackpad one does, instead of zooming on
+      // to the nearest step and sliding; + and − and a wheel notch still move one whole level.
+      const m = L.map(box.current, { zoomControl: false, attributionControl: true, maxZoom: MAX_ZOOM, zoomSnap: 0, zoomDelta: 1, wheelPxPerZoomLevel: wheelPx(L), wheelDebounceTime: 10, bounceAtZoomLimits: false, maxBoundsViscosity: 1, worldCopyJump: false, maxBounds: [[-85, -200], [85, 200]] }).setView([40, 0], 3)
       L.control.zoom({ position: 'bottomright' }).addTo(m)
       smoothTouchZoom(L, m)
+      // Shown once the family's first view is set; if the family never comes, the plain map is shown anyway.
+      setTimeout(() => box.current?.classList.remove('map-waiting'), 1500)
       if (process.env.NODE_ENV !== 'production') (window as unknown as { __fbMap?: unknown }).__fbMap = m
       m.attributionControl.setPrefix(false).addAttribution('Natural Earth')
       m.createPane('atlas').style.zIndex = '150'
@@ -551,9 +560,12 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
       st.pulses = []
       st.year = y
       st.positions = place(y)
+      // The camera is set first and only then the map is shown: drawn before, it showed the whole world for a moment
+      // and then jumped to the family.
+      e.follow.fit(keepInView(y, 0), false)
       relayout.current()
       e.trails.redraw()
-      e.follow.fit(keepInView(y, 0), false)
+      box.current?.classList.remove('map-waiting')
       return
     }
     st.positions = place(st.year)
@@ -756,7 +768,7 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
 
   return (
     <>
-      <div ref={box} role="region" aria-label={t('Карта семьи')} className="family-map fixed inset-0 z-0" />
+      <div ref={box} role="region" aria-label={t('Карта семьи')} className="family-map map-waiting fixed inset-0 z-0" />
       {isSuccess && !data.tracks.length && (
         <div className="float fixed left-1/2 top-1/2 z-10 max-w-sm -translate-x-1/2 -translate-y-1/2 p-4 text-sm text-ink-soft">
           {t('Ни у одного события нет сразу года и места с координатами. Добавьте координаты местам в разделе «Места».')}

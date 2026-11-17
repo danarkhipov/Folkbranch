@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ageWords, familyWords, patronymicFrom, peopleWords, splitPatronymic } from '../lib/names'
+import { ageWords, childSurname, familyWords, parseTypedName, patronymicFrom, peopleWords, splitPatronymic, surnameFor } from '../lib/names'
 
 describe('patronymics', () => {
   it.each([
@@ -30,5 +30,25 @@ describe('patronymics', () => {
     expect([1, 3].map((n) => peopleWords(n, 'es'))).toEqual(['1 persona', '3 personas'])
     expect([1, 3].map((n) => peopleWords(n, 'ca'))).toEqual(['1 persona', '3 persones'])
     expect([1, 3].map((n) => familyWords(n, 'ca'))).toEqual(['1 família', '3 famílies'])
+  })
+})
+
+describe('surnames of a new child', () => {
+  it.each([
+    ['Петров', 'F', 'Петрова'], ['Петрова', 'M', 'Петров'], ['Ковальский', 'F', 'Ковальская'], ['Ковальская', 'M', 'Ковальский'],
+    ['Толстой', 'F', 'Толстая'], ['Шевченко', 'F', 'Шевченко'], ['Цой', 'F', 'Цой'], ['Whitlock', 'F', 'Whitlock'], ['Петров', 'U', 'Петров'],
+  ] as const)('%s for %s is %s', (name, sex, out) => expect(surnameFor(name, sex)).toBe(out))
+  it('reads a typed name and patronymic as no surname, and the last of three words as the surname', () => {
+    expect(parseTypedName('Олег Петрович')).toEqual({ givenName: 'Олег Петрович', surname: '' })
+    expect(parseTypedName('Олег Петрович Петров')).toEqual({ givenName: 'Олег Петрович', surname: 'Петров' })
+    expect(parseTypedName('Анна Петрова')).toEqual({ givenName: 'Анна', surname: 'Петрова' })
+  })
+  it("takes the father's surname in the child's form, and the mother's only when there is no father", () => {
+    const mother = { surname: 'Петрова', sex: 'F' as const }
+    const father = { surname: 'Сидоров', sex: 'M' as const }
+    expect(childSurname([mother], 'M')).toBe('Петров')
+    expect(childSurname([mother, father], 'F')).toBe('Сидорова')
+    expect(childSurname([mother, father], 'M')).toBe('Сидоров')
+    expect(childSurname([], 'M')).toBe('')
   })
 })

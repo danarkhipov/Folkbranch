@@ -40,9 +40,19 @@ export function findPlace(text: string, places: Place[], id?: string | null): Pl
     const linked = nameIndex(places).byId.get(id)
     if (linked && answersTo(text, linked)) return linked
   }
+  if (deadLink(text, places, id)) return null
   const hits = placeMatches(text, places)
   return hits.length === 1 ? hits[0] : null
 }
+
+/**
+ * A link to a place since deleted while another of that name remains: the card meant the deleted one, so taking the
+ * other would move the person to another village in silence. It stays a question until someone picks.
+ */
+const deadLink = (text: string, places: Place[], id?: string | null) => !!id && !nameIndex(places).byId.has(id) && placeMatches(text, places).length > 0
+
+/** Whether a place as written needs someone to say which record it means: several answer, or its own was deleted. */
+export const isAmbiguous = (text: string, places: Place[], id?: string | null) => deadLink(text, places, id) || (!findPlace(text, places, id) && placeMatches(text, places).length > 1)
 
 /** Whether a place goes by the text written, whole or its first part, in any spelling. */
 const answersTo = (text: string, p: Place) => {
@@ -51,7 +61,9 @@ const answersTo = (text: string, p: Place) => {
 }
 
 /** The link to keep beside a place as written: the one record it means, or none while it is unknown or ambiguous. */
-export const placeLink = (text: string, places: Place[], id?: string | null): string | null => findPlace(text, places, id)?.id ?? null
+export const placeLink = (text: string, places: Place[], id?: string | null): string | null =>
+  // A link to a deleted place is kept while its text still has namesakes: undoing the delete brings it back whole.
+  findPlace(text, places, id)?.id ?? (deadLink(text, places, id) ? id! : null)
 
 /**
  * Every name of every place, looked up instead of searched: the map asks for each event of each life, and a search
@@ -229,7 +241,7 @@ export const placeProblem = (text: string, places: Place[], id?: string | null):
   if (!text.trim()) return null
   const place = findPlace(text, places, id)
   // Two records answer and nothing says which: the person picks one, the map does not guess.
-  if (!place) return placeMatches(text, places).length > 1 ? 'ambiguous' : 'unknown'
+  if (!place) return isAmbiguous(text, places, id) ? 'ambiguous' : 'unknown'
   return onMap(place) ? null : 'no-coords'
 }
 

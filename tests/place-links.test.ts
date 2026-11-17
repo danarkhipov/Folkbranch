@@ -2,7 +2,7 @@
 // a second one added later does not move anyone. The text stays as written; the link follows only that text.
 import { beforeAll, describe, expect, it } from 'vitest'
 import type { Actor } from '../lib/ops/core'
-import { findPlace, placeMatches, similarPlaces } from '../lib/places'
+import { findPlace, placeLink, placeMatches, placeProblem, similarPlaces } from '../lib/places'
 import { mapTimeline } from '../lib/map-timeline'
 import { maskPerson } from '../lib/ops/privacy'
 import type { Graph, Person, Place } from '../lib/types'
@@ -43,6 +43,19 @@ describe('two villages of one name', () => {
     const p = person('f', { birthPlace: 'Ивановка', birthPlaceId: 'iv-t', facts: [{ kind: 'Residence', date: '1930', place: 'Ивановка', placeId: 'iv-r', note: '' }] })
     const tl = mapTimeline({ persons: [p], parentChild: [], unions: [] } as Graph, atlas)
     expect(tl.tracks[0].stops.map((s) => s.lat)).toEqual([57.1, 54.3])
+  })
+})
+
+describe('a deleted place', () => {
+  it('does not hand its people to a namesake: the event is a question, and the link stays for an undo', () => {
+    const left = atlas.filter((p) => p.id !== 'iv-r')
+    const tl = mapTimeline({ persons: [person('a', { birthPlace: 'Ивановка', birthPlaceId: 'iv-r' })], parentChild: [], unions: [] } as Graph, left)
+    expect(tl.tracks).toEqual([])
+    expect(tl.missing).toContainEqual(expect.objectContaining({ personId: 'a', gap: 'ambiguous-place' }))
+    expect(placeLink('Ивановка', left, 'iv-r')).toBe('iv-r')
+    expect(placeProblem('Ивановка', left, 'iv-r')).toBe('ambiguous')
+    // With no namesake left there is nothing to mistake it for: the place is simply unknown.
+    expect(placeProblem('Москва', left, 'gone')).toBe('unknown')
   })
 })
 
@@ -114,6 +127,12 @@ describe('the archive keeps links as it is written to', () => {
     expect(all.find((x) => x.id === keep)?.otherNames.map((n) => n.name)).toContain('Кукуево.')
     expect(fresh(p.id).birthPlaceId).toBe(keep)
     expect(findPlace('Кукуево.', all, fresh(p.id).birthPlaceId)?.id).toBe(keep)
+  })
+  it('merging a place into one that sat inside it leaves the kept one where the other was, not under a record gone', () => {
+    const outer = (places.savePlace(owner, null, { name: 'Тула', parentId: tver }) as { id: string }).id
+    const inner = (places.savePlace(owner, null, { name: 'Тула город', parentId: outer, lat: 54.2, lon: 37.6 }) as { id: string }).id
+    places.mergePlaces(owner, inner, outer)
+    expect(places.listPlaces(owner).find((x) => x.id === inner)?.parentId).toBe(tver)
   })
   it('reads a card an older version wrote, with no link columns filled in', async () => {
     const { getDb } = await import('../lib/db')

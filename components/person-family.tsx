@@ -12,9 +12,13 @@ const SHOWN = 8
 
 export function FamilyTab({ person }: { person: Person }) {
   const app = useApp()
-  const { t, family, byId, graph, canEdit, quickAdd, focus, lang } = app
+  const { t, family, byId, graph, canEdit, quickAdd, focus, lang, notify, undoLast } = app
   const [open, setOpen] = useState<string[]>([])
-  const remove = useWrite(({ type, id }: { type: string; id: string }) => api(`relations/${type}/${id}`, { method: 'DELETE' }))
+  // One small press takes a link away, so it can be given back at once from the note it leaves.
+  const remove = useWrite(async ({ type, id }: { type: string; id: string }) => {
+    await api(`relations/${type}/${id}`, { method: 'DELETE' })
+    notify(t('Связь снята'), [{ label: t('Вернуть'), run: () => void undoLast() }])
+  })
   const setCertainty = useWrite(({ type, id, certainty, kind }: { type: string; id: string; certainty?: string; kind?: string }) => api(`relations/${type}/${id}`, { method: 'PATCH', json: { certainty, kind } }))
   const parents = graph.parentChild.filter((l) => l.childId === person.id)
   const children = graph.parentChild.filter((l) => l.parentId === person.id)
@@ -32,7 +36,7 @@ export function FamilyTab({ person }: { person: Person }) {
         </button>
         <span className="text-xs text-ink-faint break-anywhere min-w-0">{[!p.hidden && lifeYears(p), saysRelation && family.relation(person.id, id, lang)?.label].filter(Boolean).join(' · ')}</span>
         {extra}
-        {canEdit && onRemove && <button className="order-1 ml-auto max-sm:p-2 max-sm:-m-1 text-ink-faint hover:text-destructive opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity" title={t('Удалить связь')} onClick={onRemove}><X size={12} /></button>}
+        {canEdit && onRemove && <button className="order-1 ml-auto max-sm:p-2 max-sm:-m-1 text-ink-faint hover:text-destructive opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity" title={t('Удалить связь')} aria-label={`${t('Удалить связь')}: ${p.hidden ? t('Живой родственник') : personName(p) || t('Без названия')}`} onClick={onRemove}><X size={12} /></button>}
       </div>
     )
   }

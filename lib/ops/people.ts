@@ -65,7 +65,9 @@ function maskedGraph(actor: Actor): Graph {
   const scrub = (p: Person): Person => (p.facts.some((f) => f.people?.some((x) => x.personId && unseen.has(x.personId)))
     ? { ...p, facts: p.facts.map((f) => (f.people ? { ...f, people: f.people.map((x) => (x.personId && unseen.has(x.personId) ? { ...x, personId: null, name: '' } : x)) } : f)) }
     : p)
-  return { ...graph, persons: graph.persons.map((p) => (unseen.has(p.id) ? hidden.get(p.id) ?? maskPerson(p) : scrub(p))) }
+  // A marriage says when and where the hidden person was: it stays as a line on the chart, without the dates or place.
+  const unions = graph.unions.map((u) => (unseen.has(u.aId) || unseen.has(u.bId) ? { ...u, startDate: '', endDate: '', place: '', placeId: null } : u))
+  return { ...graph, unions, persons: graph.persons.map((p) => (unseen.has(p.id) ? hidden.get(p.id) ?? maskPerson(p) : scrub(p))) }
 }
 
 /** A link to one branch does not say the rest exists: those people are gone, not masked. */

@@ -31,7 +31,7 @@ async function grampsText(f: File) {
 const TAG_WORDS: Record<string, string> = { OBJE: 'ссылки на файлы', ASSO: 'связи с другими людьми', ALIA: 'другие записи о человеке', SUBM: 'сведения об авторе' }
 
 export function ImportDialog({ open, files, onOpenChange }: { open: boolean; files?: File[] | null; onOpenChange: (v: boolean) => void }) {
-  const { t, lang, graph, familyName, notify, undoLast } = useApp()
+  const { t, lang, graph, familyName, notify, undoLast, confirm } = useApp()
   const qc = useQueryClient()
   const input = useRef<HTMLInputElement>(null)
   const [loaded, setLoaded] = useState<Loaded | null>(null)
@@ -140,6 +140,9 @@ export function ImportDialog({ open, files, onOpenChange }: { open: boolean; fil
   }
 
   const apply = async () => {
+    // Replacing the tree takes every card away, so it is asked once more with the count, as a delete is.
+    if (loaded?.kind === 'gedcom' && loaded.preview.inArchive && mode === 'replace'
+      && !(await confirm(t('Заменить дерево? Удалится: {n}').replace('{n}', () => peopleWords(loaded.preview.inArchive, lang)), t('Заменить дерево'), t('Останется то, что в файле. Вернуть можно в разделе «История».')))) return
     setBusy(true)
     setError('')
     try {

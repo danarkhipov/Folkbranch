@@ -2,6 +2,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { api, useApp, useWrite, type QuickType } from '@/lib/client'
+import { childSurname, parseTypedName as parseName, splitPatronymic } from '@/lib/names'
 import { lifeYears, personName, type Person } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Mini } from './person-mini'
@@ -13,12 +14,6 @@ import { Button } from '@/components/ui/button'
 function parseYears(s: string) {
   const [b, d] = s.split(/\s*[–—-]\s*/)
   return { birthDate: (b ?? '').trim(), deathDate: (d ?? '').trim() }
-}
-
-function parseName(s: string) {
-  const parts = s.trim().split(/\s+/)
-  if (parts.length < 2) return { givenName: parts[0] ?? '', surname: '' }
-  return { givenName: parts.slice(0, -1).join(' '), surname: parts.at(-1)! }
 }
 
 type Concrete = 'father' | 'mother' | 'son' | 'daughter' | 'spouse'
@@ -58,11 +53,16 @@ export function QuickAdd({ state, onClose }: { state: State; onClose: (createdId
   const reset = (id?: string) => { setName(''); setYears(''); setOther(undefined); setPicked(null); onClose(id) }
 
   const create = useWrite(async () => {
-    const parsed = parseName(name)
-    // Children inherit the surname unless one was typed.
-    const surname = parsed.surname || (isChild && target ? target.surname : '')
+    const { givenName: typed, surname: typedSurname } = parseName(name)
+    // "Oleg Petrovich Petrov": the patronymic goes to its own field, not into the given name.
+    const [givenName, patronymic] = splitPatronymic(typed)
+    // Children inherit the father's surname in their own form unless one was typed: a son added from his mother's
+    // card is Petrov, not Petrova, and a daughter added from her father's card is Petrova.
+    const childSex = type === 'son' ? 'M' : type === 'daughter' ? 'F' : 'U'
+    const parentsOf = isChild ? [target, otherParent ? byId.get(otherParent) : undefined].filter((p): p is Person => !!p) : []
+    const surname = typedSurname || (isChild ? childSurname(parentsOf, childSex) : '')
     const person = {
-      ...parsed, surname, ...parseYears(years),
+      givenName, ...(patronymic ? { patronymic } : {}), surname, ...parseYears(years),
       // A spouse is assumed to be of the other sex; the panel can change it.
       ...(type === 'spouse' && target?.sex === 'M' ? { sex: 'F' } : type === 'spouse' && target?.sex === 'F' ? { sex: 'M' } : {}),
     }

@@ -27,6 +27,41 @@ export function splitPatronymic(given: string): [string, string] {
   return [given.trim(), '']
 }
 
+/** A name typed in one line: the last word is the surname, unless the line is a name and a patronymic ("Oleg Petrovich"). */
+export function parseTypedName(s: string) {
+  if (splitPatronymic(s)[1]) return { givenName: s.trim(), surname: '' }
+  const parts = s.trim().split(/\s+/)
+  if (parts.length < 2) return { givenName: parts[0] ?? '', surname: '' }
+  return { givenName: parts.slice(0, -1).join(' '), surname: parts.at(-1)! }
+}
+
+/**
+ * A Russian surname in the form for a man or a woman: Petrov / Petrova, Kovalsky / Kovalskaya, Tolstoy / Tolstaya.
+ * Names that do not change (Shevchenko, Tsoi, Whitlock) and forms it cannot be sure of come back as they are.
+ */
+export function surnameFor(surname: string, sex: Sex): string {
+  const s = surname.trim()
+  if (sex === 'U' || !/^[А-ЯЁ][а-яё-]+$/.test(s)) return s
+  if (sex === 'F') {
+    if (/(ов|ев|ёв|ин|ын)$/.test(s)) return s + 'а'
+    if (/(ский|цкий)$/.test(s)) return s.slice(0, -2) + 'ая'
+    if (/[^аеиоуыэюя]ой$/.test(s) && s.length > 4) return s.slice(0, -2) + 'ая'
+    return s
+  }
+  if (/(ова|ева|ёва|ина|ына)$/.test(s)) return s.slice(0, -1)
+  if (/(ская|цкая)$/.test(s)) return s.slice(0, -2) + 'ий'
+  return s
+}
+
+/**
+ * The surname a new child takes when none was typed: the father's, in the child's own form. With only a mother it is
+ * hers, again in the child's form; a son of Anna Petrova is Petrov, not Petrova.
+ */
+export function childSurname(parents: { surname: string; sex: Sex }[], childSex: Sex): string {
+  const from = parents.find((p) => p.sex === 'M' && p.surname.trim()) ?? parents.find((p) => p.surname.trim())
+  return from ? surnameFor(from.surname, childSex) : ''
+}
+
 /** One and many, for the languages with only these two forms. */
 const OTHER: Record<Exclude<Lang, 'ru'>, { year: [string, string]; person: [string, string]; family: [string, string] }> = {
   en: { year: ['year', 'years'], person: ['person', 'people'], family: ['family', 'families'] },

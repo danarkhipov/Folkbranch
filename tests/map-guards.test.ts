@@ -27,6 +27,11 @@ describe('a date that cannot be right is said where it is typed', () => {
     expect(dateProblem('2150', 'fact', life, NOW)).toEqual({ kind: 'future', year: 2150 })
   })
   it('calls a death before the birth wrong, from either field', () => {
+    expect(dateProblem('31.02.1950', 'fact', life, NOW)).toEqual({ kind: 'no-such-day', year: 1950 })
+    expect(dateProblem('1950-13-01', 'fact', life, NOW)?.kind).toBe('no-such-day')
+    expect(dateProblem('29.02.1948', 'fact', life, NOW)).toBeNull()
+    expect(dateProblem('abc', 'fact', life, NOW)?.kind).toBe('not-a-date')
+    expect(dateProblem('около 1950', 'fact', life, NOW)).toBeNull()
     expect(dateProblem('1899', 'death', { born: 1921, died: null }, NOW)?.kind).toBe('death-before-birth')
     expect(dateProblem('2001', 'birth', { born: null, died: 1999 }, NOW)?.kind).toBe('death-before-birth')
   })
@@ -39,10 +44,10 @@ describe('a date that cannot be right is said where it is typed', () => {
   it('calls an event 120 years after a birth too old for one life', () => {
     expect(dateProblem('1960', 'fact', { born: 1830, died: null }, NOW)?.kind).toBe('too-old')
   })
-  it('leaves alone a date that may be right, an empty date and a date without a year', () => {
+  it('leaves alone a date that may be right and an empty date, and says that a date with no year will not be counted', () => {
     expect(dateProblem('1944', 'fact', life, NOW)).toBeNull()
     expect(dateProblem('', 'fact', life, NOW)).toBeNull()
-    expect(dateProblem('весной', 'fact', life, NOW)).toBeNull()
+    expect(dateProblem('весной', 'fact', life, NOW)?.kind).toBe('not-a-date')
   })
 })
 

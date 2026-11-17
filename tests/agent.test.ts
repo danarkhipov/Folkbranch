@@ -70,8 +70,8 @@ describe('a place the map cannot show', () => {
     const tool = toolsFor(assistantActor(owner), 'assistant').find((t) => t.name === 'add_fact')
     expect(tool).toBeDefined()
     const id = createPerson(owner, { givenName: 'Илья', surname: 'Проверкин', birthDate: '1902', deathDate: '1972' }).id
-    const out: any = await tool!.run(assistantActor(owner), tool!.input.parse({ personId: id, fact: { kind: 'Переезд', place: 'Калуга' } }))
-    expect(out.places?.[0]).toMatchObject({ name: 'Калуга', problem: 'unknown' })
+    const out = await tool!.run(assistantActor(owner), tool!.input.parse({ personId: id, fact: { kind: 'Переезд', place: 'Калуга' } }))
+    expect((out as { places?: unknown[] }).places?.[0]).toMatchObject({ name: 'Калуга', problem: 'unknown' })
   })
 })
 

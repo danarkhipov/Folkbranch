@@ -35,6 +35,14 @@ describe('a person kept private', () => {
     expect(people.getGraph(owner).persons.find((p) => p.id === ids.secret)).toMatchObject({ givenName: 'Тихон', keepPrivate: true })
     expect(people.getGraph(reader).persons.find((p) => p.id === ids.open)?.givenName).toBe('Ольга')
   })
+  it("keeps their marriage's date and place from a reader, and the line between the two", async () => {
+    people.linkPeople(owner, 'spouse', ids.open, ids.secret)
+    const { getDb, schema } = await import('../lib/db')
+    getDb().update(schema.unions).set({ startDate: '1915', place: 'Тайный Посад' }).run()
+    const seen = (a: typeof owner) => people.getGraph(a).unions.find((u) => [u.aId, u.bId].includes(ids.secret))
+    expect(seen(owner)).toMatchObject({ startDate: '1915', place: 'Тайный Посад' })
+    expect(seen(reader)).toMatchObject({ startDate: '', endDate: '', place: '', placeId: null })
+  })
   it('keeps their pages from a reader', () => {
     expect(() => pages.listPages(reader, ids.secret)).toThrow()
   })

@@ -9,6 +9,7 @@ import * as pages from '../lib/ops/pages'
 import * as views from '../lib/ops/views'
 import { createStory } from '../lib/ops/stories'
 import { getGraph } from '../lib/ops/people'
+import { savePlace } from '../lib/ops/places'
 
 const owner: Actor = { userId: 'o', name: 'Хозяйка', role: 'owner', personId: null }
 const make = (p: Record<string, unknown>) => (people.createPerson(owner, { living: false, ...p } as never) as unknown as { id: string }).id
@@ -78,6 +79,21 @@ describe('merging two cards', () => {
     const left = db().select().from(schema.unions).all().filter((x) => [x.aId, x.bId].includes(a))
     expect(left).toHaveLength(1)
     expect([left[0].place, left[0].startDate]).toEqual(['Тула', '1920'])
+  })
+
+  it('keeps the village a place was linked to on the card it came from, for a birth and for a marriage', () => {
+    const a = (savePlace(owner, null, { name: 'Слобода', lat: 55, lon: 37 }) as { id: string }).id
+    const b = (savePlace(owner, null, { name: 'Слобода', note: 'другая', lat: 50, lon: 30 }) as { id: string }).id
+    const keep = make({ givenName: 'Ефим', surname: 'Слободской' })
+    const drop = make({ givenName: 'Ефим', surname: 'Слободской', birthPlace: 'Слобода', birthPlaceId: b })
+    const wife = make({ givenName: 'Ольга', surname: 'Слободская', sex: 'F' })
+    people.linkPeople(owner, 'spouse', keep, wife)
+    people.linkPeople(owner, 'spouse', wife, drop)
+    const u = db().select().from(schema.unions).all().find((x) => [x.aId, x.bId].includes(drop))!
+    db().update(schema.unions).set({ place: 'Слобода', placeId: a }).where(eq(schema.unions.id, u.id)).run()
+    merge(keep, drop)
+    expect(row(keep).birthPlaceId).toBe(b)
+    expect(getGraph(owner).unions.find((u) => u.aId === keep || u.bId === keep)).toMatchObject({ place: 'Слобода', placeId: a })
   })
 
   it('the same parent on both cards stays one link', () => {

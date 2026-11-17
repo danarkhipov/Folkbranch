@@ -44,12 +44,16 @@ function PlaceForm({ draft, places, onDone }: { draft: Draft; places: Place[]; o
   }, [])
   const landAt = useMemo(() => (land ? (a: number, b: number) => isOnLand(a, b, land) : null), [land])
   const point = useMemo(() => coordinateIssue(num(lat), num(lon), landAt), [lat, lon, landAt])
-  /** A pair pasted into the latitude field is split into both: "55°45′N 37°37′E", "55.7558, 37.6173". */
-  const typeLat = (value: string) => {
+  /**
+   * A pair pasted into the latitude field is split into both: "55°45′N 37°37′E", "55.7558, 37.6173". Only a paste, or
+   * a whole pair left in the field: split on every key, "55.7, 3" was taken as a point before the rest was typed.
+   */
+  const splitPair = (value: string) => {
     const pair = parseCoords(value)
-    if (!pair) { setLat(value); return }
+    if (!pair) return false
     setLat(String(pair.lat))
     setLon(String(pair.lon))
+    return true
   }
   const swap = () => { setLat(lon); setLon(lat) }
   const save = async () => {
@@ -87,7 +91,7 @@ function PlaceForm({ draft, places, onDone }: { draft: Draft; places: Place[]; o
         <button type="button" className="self-start underline underline-offset-2 hover:text-ink" onClick={() => setD({ ...d, otherNames: [...d.otherNames, { name: '', years: '' }] })}>+ {t('название')}</button>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Широта')}<Input inputMode="decimal" value={lat} placeholder="56.86" onChange={(e) => typeLat(e.target.value)} /></label>
+        <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Широта')}<Input inputMode="decimal" value={lat} placeholder="56.86" onChange={(e) => setLat(e.target.value)} onPaste={(e) => { if (splitPair(e.clipboardData.getData('text'))) e.preventDefault() }} onBlur={(e) => splitPair(e.target.value)} /></label>
         <label className="flex flex-col gap-1 text-xs text-ink-soft">{t('Долгота')}<Input inputMode="decimal" value={lon} placeholder="35.90" onChange={(e) => setLon(e.target.value)} /></label>
       </div>
       {badCoords && <p role="alert" className="text-xs text-destructive">{t('Координаты пишутся числом, например 56.86')}</p>}

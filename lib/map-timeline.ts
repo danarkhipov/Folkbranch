@@ -3,7 +3,7 @@
 // lib/places.ts's lifeStops is the Places map's version of this; it cannot be shared: it drops what has no point or no
 // year without saying why, merges repeat visits, and keeps no kinds, years or life-span rules, which all of this needs.
 import { along, easeInOut, easeInOutInverse, legPath, wrapLon, type Path } from './map-motion'
-import { badCoords, findPlace, onMap, placeMatches } from './places'
+import { badCoords, findPlace, isAmbiguous, onMap } from './places'
 import { personName, yearOf, type Graph, type Place } from './types'
 
 /** What kind of event, for its small mark on the map. */
@@ -84,7 +84,7 @@ export function mapTimeline(graph: Graph, places: Place[], t: (k: string) => str
       // A place nobody has made a record for is a different gap from a record without a point: the first is a
       // missing record (or another spelling of its name), the second is a missing coordinate. Two records of one
       // name and no choice made is a third: the map does not guess which village it was.
-      if (!place) return void missing.push({ personId: p.id, name, what, date, place: text, gap: placeMatches(text, places).length > 1 ? 'ambiguous-place' : 'unknown-place' })
+      if (!place) return void missing.push({ personId: p.id, name, what, date, place: text, gap: isAmbiguous(text, places, placeId) ? 'ambiguous-place' : 'unknown-place' })
       if (!onMap(place)) return void missing.push({ personId: p.id, name, what, date, place: text, gap: badCoords(place) ? 'bad-coords' : 'no-coords' })
       if (year === null) return void missing.push({ personId: p.id, name, what, date, place: text, gap: 'no-date' })
       const until = periodEnd(date)

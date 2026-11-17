@@ -1,6 +1,6 @@
 'use client'
 import dynamic from 'next/dynamic'
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useApp } from '@/lib/client'
@@ -342,7 +342,7 @@ export function Details({ person, patch: send }: { person: Person; patch: (p: Pa
   const at = (key: string) => translate(archiveLang, key)
   const ro = !canEdit
   // The card itself says when a save fails, with a way to try again.
-  const writer = useRef(listWriter({ facts: person.facts, sources: person.sources, tags: person.tags, claims: person.claims }, send, () => {})).current
+  const [writer] = useState(() => listWriter({ facts: person.facts, sources: person.sources, tags: person.tags, claims: person.claims }, send, () => {}))
   useEffect(() => writer.sync({ facts: person.facts, sources: person.sources, tags: person.tags, claims: person.claims }), [writer, person.facts, person.sources, person.tags, person.claims])
   /** The person as the next change must see it: lists as last written. */
   const current = (): Person => ({ ...person, claims: writer.get('claims'), sources: writer.get('sources') })

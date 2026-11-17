@@ -2,63 +2,67 @@
 // scripts/build-atlas.mjs), drawn on our own canvas, and the names of countries and cities placed where they fit.
 // No tiles and nothing asked of any other server, so no consent is needed.
 import type * as Leaflet from 'leaflet'
-import { mercator } from '@/lib/map-motion'
 import type { Taken } from '@/lib/map-layout'
+import { ATLAS_FILES, atlasDrawer, type AtlasColours, type Geometry } from './map-atlas-draw'
 import { canvasLayer, type View } from './map-canvas'
 
 const ATLAS = '/atlas'
 /** Rows of [name, lat, lon, rank] for labels: a lower rank shows from further out. */
 type LabelRow = [string, number, number, number]
 export interface AtlasLabels { countries: LabelRow[]; cities: LabelRow[] }
-interface Geometry { type: string; coordinates: unknown; geometries?: Geometry[] }
 
-/** A GeoJSON geometry as one path in world pixels at zoom 0: built once, drawn at any zoom with a transform. */
-function toPath(g: Geometry, closed: boolean): Path2D {
-  const path = new Path2D()
-  const ring = (pts: [number, number][]) => {
-    pts.forEach(([lon, lat], i) => { const [x, y] = mercator([lat, lon]); if (i) path.lineTo(x, y); else path.moveTo(x, y) })
-    if (closed) path.closePath()
-  }
-  const walk = (geo: Geometry) => {
-    if (geo.geometries) return geo.geometries.forEach(walk)
-    const c = geo.coordinates as never
-    if (geo.type === 'Polygon' || geo.type === 'MultiLineString') (c as [number, number][][]).forEach(ring)
-    else if (geo.type === 'MultiPolygon') (c as [number, number][][][]).forEach((p) => p.forEach(ring))
-    else if (geo.type === 'LineString') ring(c)
-  }
-  walk(g)
-  return path
+/** The base map drawn in a worker where the browser can, else on the page; with the names of places. */
+export async function loadAtlas(L: typeof Leaflet) {
+  const css = (name: string, or: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || or
+  const colours = { sepia: css('--ink-faint', '#6b6455'), sea: css('--paper-dot', '#d9d2c2'), paper: css('--paper', '#f7f3ea') }
+  const labels = fetch(`${ATLAS}/labels.json`).then((r) => { if (!r.ok) throw new Error(`labels.json: ${r.status}`); return r.json() as Promise<AtlasLabels> })
+  // Not left unheard if the base map fails first; it is awaited below.
+  labels.catch(() => {})
+  const base = (await inWorker(L, colours)) ?? (await onPage(L, colours))
+  return { base, names: atlasNames(L, await labels) }
 }
 
-export async function loadAtlas(L: typeof Leaflet) {
+/** On the page's own thread: for a browser that cannot draw in a worker. */
+async function onPage(L: typeof Leaflet, colours: AtlasColours) {
   // A proxy or an offline page can answer with HTML: anything but the files themselves is a failure, not a map.
-  const get = (f: string) => fetch(`${ATLAS}/${f}`).then((r) => { if (!r.ok) throw new Error(`${f}: ${r.status}`); return r.json() })
-  const [land, lakes, rivers, borders, labels] = await Promise.all(['land.json', 'lakes.json', 'rivers.json', 'borders.json', 'labels.json'].map(get))
-  const css = (name: string, or: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || or
-  const sepia = css('--ink-faint', '#6b6455'), sea = css('--paper-dot', '#d9d2c2'), paper = css('--paper', '#f7f3ea')
-  const p = { land: toPath(land, true), lakes: toPath(lakes, true), rivers: toPath(rivers, false), borders: toPath(borders, false) }
-  // A quiet old atlas: paper land, thin sepia coasts, faint lakes and rivers, dashed borders.
-  const draw = ({ ctx, scale: s, ox, oy, dpr }: View) => {
-    ctx.setTransform(dpr * s, 0, 0, dpr * s, -dpr * ox, -dpr * oy)
-    ctx.lineJoin = 'round'
-    const line = (path: Path2D, width: number, alpha: number, dash?: number[]) => {
-      ctx.globalAlpha = alpha; ctx.lineWidth = width / s; ctx.setLineDash(dash ? dash.map((d) => d / s) : []); ctx.stroke(path)
+  const files = await Promise.all(ATLAS_FILES.map((f) => fetch(`${ATLAS}/${f}`).then((r) => { if (!r.ok) throw new Error(`${f}: ${r.status}`); return r.json() as Promise<Geometry> })))
+  const draw = atlasDrawer(files, colours)
+  return canvasLayer(L, 'atlas', (v: View) => draw(v.ctx, v))
+}
+
+/**
+ * In a worker: the page's thread only puts finished pictures in place, so a pinch or a pan never waits for the coast
+ * to be drawn. Nothing, if this browser cannot draw off the page; a file that does not come is a failure as on the page.
+ */
+async function inWorker(L: typeof Leaflet, colours: AtlasColours) {
+  if (typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined' || !('transferToImageBitmap' in OffscreenCanvas.prototype)) return null
+  let worker: Worker
+  try { worker = new Worker(new URL('./map-atlas.worker.ts', import.meta.url), { type: 'module' }) } catch { return null }
+  const waiting = new Map<number, (p: ImageBitmap | null) => void>()
+  let next = 1
+  const ready = new Promise<boolean>((resolve, reject) => {
+    worker.onmessage = ({ data }) => {
+      if (data.type === 'ready') resolve(true)
+      else if (data.type === 'error') reject(new Error(data.error))
+      else if (data.type === 'drawn') { waiting.get(data.id)?.(data.picture); waiting.delete(data.id) }
     }
-    ctx.strokeStyle = sepia
-    ctx.globalAlpha = 1; ctx.fillStyle = paper; ctx.fill(p.land, 'evenodd')
-    line(p.land, 0.6, 0.7)
-    ctx.globalAlpha = 1; ctx.fillStyle = sea; ctx.fill(p.lakes, 'evenodd')
-    line(p.lakes, 0.4, 0.5)
-    line(p.rivers, 0.5, 0.35)
-    line(p.borders, 0.6, 0.55, [3, 2])
-    ctx.globalAlpha = 1; ctx.setLineDash([])
-  }
-  return { base: canvasLayer(L, 'atlas', draw), names: atlasNames(L, labels as AtlasLabels) }
+    // A worker that cannot start at all is no worse than none: the page draws instead.
+    worker.onerror = () => { resolve(false); waiting.forEach((done) => done(null)); waiting.clear() }
+  })
+  worker.postMessage({ type: 'init', colours })
+  if (!(await ready.catch((e) => { worker.terminate(); throw e }))) { worker.terminate(); return null }
+  return canvasLayer(L, 'atlas', null, (view, pw, ph) => new Promise((done) => {
+    const id = next++
+    waiting.set(id, done)
+    worker.postMessage({ type: 'draw', id, view, pw, ph })
+  }), () => worker.terminate())
 }
 
 /**
  * Country and city names, placed greedily where nothing else is: big cities, then countries (never microstates,
- * Natural Earth label rank 6), then small cities. A name already on the map is kept, not made again.
+ * Natural Earth label rank 6). Smaller cities (rank 4 and up, mostly towns that grew in the last century) are left
+ * out: on a family's map they crowd the family's own places and help nobody find them. A name already on the map is
+ * kept, not made again.
  */
 function atlasNames(L: typeof Leaflet, labels: AtlasLabels) {
   const shown = new Map<string, Leaflet.Marker>()
@@ -75,10 +79,10 @@ function atlasNames(L: typeof Leaflet, labels: AtlasLabels) {
         want.set(`${cls}|${name}|${lat}|${lon}`, { row, cls })
       }
     }
-    const city = (r: number) => z >= 4 && r <= z - 2
+    // A city shows one zoom after its rank would allow, so the biggest come first and the map is not lettered over.
+    const city = (r: number) => z >= 4 && r <= z - 3
     put(labels.cities, 'atlas-label atlas-city', 6.2, (r) => r <= 3 && city(r))
     put(labels.countries, 'atlas-label atlas-country', 8.4, (r) => r < 6 && r <= Math.max(2, z))
-    put(labels.cities, 'atlas-label atlas-city', 6.2, (r) => r > 3 && city(r))
     for (const [k, mk] of shown) if (!want.has(k)) { group.removeLayer(mk); shown.delete(k) }
     for (const [k, { row, cls }] of want) {
       if (shown.has(k)) continue
