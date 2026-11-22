@@ -9,13 +9,14 @@ import { speechRoutes } from '@/lib/api/routes/speech'
 import { faceRoutes } from '@/lib/api/routes/faces'
 import { exchangeRoutes } from '@/lib/api/routes/exchange'
 import { familyRoutes } from '@/lib/api/routes/family'
+import { chronicleRoutes } from '@/lib/api/routes/chronicle'
 import { langOfRequest, withViewerLang } from '@/lib/ops/app-config'
 import { errorFor } from '@/lib/i18n-errors'
 import { OpError } from '@/lib/ops/core'
 
 export const dynamic = 'force-dynamic'
 
-const routes = [...familyRoutes, ...contentRoutes, ...exchangeRoutes, ...accessRoutes, ...speechRoutes, ...faceRoutes]
+const routes = [...familyRoutes, ...contentRoutes, ...exchangeRoutes, ...accessRoutes, ...speechRoutes, ...faceRoutes, ...chronicleRoutes]
 
 /** The largest upload, as base64, with room for its envelope. */
 const MAX_BODY = 60 * 1024 * 1024

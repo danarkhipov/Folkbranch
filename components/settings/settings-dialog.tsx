@@ -1,6 +1,6 @@
 'use client'
 import { useState, type ComponentType } from 'react'
-import { AudioLines, ChevronLeft, ChevronRight, Cpu, DatabaseBackup, DoorOpen, KeyRound, Lightbulb, ScanFace, Sparkles, ListChecks, SlidersHorizontal, UserRound, Users } from 'lucide-react'
+import { AudioLines, ChevronLeft, ChevronRight, Cpu, DatabaseBackup, DoorOpen, KeyRound, Lightbulb, Map as MapIcon, ScanFace, Sparkles, ListChecks, SlidersHorizontal, UserRound, Users } from 'lucide-react'
 import { AssistantIcon } from '../assistant-icon'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useApp } from '@/lib/client'
@@ -9,6 +9,7 @@ import { Account } from './account'
 import { Access } from './access'
 import { Archive } from './archive'
 import { Files } from './files'
+import { MapSettings } from './map'
 import { FeatureGuide } from '../feature-guide'
 import { CloudSpeech } from './cloud-speech'
 import { CloudFaces } from './cloud-faces'
@@ -21,7 +22,7 @@ import { SmartSettings } from './smart'
 import type { SignInMethods as Methods } from '@/lib/sign-in-methods'
 import { TokensTab } from './tokens'
 
-export type Section = 'ai' | 'speech' | 'faces' | 'tips' | 'setup' | 'account' | 'smart' | 'general' | 'people' | 'signin' | 'assistant' | 'agents' | 'data'
+export type Section = 'ai' | 'speech' | 'faces' | 'tips' | 'setup' | 'account' | 'smart' | 'general' | 'people' | 'signin' | 'assistant' | 'agents' | 'data' | 'map'
 
 /** Each screen says what it is for, so nobody has to work it out from the fields. */
 const SECTIONS: Record<Section, [string, string, ComponentType<{ size?: number }>]> = {
@@ -38,6 +39,7 @@ const SECTIONS: Record<Section, [string, string, ComponentType<{ size?: number }
   assistant: ['Assistant', 'A chat in the app: it answers questions about the family and makes changes once you confirm.', AssistantIcon],
   agents: ['MCP server and access tokens', 'The archive is an MCP server: Claude, ChatGPT, Cursor and other clients connect with an access token.', KeyRound],
   data: ['Data and backups', 'Add people from a file, download data, make a copy of the archive.', DatabaseBackup],
+  map: ['Map', 'History and the chronicle on the family map, filled in by agents.', MapIcon],
 }
 
 /** The pages that open from the AI screen. */
@@ -51,7 +53,7 @@ export function SettingsDialog({ open, onOpenChange, familyName, providers, onTe
   const [inside, setInside] = useState(!!initial)
   const setSection = (next: Section) => { setSectionNow(next); setInside(true) }
   const groups: [string, Section[]][] = isOwner
-    ? [['', ['setup', 'tips', 'account']], ['Main settings', ['general', 'people', 'signin', 'data', 'ai']]]
+    ? [['', ['setup', 'tips', 'account']], ['Main settings', ['general', 'people', 'signin', 'map', 'data', 'ai']]]
     : [['', ['account', 'tips', 'smart', 'data']]]
   const [title, description] = SECTIONS[section]
   // For the owner the AI pages open from the AI screen: the list shows only "AI", and each page has a way back to it.
@@ -92,6 +94,7 @@ export function SettingsDialog({ open, onOpenChange, familyName, providers, onTe
             {section === 'faces' && isOwner && <CloudFaces />}
             {section === 'assistant' && isOwner && <AssistantSettings />}
             {section === 'agents' && isOwner && <TokensTab />}
+            {section === 'map' && isOwner && <MapSettings />}
             {section === 'data' && <Files onText={() => { onOpenChange(false); onText() }} />}
           </div>
         </div>

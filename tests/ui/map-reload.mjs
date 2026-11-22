@@ -13,7 +13,8 @@ for (const [name, size] of [['desktop', SIZES['desktop-1440']], ['phone', SIZES[
   const { page, ctx } = await open(br, size)
   const cdp = await ctx.newCDPSession(page)
   if (phone) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 })
-  await page.addInitScript(() => { window.__long = []; new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__long.push(e.duration) }).observe({ type: 'longtask', buffered: true }) })
+  // The chronicle's canvas reports how long each drawing took (components/map-chronicle.ts) when this list exists.
+  await page.addInitScript(() => { window.__fbChronicleDraws = []; window.__long = []; new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__long.push(e.duration) }).observe({ type: 'longtask', buffered: true }) })
   await page.goto(O + '/'); await page.locator('.pcard').first().waitFor({ timeout: 90000 }); await sleep(1500)
   // Twice: the first load warms the server and the browser's cache, the second is what a returning person sees.
   let shown = 0, zoom = 0, long = 0, faces = 0
@@ -32,10 +33,14 @@ for (const [name, size] of [['desktop', SIZES['desktop-1440']], ['phone', SIZES[
     await sleep(1500)
     long = await page.evaluate(() => Math.round(window.__long.reduce((a, b) => a + b, 0)))
   }
+  // The chronicle's fixture is on the map at 1950 (a front in four stages): each drawing of it, pan and zoom included.
+  const draws = await page.evaluate(() => window.__fbChronicleDraws.slice().sort((a, b) => a - b))
+  const worst = draws.length ? draws.at(-1) : Infinity, median = draws[Math.floor(draws.length / 2)]
   const b = (k) => budget[`${name}${k}`]
   ok(`${name}: faces are on the map within ${b('ShownMs')} ms of a reload`, shown <= b('ShownMs'), `${shown} ms, ${faces} faces`)
   ok(`${name}: the first zoom answers within ${b('ZoomMs')} ms`, zoom <= b('ZoomMs'), `${zoom} ms`)
   ok(`${name}: the page is busy no longer than ${b('LongMs')} ms in all`, long <= b('LongMs'), `${long} ms of long tasks`)
+  ok(`${name}: the chronicle draws within ${b('ChronicleDrawMs')} ms each time`, worst <= b('ChronicleDrawMs'), `${draws.length} drawings, median ${median?.toFixed(2)} ms, worst ${worst.toFixed(2)} ms`)
   await ctx.close()
 }
 await br.close()

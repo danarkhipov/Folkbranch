@@ -23,6 +23,21 @@ describe('the pace of playback', () => {
     expect(Math.max(...s.start.slice(1).map((v, i) => v - s.start[i]))).toBeLessThanOrEqual(BASE_MS * 8)
     expect(totalMs(s)).toBe(s.start.at(-1))
   })
+  it('slows down through an era, even across years nobody moves, and leaves the rest as it was', () => {
+    const plain = schedule([sailor], 1850, 1960)
+    const s = schedule([sailor], 1850, 1960, [{ from: 1926.54, to: 1929.25, weight: 3 }])
+    const yearMs = (x: typeof s, y: number) => msAt(x, y + 1) - msAt(x, y)
+    // A year of the era lasts about two seconds at 1x; the empty years around it are still squeezed.
+    for (const y of [1926, 1927, 1928, 1929]) expect(yearMs(s, y)).toBeCloseTo(BASE_MS * 4, 6)
+    expect(yearMs(s, 1925)).toBeLessThan(BASE_MS)
+    expect(yearMs(s, 1930)).toBeLessThan(BASE_MS)
+    for (const y of [1860, 1888, 1889]) expect(yearMs(s, y)).toBeCloseTo(yearMs(plain, y), 9)
+    // A busier year than the era asks keeps its own weight.
+    const busy = schedule([sailor], 1850, 1960, [{ from: 1888, to: 1890, weight: 0.1 }])
+    expect(yearMs(busy, 1889)).toBeCloseTo(yearMs(plain, 1889), 9)
+    // Outside the family's years it changes nothing.
+    expect(schedule([sailor], 1850, 1960, [{ from: 1500, to: 1600, weight: 3 }]).start).toEqual(plain.start)
+  })
   it('maps playback time to true years and back', () => {
     const s = schedule([sailor], 1850, 1960)
     for (const y of [1850, 1861.25, 1888.5, 1889, 1930.9]) expect(yearAtMs(s, msAt(s, y))).toBeCloseTo(y, 9)

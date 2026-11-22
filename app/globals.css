@@ -486,6 +486,10 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
 /* Two rings, so the person followed is not taken for a traveller (one ring). */
 .map-face-in.focused img { box-shadow: 0 0 0 2.5px var(--accent), 0 0 0 4.5px var(--paper), 0 0 0 5.5px var(--accent); filter: grayscale(.25) sepia(.2); }
 .focusing .map-event:not(.mine) { opacity: .4; }
+/* Story focus: the relatives a chronicle entry names stay in full ink, everyone else goes quiet and unnamed. */
+.storying .map-face-in:not(.concerned):not(.open) { opacity: .3; }
+.storying .map-face-in:not(.concerned) .map-name { display: none; }
+.storying .map-event:not(.concerned) { opacity: .25; }
 /* Their route's stops: small numbered circles in order of time, with the year and place where there is room. */
 .map-stop { overflow: visible; pointer-events: none; }
 .map-stop-in { position: absolute; left: 0; top: 0; width: 0; height: 0; transform: translate(var(--ox, 0px), var(--oy, 0px)); }
@@ -508,15 +512,15 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
 /* The bar under the map: the track (a quiet histogram of the family's events, the line, decade ticks, labels every
    50 years), then the controls. On a phone it sits above the app's own bar, with room for fingers. */
 .map-bar { bottom: 12px; }
-/* With the person card open beside it, the bar centres in the room left of the card. */
-.map-bar { left: calc((100vw - var(--map-card, 0px)) / 2); max-width: calc(100vw - 16px - var(--map-card, 0px)); }
+/* With the person card open beside it, the bar centres in the room left of the card (and right of the chronicle's page). */
+.map-bar { left: calc(var(--map-left, 0px) + (100vw - var(--map-left, 0px) - var(--map-card, 0px)) / 2); max-width: calc(100vw - 16px - var(--map-left, 0px) - var(--map-card, 0px)); }
 /* The view's corner (zoom, tree or map) holds the bottom right; the timeline stays centred on the screen where that
    clears the corner, otherwise it moves left of it. The map's own zoom is pressed from the corner and stays hidden; the
    map's credit sits above the corner. */
 @media (min-width: 641px) {
   .map-bar {
-    left: min(calc((100vw - var(--map-card, 0px)) / 2), calc(100vw - var(--map-card, 0px) - var(--view-tools-w, 0px) - 12px - min(960px, 100vw - var(--view-tools-w, 0px) - 20px - var(--map-card, 0px)) / 2));
-    max-width: calc(100vw - var(--view-tools-w, 0px) - 20px - var(--map-card, 0px));
+    left: min(calc(var(--map-left, 0px) + (100vw - var(--map-left, 0px) - var(--map-card, 0px)) / 2), calc(100vw - var(--map-card, 0px) - var(--view-tools-w, 0px) - 12px - min(960px, 100vw - var(--map-left, 0px) - var(--view-tools-w, 0px) - 20px - var(--map-card, 0px)) / 2));
+    max-width: calc(100vw - var(--map-left, 0px) - var(--view-tools-w, 0px) - 20px - var(--map-card, 0px));
   }
   .family-map .leaflet-bottom.leaflet-right { bottom: calc(16px + var(--view-tools-h, 0px)); }
 }
@@ -556,6 +560,98 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
 .map-handle { position: absolute; top: 25px; left: calc(var(--at) * 100%); width: 14px; height: 14px; translate: -50% -50%; border-radius: 50%; background: var(--paper); box-shadow: 0 0 0 2px var(--ink), 0 1px 3px rgb(60 45 20 / .25); pointer-events: none; }
 .map-track.dragging .map-handle, .map-track:focus-visible .map-handle { box-shadow: 0 0 0 2.5px var(--ink), 0 0 0 6px color-mix(in srgb, var(--ink) 12%, transparent); }
 .map-bubble { position: absolute; bottom: calc(100% - 2px); left: calc(var(--at) * 100%); translate: -50% 0; padding: 1px 7px; border-radius: 6px; background: var(--ink); color: var(--paper); font: 500 14px/20px var(--font-serif); font-variant-numeric: tabular-nums; pointer-events: none; white-space: nowrap; }
+/* The chronicle on the track: a rust mark for each entry's years (a framing one fills the height), under the handle.
+   The bubble then names the entry too, and keeps inside the track however long the name is. */
+.map-bubble { left: clamp(calc(var(--bw, 0px) / 2), var(--bx, calc(var(--at) * 100%)), calc(100% - var(--bw, 0px) / 2)); max-width: min(260px, 100%); overflow: hidden; text-overflow: ellipsis; }
+.map-eras { position: absolute; left: 0; right: 0; top: 22px; width: 100%; height: 6px; overflow: visible; pointer-events: none; }
+.map-era { fill: var(--accent); opacity: .55; }
+.map-era.lead { opacity: .8; }
+/* A bar narrowed by the chronicle's page (and the person card) gives the count's room to the chip and the caption. */
+.map-bar { container: map-bar / inline-size; }
+@container map-bar (max-width: 700px) { .map-count { display: none; } }
+/* The era chip: the entry the year is in, beside the year. Pressed, it opens the entry. */
+.map-era-chip { flex: 0 1 auto; display: inline-flex; align-items: center; min-width: 72px; max-width: 240px; padding: 0; border-radius: 6px; animation: era-in .15s ease-out; }
+.map-era-chip > span { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; height: 24px; padding: 0 8px 0 9px; border-radius: 6px; background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 3px 0 0 var(--accent); font: 500 13px/24px var(--font-sans); color: var(--ink); }
+.map-era-chip:hover > span { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.map-era-chip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.map-era-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map-era-more { flex: none; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+@keyframes era-in { from { opacity: 0; } }
+/* A chronicle entry as an article: on the front page (wide screens) and in the card inside the bar (phones, tablets). */
+.chronicle-article { animation: era-in .15s ease-out; }
+.chronicle-article + .chronicle-article { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
+.chronicle-kicker { display: block; margin: 0; font: 500 12px/16px var(--font-sans); text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+.chronicle-headline { margin: 4px 0 0; font: 600 20px/24px var(--font-serif); color: var(--ink); }
+.chronicle-headline button { text-align: left; border-radius: 4px; }
+.chronicle-headline button:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.chronicle-legend { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font: 13px/18px var(--font-sans); color: var(--ink); }
+.chronicle-legend li { display: flex; align-items: center; gap: 8px; }
+.chronicle-swatch { flex: none; width: 14px; height: 14px; border-radius: 2px; }
+.chronicle-body { margin-top: 12px; font: 400 15px/23px var(--font-serif); color: var(--ink); }
+.chronicle-body p { margin: 0; }
+.chronicle-body p + p { margin-top: 10px; }
+.chronicle-body a, .chronicle-link { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+.chronicle-mention { font-weight: 500; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px; }
+.chronicle-more { margin-top: 6px; font: 500 13px/20px var(--font-sans); color: var(--ink-soft); text-decoration: underline; text-underline-offset: 2px; }
+.chronicle-family { margin-top: 16px; }
+.chronicle-family .chronicle-kicker { margin-bottom: 4px; }
+.chronicle-line { display: block; width: 100%; padding: 6px 4px; border-radius: 6px; text-align: left; }
+.chronicle-line:hover, .chronicle-line:focus-visible { background: var(--muted); }
+.chronicle-line-head { display: flex; align-items: center; gap: 8px; }
+.chronicle-face { flex: none; width: 24px; height: 24px; border-radius: 50%; object-fit: cover; background: var(--muted); box-shadow: 0 0 0 1px var(--ink); filter: grayscale(.6) sepia(.35) contrast(.95); }
+.chronicle-line-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 14px/20px var(--font-sans); color: var(--ink); }
+.chronicle-line-year { flex: none; font: 13px/20px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--ink-faint); }
+.chronicle-line-text { display: block; margin: 2px 0 0 32px; font: 14px/20px var(--font-serif); color: var(--ink-soft); }
+.chronicle-link { display: inline-block; margin-top: 12px; font: 13px/20px var(--font-sans); }
+.chronicle-story { display: flex; width: 100%; height: 36px; margin-top: 12px; border: 1px solid var(--border); }
+.chronicle-story[aria-pressed=true] { border-color: var(--ink); color: var(--ink); }
+@media (pointer: coarse) { .chronicle-story { height: 44px; } }
+.chronicle-print { margin: 10px 0 0; font: 12px/16px var(--font-sans); color: var(--ink-faint); }
+@media (prefers-reduced-motion: reduce) { .chronicle-article { animation: none; } }
+/* The card inside the bar, above the track: its own scroll, a close button in the corner. */
+.chronicle-card { position: relative; max-height: 46dvh; overflow-y: auto; overscroll-behavior: contain; padding: 10px 6px 8px; margin-bottom: 2px; border-bottom: 1px solid var(--border); }
+.chronicle-card .chronicle-article { max-width: 560px; padding-right: 40px; }
+.chronicle-close { position: absolute; top: 2px; right: 0; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 8px; color: var(--ink-soft); }
+.chronicle-close:hover { background: var(--muted); color: var(--ink); }
+.chronicle-switch { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 44px 10px 0; }
+.chronicle-switch button { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 10px; height: 28px; border-radius: 6px; border: 1px solid var(--border); font: 13px/26px var(--font-sans); color: var(--ink-soft); }
+@media (pointer: coarse) { .map-bar .chronicle-switch button { min-height: 44px; } }
+/* The front page, from 1100 px: a column on the left of the map. */
+.chronicle { position: fixed; left: 12px; top: 64px; bottom: 12px; width: 360px; z-index: 15; display: flex; flex-direction: column; overflow: hidden; }
+.chronicle-mast { flex: none; display: flex; align-items: center; gap: 4px; height: 52px; padding: 0 8px 0 14px; border-bottom: 1px solid var(--border); }
+.chronicle-label { flex: 1; font: 600 12px/1 var(--font-sans); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); }
+.chronicle-year { margin-right: 6px; font: 500 24px/1 var(--font-serif); font-variant-numeric: tabular-nums; color: var(--ink); }
+.chronicle-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 6px; color: var(--ink-soft); }
+.chronicle-icon:hover:not(:disabled), .chronicle-icon[aria-pressed=true] { background: var(--muted); color: var(--ink); }
+.chronicle-icon:disabled { opacity: .35; }
+.chronicle-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px 16px; }
+.chronicle-loading { display: flex; flex-direction: column; gap: 10px; }
+.chronicle-loading i { display: block; height: 12px; border-radius: 4px; background: var(--muted); }
+.chronicle-empty { margin: 0; font: 15px/23px var(--font-serif); color: var(--ink-soft); }
+.chronicle-none { display: flex; flex-direction: column; gap: 10px; }
+.chronicle-near, .chronicle-list button { display: block; width: 100%; padding: 8px 10px; border-radius: 6px; text-align: left; }
+.chronicle-near { border: 1px solid var(--border); }
+.chronicle-near:hover, .chronicle-list button:hover { background: var(--muted); }
+.chronicle-list-title { display: block; margin-top: 2px; font: 600 16px/20px var(--font-serif); color: var(--ink); }
+.chronicle-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.chronicle-list button.current { box-shadow: inset 3px 0 0 var(--accent); }
+.chronicle-foot { flex: none; display: flex; height: 48px; border-top: 1px solid var(--border); }
+.chronicle-foot button { flex: 1 1 0; min-width: 0; padding: 0 12px; font: 13px/1 var(--font-sans); color: var(--ink-soft); }
+.chronicle-foot button > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chronicle-foot button:first-child { text-align: left; border-right: 1px solid var(--border); }
+.chronicle-foot button:last-child { text-align: right; }
+.chronicle-foot button:hover:not(:disabled) { background: var(--muted); color: var(--ink); }
+.chronicle-foot button:disabled { opacity: .35; }
+/* The owner's switch: who sees the chronicle. A small eye beside the title while only the owner does. */
+.chronicle-draft { display: inline-block; margin-left: 6px; vertical-align: -1px; color: var(--ink-soft); }
+.chronicle-tab { position: fixed; left: 12px; top: 64px; z-index: 15; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; font: 500 14px/1 var(--font-sans); color: var(--ink); }
+.chronicle-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .map-era-chip { animation: none; } }
+/* A phone: the chip goes to the buttons' row, on the right; the coarse pointer makes it 44 px tall, the pill stays 28. */
+@media (max-width: 640px) {
+  .map-bar .map-era-chip { order: 5; margin-left: auto; max-width: calc(100% - 190px); }
+  .map-bar .map-era-chip > span { height: 28px; line-height: 28px; }
+}
 .map-now-inline { display: none; }
 @media (max-width: 640px) { .map-now-inline { display: inline; } }
 .map-bar .bar-btn:disabled { opacity: .35; cursor: default; background: none; }

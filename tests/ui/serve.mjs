@@ -5,6 +5,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { loadChronicleDemo } from '../../scripts/chronicle-demo.mjs'
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const root = fileURLToPath(new URL('../..', import.meta.url))
@@ -21,9 +22,10 @@ async function waitUp(B, ms = 90000) {
 
 /**
  * Starts `next start` on a free-ish port with the demo family (or `people` invented people from gen-family.py on top).
+ * With `chronicle`, the invented chronicle entries of tests/fixtures/chronicle-demo.json too, shown to everyone.
  * Returns the address, an owner's cookie, and `stop()`.
  */
-export async function startApp({ port = 3590, language = 'en', people = 0, env = {} } = {}) {
+export async function startApp({ port = 3590, language = 'en', people = 0, chronicle = false, env = {} } = {}) {
   const data = mkdtempSync(path.join(tmpdir(), 'folkbranch-ui-'))
   const B = `http://127.0.0.1:${port}`
   const child = spawn('pnpm', ['exec', 'next', 'start', '-H', '127.0.0.1', '-p', String(port)], {
@@ -52,6 +54,7 @@ export async function startApp({ port = 3590, language = 'en', people = 0, env =
       const i = await fetch(B + '/api/v1/gedcom/import', { method: 'POST', headers: { cookie, origin: B, 'content-type': 'text/plain' }, body: ged })
       if (!i.ok) throw new Error('import answered ' + i.status)
     }
+    if (chronicle) await loadChronicleDemo(B, { cookie }, { show: 'all' })
     return { B, cookie, stop }
   } catch (e) {
     stop()

@@ -46,7 +46,7 @@ export interface Pulse { at: World; t0: number }
 const headOf = (pos: Position): World => mercator(pos.leg ? along(pos.leg.path, pos.progress) : [pos.lat, pos.lon])
 /** A line of descent followed: its thread, everyone in it, and a key that changes with it (for the ghost cache). */
 export interface LineDraw { thread: Thread; ids: Set<string>; key: string }
-export interface TrailState { departed?: boolean; tracks: Track[]; year: number; positions: Map<string, Position | null>; pulses: Pulse[]; ink: string; accent?: string; focus: Track | null; line?: LineDraw | null; /** The person under the pointer: their whole route is drawn dark. */ hover?: Track | null; /** Every finished journey, or each person's last one (the default). */ routes?: 'recent' | 'all'; /** The routes layer: off leaves only the person followed, the one pointed at and a line. */ trails?: boolean }
+export interface TrailState { departed?: boolean; tracks: Track[]; year: number; positions: Map<string, Position | null>; pulses: Pulse[]; ink: string; accent?: string; focus: Track | null; line?: LineDraw | null; /** The person under the pointer: their whole route is drawn dark. */ hover?: Track | null; /** Every finished journey, or each person's last one (the default). */ routes?: 'recent' | 'all'; /** The routes layer: off leaves only the person followed, the one pointed at and a line. */ trails?: boolean; /** Story focus: the relatives a story names keep their ink, everyone else is quieter. */ apart?: Set<string> | null; /** The story's key, for the ghost cache. */ story?: string | null }
 
 /** The thread: ahead of the clock a faint outline, behind it full ink; an assumed link is dashed in both. */
 const THREAD_AHEAD = 0.2, THREAD_INK = 0.9, THREAD_PX = 2.4, LINK_PX = 1.6, DASH = [5, 5]
@@ -147,9 +147,12 @@ function pen({ ctx, scale: s, ox, oy, dpr }: View, st: TrailState) {
   const X = (w: World) => (w[0] + shift) * s - ox, Y = (w: World) => w[1] * s - oy
   const focusId = st.focus?.personId
   const line = st.line ?? null
-  const quiet = focusId || line ? QUIET : 1
+  const story = st.apart ?? null
+  const quiet = focusId || line || story ? QUIET : 1
   /** Whose trails are drawn some other way: the person followed, or everyone in the line. */
   const apart = (id: string) => id === focusId || !!line?.ids.has(id)
+  /** How much of its ink a trail keeps: the relatives a story names keep all of it, as before anyone was picked. */
+  const inkOf = (id: string) => (story?.has(id) ? 1 : quiet)
   /** A journey's way, as one stroke; again one world over when it runs past the 180° meridian. */
   const stroke = (leg: Leg, n: number, head: World | null) => {
     for (const sh of leg.path.wraps ? [0, -leg.path.wraps * WORLD] : [0]) {
@@ -165,13 +168,13 @@ function pen({ ctx, scale: s, ox, oy, dpr }: View, st: TrailState) {
   }
   /** Draws one world over for what runs past the 180° meridian, then back. */
   const over = (wraps: number, fn: () => void) => { for (const sh of wraps ? [0, -wraps * WORLD] : [0]) { shift = sh; fn() } shift = 0 }
-  return { X, Y, line, quiet, apart, stroke, over }
+  return { X, Y, line, quiet, apart, inkOf, story, stroke, over }
 }
 
 export function drawGhost(v: View, st: TrailState) {
   if (st.trails === false) return
   const { ctx } = v, { year } = st
-  const { quiet, apart } = pen(v, st)
+  const { quiet, apart, story } = pen(v, st)
   // The ghost goes into ONE path and is stroked once: a place where many took the same way reads no darker than a
   // lone one, so the family's routes cannot pile up into a black mass. Zoomed in, another region's long line is left
   // out rather than crossing this one. The canvas is redrawn only when a journey finishes, the view changes, or
@@ -183,7 +186,7 @@ export function drawGhost(v: View, st: TrailState) {
   const ends: [number, number][] = []
   let drew = false, count = 0
   for (const tr of st.tracks) {
-    if (apart(tr.personId)) continue
+    if (apart(tr.personId) || story?.has(tr.personId)) continue
     // A person whose life has ended leaves with their lines, so no line runs on to nobody: unless the dead are kept, and
     // then every move they made stays.
     const gone = year >= lifeSpan(tr)[1] + 1
@@ -222,11 +225,13 @@ export function drawGhost(v: View, st: TrailState) {
     ctx.fill()
   }
   ctx.globalAlpha = 1
+  // In story focus the relatives it names are their own pass, at full ink.
+  if (story) drawGhost(v, { ...st, tracks: st.tracks.filter((tr) => story.has(tr.personId)), apart: null })
 }
 
 export function drawTrails(v: View, st: TrailState) {
   const { ctx } = v, { year } = st
-  const { X, Y, line, quiet, apart, stroke, over } = pen(v, st)
+  const { X, Y, line, apart, inkOf, stroke, over } = pen(v, st)
   // At the world view the recent ink of every life would be laid over every other; only the followed keeps it there.
   const recentShown = Math.log2(v.scale) >= RECENT_ZOOM
   // And a trail belongs to its traveller: one whose face is off the screen is passing through, not here. Its ink is
@@ -250,7 +255,7 @@ export function drawTrails(v: View, st: TrailState) {
     // Journeys under way: their ghost so far, live. Where the recent ink draws the same way (it does for a traveller
     // near the view), the way is drawn once, in that ink, not again underneath it.
     const inked = recentShown && near(pos ?? null)
-    ctx.globalAlpha = GHOST * quiet
+    ctx.globalAlpha = GHOST * inkOf(tr.personId)
     ctx.lineWidth = 1.2
     for (const leg of trackLegs(tr)) {
       if (leg.leave >= year) break
@@ -265,8 +270,8 @@ export function drawTrails(v: View, st: TrailState) {
   }
   // Recent ink is shared out by how much of it there is: with a crowd on screen each trail is quieter, so the many
   // do not add up to black, while a lone traveller is drawn as dark as before.
-  const k = quiet * recentInk(live.length)
-  for (const { tr, pos } of live) recent(tr, pos, k)
+  const k = recentInk(live.length)
+  for (const { tr, pos } of live) recent(tr, pos, k * inkOf(tr.personId))
   // The person followed: their whole life as one route in ink, and their recent travel over it.
   if (st.focus) {
     // What is still ahead of the clock is drawn faint and dashed, as a line's thread is: the way is there to read,
@@ -421,5 +426,5 @@ export function ghostKey(st: TrailState) {
   const apart = (id: string) => id === focusId || !!line?.ids.has(id)
   const who = `${focusId}|${line?.key}`
   // A journey enters the ghost when it ends and leaves it a generation later: either way the canvas changes.
-  return `${st.routes ?? 'recent'}|${st.departed ? 'dead' : ''}|${st.trails === false ? 'off' : 'on'}|${finishedBy(st.tracks, who, apart, st.year)}-${finishedBy(st.tracks, who, apart, st.year - GHOST_YEARS - 1e-9)}-${st.routes === 'all' ? '' : finishedBy(st.tracks, who, apart, st.year - 1e-9, 'leave')}|${endedBy(st.tracks, who, apart, st.year)}|${focusId}|${line?.key}|${st.ink}`
+  return `${st.routes ?? 'recent'}|${st.departed ? 'dead' : ''}|${st.trails === false ? 'off' : 'on'}|${finishedBy(st.tracks, who, apart, st.year)}-${finishedBy(st.tracks, who, apart, st.year - GHOST_YEARS - 1e-9)}-${st.routes === 'all' ? '' : finishedBy(st.tracks, who, apart, st.year - 1e-9, 'leave')}|${endedBy(st.tracks, who, apart, st.year)}|${focusId}|${line?.key}|${st.story ?? ''}|${st.ink}`
 }

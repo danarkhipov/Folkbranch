@@ -12,6 +12,8 @@
     "desktopLongMs": 2000,
     "phoneShownMs": 7000,
     "phoneZoomMs": 3500,
-    "phoneLongMs": 6000
+    "phoneLongMs": 6000,
+    "desktopChronicleDrawMs": 4,
+    "phoneChronicleDrawMs": 4
   }
 }

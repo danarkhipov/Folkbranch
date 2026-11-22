@@ -35,7 +35,7 @@ export function MapGaps({ data, only = null, open, onOpen }: { data: MapTimeline
   return (
     <>
       {(data.absent.length > 0 || gapEvents > 0) && (
-        <div className="map-gaps fixed left-3 top-16 z-10 max-sm:top-[max(12px,env(safe-area-inset-top))] max-sm:max-w-[calc(100vw-80px)] flex max-h-[calc(100vh-180px)] flex-col items-start gap-1">
+        <div className="map-gaps fixed left-[calc(12px_+_var(--map-left,0px))] top-[calc(64px_+_var(--chronicle-tab,0px))] z-10 max-sm:top-[max(12px,env(safe-area-inset-top))] max-sm:max-w-[calc(100vw-80px)] flex max-h-[calc(100vh-180px)] flex-col items-start gap-1">
           <button type="button" className="float flex min-h-9 items-center gap-1.5 px-2.5 py-1.5 text-left text-sm text-ink-soft" aria-expanded={listOpen} onClick={() => setListOpen(!listOpen)}>
             <MapPinOff size={13} className="flex-none" />
             <span>

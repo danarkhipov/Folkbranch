@@ -3,7 +3,7 @@
 // to drag (its year in a bubble), previous / next event, Play, the speed, what to show, and how many are shown.
 // Plain props in and plain calls out; the handle follows the clock itself while it plays, so React redraws the bar
 // only once a year.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import { Pause, Play, SkipBack, SkipForward } from 'lucide-react'
 import { useApp } from '@/lib/client'
 import { axisTicks, bins, caption, eventWords, share, stepYear, yearAt } from '@/lib/map-scrub'
@@ -18,6 +18,9 @@ export interface BarEvent { year: number; moved: boolean; what: string; name: st
  * descent has a band per generation (named where it fits) and its own events to step through.
  */
 export interface BarFocus { id: string; name: string; from: number; to: number; bands?: { from: number; to: number; name: string }[]; steps?: BarEvent[] }
+
+/** A chronicle entry as the bar shows it: a mark on the track, the chip, the bubble's words. */
+export interface BarEra { key: string; from: number; to: number; title: string; lead: boolean }
 
 export interface TimelineBarProps {
   min: number; max: number
@@ -35,11 +38,23 @@ export interface TimelineBarProps {
   /** A new moment; `settled` when the hand has let go (end of a drag, a key). */
   onSeek: (year: number, settled: boolean) => void
   onPlay: () => void; onSpeed: () => void
+  /** The chronicle's entries, in the order they stand (framing ones first, then the latest begun). */
+  eras?: BarEra[]
+  /** The chip pressed: the entry it names. */
+  onEra?: (key: string) => void
+  /** Whether the chip has opened the entry's card (phones and tablets). */
+  eraOpen?: boolean
+  /** The entry card on phones and tablets, over everything else in the bar. */
+  card?: ReactNode
 }
 
 const speedText = (s: number) => (s === 0.5 ? '½×' : `${s}×`)
 
-export function TimelineBar({ min, max, year, playing, speed, show, counts, events, focus, chip, listen, onSeek, onPlay, onSpeed }: TimelineBarProps) {
+const NO_ERAS: BarEra[] = []
+/** The entries going on at some point of a whole year, in the order given. */
+const erasIn = (eras: BarEra[], y: number) => eras.filter((e) => e.from < y + 1 && y < e.to)
+
+export function TimelineBar({ min, max, year, playing, speed, show, counts, events, focus, chip, listen, onSeek, onPlay, onSpeed, eras = NO_ERAS, onEra, eraOpen, card }: TimelineBarProps) {
   const { t, lang } = useApp()
   const track = useRef<HTMLDivElement>(null)
   const line = useRef<HTMLDivElement>(null)
@@ -79,7 +94,8 @@ export function TimelineBar({ min, max, year, playing, speed, show, counts, even
   useEffect(() => listen?.((y) => put(y)), [listen, min, max]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const countIn = (y: number) => steps.filter((e) => Math.floor(e.year) === y).length
-  const valueText = (y: number) => { const k = countIn(y); return k ? `${y}, ${eventWords(k, lang)}` : String(y) }
+  const eraOf = (y: number) => erasIn(eras, y)[0] ?? null
+  const valueText = (y: number) => { const k = countIn(y), era = eraOf(y); return [String(y), era?.title, k ? eventWords(k, lang) : ''].filter(Boolean).join(', ') }
   // The year stands large beside the line, so the line itself starts with what happened.
   const lineOf = (y: number) => caption(steps, y, false)
   /** The year is told once the clock settles: a step, the end of a drag, a pause. Never while it plays. */
@@ -133,9 +149,18 @@ export function TimelineBar({ min, max, year, playing, speed, show, counts, even
   const bubble = drag ? whole : hover
   const bar = (list: number[]) => list.map((v, i) => (v ? `M${i + 0.12} 1V${1 - Math.max(0.12, v / hist.peak)}h0.76V1Z` : '')).join('')
   const ticksAt = (ys: number[]) => ys.map((y) => `M${y - min + 0.5} 0V1`).join('')
+  // A three-year war on a 500-year track would be under 2 px: every mark is at least 3 px wide.
+  const least = width ? (3 * n) / width : 0
+  const shownEras = erasIn(eras, whole)
+  const era = shownEras[0] ?? null
+  const bubbleEra = bubble === null ? null : eraOf(bubble)
+  // The bubble keeps inside the track: its half width, measured once its words change.
+  const bubbleRef = useRef<HTMLSpanElement>(null)
+  useLayoutEffect(() => { const b = bubbleRef.current; if (b) b.style.setProperty('--bw', `${b.offsetWidth}px`) }, [bubble, bubbleEra])
 
   return (
     <div className="map-bar float fixed z-10 flex w-[960px] -translate-x-1/2 flex-col px-3 pb-1.5 pt-1" onKeyDown={barKeys}>
+      {card}
       {chip}
       <div ref={track} role="slider" tabIndex={0} aria-label={t('Year')} aria-valuemin={min} aria-valuemax={max} aria-valuenow={whole} aria-valuetext={valueText(whole)}
         className={`map-track${drag ? ' dragging' : ''}`} onKeyDown={keys} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onPointerLeave={() => setHover(null)}>
@@ -146,6 +171,15 @@ export function TimelineBar({ min, max, year, playing, speed, show, counts, even
           <path className="map-hist-moves" d={bar(hist.moves)} />
         </svg>
         <div ref={line} className="map-line"><div className="map-played" /></div>
+        {/* Over the line, under the handle: each entry's years in rust. */}
+        {eras.length > 0 && (
+          <svg className="map-eras" viewBox={`0 0 ${n} 1`} preserveAspectRatio="none" aria-hidden>
+            {eras.map((e) => {
+              const x = Math.max(0, e.from - min), w = Math.max(least, Math.min(n, e.to - min) - x)
+              return <rect key={e.key} className={`map-era${e.lead ? ' lead' : ''}`} x={x} width={w} y={e.lead ? 0 : 0.25} height={e.lead ? 1 : 0.5} />
+            })}
+          </svg>
+        )}
         <svg className="map-ticks" viewBox={`0 0 ${n} 1`} preserveAspectRatio="none" aria-hidden>
           <path className="map-tick" d={ticksAt(ticks.minor)} />
           <path className="map-tick-major" d={ticksAt(ticks.labels)} />
@@ -158,7 +192,7 @@ export function TimelineBar({ min, max, year, playing, speed, show, counts, even
           return px > b.name.length * 6.5 + 8 && <span key={i} className="map-band-name" style={{ left: pct(Math.max(min, b.from)), maxWidth: `${px}px` }} aria-hidden>{b.name}</span>
         })}
         <div className="map-handle" />
-        {bubble !== null && <span className="map-bubble" style={drag ? undefined : { left: pct(bubble + 0.5) }} aria-hidden>{bubble}</span>}
+        {bubble !== null && <span ref={bubbleRef} className="map-bubble" style={drag ? undefined : ({ '--bx': pct(bubble + 0.5) } as CSSProperties)} aria-hidden>{bubble}{bubbleEra && ` · ${bubbleEra.title}`}</span>}
       </div>
       <div className="map-controls flex min-w-0 items-center gap-x-1">
         <button type="button" className="bar-btn !px-0" aria-label={t('Previous event')} title={t('Previous event')} disabled={prev === null} onClick={() => step(-1)}><SkipBack size={15} /></button>
@@ -168,6 +202,11 @@ export function TimelineBar({ min, max, year, playing, speed, show, counts, even
         <button type="button" className="bar-btn !px-0" aria-label={t('Next event')} title={t('Next event')} disabled={next === null} onClick={() => step(1)}><SkipForward size={15} /></button>
         <button type="button" className="bar-btn map-speed !px-1 font-serif tabular-nums" aria-label={`${t('Speed')}: ${speedText(speed)}`} title={t('Speed')} onClick={onSpeed}>{speedText(speed)}</button>
         <span className="map-now ml-1 w-14 flex-none font-serif text-xl tabular-nums" aria-hidden>{whole}</span>
+        {era && (
+          <button type="button" key={era.key} className="map-era-chip" aria-label={`${t('Chronicle')}: ${era.title}`} title={era.title} aria-expanded={eraOpen ?? undefined} onClick={() => onEra?.(era.key)}>
+            <span><span className="map-era-title">{era.title}</span>{shownEras.length > 1 && <span className="map-era-more">+{shownEras.length - 1}</span>}</span>
+          </button>
+        )}
         {/* On a phone the year leads the caption line, so the buttons and the choice fit one row. */}
         <span className="map-caption min-w-0 flex-1 truncate font-serif text-sm italic text-ink-soft" title={told || undefined}><span className="map-now-inline not-italic text-ink" aria-hidden>{whole}{told && ' · '}</span>{told}</span>
         <span className="map-count ml-2 flex-none text-sm text-ink-soft">{count}</span>

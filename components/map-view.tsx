@@ -3,7 +3,7 @@
 // (map-atlas), the trails (map-trails) and the faces (map-people) are drawn from it; the camera (map-follow) holds
 // still unless someone would leave the view; the bar (map-timeline-bar) plays and scrubs the clock.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQueries, useQuery } from '@tanstack/react-query'
 import type * as Leaflet from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { LocateFixed } from 'lucide-react'
@@ -17,16 +17,19 @@ import { msAt, schedule, yearAtMs } from '@/lib/map-pacing'
 import { generationWords } from '@/lib/map-scrub'
 import { eventYear, lifeSpan, mapTimeline, positionAt, routePoints, routeStops, sinceAt, trackLegs, withoutKinds, type MapTimeline, type Position, type RouteStop, type Track } from '@/lib/map-timeline'
 import { lifeYears, personName, type Graph, type Place } from '@/lib/types'
+import { activeIn, byStanding, entryBounds, erasOf, pickText, type ChronicleList, type ChronicleSwitches, type Entry, type Shape } from '@/lib/chronicle'
 import { useLayers } from '@/lib/map-layers'
 import { loadAtlas } from './map-atlas'
 import { canvasLayer, type CanvasLayer } from './map-canvas'
+import type { ArticleActions } from './chronicle-card'
+import type { ChronicleState } from './map-chronicle'
 import { useStoryClock } from './map-clock'
 import { Follow, type Insets } from './map-follow'
 import { FollowChip } from './map-follow-chip'
 import { GAP_LABEL, MapGaps } from './map-gaps'
 import { FADE_YEARS, PeopleLayer, RING_ZOOM, type Mark, type StackHit } from './map-people'
 import { MapPlaceCard, type PlaceCardProps } from './map-place-card'
-import { TimelineBar, type BarEvent, type BarFocus, type Show } from './map-timeline-bar'
+import { TimelineBar, type BarEra, type BarEvent, type BarFocus, type Show } from './map-timeline-bar'
 import { agePulses, drawGhost, drawTrails, ghostKey, type LineDraw, type TrailState } from './map-trails'
 
 /** How far ahead the camera looks while playing, in ms of what the screen will show. */
@@ -41,6 +44,13 @@ const CAMERA_EVERY_MS = 250
 const TRAIL_STEP = 1 / 6
 /** While a ring of an event lives, the live trails are drawn for it at most this often: a ring opens over 700 ms. */
 const RING_FRAME_MS = 40
+/** The chronicle's shapes are drawn again at most this often while a front moves or an entry fades. */
+const CHRONICLE_FRAME_MS = 33
+/** No chronicle yet, the same empty list every render. */
+const NO_ENTRIES: Entry[] = []
+const NO_ERAS: BarEra[] = []
+/** The chronicle's code, loaded only once a switch under Settings > Map shows it. */
+type ChronicleParts = typeof import('./map-chronicle-parts')
 /**
  * The live trails are drawn at most this often while they change: two screens a frame apart look the same, and a
  * trail 30 ms behind its traveller cannot be seen, while every frame of a big play redraws hundreds of journeys.
@@ -141,18 +151,39 @@ function missingFor(data: MapTimeline, id: string, t: (k: string) => string): st
   return gaps.slice(0, 2).map((g) => `${g.what} — ${t(GAP_LABEL[g.gap])}`).join('; ') + (gaps.length > 2 ? ` +${gaps.length - 2}` : '')
 }
 
-interface Engine { map: Leaflet.Map; people: PeopleLayer; trails: CanvasLayer; live: CanvasLayer; ghost: CanvasLayer; names: { group: Leaflet.LayerGroup; place: (m: Leaflet.Map, taken: import('@/lib/map-layout').Taken) => void }; follow: Follow }
+interface Engine { L: typeof Leaflet; map: Leaflet.Map; people: PeopleLayer; trails: CanvasLayer; live: CanvasLayer; ghost: CanvasLayer; names: { group: Leaflet.LayerGroup; place: (m: Leaflet.Map, taken: import('@/lib/map-layout').Taken) => void }; follow: Follow; chronicle: CanvasLayer | null }
 
 /** A phone: the person card is a sheet over most of the map, so picking someone follows them with the card closed. */
 const narrow = () => matchMedia('(max-width: 640px)').matches
+/** From this width the chronicle is a front page beside the map; below it, a card inside the bar. */
+const WIDE = '(min-width: 1100px)'
 
 /**
  * `card`: whether the person card is open. Who is followed is the app's `focusId` (`p`); the two are apart here.
  * `root`: the person the tree's current view is drawn from, if it is narrowed to one; a line may end there.
  */
 export default function MapView({ card: cardOpen, onCard, root = null }: { card: boolean; onCard: (open: boolean) => void; root?: string | null }) {
-  const { t, lang, view, graph, family, me, focus, byId, focusId } = useApp()
+  const { t, lang, archiveLang, view, graph, family, me, focus, byId, focusId } = useApp()
   const { data: places, isSuccess } = useQuery({ queryKey: ['places'], queryFn: () => api<Place[]>('places') })
+  // What was going on around the family, when the owner's switches show it (Settings > Map): `history` draws the
+  // shapes, `words` the marks on the bar, the chip, the card and the front page. Off, nothing of it is asked for or
+  // loaded. The list comes again on every change; each shape once per version of its entry.
+  const switches = useQuery({ queryKey: ['chronicle', 'switches'], queryFn: () => api<ChronicleSwitches>('chronicle/switches') })
+  const history = !!switches.data?.history, words = !!switches.data?.chronicle
+  const chronicle = useQuery({ queryKey: ['chronicle'], queryFn: () => api<ChronicleList>('chronicle'), enabled: history || words })
+  const entries = (history || words) && chronicle.data?.entries || NO_ENTRIES
+  const [parts, setParts] = useState<ChronicleParts | null>(null)
+  useEffect(() => {
+    if (parts || !(history || words)) return
+    let gone = false
+    void import('./map-chronicle-parts').then((m) => { if (!gone) setParts(m) })
+    return () => { gone = true }
+  }, [parts, history, words])
+  const shapeAnswers = useQueries({ queries: entries.filter((e) => history && e.hasShape).map((e) => ({ queryKey: ['chronicle-shape', e.key, e.updatedAt], queryFn: () => api<{ shape: Shape }>(`chronicle/${encodeURIComponent(e.key)}/shape`).then((r) => [e.key, r.shape] as const), staleTime: Infinity })) })
+  const shapesKey = shapeAnswers.map((q) => q.dataUpdatedAt).join()
+  const shapes = useMemo(() => new Map(shapeAnswers.flatMap((q) => (q.data ? [q.data] : []))), [shapesKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Play slows through a moving front only where the front is drawn.
+  const eras = useMemo(() => (history ? erasOf(entries) : []), [entries, history])
   // What the viewer switched on and off, remembered in this browser.
   const layers = useLayers()
   // A line is found in the whole family the page holds, not only the part the tree shows, and so is who is placed.
@@ -194,7 +225,7 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
   }, [line, data, byId])
   const lineTracks = useMemo(() => (line ? data.tracks.filter((x) => line.ids.includes(x.personId)) : null), [line, data])
   // A line plays at its own pace: its busy years get the time, not the rest of the family's.
-  const pacing = useMemo(() => schedule(lineTracks?.length ? lineTracks : data.tracks, data.min, data.max), [data, lineTracks])
+  const pacing = useMemo(() => schedule(lineTracks?.length ? lineTracks : data.tracks, data.min, data.max, eras), [data, lineTracks, eras])
   // Every event with a place and a year, oldest first: for marks, pulses and the camera.
   // A marriage is a stop for both partners but one mark on the map, as on the bar.
   const events = useMemo<Mark[]>(() => {
@@ -305,6 +336,19 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
   /** What the canvas and the layout read, kept outside React. */
   const state = useRef<TrailState & { show: Show; events: Mark[]; points: [number, number][] }>({ tracks: [], year: data.min, positions: new Map(), pulses: [], ink: '#2a2620', show: 'both', events: [], focus: null, line: null, points: [] })
   useLayoutEffect(() => { state.current.focus = focusTrack; state.current.line = lineDraw; state.current.routes = layers.routes; state.current.trails = layers.trails; state.current.departed = layers.departed; departedRef.current = layers.departed })
+  /** What the chronicle's canvas reads, kept outside React; `chronicleShown` is the look it last drew. */
+  const chron = useRef<ChronicleState>({ entries: [], shapes: new Map(), year: data.min, story: null, name: (x) => pickText(x, lang), colors: { ink: '#2a2620', inkSoft: '#6f685b', accent: '#a4502e', paper: '#f7f3ea', sans: 'sans-serif', serif: 'serif' } })
+  const chronicleShown = useRef('')
+  /** What the chronicle would draw at a moment, while its shapes are on the map; null while they are not. */
+  const look = useRef<ChronicleParts['chronicleLook'] | null>(null)
+  /** Draws the chronicle again if what it shows changed, at most every CHRONICLE_FRAME_MS; set with the clock below. */
+  const redrawChronicle = useRef(() => {})
+  useLayoutEffect(() => {
+    const c = chron.current
+    c.entries = entries; c.shapes = shapes; c.name = (x) => pickText(x, lang)
+    chronicleShown.current = look.current?.(c, c.year) ?? ''
+    engine.current?.chronicle?.redraw()
+  }, [entries, shapes, lang, ready])
   // Chosen in the map's layers: the lines are drawn again at once.
   useEffect(() => { engine.current?.ghost.redraw(); engine.current?.live.redraw() }, [layers.routes, layers.trails])
   /** The places a followed route or line keeps in view, framed once when it is followed; null when no one is. */
@@ -360,6 +404,8 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
       const live = canvasLayer(L, 'trails', (v) => { if (state.current.show !== 'events') drawTrails(v, state.current) })
       ghost.layer.addTo(m)
       live.layer.addTo(m)
+      const css = getComputedStyle(document.documentElement), cssVar = (k: string, d: string) => css.getPropertyValue(k).trim() || d
+      chron.current.colors = { ink: cssVar('--ink', '#2a2620'), inkSoft: cssVar('--ink-soft', '#6f685b'), accent: cssVar('--accent', '#a4502e'), paper: cssVar('--paper', '#f7f3ea'), sans: cssVar('--font-sans', 'sans-serif'), serif: cssVar('--font-serif', 'serif') }
       const trails: CanvasLayer = { layer: live.layer, redraw: () => { ghost.redraw(); live.redraw() } }
       state.current.accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#a4502e'
       const people = new PeopleLayer(L, m, { avatar: (id) => faceOf.current(id), pick: (id) => pick.current(id), stack: (h) => openStack.current(h), t: (k) => tr.current(k), people: (n) => peopleWords(n, langRef.current), hover: (id) => { state.current.hover = id ? state.current.tracks.find((t) => t.personId === id) ?? null : null; engine.current?.live.redraw() } })
@@ -367,7 +413,7 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
       // Without the base map the family still stands and travels on plain paper, and the atlas can be asked again.
       const atlas = await loadAtlas(L).catch(() => null)
       if (gone) { m.remove(); return }
-      engine.current = { map: m, people, trails, live, ghost, names: { group: L.layerGroup(), place: () => {} }, follow }
+      engine.current = { L, map: m, people, trails, live, ghost, names: { group: L.layerGroup(), place: () => {} }, follow, chronicle: null }
       if (atlas) addAtlas(atlas)
       else setAtlasLost(true)
       retryAtlas.current = () => {
@@ -404,7 +450,7 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
     const now = performance.now()
     if (now - bars.current.at > 500) {
       const box = e.map.getContainer().getBoundingClientRect()
-      bars.current = { at: now, boxes: [...document.querySelectorAll('.main-bar, .map-gaps > *, .map-bar, .map-follow')].map((el): [number, number, number, number] => {
+      bars.current = { at: now, boxes: [...document.querySelectorAll('.main-bar, .map-gaps > *, .map-bar, .map-follow, .chronicle, .chronicle-tab')].map((el): [number, number, number, number] => {
         const r = el.getBoundingClientRect()
         return [r.left - box.left, r.top - box.top, r.right - box.left, r.bottom - box.top]
       }) }
@@ -499,11 +545,26 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
     // The step of the year the live trails were last drawn at, for TRAIL_STEP, and when, for RING_FRAME_MS.
     let trailStep = NaN
     let trailAt = 0
+    // The chronicle is drawn again only when what it shows has changed (an entry, a front's blend, a fade), and at most
+    // every CHRONICLE_FRAME_MS; a change inside that time is drawn when it is up.
+    let chronicleAt = 0, chronicleWait = 0
+    const chronicleFrame = () => {
+      const c = chron.current, now = look.current?.(c, c.year)
+      if (now === undefined || now === chronicleShown.current) return
+      const wait = CHRONICLE_FRAME_MS - (performance.now() - chronicleAt)
+      if (wait > 0) { chronicleWait ||= window.setTimeout(() => { chronicleWait = 0; chronicleFrame() }, wait); return }
+      chronicleAt = performance.now()
+      chronicleShown.current = now
+      engine.current?.chronicle?.redraw()
+    }
+    redrawChronicle.current = chronicleFrame
     const off = clock.listen((y, prev) => {
       const e = engine.current
       if (!e) return
       const st = state.current
       st.year = y
+      chron.current.year = y
+      chronicleFrame()
       st.positions = place(y)
       // Events as they happen: a ring at the place, only when the clock runs forward a little (not a jump).
       if (!reduced && st.show !== 'events' && y > prev && y - prev < 2) {
@@ -547,8 +608,43 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
       if ((y >= pacing.max || (lineEndRef.current !== null && y >= lineEndRef.current)) && e.follow.following) e.follow.fit(followRef.current ?? allPointsRef.current, true)
       else e.follow.keep(keepInView(y, 0))
     })
-    return () => { off(); offSettle(); cancelAnimationFrame(pulsing) }
+    return () => { off(); offSettle(); cancelAnimationFrame(pulsing); clearTimeout(chronicleWait); redrawChronicle.current = () => {} }
   }, [ready, clock.listen, clock.onSettle, pacing])
+
+  // The history on the map, once its code is in: the shapes on a canvas over the atlas and under the family, their
+  // names just above, never in the way of a click. Switched off, both leave the map.
+  useEffect(() => {
+    const e = engine.current
+    if (!ready || !e || !parts || !history) return
+    const { L, map: m } = e
+    for (const [name, z] of [['chronicle', '160'], ['chronicleNames', '161']] as const) {
+      if (m.getPane(name)) continue
+      const pane = m.createPane(name)
+      pane.style.zIndex = z
+      pane.style.pointerEvents = 'none'
+    }
+    const canvas = canvasLayer(L, 'chronicle', (v) => parts.drawChronicle(v, chron.current))
+    canvas.layer.addTo(m)
+    const names = new parts.ChronicleNames(L, m, 'chronicleNames')
+    e.chronicle = { layer: canvas.layer, redraw: () => { canvas.redraw(); names.update(chron.current) } }
+    // Names show from a zoom on: looked at again when a zoom ends.
+    const zoomed = () => names.update(chron.current)
+    m.on('zoomend', zoomed)
+    look.current = parts.chronicleLook
+    chronicleShown.current = parts.chronicleLook(chron.current, chron.current.year)
+    e.chronicle.redraw()
+    // A moving front's next step, traced in the worker, is drawn as soon as it comes in.
+    const offMorph = parts.onMorph(() => redrawChronicle.current())
+    return () => {
+      offMorph()
+      m.off('zoomend', zoomed)
+      canvas.layer.remove()
+      names.clear()
+      look.current = null
+      chronicleShown.current = ''
+      e.chronicle = null
+    }
+  }, [ready, parts, history])
 
   // At 4× and 8× over the whole family, the camera frames all routes once and then holds still while they build.
   useEffect(() => {
@@ -793,6 +889,87 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
     return () => { ro?.disconnect(); cancelAnimationFrame(raf); clearTimeout(late); removeEventListener('resize', set); wrap.style.removeProperty('--map-card') }
   }, [focusId, cardOpen])
 
+  // The chronicle beside the family: a front page on the left from 1100 px, a card inside the bar below that. Both show
+  // the entries going on in the year shown, framing ones first; the chip in the bar names the first of them.
+  const [wide, setWide] = useState(() => matchMedia(WIDE).matches)
+  useEffect(() => {
+    const q = matchMedia(WIDE), on = () => setWide(q.matches)
+    q.addEventListener('change', on)
+    return () => q.removeEventListener('change', on)
+  }, [])
+  const ordered = useMemo(() => [...entries].sort(byStanding), [entries])
+  const barEras = useMemo<BarEra[]>(() => ordered.map((e) => ({ key: e.key, from: e.fromYear, to: e.toYear, title: pickText(e.title, lang, archiveLang), lead: e.lead })), [ordered, lang, archiveLang])
+  const shownYear = Math.floor(clock.shown)
+  const activeNow = useMemo(() => activeIn(ordered, shownYear), [ordered, shownYear])
+  const [eraCard, setEraCard] = useState<string | null>(null)
+  const [pageAsk, setPageAsk] = useState<{ key: string; n: number } | null>(null)
+  const cardEntry = eraCard === null ? null : activeNow.find((e) => e.key === eraCard) ?? activeNow[0] ?? null
+  // The card closes once nothing is going on, when the person sheet opens, and on a wide screen, where the page shows it.
+  if (eraCard !== null && (!activeNow.length || cardOpen || wide)) setEraCard(null)
+  const closeEraCard = useCallback(() => setEraCard(null), [])
+  const onEra = (key: string) => {
+    if (wide) setPageAsk((a) => ({ key, n: (a?.n ?? 0) + 1 }))
+    else setEraCard((k) => (k === null ? key : null))
+  }
+  /** An entry's headline: the moment goes inside it, and the camera frames its shape with the relatives it names. */
+  const goToEntry = (entry: Entry) => {
+    const e = engine.current
+    if (!e) return
+    e.follow.release()
+    if (clock.at.current < entry.fromYear || clock.at.current >= entry.toYear) clock.seek(entry.fromYear, true)
+    const shape = shapes.get(entry.key), box = shape && entryBounds(shape)
+    const points: [number, number][] = box ? [box[0], box[1]] : []
+    for (const l of entry.people) { const at = state.current.positions.get(l.personId); if (at) points.push([at.lat, at.lon]) }
+    if (!points.length) return
+    const room = insets(e.map)
+    e.map.flyToBounds(points, { paddingTopLeft: [room.left, room.top], paddingBottomRight: [room.right, room.bottom], maxZoom: 7, duration: 0.8, animate: !matchMedia('(prefers-reduced-motion: reduce)').matches })
+  }
+  // Story focus: the relatives an entry names stay in full ink and everyone else goes quiet. Following someone wins:
+  // the story waits under it. It ends on "The whole family", Escape, or when the clock settles outside the entry.
+  const [story, setStory] = useState<string | null>(null)
+  const storyEntry = story === null ? null : entries.find((x) => x.key === story) ?? null
+  if (story !== null && chronicle.isSuccess && !storyEntry) setStory(null)
+  const storying = !!storyEntry && !followKey
+  const concerned = useMemo(() => (storying && storyEntry ? new Set(storyEntry.people.map((l) => l.personId)) : null), [storying, storyEntry])
+  useEffect(() => {
+    const e = engine.current
+    if (!ready || !e) return
+    const key = concerned ? story : null
+    e.map.getContainer().classList.toggle('storying', !!concerned)
+    e.people.setConcerned(concerned)
+    state.current.apart = concerned
+    state.current.story = key
+    chron.current.story = key
+    chronicleShown.current = look.current?.(chron.current, chron.current.year) ?? ''
+    relayout.current()
+    e.trails.redraw()
+    e.chronicle?.redraw()
+  }, [ready, concerned]) // eslint-disable-line react-hooks/exhaustive-deps
+  const settleOn = clock.onSettle
+  useEffect(() => {
+    if (!storyEntry) return
+    // The card in the bar takes the first Escape; the next one leaves the story.
+    const key = (ev: KeyboardEvent) => { if (ev.key === 'Escape' && !ev.defaultPrevented && !document.querySelector('.chronicle-card')) setStory(null) }
+    const off = settleOn((y) => { if (y < storyEntry.fromYear || y >= storyEntry.toYear) setStory(null) })
+    addEventListener('keydown', key)
+    return () => { removeEventListener('keydown', key); off() }
+  }, [storyEntry, settleOn])
+  const chronicleActions: ArticleActions = {
+    onHeadline: goToEntry,
+    story,
+    onStory: (x) => { if (x) goToEntry(x); setStory(x?.key ?? null) },
+    // A relative's line: the moment goes to the line's year and the map follows them.
+    onPerson: (id, year) => { if (year !== undefined) clock.seek(year, true); setEraCard(null); follow(id) },
+    onHover: (id) => engine.current?.people.highlight(id),
+    faceFor,
+    nameOf: (id) => { const p = byId.get(id); return (p && personName(p)) || t('No name') },
+  }
+  // Who sees it, for the owner's small eye: changed under Settings > Map.
+  const chronicleShow = me.role === 'owner' && !me.guest ? chronicle.data?.show : undefined
+  const eraCardNode = !wide && words && parts && cardEntry && (
+    <parts.ChronicleCard entries={activeNow} shown={cardEntry} shapes={shapes} onShow={setEraCard} onClose={closeEraCard} actions={chronicleActions} />
+  )
+
   const followAgain = () => {
     const e = engine.current
     if (!e) return
@@ -816,11 +993,16 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
         </div>
       )}
       {/* Before the bar in the page, as it is on the screen: top left, then the bar at the bottom. */}
+      {wide && words && parts && (
+        <parts.ChroniclePage entries={ordered} shapes={shapes} year={shownYear} status={chronicle.isError ? 'error' : chronicle.isSuccess ? 'ready' : 'loading'}
+          owner={me.role === 'owner' && !me.guest} personCard={cardOpen} ask={pageAsk} onJump={(x) => clock.seek(x.fromYear, true)} onRetry={() => chronicle.refetch()} actions={chronicleActions} show={chronicleShow} />
+      )}
       <MapGaps data={data} only={gapsOpen ? lineGapIds : null} open={gapsOpen || undefined} onOpen={(v) => { if (!v) setGapsOpen(false) }} />
       <div ref={bar}>
         <TimelineBar min={data.min} max={data.max} year={clock.shown} playing={clock.playing} speed={clock.speed} show={show} counts={counts}
           events={barEvents} focus={barFocus} listen={clock.listen} chip={chip}
-          onSeek={clock.seek} onPlay={play} onSpeed={clock.nextSpeed} />
+          onSeek={clock.seek} onPlay={play} onSpeed={clock.nextSpeed}
+          eras={words ? barEras : NO_ERAS} onEra={onEra} eraOpen={wide ? undefined : eraCard !== null} card={eraCardNode || null} />
       </div>
       {!following && (
         <button type="button" className="map-follow float bar-btn fixed right-3 top-16 z-10 !h-9 text-ink max-sm:top-3" onClick={followAgain} title={focusTrack ? t('The camera goes back to this person and stays with them') : t('The camera goes where people are moving; pick someone on the map to follow only them')}>
@@ -836,7 +1018,7 @@ export default function MapView({ card: cardOpen, onCard, root = null }: { card:
 function insets(m: Leaflet.Map): Insets {
   const h = m.getSize().y, w = m.getSize().x
   let top = 12, bottom = 12
-  for (const el of document.querySelectorAll('.main-bar, .map-gaps > button, .map-bar')) {
+  for (const el of document.querySelectorAll('.main-bar, .map-gaps > button, .map-bar, .chronicle-tab')) {
     const r = el.getBoundingClientRect()
     if (!r.height) continue
     if (r.top + r.height / 2 < h / 2) top = Math.max(top, r.bottom + 8)
@@ -850,7 +1032,10 @@ function insets(m: Leaflet.Map): Insets {
     else if (panel.top > h * 0.15) { bottom = h - panel.top + 8; sheet = true }
   }
   const narrow = w < 640
+  // The chronicle's front page stands on the left on a wide screen.
+  const page = document.querySelector('aside.chronicle')?.getBoundingClientRect()
+  const left = Math.max(narrow ? 32 : 64, page?.width ? Math.round(page.right + 16) : 0)
   // A name above a face and an event's mark below it need a little more room, unless a sheet leaves only a strip.
   const roomy = !sheet || h - top - bottom > 220
-  return { top: top + (roomy ? 24 : 4), bottom: bottom + (roomy ? 34 : 6), left: narrow ? 32 : 64, right: right + (narrow ? Math.round(w * 0.22) : Math.min(200, Math.round(w * 0.14))) }
+  return { top: top + (roomy ? 24 : 4), bottom: bottom + (roomy ? 34 : 6), left, right: right + (narrow ? Math.round(w * 0.22) : Math.min(200, Math.round(w * 0.14))) }
 }

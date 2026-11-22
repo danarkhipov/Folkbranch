@@ -120,6 +120,13 @@
       "when": 1794945325048,
       "tag": "0016_union_end_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1795288931364,
+      "tag": "0017_chronicle",
+      "breakpoints": true
     }
   ]
 }

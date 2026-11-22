@@ -1,0 +1,484 @@
+{
+ "about": "Invented entries for the demo family (English demo archive). Load with: node scripts/chronicle-demo.mjs. Places and people are named, the loader turns them into ids.",
+ "entries": [
+  {
+   "key": "northern-quarantine",
+   "from": "1947-03-10",
+   "to": "1951-06",
+   "lead": true,
+   "title": {
+    "en": "The northern quarantine",
+    "es": "La cuarentena del norte",
+    "ca": "La quarantena del nord",
+    "ru": "Северный карантин"
+   },
+   "body": {
+    "en": "An invented fever spread south from the lumber camps. Town by town the province closed its roads, and the quarantine line moved down the coast for three years.\n\nInside the line, mail was smoked and trains ran empty. Outside it, people waited for news.\n\nThis entry is made up for the demo family."
+   },
+   "link": {
+    "en": "https://example.org/northern-quarantine"
+   },
+   "shape": {
+    "kind": "zones",
+    "zones": [
+     {
+      "id": "province",
+      "name": {
+       "en": "Open province",
+       "es": "Provincia abierta",
+       "ca": "Província oberta",
+       "ru": "Открытая провинция"
+      },
+      "tone": 2,
+      "stages": [
+       {
+        "at": "1947-03-10",
+        "outline": {
+         "type": "Polygon",
+         "coordinates": [
+          [
+           [
+            -73.5,
+            41
+           ],
+           [
+            -71.9,
+            41.3
+           ],
+           [
+            -71.1,
+            41.5
+           ],
+           [
+            -70.6,
+            41.6
+           ],
+           [
+            -70,
+            41.8
+           ],
+           [
+            -70.5,
+            42.2
+           ],
+           [
+            -70.7,
+            42.6
+           ],
+           [
+            -70.6,
+            43.1
+           ],
+           [
+            -70.2,
+            43.6
+           ],
+           [
+            -69.6,
+            43.8
+           ],
+           [
+            -69,
+            44.1
+           ],
+           [
+            -68.2,
+            44.4
+           ],
+           [
+            -67,
+            44.8
+           ],
+           [
+            -67.8,
+            45.7
+           ],
+           [
+            -67.8,
+            47.1
+           ],
+           [
+            -69.2,
+            47.4
+           ],
+           [
+            -70,
+            46.6
+           ],
+           [
+            -70.9,
+            45.3
+           ],
+           [
+            -71.5,
+            45
+           ],
+           [
+            -73.3,
+            45
+           ],
+           [
+            -73.3,
+            42.7
+           ],
+           [
+            -73.5,
+            42
+           ],
+           [
+            -73.5,
+            41
+           ]
+          ]
+         ]
+        },
+        "label": [
+         -72.2,
+         42.3
+        ]
+       }
+      ]
+     },
+     {
+      "id": "quarantine",
+      "name": {
+       "en": "Quarantine zone",
+       "es": "Zona de cuarentena",
+       "ca": "Zona de quarantena",
+       "ru": "Зона карантина"
+      },
+      "tone": 1,
+      "stages": [
+       {
+        "at": "1947-03",
+        "outline": {
+         "type": "Polygon",
+         "coordinates": [
+          [
+           [
+            -67.8,
+            46.97
+           ],
+           [
+            -67.8,
+            47.1
+           ],
+           [
+            -69.2,
+            47.4
+           ],
+           [
+            -70,
+            46.6
+           ],
+           [
+            -70.365,
+            46.072
+           ],
+           [
+            -67.8,
+            46.97
+           ]
+          ]
+         ]
+        },
+        "label": [
+         -68.6,
+         46.6
+        ]
+       },
+       {
+        "at": "1948-02",
+        "outline": {
+         "type": "Polygon",
+         "coordinates": [
+          [
+           [
+            -67.8,
+            45.77
+           ],
+           [
+            -67.8,
+            47.1
+           ],
+           [
+            -69.2,
+            47.4
+           ],
+           [
+            -70,
+            46.6
+           ],
+           [
+            -70.9,
+            45.3
+           ],
+           [
+            -71.5,
+            45
+           ],
+           [
+            -73.3,
+            45
+           ],
+           [
+            -73.3,
+            43.845
+           ],
+           [
+            -67.8,
+            45.77
+           ]
+          ]
+         ]
+        },
+        "label": [
+         -69.2,
+         45.6
+        ]
+       },
+       {
+        "at": "1949-06",
+        "outline": {
+         "type": "Polygon",
+         "coordinates": [
+          [
+           [
+            -67.102,
+            44.914
+           ],
+           [
+            -67.8,
+            45.7
+           ],
+           [
+            -67.8,
+            47.1
+           ],
+           [
+            -69.2,
+            47.4
+           ],
+           [
+            -70,
+            46.6
+           ],
+           [
+            -70.9,
+            45.3
+           ],
+           [
+            -71.5,
+            45
+           ],
+           [
+            -73.3,
+            45
+           ],
+           [
+            -73.3,
+            42.745
+           ],
+           [
+            -67.102,
+            44.914
+           ]
+          ]
+         ]
+        },
+        "label": [
+         -70,
+         44.9
+        ]
+       },
+       {
+        "at": "1950-09-15",
+        "outline": {
+         "type": "Polygon",
+         "coordinates": [
+          [
+           [
+            -70.638,
+            42.477
+           ],
+           [
+            -70.7,
+            42.6
+           ],
+           [
+            -70.6,
+            43.1
+           ],
+           [
+            -70.2,
+            43.6
+           ],
+           [
+            -69.6,
+            43.8
+           ],
+           [
+            -69,
+            44.1
+           ],
+           [
+            -68.2,
+            44.4
+           ],
+           [
+            -67,
+            44.8
+           ],
+           [
+            -67.8,
+            45.7
+           ],
+           [
+            -67.8,
+            47.1
+           ],
+           [
+            -69.2,
+            47.4
+           ],
+           [
+            -70,
+            46.6
+           ],
+           [
+            -70.9,
+            45.3
+           ],
+           [
+            -71.5,
+            45
+           ],
+           [
+            -73.3,
+            45
+           ],
+           [
+            -73.3,
+            42.7
+           ],
+           [
+            -73.5,
+            42
+           ],
+           [
+            -73.5,
+            41.475
+           ],
+           [
+            -70.638,
+            42.477
+           ]
+          ]
+         ]
+        },
+        "label": [
+         -71,
+         44.2
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "people": [
+    {
+     "person": "Gregory Harlan",
+     "at": "1949-07",
+     "text": {
+      "en": "Kept the Portland ferry running for the doctors, says the family."
+     }
+    },
+    {
+     "person": "Stephen Whitlock",
+     "at": "1947",
+     "text": {
+      "en": "A baby in Portland when the line was still far to the north."
+     }
+    }
+   ]
+  },
+  {
+   "key": "john-goes-to-sea",
+   "from": "1936-09",
+   "to": "1941",
+   "namesPeople": true,
+   "title": {
+    "en": "John goes to sea",
+    "es": "John se hace a la mar",
+    "ca": "En John se'n va a la mar",
+    "ru": "Джон уходит в море"
+   },
+   "body": {
+    "en": "[@John Whitlock](person:{John Whitlock}) left Salem to study ships, and probably crossed to Glasgow to see the yards before settling in Portland. The crossing is not in any paper the family kept."
+   },
+   "shape": {
+    "kind": "route",
+    "stops": [
+     {
+      "place": "Salem"
+     },
+     {
+      "place": "Cambridge"
+     },
+     {
+      "place": "Glasgow"
+     },
+     {
+      "place": "Portland"
+     }
+    ],
+    "unsure": [
+     1
+    ]
+   },
+   "people": [
+    {
+     "person": "John Whitlock",
+     "at": "1936-09",
+     "text": {
+      "en": "Studied naval architecture, then the yards."
+     }
+    }
+   ]
+  },
+  {
+   "key": "mill-fire",
+   "from": "1911-06-02",
+   "to": "1912-03",
+   "title": {
+    "en": "The mill fires",
+    "es": "Los incendios de los molinos",
+    "ca": "Els incendis dels molins",
+    "ru": "Пожары на мельницах"
+   },
+   "body": {
+    "en": "Two invented fires a few weeks apart closed the mills of Salem and Ipswich for a winter."
+   },
+   "shape": {
+    "kind": "places",
+    "places": [
+     {
+      "place": "Salem"
+     },
+     {
+      "place": "Ipswich"
+     }
+    ]
+   },
+   "people": [
+    {
+     "person": "Nicholas Whitlock",
+     "at": "1912",
+     "text": {
+      "en": "Found work with a crew of carpenters rebuilding the mill."
+     }
+    }
+   ]
+  }
+ ]
+}

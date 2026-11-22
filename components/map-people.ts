@@ -33,10 +33,10 @@ interface Face {
   /** Whose route a hover shows: in a folded stack, the person named on top, whichever face is under the pointer. */
   hoverAs?: string
   marker: Leaflet.Marker; el: HTMLElement; name: HTMLElement; strong: HTMLElement; where: HTMLElement
-  shown: boolean; moving: boolean; yields: boolean; focused: boolean; kin: boolean; hidden: boolean; unsure: boolean; gone: boolean
+  shown: boolean; moving: boolean; yields: boolean; focused: boolean; kin: boolean; hidden: boolean; unsure: boolean; concerned: boolean; gone: boolean
   at: string; dx: number; dy: number; side: Side | null; text: string; w: number; z: number
 }
-interface MarkEl { marker: Leaflet.Marker; el: HTMLElement; cap: HTMLElement; capW: number; fade: number; slot: string; mine: boolean }
+interface MarkEl { marker: Leaflet.Marker; el: HTMLElement; cap: HTMLElement; capW: number; fade: number; slot: string; mine: boolean; concerned: boolean }
 
 let measurer: CanvasRenderingContext2D | null = null
 const widths = new Map<string, number>()
@@ -90,6 +90,17 @@ export class PeopleLayer {
    * Follows one person: their face is ringed and on top, their route's stops are numbered, everyone else is quieter.
    * A line of descent gives its generation marks as the stops (with their own words) and everyone in it as `kin`.
    */
+  /** A face shown as if hovered (a relative's line hovered elsewhere on the page), or none. */
+  private lit: string | null = null
+  highlight(id: string | null) {
+    if (this.lit === id) return
+    const was = this.lit && this.faces.get(this.lit)
+    if (was && !was.el.matches(':hover') && document.activeElement !== was.el) { was.el.classList.remove('open'); was.marker.setZIndexOffset(was.z) }
+    this.lit = id
+    const f = id && this.faces.get(id)
+    if (f) { f.el.classList.add('open'); f.marker.setZIndexOffset(30000) }
+  }
+
   setFocus(id: string | null, stops: (RouteStop & { text?: string })[], kin: Set<string> | null = null) {
     this.focusId = id
     this.kin = kin
@@ -129,6 +140,9 @@ export class PeopleLayer {
 
   /** Along a line, who carries it now: their face wears the rings. Only names it; the next layout shows it. */
   setCurrent(id: string | null) { if (this.kin) this.focusId = id }
+  /** The relatives a story names (story focus): everyone else goes quiet at the next layout. Null: nobody apart. */
+  private concerned: Set<string> | null = null
+  setConcerned(ids: Set<string> | null) { this.concerned = ids }
 
   /** A face pressed or Entered: a stack opens who is here, a single face follows that person. */
   private activate(id: string) {
@@ -186,6 +200,7 @@ export class PeopleLayer {
     if (f) return f
     const el = document.createElement('div')
     el.className = 'map-face-in'
+    el.dataset.person = id
     el.setAttribute('role', 'button')
     el.tabIndex = -1
     const img = el.appendChild(document.createElement('img'))
@@ -213,7 +228,7 @@ export class PeopleLayer {
       if (d) { e.preventDefault(); e.stopPropagation(); this.roam(id, d); return }
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); this.activate(id) }
     })
-    f = { marker, el, name: label, strong, where, shown: false, moving: false, yields: false, focused: false, kin: false, hidden: false, unsure: false, gone: false, at: '', dx: NaN, dy: NaN, side: null, text: name, w: textWidth(name, this.font) + 8, z: 0 }
+    f = { marker, el, name: label, strong, where, shown: false, moving: false, yields: false, focused: false, kin: false, hidden: false, unsure: false, concerned: false, gone: false, at: '', dx: NaN, dy: NaN, side: null, text: name, w: textWidth(name, this.font) + 8, z: 0 }
     this.faces.set(id, f)
     return f
   }
@@ -241,7 +256,7 @@ export class PeopleLayer {
     else delete f.name.dataset.side
   }
   /** A class on a face, changed only when it is another: a play lays the same faces out again and again. */
-  private setFlag(f: Face, key: 'moving' | 'focused' | 'kin' | 'hidden' | 'unsure' | 'gone', on: boolean) {
+  private setFlag(f: Face, key: 'moving' | 'focused' | 'kin' | 'hidden' | 'unsure' | 'concerned' | 'gone', on: boolean) {
     if (f[key] === on) return
     f[key] = on
     f.el.classList.toggle(key === 'hidden' ? 'hidden-face' : key, on)
@@ -355,6 +370,7 @@ export class PeopleLayer {
       if (face.at !== at) { face.at = at; face.where.textContent = at }
       this.setFlag(face, 'focused', tr.personId === this.focusId)
       this.setFlag(face, 'kin', !!this.kin?.has(tr.personId))
+      this.setFlag(face, 'concerned', !!this.concerned?.has(tr.personId))
       this.setLabel(face, pos.moving ? `${tr.name}, ${pos.at.place} → ${pos.moving.place}`
         : pos.after !== undefined ? `${tr.name}, ${pos.at.place} ${sinceAt(tr, pos)}–${pos.after}, ${t('whereabouts after that unknown')}`
           : `${tr.name}, ${pos.at.place}, ${t('since')} ${sinceAt(tr, pos)}`)
@@ -372,6 +388,9 @@ export class PeopleLayer {
       const anchor = this.stacks.get(s.key)!
       groups.set(anchor, [...(groups.get(anchor) ?? []), ...spots.get(s.key)!.ids])
     }
+    // In story focus the relatives it names go to the top of their stack, where they show in full ink.
+    const named = this.concerned
+    if (named) for (const ids of groups.values()) ids.sort((a, b) => Number(named.has(b)) - Number(named.has(a)))
     this.stackOf.clear()
     const order: { id: string; x: number; y: number }[] = []
     const where = new Map(tracks.map((tr) => [tr.personId, positions.get(tr.personId)?.at.place ?? '']))
@@ -533,11 +552,13 @@ export class PeopleLayer {
         marker.on('click', () => this.opts.pick(e.personId))
         this.group.addLayer(marker)
         marker.getElement()!.title = e.caption
-        mk = { marker, el, cap: capEl, capW: 0, fade: NaN, slot: '', mine: false }
+        mk = { marker, el, cap: capEl, capW: 0, fade: NaN, slot: '', mine: false, concerned: false }
         this.marks.set(e.key, mk)
       }
       const mine = this.kin ? this.kin.has(e.personId) : e.personId === this.focusId
       if (mk.mine !== mine) { mk.mine = mine; marker(mk).classList.toggle('mine', mine) }
+      const concerned = !!this.concerned?.has(e.personId)
+      if (mk.concerned !== concerned) { mk.concerned = concerned; marker(mk).classList.toggle('concerned', concerned) }
       const slot = `${gx},${gy}`
       if (mk.slot !== slot) { mk.slot = slot; mk.el.style.setProperty('--gx', `${gx}px`); mk.el.style.setProperty('--gy', `${gy}px`) }
       // The glyph stands beside its place, joined to it by a hairline and a dot, not left floating as a stray mark.

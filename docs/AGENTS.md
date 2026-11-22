@@ -44,6 +44,15 @@ Clients that accept only OAuth, such as some hosted connectors, cannot connect y
 
 Use one token per agent, so its name shows up in history and you can cut it off alone. `--days N` makes it end by itself. `./folkbranch token revoke ID` ends it now. Tokens are stored hashed and shown only once.
 
+## The chronicle on the map
+
+An editor token (or a session) can write dated entries about what went on around the family: `PUT /api/v1/chronicle/<key>` creates or replaces one, `DELETE` removes it, `GET /api/v1/chronicle` lists them. Entries skip the review queue. An entry has `from` and an optional `to` (`YYYY`, `YYYY-MM` or `YYYY-MM-DD`), a `title` and optional `body` and `link` per language (`en`, `es`, `ca`, `ru`), optional `people` (one line per relative: `personId`, `at`, `text`) and an optional `shape`: `places` (place ids), a `route` (place ids or `[lon, lat]` points) or up to four `zones` whose outlines (GeoJSON polygons) change at dated `stages`. Readers get only the lines of relatives they may see. The owner turns the map's history and the chronicle on under Settings → Map.
+
+```sh
+curl -X PUT "$FB_URL/api/v1/chronicle/harbour-opens" -H "authorization: Bearer $FB_TOKEN" -H 'content-type: application/json' \
+  -d '{"from":"1872-05","to":"1874","title":{"en":"The new harbour opens"},"shape":{"kind":"places","places":[{"place":"<place id>"}]}}'
+```
+
 ## Good to know
 
 - `get_overview` and `find_gaps` are the best first calls for an agent. Prompts `research_person`, `fill_gaps` and `import_notes` set up common jobs.

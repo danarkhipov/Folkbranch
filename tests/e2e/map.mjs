@@ -145,6 +145,21 @@ for (const label of (await shownFaces(A)).filter((l) => !/ people, /.test(l))) {
 ok('a person picked opens their card', (await A.locator('aside.panel').count()) === 1, who)
 ok('and their route is drawn with numbered stops', route >= 2 && (await A.locator('.map-stop-in b').first().innerText()) === '1', `${route} stops`)
 ok('the person followed is marked', (await A.locator('.map-face-in.focused').count()) === 1)
+// Someone picked at the right edge, where their card opens: the camera moves them out from under it, even when the
+// whole family already fits the screen at this zoom.
+{
+  await A.goto(O + '/?view=map'); await faces(A).first().waitFor({ state: 'attached', timeout: 30000 }); await sleep(2000)
+  const right = await A.evaluate(() => [...document.querySelectorAll('.map-face-in[role=button]')]
+    .filter((e) => !e.closest('.hidden-face') && !/ people, /.test(e.getAttribute('aria-label') ?? ''))
+    .map((e) => ({ label: e.getAttribute('aria-label'), x: e.querySelector('img')?.getBoundingClientRect().left ?? 0 }))
+    .sort((a, b) => b.x - a.x)[0])
+  // The map moved by hand so that this face stands where the card will open.
+  await A.mouse.move(700, 120); await A.mouse.down(); await A.mouse.move(950, 120, { steps: 8 }); await A.mouse.move(1120 - right.x + 700, 120, { steps: 8 }); await A.mouse.up(); await sleep(800)
+  right.x = await A.evaluate((label) => [...document.querySelectorAll('.map-face-in[role=button]')].find((e) => e.getAttribute('aria-label') === label)?.querySelector('img')?.getBoundingClientRect().left ?? 0, right.label)
+  await pressFace(A, right.label); await sleep(2500)
+  const [face, panel] = await A.evaluate(() => ['.map-face-in.focused img', 'aside.panel'].map((s) => document.querySelector(s)?.getBoundingClientRect().toJSON()))
+  ok('the person followed is not left under their card', !!face && !!panel && face.right <= panel.left, `${right.label}: picked at x ${Math.round(right.x)}, now ${Math.round(face?.left)}–${Math.round(face?.right)}, card from ${Math.round(panel?.left)}`)
+}
 await A.screenshot({ path: '/tmp/family-map-route.png' })
 
 ok('nothing was asked of another server', outside.length === 0, outside.slice(0, 3).join(' '))

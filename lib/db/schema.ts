@@ -234,6 +234,28 @@ export const views = sqliteTable('views', {
   updatedAt: integer('updated_at').notNull().default(0),
 })
 
+// The chronicle: what was going on around the family, written by its agents. Not a fact about a person,
+// so it is not in the history.
+export const chronicle = sqliteTable('chronicle', {
+  id: text('id').primaryKey(),
+  key: text('key').notNull().unique(),
+  fromYear: real('from_year').notNull(),
+  toYear: real('to_year').notNull(),
+  dateFrom: text('date_from').notNull(),
+  dateTo: text('date_to').notNull().default(''),
+  lead: integer('lead').notNull().default(0),
+  namesPeople: integer('names_people').notNull().default(0),
+  title: text('title').notNull(),
+  body: text('body').notNull().default('{}'),
+  link: text('link').notNull().default('{}'),
+  shape: text('shape'),
+  people: text('people').notNull().default('[]'),
+  createdBy: text('created_by').notNull().default(''),
+  updatedBy: text('updated_by').notNull().default(''),
+  createdAt: integer('created_at').notNull().default(0),
+  updatedAt: integer('updated_at').notNull().default(0),
+}, (t) => [index('chronicle_years').on(t.fromYear)])
+
 // A link to look at the family without an account. Sees what a reader sees, and with a view, only the people in it.
 export const shareLinks = sqliteTable('share_links', {
   id: text('id').primaryKey(),

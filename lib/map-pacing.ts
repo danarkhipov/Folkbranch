@@ -15,6 +15,9 @@ const CAP = 7
 /** A run of empty years together never lasts longer than this at 1×. */
 const GAP_MS = 1500
 
+/** A stretch of history the map plays slower through, such as a moving front: each year it touches weighs at least `weight`. */
+export interface Era { from: number; to: number; weight: number }
+
 export interface Schedule { min: number; max: number; /** ms at the start of each year from min, and one more for the end. */ start: number[] }
 
 /** How busy each year is, from min to max (one number per year). */
@@ -38,8 +41,10 @@ export function yearWeights(tracks: Track[], min: number, max: number): number[]
 }
 
 /** The schedule for a span: each year lasts BASE × (FLOOR + weight); a long empty stretch is squeezed to GAP_MS. */
-export function schedule(tracks: Track[], min: number, max: number): Schedule {
+export function schedule(tracks: Track[], min: number, max: number, eras: Era[] = []): Schedule {
   const w = yearWeights(tracks, min, max)
+  // A year inside an era is never quieter than the era asks, even with nobody moving: the front moves instead.
+  for (const e of eras) for (let i = Math.max(0, Math.floor(e.from) - min); i < w.length && min + i < e.to; i++) w[i] = Math.max(w[i], e.weight)
   const ms = w.map((v) => BASE_MS * (FLOOR + v))
   for (let i = 0; i < w.length;) {
     if (w[i] > 0) { i++; continue }

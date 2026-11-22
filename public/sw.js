@@ -28,6 +28,9 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(fetch(request).then((r) => (r.status === 502 || r.status === 503 || r.status === 504 ? caches.match(OFFLINE).then((o) => o ?? r) : r)).catch(() => caches.match(OFFLINE)))
     return
   }
+  // A worker's script is one file for every worker, told which one it is by what follows its #. A cache match leaves
+  // that out, so a kept copy would start every later worker as the first one (the map's base map, every time).
+  if (request.destination === 'worker' || request.destination === 'sharedworker') return
   if (url.pathname.startsWith('/_next/static/') || url.pathname.startsWith('/fonts/')) {
     event.respondWith(caches.open(CACHE).then(async (cache) => {
       const kept = await cache.match(request)

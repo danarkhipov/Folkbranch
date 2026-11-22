@@ -48,7 +48,8 @@ export class Follow {
   private fly(points: [number, number][], animate = !this.reduced) {
     const m = this.map, want = this.L.latLngBounds(points), pad = this.pad()
     const zoom = Math.min(MAX_ZOOM, m.getBoundsZoom(want, false, pad.paddingTopLeft.add(pad.paddingBottomRight)))
-    const same = Math.abs(zoom - m.getZoom()) < 0.25 && m.getBounds().contains(want)
+    const [x0, y0, x1, y1] = this.safe(), inRoom = points.every((p) => { const c = m.latLngToContainerPoint(p); return c.x >= x0 && c.x <= x1 && c.y >= y0 && c.y <= y1 })
+    const same = Math.abs(zoom - m.getZoom()) < 0.25 && inRoom
     if (same) return
     if (!animate) { m.fitBounds(want, { ...pad, maxZoom: MAX_ZOOM, animate: false }); return }
     this.flying = true

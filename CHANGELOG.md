@@ -4,6 +4,10 @@ All notable changes are listed here, newest first. Versions follow [Semantic Ver
 
 ## Unreleased
 
+### Added
+- **A chronicle on the map**: dated entries agents write through the API (`PUT /api/v1/chronicle/<key>`), drawn as zones, a route or places under the family, with marks on the timeline, an entry card and a front page. Off by default.
+- **Settings > Map** (owner only): turn on the history on the map (zones, routes and places agents drew under the family) and the chronicle (marks on the timeline, the year's entry and the front page) separately, and choose who sees them. Both start off on a new archive; an archive where agents already wrote entries keeps showing them. Switched off, the map does not load them at all.
+
 ## 1.8.0 - 2026-11-18
 
 Folkbranch 1.8.0 lets you correct the family chart with your hands instead of deleting and re-entering people, makes the map tell the truth when you rewind it, and opens the app to more languages. The assistant does bulk edits in one step and can be pointed at any AI service you choose.
