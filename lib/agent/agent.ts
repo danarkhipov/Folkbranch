@@ -10,6 +10,7 @@ import { currentProvider } from './provider-key'
 import type { ActiveProvider } from './provider'
 import { countTokens } from './limits'
 import { recordUse } from '../ai/usage'
+import { DEMO_PROMPT, demoAssistantOff, demoOn } from '../demo-mode'
 
 const MAX_STEPS = 25
 /** A model that keeps failing stops and explains, instead of paying for the same refusal again. */
@@ -61,7 +62,8 @@ export const changesWhoIsLiving = (input: unknown) => /"(living|deathDate)"\s*:/
 
 /** What the assistant's button leads this person to: the chat, or why there is none and what to do. */
 export function assistantState(actor: Actor): AssistantState {
-  const canFix = actor.role === 'owner'
+  const canFix = actor.role === 'owner' && !demoOn()
+  if (demoAssistantOff()) return { ready: false, reason: 'off', canFix }
   if (!currentProvider()) return { ready: false, reason: 'no-key', canFix }
   if (getSetting('assistantEnabled') !== '1') return { ready: false, reason: 'off', canFix }
   if (actor.role === 'reader' && getSetting('assistantForReaders') !== '1') return { ready: false, reason: 'readers', canFix: false }
@@ -70,6 +72,8 @@ export function assistantState(actor: Actor): AssistantState {
 
 /** Why this person cannot use the assistant, or null when they can. */
 export function assistantRefusal(actor: Actor) {
+  const demoOff = demoAssistantOff()
+  if (demoOff) return demoOff
   if (getSetting('assistantEnabled') !== '1') return tell('The assistant is turned off by the archive owner.')
   if (!currentProvider()) return tell('The assistant is not set up: the server has no API key or model.')
   if (actor.role === 'reader' && getSetting('assistantForReaders') !== '1') return tell('The assistant is not available to readers.')
@@ -201,6 +205,7 @@ export function buildAgent(person: Actor, opts: { model?: LanguageModel; provide
     language ? `The archive is kept in ${language}: write what you add to it in that language, and reply in it unless the person writes in another.` : '',
     actor.role === 'reader' ? 'As a reader they do not see living relatives, and neither do you.' : '',
     opts.hasFiles ? FILES : '',
+    demoOn() ? DEMO_PROMPT : '',
     opts.sees === false ? 'The model answering cannot see pictures. Say so when asked to read a scan or photo, and suggest the owner choose a model that can under Settings.' : '',
     opts.focusId ? `They have this person open on the chart: id ${opts.focusId}.` : '',
   ].filter(Boolean).join(' ')

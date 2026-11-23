@@ -9,6 +9,7 @@ import sharp from 'sharp'
 import { sheetCell } from '../import-formats'
 import { DATA_DIR } from '../db'
 import { newId, OpError, type Actor } from '../ops/core'
+import { checkDemoUpload, demoOn, demoStorageBytes } from '../demo-mode'
 
 const MAX_SIZE = 40 * 1024 * 1024
 const MAX_AGE = 14 * 24 * 3600 * 1000
@@ -37,6 +38,11 @@ function asText(buf: Buffer) {
   }
 }
 
+const isPicture = async (buf: Buffer) => ['jpeg', 'png', 'webp', 'gif', 'heif', 'tiff', 'avif'].includes((await sharp(buf, { failOn: 'none' }).metadata().catch(() => null))?.format ?? '')
+
+/** What a folder holds, for the demo's room limit; a folder that is not there yet holds nothing. */
+const folderBytes = async (dir: string) => Promise.all((await fs.readdir(dir).catch(() => [])).map((f) => fs.stat(path.join(/*turbopackIgnore: true*/ dir, f)).then((x) => x.size, () => 0))).then((a) => a.reduce((x, y) => x + y, 0))
+
 async function spreadsheetText(buf: Buffer) {
   const rows = await readSheet(buf)
   return rows.map((r) => r.map((c) => `"${sheetCell(c).replace(/"/g, '""')}"`).join(',')).join('\n')
@@ -45,6 +51,9 @@ async function spreadsheetText(buf: Buffer) {
 export async function saveAttachment(actor: Actor, buf: Buffer, name: string): Promise<Attachment> {
   if (!buf.length) throw new OpError(400, 'the file is empty')
   if (buf.length > MAX_SIZE) throw new OpError(413, 'file too large')
+  if (demoOn() && !(await isPicture(buf))) throw new OpError(403, 'The demo takes pictures and sound recordings only.')
+  checkDemoUpload(buf.length, true)
+  if (demoOn() && (await folderBytes(dirOf(actor.userId))) + buf.length > demoStorageBytes()) throw new OpError(413, `The demo copy holds up to ${demoStorageBytes() / 1024 / 1024} MB of files: it is full.`)
   const id = newId()
   await fs.mkdir(dirOf(actor.userId), { recursive: true })
   const put = (part: string, data: Buffer | string) => fs.writeFile(fileOf(actor.userId, id, part), data)

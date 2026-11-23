@@ -6,6 +6,7 @@ import { Actor, newId, OpError, requireRole, seesOnlyPublic } from './core'
 import { say, tell } from './app-config'
 import { changeDetails, changedPeople, readableSummary } from './history-text'
 import { getGraph, hiddenPeople } from './people'
+import { refuseInDemo } from '../demo-mode'
 
 export { archiveLang, getSetting, say, tell, setSetting } from './app-config'
 
@@ -27,6 +28,7 @@ function assertAlive(personId: string | null | undefined) {
 export const ownCard = (personId: string | null | undefined) => (personId && isAlive(personId) ? personId : null)
 
 export function createInvite(actor: Actor, input: { name: string; role: Role; personId?: string | null; userId?: string | null }) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   assertAlive(input.personId)
   const token = randomBytes(24).toString('base64url')

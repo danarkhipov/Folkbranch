@@ -10,6 +10,7 @@ import { type Actor, OpError, requireRole } from './ops/core'
 import { getSetting, tell, setSetting } from './ops/settings'
 import { publicUrl } from './public-url'
 import { seal, unseal } from './sealed'
+import { refuseInDemo } from './demo-mode'
 
 export const METHODS = ['google', 'yandex', 'vk', 'telegram', 'email'] as const
 export type MethodId = (typeof METHODS)[number]
@@ -135,6 +136,7 @@ async function checkMail(v: Values) {
 
 /** Nothing is stored until it is checked where it can be: Telegram and the mail server are asked first. */
 export async function saveMethod(actor: Actor, id: MethodId, raw: unknown) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   if (fromEnv(id)) throw new OpError(409, tell('This way of signing in is set in the server\'s settings'))
   const parsed = INPUT[id].safeParse(raw)
@@ -151,6 +153,7 @@ export async function saveMethod(actor: Actor, id: MethodId, raw: unknown) {
 }
 
 export function removeMethod(actor: Actor, id: MethodId) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   if (fromEnv(id)) throw new OpError(409, tell('This way of signing in is set in the server\'s settings'))
   getDb().delete(schema.settings).where(eq(schema.settings.key, settingKey(id))).run()
@@ -160,6 +163,7 @@ export function removeMethod(actor: Actor, id: MethodId) {
 
 /** A code by mail, in the archive's language: to sign in, or to confirm an address someone adds to their account. */
 export async function sendCode(to: string, code: string, purpose: 'sign-in' | 'confirm' = 'sign-in') {
+  refuseInDemo()
   const v = methodConfig('email')
   if (!v) throw new OpError(409, tell('Sign-in by email is not set up'))
   const family = getSetting('familyName') || tell('Family archive')

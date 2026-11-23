@@ -10,6 +10,7 @@ import { DATA_DIR, getDb } from './db'
 import { type Actor, OpError, requireRole } from './ops/core'
 import { tell } from './ops/settings'
 import { updateStatus } from './update-check'
+import { refuseInDemo } from './demo-mode'
 
 export type InstallKind = 'local' | 'server' | 'docker' | 'railway' | 'render' | 'fly' | 'other'
 
@@ -79,6 +80,7 @@ export const updateRunning = () => fs.existsSync(lockFile())
 
 /** Starts the update and returns at once: the installer stops this server, swaps the program and starts it again. */
 export async function applyUpdate(actor: Actor, run = spawn) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   const status = await updateStatus(actor)
   if (!status.newer || !status.latest) throw new OpError(409, tell('There is no newer version'))

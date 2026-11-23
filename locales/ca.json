@@ -2146,5 +2146,7 @@
   "Bulk edits apply at once": "Els canvis en bloc s'apliquen a l'instant",
   "Changes to many people at once, and deleting several, skip review. Imports still wait for you.": "Els canvis a moltes persones alhora i eliminar-ne diverses s'apliquen sense revisió. Les importacions continuen esperant el vostre vistiplau.",
   "Counting across the archive": "Comptant a tot l'arxiu",
-  "Looking for who lived together": "Cercant qui va viure junt"
+  "Looking for who lived together": "Cercant qui va viure junt",
+  "Demo with an invented family. Everything is deleted after an hour, so do not upload real family data.": "Demostració amb una família inventada. Tot s'esborra passada una hora, així que no pugis dades reals de la teva família.",
+  "Install your own": "Instal·la la teva"
 }

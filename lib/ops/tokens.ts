@@ -4,6 +4,7 @@ import { getDb, schema } from '../db'
 import type { Role } from '../types'
 import { Actor, newId, OpError, requireRole } from './core'
 import { getSetting, setSetting } from './settings'
+import { refuseInDemo } from '../demo-mode'
 
 const hash = (t: string) => createHash('sha256').update(t).digest('hex')
 const TOUCH_MS = 60_000
@@ -14,6 +15,7 @@ const trusted = (): string[] => { try { return JSON.parse(getSetting(TRUSTED) ??
 const setTrusted = (id: string, on: boolean) => setSetting(TRUSTED, JSON.stringify([...new Set([...trusted().filter((x) => x !== id), ...(on ? [id] : [])])]))
 
 export function createToken(actor: Actor, input: { name: string; role: 'reader' | 'editor'; review: boolean; trustBulk?: boolean; expiresInDays?: number | null }) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   const token = `fb_${randomBytes(32).toString('base64url')}`
   const id = newId()
@@ -32,6 +34,7 @@ export function listTokens(actor: Actor) {
 
 /** The owner's choice for one editor token whose edits apply at once: whether its bulk edits do too. */
 export function setTokenTrustBulk(actor: Actor, id: string, on: boolean) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   const row = getDb().select().from(schema.apiTokens).where(eq(schema.apiTokens.id, id)).get()
   if (!row) throw new OpError(404, 'not found')

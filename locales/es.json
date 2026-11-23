@@ -2146,5 +2146,7 @@
   "Bulk edits apply at once": "Los cambios en bloque se aplican al instante",
   "Changes to many people at once, and deleting several, skip review. Imports still wait for you.": "Los cambios a muchas personas a la vez y borrar varias se aplican sin revisión. Las importaciones siguen esperando su aprobación.",
   "Counting across the archive": "Contando en todo el archivo",
-  "Looking for who lived together": "Buscando quién vivió junto"
+  "Looking for who lived together": "Buscando quién vivió junto",
+  "Demo with an invented family. Everything is deleted after an hour, so do not upload real family data.": "Demostración con una familia inventada. Todo se borra pasada una hora, así que no subas datos reales de tu familia.",
+  "Install your own": "Instala la tuya"
 }

@@ -8,6 +8,7 @@ import { say } from './app-config'
 import { reconcile } from './merge'
 import { subgraph } from '../graph/select'
 import { hiddenFor, hiddenIn, isPrivate, maskPerson } from './privacy'
+import { checkDemoPeople } from '../demo-mode'
 
 export { hiddenFor }
 
@@ -193,6 +194,7 @@ export const allPlaces = (): Place[] => getDb().select().from(schema.places).all
 export type QuickRelation = 'father' | 'mother' | 'son' | 'daughter' | 'spouse'
 
 export function insertPerson(c: Changes, input: PersonInput) {
+  checkDemoPeople()
   const id = newId()
   const row = normalize(linkPlaces(input))
   const birthYear = (row.birthYear as number | null) ?? null

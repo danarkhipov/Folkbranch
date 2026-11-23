@@ -2,10 +2,12 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import { tokenActor } from '@/lib/api-auth'
 import { buildMcpServer } from '@/lib/mcp'
 import { recordUse } from '@/lib/ai/usage'
+import { DEMO_REFUSAL, demoOn } from '@/lib/demo-mode'
 
 export const dynamic = 'force-dynamic'
 
 async function handle(req: Request) {
+  if (demoOn()) return Response.json({ error: DEMO_REFUSAL }, { status: 403 })
   const actor = tokenActor(req.headers)
   if (!actor) return Response.json({ error: 'a valid API token is required' }, { status: 401, headers: { 'WWW-Authenticate': 'Bearer' } })
   if (Number(req.headers.get('content-length') ?? 0) > 60 * 1024 * 1024) return Response.json({ error: 'request too large' }, { status: 413 })

@@ -8,6 +8,7 @@ import { type Actor, OpError, requireRole } from '../ops/core'
 import { getSetting, setSetting, tell } from '../ops/settings'
 import { vaultKey, writeKey } from './keys'
 import { checkBaseUrl, keyOptional, safeFetch, type UrlProblem } from './safe-url'
+import { refuseInDemo } from '../demo-mode'
 
 export interface CustomProvider { id: string; name: string; baseUrl: string; model: string; note: string }
 
@@ -83,6 +84,7 @@ const addressOrThrow = (raw: string) => {
 
 /** Adds a provider, or changes one. The address is only changed together with the key. */
 export function saveCustom(actor: Actor, raw: unknown) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   const parsed = fields.safeParse(raw)
   if (!parsed.success) throw new OpError(400, tell('Give a name, an address and a model'))
@@ -108,6 +110,7 @@ export function saveCustom(actor: Actor, raw: unknown) {
 
 /** Removes the provider and its key. The caller switches the assistant off if it was this one. */
 export function removeCustom(actor: Actor, id: string) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   if (!isCustomId(id) || !customById(id)) throw new OpError(404, tell('This provider is not in the list'))
   writeCustom(readCustom().filter((p) => p.id !== id))
@@ -142,6 +145,7 @@ const headersFor = (key: string | null): Record<string, string> => ({ 'content-t
 
 /** The models the server lists, so one can be picked. A failure is not an error: the name can be typed. */
 export async function customModels(actor: Actor, raw: unknown): Promise<{ models: string[]; listed: boolean }> {
+  refuseInDemo()
   requireRole(actor, 'owner')
   const { baseUrl, key } = target(raw)
   try {
@@ -170,6 +174,7 @@ const TEXT: Record<ProbeCode, () => string> = {
 
 /** One small request, and what it says in plain words. The key is only ever in the request's header. */
 export async function testCustom(actor: Actor, raw: unknown): Promise<{ ok: boolean; code: ProbeCode; message: string }> {
+  refuseInDemo()
   requireRole(actor, 'owner')
   const { baseUrl, key, model } = target(raw)
   if (!model) throw new OpError(400, tell('Give a name, an address and a model'))

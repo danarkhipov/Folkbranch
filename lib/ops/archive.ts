@@ -15,6 +15,7 @@ import { PENDING } from '../db/restore'
 import { publicUrl } from '../public-url'
 import { Actor, OpError, requireRole } from './core'
 import { tell } from './settings'
+import { refuseInDemo } from '../demo-mode'
 
 const FORMAT = 1
 const STAGING = 'restore-staging'
@@ -210,6 +211,7 @@ let staging = false
 
 /** Checks a saved copy completely and lays it out next to the archive, which is not touched. The swap comes at the next start. */
 export async function stageRestore(zipFile: string) {
+  refuseInDemo()
   if (staging) throw refuse('A restore is already running', 409)
   staging = true
   const stage = inData(STAGING)

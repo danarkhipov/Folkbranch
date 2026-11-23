@@ -2151,5 +2151,7 @@
   "Bulk edits apply at once": "Массовые правки применяются сразу",
   "Changes to many people at once, and deleting several, skip review. Imports still wait for you.": "Правки сразу многих людей и удаление нескольких идут без проверки. Импорт по-прежнему ждёт вас.",
   "Counting across the archive": "Считает по всему архиву",
-  "Looking for who lived together": "Ищет, кто жил рядом"
+  "Looking for who lived together": "Ищет, кто жил рядом",
+  "Demo with an invented family. Everything is deleted after an hour, so do not upload real family data.": "Демо с выдуманной семьёй. Через час всё удаляется, поэтому не загружайте настоящие семейные данные.",
+  "Install your own": "Установить свою"
 }

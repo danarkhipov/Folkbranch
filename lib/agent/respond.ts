@@ -7,6 +7,7 @@ import { OpError } from '../ops/core'
 import { tell } from '../ops/settings'
 import { stampMaker } from './stamp'
 import { attachmentBytes, attachmentIdFromUrl, attachmentView, getAttachment, readAttachmentText } from './attachments'
+import { takeDemoAiMessage } from '../demo-mode'
 
 export const chatInput = z.object({
   messages: z.array(z.record(z.string(), z.unknown())).min(1).max(400),
@@ -55,6 +56,11 @@ const lastAnswerAt = (messages: UIMessage[]) => {
 export async function assistantResponse(person: Actor, body: unknown, opts: { model?: LanguageModel; abortSignal?: AbortSignal } = {}) {
   const input = chatInput.parse(body)
   const messages = await validateUIMessages<UIMessage>({ messages: input.messages, tools: assistantTools(assistantActor(person)) as never })
+  // A message of the person counts against the demo copy's share; an answer to a confirmation card is not one.
+  if (messages.at(-1)?.role === 'user') {
+    const over = takeDemoAiMessage()
+    if (over) throw new OpError(429, over)
+  }
   // Only the owner sends the archive to another of their services: a key added for speech is not a consent for chat.
   if (input.choice && person.role !== 'owner') throw new OpError(403, tell('Only the owner picks another model for an answer'))
   const picked = input.choice && !opts.model ? providerFor(input.choice.provider, input.choice.model) : null

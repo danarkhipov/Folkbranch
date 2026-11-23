@@ -10,6 +10,7 @@ import { STT_PRESETS } from '../transcribe/presets'
 import { checkKey, removeTranscription, speechSetup } from '../transcribe/service'
 import { readKeys, SERVICES, writeKey, type Service } from './keys'
 import { removeCustom } from './custom-providers'
+import { refuseInDemo } from '../demo-mode'
 
 const agentPreset = (s: string) => PRESETS.find((p) => p.id === s)
 const speechPreset = (s: string) => STT_PRESETS.find((p) => p.id === s)
@@ -42,6 +43,7 @@ const addInput = z.object({
 
 /** Checked for free with the service itself before it is kept; nothing is switched on by adding it. */
 export async function addKey(actor: Actor, raw: unknown) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   const parsed = addInput.safeParse(raw)
   if (!parsed.success) throw new OpError(400, parsed.error.issues.some((i) => i.path[0] === 'key') ? tell('The key is too short: copy it whole') : tell('Choose a service from the list'))
@@ -59,6 +61,7 @@ export async function addKey(actor: Actor, raw: unknown) {
 }
 
 export function removeKey(actor: Actor, service: string) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   const s = z.enum(SERVICES).parse(service) as Service
   const { keys } = listServices(actor)
@@ -74,6 +77,7 @@ export function removeKey(actor: Actor, service: string) {
 
 /** A provider the owner added, removed with its key; the assistant is switched off if it was the one answering. */
 export function removeOwnProvider(actor: Actor, id: string) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   const answering = getSetting('agentProvider') === id
   removeCustom(actor, id)
