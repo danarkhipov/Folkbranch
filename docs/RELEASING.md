@@ -16,6 +16,7 @@ A deploy never changes the version, and nothing is released by accident: only a 
 
 - Branch from `develop`, pull request into `develop`, squash-merge. The PR title is the commit message: `feat:`, `fix:`, `docs:`, `test:`, `chore:`, and `!` after the type (or `BREAKING CHANGE:` in the body) for a break.
 - Anything a person using the app would notice goes under **Unreleased** in `CHANGELOG.md`, in the same pull request, written for them and not for developers: what they can do now, not which file changed. Groups: Added, Changed, Fixed, Removed, Security. Security goes first.
+- The public demo (demo.folkbranch.com) runs the app from the same image, so **it must be redeployed with every release**; otherwise it shows an old version. See [DEMO.md](DEMO.md).
 - A change to what the app promises (a feature, a way to sign in, a supported provider) also changes `README.md` and `README.ru.md` in the same pull request, and the matching page in `docs/`.
 - Run `pnpm check` before opening it. A screen needs a browser check in `tests/ui` (see [TESTING.md](TESTING.md)), and `pnpm build && pnpm check:ui` before you open the pull request.
 - No real family data in code, tests, screenshots or issues.

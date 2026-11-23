@@ -4,6 +4,9 @@ All notable changes are listed here, newest first. Versions follow [Semantic Ver
 
 ## Unreleased
 
+### Added
+- **A public demo you can host.** With `FOLKBRANCH_DEMO=1` and the router in `demo/`, every visitor gets their own throwaway copy with an invented family, signed in with no sign-up, and the assistant works within limits; keys, accounts, mail, updates and restores are closed. Nothing changes on a normal install. See `docs/DEMO.md`.
+
 ## 1.8.0 - 2026-11-18
 
 Folkbranch 1.8.0 lets you correct the family chart with your hands instead of deleting and re-entering people, makes the map tell the truth when you rewind it, and opens the app to more languages. The assistant does bulk edits in one step and can be pointed at any AI service you choose.

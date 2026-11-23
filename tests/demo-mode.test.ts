@@ -141,7 +141,7 @@ describe('what a demo copy refuses', () => {
       ['connectProvider', () => provider.connectProvider(owner, {})], ['disconnectProvider', () => provider.disconnectProvider(owner)], ['chooseModel', () => provider.chooseModel(owner, {})],
       ['importAiSettings', () => aiConfig.importAiSettings(owner, {})],
       ['saveTranscription', () => speech.saveTranscription(owner, {})], ['removeTranscription', () => speech.removeTranscription(owner)],
-      ['transcribe', () => speech.transcribe(owner, { bytes: Buffer.from('x'), name: 'a.webm', mime: 'audio/webm' }, {})], ['testTranscription', () => speech.testTranscription(owner)],
+      ['transcribe', () => speech.transcribe(owner, { bytes: Buffer.from('x'), name: 'a.webm', mime: 'audio/webm' }, { seconds: 0 })], ['testTranscription', () => speech.testTranscription(owner)],
       ['saveFaces', () => faces.saveFaces(owner, {})], ['removeFaces', () => faces.removeFaces(owner)], ['scanFaces', () => faces.scanFaces(owner, {})], ['testFaces', () => faces.testFaces(owner)],
       ['saveMethod', () => methods.saveMethod(owner, 'email', {})], ['removeMethod', () => methods.removeMethod(owner, 'email')], ['sendCode', () => methods.sendCode('a@b.test', '123456')],
       ['updateStatus', () => updates.updateStatus(owner)], ['applyUpdate', () => self.applyUpdate(owner)],
@@ -243,7 +243,7 @@ describe('what a demo copy caps', () => {
 
   it('takes pictures and recordings only, of at most DEMO_UPLOAD_MB, and no more than DEMO_STORAGE_MB in all', async () => {
     const { uploadMedia, storeAudio } = await import('../lib/ops/media')
-    const photo = (n: number) => sharp({ create: { width: n, height: n, channels: 3, noise: { type: 'gaussian', mean: 128, sigma: 60 } } }).png().toBuffer()
+    const photo = (n: number) => sharp({ create: { width: n, height: n, channels: 3, background: '#888', noise: { type: 'gaussian', mean: 128, sigma: 60 } } }).png().toBuffer()
     // A text file is not a picture.
     await expect(uploadMedia(owner, Buffer.from('a letter'), 'letter.txt')).rejects.toMatchObject({ status: 403, message: expect.stringContaining('pictures and sound') })
     // Too big for one file.

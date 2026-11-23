@@ -16,7 +16,8 @@ export async function seedDemo() {
   const w = WORDS[lang]
   const context = await getAuth().$context
   // The same stand-in address as an invited relative's: Better Auth wants one, and nobody can use it.
-  const owner = await (context.internalAdapter as any).createUser({ name: w.owner, email: `${randomBytes(9).toString('hex')}@invite.invalid`, emailVerified: false, role: 'owner', personId: null })
+  const adapter = context.internalAdapter as unknown as { createUser(user: Record<string, unknown>): Promise<{ id: string }> }
+  const owner = await adapter.createUser({ name: w.owner, email: `${randomBytes(9).toString('hex')}@invite.invalid`, emailVerified: false, role: 'owner', personId: null })
   setSetting('familyName', w.family)
   setSetting('language', lang)
   setSetting('assistantEnabled', '1')
