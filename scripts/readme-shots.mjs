@@ -2,15 +2,17 @@
 // Real screenshots of the app on the invented demo family, for the README, the website and GitHub's social preview.
 // Nothing real is read: a built copy (pnpm build) starts on a throwaway data folder.
 //   node scripts/readme-shots.mjs [outDir]       default docs/images
+// With --landing <dir> it writes only the website's how-it-works shots instead (see below).
 // Writes chart-<lang>.png, card-<lang>.png, map-<lang>.png, story-phone-<lang>.png and social-preview.png (1280x640).
 import { chromium } from 'playwright-core'
-import { mkdirSync, readFileSync, statSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { startApp, cookiesFor } from '../tests/ui/serve.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
-const out = path.resolve(process.argv[2] ?? path.join(root, 'docs/images'))
+const out = path.resolve(process.argv[2]?.startsWith('--') ? path.join(root, 'docs/images') : (process.argv[2] ?? path.join(root, 'docs/images')))
 mkdirSync(out, { recursive: true })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const br = await chromium.launch({ channel: 'chrome', headless: true })
@@ -21,6 +23,101 @@ async function session(app, size, { phone = false, lang = 'en' } = {}) {
   await ctx.addCookies(cookiesFor(app.B, app.cookie))
   await ctx.addInitScript(() => { try { localStorage.setItem('folkbranch-tour', '1') } catch {} })
   return { ctx, page: await ctx.newPage() }
+}
+
+// --landing <dir>: the four steps of folkbranch.com ("how it works") and the phone shot for its first screen, from the same invented family.
+//   node scripts/readme-shots.mjs --landing landing/site/assets   writes step-*-<lang>.png and phone-page-<lang>.png; convert them to webp for the site.
+if (process.argv.includes('--landing')) {
+  const dir = path.resolve(process.argv[process.argv.indexOf('--landing') + 1] ?? path.join(root, 'landing/site/assets'))
+  mkdirSync(dir, { recursive: true })
+  for (const [i, lang] of ['en', 'ru'].entries()) {
+    const words = lang === 'ru' ? JSON.parse(readFileSync(path.join(root, 'locales/ru.json'), 'utf8')) : {}
+    const tr = (k) => words[k] ?? k
+    // Links read https://demo.folkbranch.com/tell/..., not a localhost address: the app takes its link address from this file.
+    const data = mkdtempSync(path.join(tmpdir(), 'folkbranch-landing-'))
+    writeFileSync(path.join(data, 'public-address'), 'https://demo.folkbranch.com\n')
+    const app = await startApp({ port: 3950 + i, language: lang, env: { DATA_DIR: data } })
+    try {
+      const H = { cookie: app.cookie, origin: app.B, 'content-type': 'application/json' }
+      const graph = await (await fetch(app.B + '/api/v1/graph', { headers: H })).json()
+      const links = new Map()
+      for (const l of graph.parentChild) for (const id of [l.parentId, l.childId]) links.set(id, (links.get(id) ?? 0) + 1)
+      const hub = [...links].sort((a, b) => b[1] - a[1])[0][0]
+      const question = lang === 'ru' ? 'Каким Серёжа был в детстве?' : 'What was Stephen like as a boy?'
+      const transcript = lang === 'ru'
+        ? 'Серёжа родился в Ярославле зимой сорок шестого. Каждое лето мы уезжали на Волгу. Этот текст, как и вся демо-семья, выдуман.'
+        : 'Stephen was born in Portland in the winter of 1946. Every summer we went to the coast. This text, like everyone in the demo family, is invented.'
+      // Phone-sized screens, so the pictures stay readable on a phone page. The owner's side is shown on a phone too.
+      const { ctx, page } = await session(app, { width: 390, height: 1040 }, { phone: true, lang })
+      const tab = (name) => page.getByRole('tab', { name: tr(name), exact: true }).click()
+      await page.goto(`${app.B}/?p=${hub}`)
+      await page.locator('img').first().waitFor({ timeout: 60000 })
+      await sleep(2500)
+      // 1. The owner asks a relative by a link.
+      await tab('Stories')
+      await page.getByRole('button', { name: tr('Ask to tell by a link') }).click()
+      await page.getByPlaceholder(tr('For example, Grandma Nina')).fill(lang === 'ru' ? 'Бабушка Нина' : 'Grandma Nina')
+      await page.getByLabel(tr('Questions'), { exact: true }).fill(question)
+      await page.getByRole('button', { name: tr('Create a story link') }).click()
+      await page.getByRole('button', { name: tr('Done') }).waitFor()
+      await sleep(500)
+      const found = (await page.locator('[role=dialog]').innerText()).match(/https:\/\/demo\.folkbranch\.com\/tell\/(\S+)/)
+      if (!found) throw new Error('the link does not read demo.folkbranch.com')
+      const token = found[1]
+      await page.locator('[role=dialog]').screenshot({ path: path.join(dir, `step-ask-${lang}.png`) })
+      await page.getByRole('button', { name: tr('Done') }).click()
+      // 2. The relative's page, and the recording that arrives from it.
+      const rel = await session(app, { width: 390, height: 844 }, { phone: true, lang })
+      await rel.page.goto(`${app.B}/tell/${token}`)
+      await sleep(2500)
+      await rel.page.screenshot({ path: path.join(dir, `step-voice-${lang}.png`), clip: { x: 0, y: 0, width: 390, height: 440 } })
+      await rel.ctx.close()
+      const n = 8000 * 3, buf = Buffer.alloc(44 + n * 2)
+      buf.write('RIFF', 0); buf.writeUInt32LE(36 + n * 2, 4); buf.write('WAVEfmt ', 8); buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(1, 22); buf.writeUInt32LE(8000, 24); buf.writeUInt32LE(16000, 28); buf.writeUInt16LE(2, 32); buf.writeUInt16LE(16, 34); buf.write('data', 36); buf.writeUInt32LE(n * 2, 40)
+      const form = new FormData(); form.append('audio', new File([buf], 'a.wav', { type: 'audio/wav' })); form.append('seconds', '192'); form.append('topic', '0')
+      const sent = await fetch(app.B + '/api/tell/' + token, { method: 'POST', headers: { origin: app.B, referer: app.B + '/tell/' + token }, body: form })
+      if (!sent.ok) throw new Error('recording answered ' + sent.status)
+      // 3. The owner checks it before it joins the archive.
+      await page.goto(`${app.B}/`)
+      await sleep(2500)
+      await page.getByRole('button', { name: new RegExp(tr('Review')) }).first().click()
+      await page.getByRole('button', { name: tr('Accept') }).first().waitFor()
+      await sleep(800)
+      await page.screenshot({ path: path.join(dir, `step-review-full-${lang}.png`) })
+      await page.getByRole('button', { name: tr('Accept') }).first().click()
+      await sleep(1500)
+      // 4. Accepted: it sits on the person's page, with what was said written down (here typed in, as no speech service is connected).
+      const mine = await (await fetch(app.B + `/api/v1/persons/${hub}/stories`, { headers: H })).json()
+      const story = mine[0]
+      const put = await fetch(app.B + `/api/v1/stories/${story.id}`, { method: 'PATCH', headers: H, body: JSON.stringify({ baseUpdatedAt: story.updatedAt, about: [hub], body: transcript }) })
+      if (!put.ok) throw new Error('story update answered ' + put.status + ' ' + (await put.text()))
+      await page.goto(`${app.B}/?p=${hub}`)
+      await sleep(2500)
+      await page.getByRole('tab', { name: tr('Stories'), exact: true }).click({ force: true })
+      await sleep(1200)
+      await page.getByRole('button', { name: new RegExp(tr('Close the link')) }).click()
+      await page.getByRole('button', { name: tr('Close'), exact: true }).last().click()
+      await sleep(1500)
+      await page.screenshot({ path: path.join(dir, `step-page-full-${lang}.png`) })
+      // The story's own card: title, who told it, the voice and what was said.
+      await page.getByText(transcript.slice(0, 24)).locator('xpath=ancestor::*[contains(@class, "rounded")][1]').screenshot({ path: path.join(dir, `step-page-${lang}.png`) })
+      await ctx.close()
+      // The first screen on a wide window: the chart with a person's biography open beside it.
+      const wide = await session(app, { width: 1000, height: 740 }, { lang })
+      await wide.page.goto(`${app.B}/?p=${hub}`)
+      await wide.page.locator('img').first().waitFor({ timeout: 60000 })
+      await sleep(3000)
+      await wide.page.getByRole('tab', { name: tr('Stories'), exact: true }).click()
+      await sleep(1200)
+      // Slide the chart right so nobody at the left edge is cut off.
+      await wide.page.mouse.move(250, 560); await wide.page.mouse.down(); await wide.page.mouse.move(400, 560, { steps: 8 }); await wide.page.mouse.up()
+      await sleep(600)
+      await wide.page.screenshot({ path: path.join(dir, `hero-wide-${lang}.png`) })
+      await wide.ctx.close()
+    } finally { app.stop(); rmSync(data, { recursive: true, force: true }) }
+  }
+  await br.close()
+  process.exit(0)
 }
 
 for (const [i, lang] of ['en', 'ru'].entries()) {

@@ -233,3 +233,32 @@ describe('404 page', () => {
     expect(sitemapUrls.some((u) => u.endsWith('404.html'))).toBe(false)
   })
 })
+
+describe('home pages', () => {
+  const homes = pages.filter((p) => ['index.html', 'ru/index.html'].includes(p.rel))
+  const installCommand = 'curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh'
+
+  it('offers the live demo and the install block before the steps, with the real command to copy', () => {
+    for (const p of homes) {
+      expect(p.html, p.rel).toContain('href="https://demo.folkbranch.com/"')
+      expect(p.html, p.rel).toContain('href="#install"')
+      expect(p.html, p.rel).toMatch(/<section id="install"/)
+      expect(p.html, p.rel).toContain(`<code id="c-mac">${installCommand}</code>`)
+      expect(p.html.indexOf('id="install"'), p.rel).toBeLessThan(p.html.indexOf('id="how"'))
+    }
+  })
+
+  it('has six questions, the first three open and the rest closed', () => {
+    for (const p of homes) {
+      const faq = p.html.match(/<div class="faq">[\s\S]*?<\/div>/)![0]
+      const items = faq.match(/<details[^>]*>/g) ?? []
+      expect(items.length, p.rel).toBe(6)
+      expect(items.map((t) => t.includes('open')), p.rel).toEqual([true, true, true, false, false, false])
+    }
+  })
+
+  it('keeps the old decoration and the claims we cannot stand behind off the page', () => {
+    const banned = [/chapter (one|two|three|four|five|six|seven)/i, /глава (первая|вторая|третья|четвёртая|пятая|шестая|седьмая)/i, /kept for good/i, /not even we can see/i, /nobody can close/i, /family\.db/i]
+    for (const p of homes) for (const re of banned) expect(visibleText(p.html), `${p.rel} ${re}`).not.toMatch(re)
+  })
+})
