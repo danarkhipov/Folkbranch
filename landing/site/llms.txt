@@ -1,12 +1,13 @@
 # Folkbranch
 
-> Free, open-source, self-hosted family archive: a family tree, photos with face recognition, voice stories from relatives by link, and an AI assistant. One SQLite file on the owner's computer or server.
+> Free, open-source family tree with photos and voice stories, hosted by its owner: a relative records a story from a link on their phone, with no account, and the owner reviews it before it joins the person's page. One SQLite file and a photos folder on the owner's computer or server.
 
-- [Install guide for AI agents](https://github.com/danarkhipov/folkbranch/blob/main/skills/folkbranch/SKILL.md): ask whether this computer or a server, install, open, connect over MCP.
+- [Try the live demo](https://demo.folkbranch.com/): an invented family to look around in.
 - [Source code and README](https://github.com/danarkhipov/folkbranch)
+- [Install guide for AI agents](https://github.com/danarkhipov/folkbranch/blob/main/skills/folkbranch/SKILL.md): ask whether this computer or a server, install, open, connect over MCP.
 - [Self-hosting guide](https://github.com/danarkhipov/folkbranch/blob/main/docs/SELF_HOSTING.md)
 - [Deploying on Railway, Render, Fly.io](https://github.com/danarkhipov/folkbranch/blob/main/docs/DEPLOY.md)
-- [Folkbranch website](https://folkbranch.com/): what it does, how it compares, FAQ
+- [Folkbranch website](https://folkbranch.com/): install, how it works, comparison, limits, FAQ
 - [Folkbranch compared with Ancestry, MyHeritage, Gramps Web and webtrees](https://folkbranch.com/alternatives/): what each is for, fairly
 - [Import and export GEDCOM](https://folkbranch.com/gedcom/): GEDCOM 5.5.1 and 7.0, Gramps, Excel and CSV; what carries over
 - [How to install Folkbranch](https://folkbranch.com/install/): Mac, Linux, Windows with Docker, a server with HTTPS, Railway; backups and updates
@@ -19,9 +20,12 @@
 
 - Licence: AGPL-3.0. Price: free, no paid plan; you pay only for a server if you rent one.
 - Data: one SQLite file and a photos folder on the owner's computer or server. Daily database copy, full download any time.
+- Install: one command on macOS and Linux (`curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh`), under a minute on a Mac or Linux computer; `npx folkbranch`; a Linux server with automatic HTTPS (`... | sudo sh -s -- --server`); Docker on Windows. The PowerShell installer has not been tried on a real Windows computer.
+- Builds: macOS and Linux on arm64 and x64; Docker image for amd64 and arm64.
+- Memory: about 70 MB in the project's own test, about 130 MB with a family of a thousand people; a 512 MB server is enough.
 - GEDCOM 5.5.1 and 7.0 import, GEDCOM export; Excel, CSV and plain-text import.
-- Relatives answer questions by voice through a link, without an account.
-- Runs on macOS and Linux with one command, on Windows and servers with Docker; an AI agent (Claude Code, Codex, Cursor) can install it from the guide above.
+- AI: MCP access for agents such as Claude Code and Codex (their edits wait for approval); an optional in-app assistant that is off until the owner adds a key.
+- Limits: one author, young project; 6 of the 10 app languages are machine translations in beta; no hosted version; no record collections or DNA.
 - Languages: English, Russian, Spanish, Catalan, and in beta Portuguese, French, German, Italian, Ukrainian, Polish.
 
-Current release: 1.8.0 (https://github.com/danarkhipov/Folkbranch/releases/tag/v1.8.0). Page updated 2026-11-19.
+Current release: 1.8.0 (https://github.com/danarkhipov/Folkbranch/releases/tag/v1.8.0). Page updated 2026-11-23.

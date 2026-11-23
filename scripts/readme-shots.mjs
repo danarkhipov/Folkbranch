@@ -40,13 +40,14 @@ if (process.argv.includes('--landing')) {
       for (const l of graph.parentChild) for (const id of [l.parentId, l.childId]) links.set(id, (links.get(id) ?? 0) + 1)
       const hub = [...links].sort((a, b) => b[1] - a[1])[0][0]
       const question = tr('How did you meet Grandpa?')
-      const { ctx, page } = await session(app, { width: 1440, height: 900 }, { lang })
-      const storiesTab = () => page.getByRole('tab', { name: tr('Stories'), exact: true }).click()
+      // Phone-sized screens, so the pictures stay readable on a phone page. The owner's side is shown on a phone too.
+      const { ctx, page } = await session(app, { width: 390, height: 844 }, { phone: true, lang })
+      const tab = (name) => page.getByRole('tab', { name: tr(name), exact: true }).click()
       await page.goto(`${app.B}/?p=${hub}`)
       await page.locator('img').first().waitFor({ timeout: 60000 })
       await sleep(2500)
       // 1. The owner asks a relative by a link.
-      await storiesTab()
+      await tab('Stories')
       await page.getByRole('button', { name: tr('Ask to tell by a link') }).click()
       await page.getByPlaceholder(tr('For example, Grandma Nina')).fill(lang === 'ru' ? 'Бабушка Нина' : 'Grandma Nina')
       await page.getByRole('button', { name: question, exact: true }).click().catch(() => {})
@@ -56,40 +57,46 @@ if (process.argv.includes('--landing')) {
       const token = (await page.locator('[role=dialog]').innerText()).match(/\/tell\/(\S+)/)[1].replace(/\s/g, '')
       await page.locator('[role=dialog]').screenshot({ path: path.join(dir, `step-ask-${lang}.png`) })
       await page.getByRole('button', { name: tr('Done') }).click()
-      // 2. The relative's recording arrives from the phone (that page is the story-phone shot).
+      // 2. The relative's page, and the recording that arrives from it.
+      const rel = await session(app, { width: 390, height: 844 }, { phone: true, lang })
+      await rel.page.goto(`${app.B}/tell/${token}`)
+      await sleep(2500)
+      await rel.page.screenshot({ path: path.join(dir, `step-voice-${lang}.png`), clip: { x: 0, y: 0, width: 390, height: 440 } })
+      await rel.ctx.close()
       const n = 8000 * 3, buf = Buffer.alloc(44 + n * 2)
       buf.write('RIFF', 0); buf.writeUInt32LE(36 + n * 2, 4); buf.write('WAVEfmt ', 8); buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(1, 22); buf.writeUInt32LE(8000, 24); buf.writeUInt32LE(16000, 28); buf.writeUInt16LE(2, 32); buf.writeUInt16LE(16, 34); buf.write('data', 36); buf.writeUInt32LE(n * 2, 40)
       const form = new FormData(); form.append('audio', new File([buf], 'a.wav', { type: 'audio/wav' })); form.append('seconds', '192'); form.append('topic', '0')
       const sent = await fetch(app.B + '/api/tell/' + token, { method: 'POST', headers: { origin: app.B, referer: app.B + '/tell/' + token }, body: form })
       if (!sent.ok) throw new Error('recording answered ' + sent.status)
       // 3. The owner checks it before it joins the archive.
-      await page.goto(`${app.B}/?p=${hub}`)
+      await page.goto(`${app.B}/`)
       await sleep(2500)
       await page.getByRole('button', { name: new RegExp(tr('Review')) }).first().click()
       await page.getByRole('button', { name: tr('Accept') }).first().waitFor()
       await sleep(800)
-      await page.screenshot({ path: path.join(dir, `step-review-${lang}.png`), clip: { x: 12, y: 60, width: 388, height: 290 } })
-      // 4. Accepted: it sits on the person's page.
+      await page.screenshot({ path: path.join(dir, `step-review-full-${lang}.png`) })
       await page.getByRole('button', { name: tr('Accept') }).first().click()
       await sleep(1500)
+      // 4. Accepted: it sits on the person's page.
       await page.goto(`${app.B}/?p=${hub}`)
       await sleep(2500)
-      await storiesTab()
+      await page.getByRole('tab', { name: tr('Stories'), exact: true }).click({ force: true })
       await sleep(1200)
-      // The link has done its job; closing it leaves the story alone on the page.
       await page.getByRole('button', { name: new RegExp(tr('Close the link')) }).click()
       await page.getByRole('button', { name: tr('Close'), exact: true }).last().click()
       await sleep(1500)
-      await page.screenshot({ path: path.join(dir, `step-page-${lang}.png`), clip: { x: 948, y: 12, width: 480, height: 420 } })
+      await page.screenshot({ path: path.join(dir, `step-page-full-${lang}.png`) })
       await ctx.close()
-      // The same page on a phone, for the first screen.
-      const ph = await session(app, { width: 390, height: 844 }, { phone: true, lang })
-      await ph.page.goto(`${app.B}/?p=${hub}`)
+      // The first screen on a wide window: the chart with a person's biography open beside it.
+      const wide = await session(app, { width: 1000, height: 740 }, { lang })
+      await wide.page.goto(`${app.B}/?p=${hub}`)
+      await wide.page.locator('img').first().waitFor({ timeout: 60000 })
       await sleep(3000)
-      await ph.page.getByRole('tab', { name: tr('Biography'), exact: true }).click()
-      await sleep(1200)
-      await ph.page.screenshot({ path: path.join(dir, `phone-page-${lang}.png`) })
-      await ph.ctx.close()
+      // Slide the chart right so nobody at the left edge is cut off.
+      await wide.page.mouse.move(250, 560); await wide.page.mouse.down(); await wide.page.mouse.move(400, 560, { steps: 8 }); await wide.page.mouse.up()
+      await sleep(600)
+      await wide.page.screenshot({ path: path.join(dir, `hero-wide-${lang}.png`) })
+      await wide.ctx.close()
     } finally { app.stop() }
   }
   await br.close()
