@@ -2,6 +2,7 @@
 // Real screenshots of the app on the invented demo family, for the README, the website and GitHub's social preview.
 // Nothing real is read: a built copy (pnpm build) starts on a throwaway data folder.
 //   node scripts/readme-shots.mjs [outDir]       default docs/images
+// With --landing <dir> it writes only the website's how-it-works shots instead (see below).
 // Writes chart-<lang>.png, card-<lang>.png, map-<lang>.png, story-phone-<lang>.png and social-preview.png (1280x640).
 import { chromium } from 'playwright-core'
 import { mkdirSync, readFileSync, statSync } from 'node:fs'
@@ -10,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { startApp, cookiesFor } from '../tests/ui/serve.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
-const out = path.resolve(process.argv[2] ?? path.join(root, 'docs/images'))
+const out = path.resolve(process.argv[2]?.startsWith('--') ? path.join(root, 'docs/images') : (process.argv[2] ?? path.join(root, 'docs/images')))
 mkdirSync(out, { recursive: true })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const br = await chromium.launch({ channel: 'chrome', headless: true })
@@ -21,6 +22,78 @@ async function session(app, size, { phone = false, lang = 'en' } = {}) {
   await ctx.addCookies(cookiesFor(app.B, app.cookie))
   await ctx.addInitScript(() => { try { localStorage.setItem('folkbranch-tour', '1') } catch {} })
   return { ctx, page: await ctx.newPage() }
+}
+
+// --landing <dir>: the four steps of folkbranch.com ("how it works") and the phone shot for its first screen, from the same invented family.
+//   node scripts/readme-shots.mjs --landing landing/site/assets   writes step-*-<lang>.png and phone-page-<lang>.png; convert them to webp for the site.
+if (process.argv.includes('--landing')) {
+  const dir = path.resolve(process.argv[process.argv.indexOf('--landing') + 1] ?? path.join(root, 'landing/site/assets'))
+  mkdirSync(dir, { recursive: true })
+  for (const [i, lang] of ['en', 'ru'].entries()) {
+    const words = lang === 'ru' ? JSON.parse(readFileSync(path.join(root, 'locales/ru.json'), 'utf8')) : {}
+    const tr = (k) => words[k] ?? k
+    const app = await startApp({ port: 3950 + i, language: lang })
+    try {
+      const H = { cookie: app.cookie, origin: app.B, 'content-type': 'application/json' }
+      const graph = await (await fetch(app.B + '/api/v1/graph', { headers: H })).json()
+      const links = new Map()
+      for (const l of graph.parentChild) for (const id of [l.parentId, l.childId]) links.set(id, (links.get(id) ?? 0) + 1)
+      const hub = [...links].sort((a, b) => b[1] - a[1])[0][0]
+      const question = tr('How did you meet Grandpa?')
+      const { ctx, page } = await session(app, { width: 1440, height: 900 }, { lang })
+      const storiesTab = () => page.getByRole('tab', { name: tr('Stories'), exact: true }).click()
+      await page.goto(`${app.B}/?p=${hub}`)
+      await page.locator('img').first().waitFor({ timeout: 60000 })
+      await sleep(2500)
+      // 1. The owner asks a relative by a link.
+      await storiesTab()
+      await page.getByRole('button', { name: tr('Ask to tell by a link') }).click()
+      await page.getByPlaceholder(tr('For example, Grandma Nina')).fill(lang === 'ru' ? 'Бабушка Нина' : 'Grandma Nina')
+      await page.getByRole('button', { name: question, exact: true }).click().catch(() => {})
+      await page.getByRole('button', { name: tr('Create a story link') }).click()
+      await page.getByRole('button', { name: tr('Done') }).waitFor()
+      await sleep(500)
+      const token = (await page.locator('[role=dialog]').innerText()).match(/\/tell\/(\S+)/)[1].replace(/\s/g, '')
+      await page.locator('[role=dialog]').screenshot({ path: path.join(dir, `step-ask-${lang}.png`) })
+      await page.getByRole('button', { name: tr('Done') }).click()
+      // 2. The relative's recording arrives from the phone (that page is the story-phone shot).
+      const n = 8000 * 3, buf = Buffer.alloc(44 + n * 2)
+      buf.write('RIFF', 0); buf.writeUInt32LE(36 + n * 2, 4); buf.write('WAVEfmt ', 8); buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(1, 22); buf.writeUInt32LE(8000, 24); buf.writeUInt32LE(16000, 28); buf.writeUInt16LE(2, 32); buf.writeUInt16LE(16, 34); buf.write('data', 36); buf.writeUInt32LE(n * 2, 40)
+      const form = new FormData(); form.append('audio', new File([buf], 'a.wav', { type: 'audio/wav' })); form.append('seconds', '192'); form.append('topic', '0')
+      const sent = await fetch(app.B + '/api/tell/' + token, { method: 'POST', headers: { origin: app.B, referer: app.B + '/tell/' + token }, body: form })
+      if (!sent.ok) throw new Error('recording answered ' + sent.status)
+      // 3. The owner checks it before it joins the archive.
+      await page.goto(`${app.B}/?p=${hub}`)
+      await sleep(2500)
+      await page.getByRole('button', { name: new RegExp(tr('Review')) }).first().click()
+      await page.getByRole('button', { name: tr('Accept') }).first().waitFor()
+      await sleep(800)
+      await page.screenshot({ path: path.join(dir, `step-review-${lang}.png`), clip: { x: 12, y: 60, width: 388, height: 290 } })
+      // 4. Accepted: it sits on the person's page.
+      await page.getByRole('button', { name: tr('Accept') }).first().click()
+      await sleep(1500)
+      await page.goto(`${app.B}/?p=${hub}`)
+      await sleep(2500)
+      await storiesTab()
+      await sleep(1200)
+      // The link has done its job; closing it leaves the story alone on the page.
+      await page.getByRole('button', { name: new RegExp(tr('Close the link')) }).click()
+      await page.getByRole('button', { name: tr('Close'), exact: true }).last().click()
+      await sleep(1500)
+      await page.screenshot({ path: path.join(dir, `step-page-${lang}.png`), clip: { x: 948, y: 12, width: 480, height: 420 } })
+      await ctx.close()
+      // The same page on a phone, for the first screen.
+      const ph = await session(app, { width: 390, height: 844 }, { phone: true, lang })
+      await ph.page.goto(`${app.B}/?p=${hub}`)
+      await sleep(3000)
+      await ph.page.getByRole('tab', { name: tr('Biography'), exact: true }).click()
+      await sleep(1200)
+      await ph.page.screenshot({ path: path.join(dir, `phone-page-${lang}.png`) })
+      await ph.ctx.close()
+    } finally { app.stop() }
+  }
+  await br.close()
+  process.exit(0)
 }
 
 for (const [i, lang] of ['en', 'ru'].entries()) {
