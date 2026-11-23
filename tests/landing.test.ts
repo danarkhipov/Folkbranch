@@ -250,7 +250,8 @@ describe('home pages', () => {
 
   it('has six questions, the first three open and the rest closed', () => {
     for (const p of homes) {
-      const items = p.html.match(/<details[^>]*>/g) ?? []
+      const faq = p.html.match(/<div class="faq">[\s\S]*?<\/div>/)![0]
+      const items = faq.match(/<details[^>]*>/g) ?? []
       expect(items.length, p.rel).toBe(6)
       expect(items.map((t) => t.includes('open')), p.rel).toEqual([true, true, true, false, false, false])
     }

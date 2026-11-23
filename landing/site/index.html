@@ -52,7 +52,7 @@ a{color:var(--accent-d);text-underline-offset:3px}a:hover{color:var(--ink)}
 :focus-visible{outline:3px solid var(--accent);outline-offset:3px;border-radius:4px}
 code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 h1,h2,h3{font-family:'Literata',Georgia,serif;font-weight:600;color:var(--ink);margin:0;overflow-wrap:break-word;hyphens:manual}
-h1{font-size:34px;line-height:1.14;letter-spacing:-.01em}
+h1{font-size:32px;line-height:1.14;letter-spacing:-.01em}
 h2{font-size:32px;line-height:1.15}
 h3{font-size:20px;line-height:1.3}
 p{margin:0}
@@ -67,11 +67,11 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:12p
 .nav a:hover,.langlink:hover,.ghlink:hover{background:#ece4d3;color:var(--ink)}
 .topright{display:flex;align-items:center;gap:2px}
 .ghlink{display:none}
-section{padding:36px 0}
-.hero{padding:20px 0 40px}
+section{padding:28px 0}
+.hero{padding:16px 0 28px}
 .hero .sub{font-size:18px;color:var(--soft);margin-top:14px;max-width:34em}
-.cta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:22px;max-width:520px}
-.btn{display:inline-flex;align-items:center;justify-content:center;text-align:center;min-height:52px;padding:6px 14px;border-radius:10px;font:600 17px/1.2 'Golos Text',system-ui,sans-serif;text-decoration:none;border:2px solid var(--ink);color:var(--ink);background:transparent;cursor:pointer}
+.cta{display:grid;grid-template-columns:1fr;gap:10px;margin-top:20px;max-width:420px}
+.btn{display:inline-flex;align-items:center;justify-content:center;text-align:center;min-height:52px;padding:6px 14px;border-radius:10px;font:600 17px/1.2 'Golos Text',system-ui,sans-serif;text-decoration:none;border:2px solid var(--ink);color:var(--ink);background:transparent;cursor:pointer;white-space:nowrap}
 .btn:hover{background:#ece4d3;color:var(--ink)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#fffdf8}
 .btn.primary:hover{background:var(--accent-d);border-color:var(--accent-d);color:#fffdf8}
@@ -83,7 +83,7 @@ figcaption{font-size:14.5px;color:var(--soft);margin-top:8px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px}
 .kicker{color:var(--soft);margin-top:10px;max-width:40em}
 /* install */
-.tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:22px 0 16px}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:18px 0 12px}
 .tabs button{min-height:48px;border-radius:10px;border:2px solid var(--line);background:transparent;color:var(--ink);font:600 16px 'Golos Text',system-ui,sans-serif;cursor:pointer;padding:0 10px}
 .tabs button[aria-selected=true]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
 .panel>p{margin:0 0 12px}
@@ -101,29 +101,32 @@ html:not(.js) .tabs{display:none}
 .after li::before{content:'';position:absolute;left:4px;top:.7em;width:10px;height:10px;border-radius:50%;background:var(--accent)}
 .links{display:flex;flex-wrap:wrap;gap:4px 18px;margin-top:14px}
 .links a{display:inline-flex;align-items:center;min-height:44px}
-.ai{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}
-.ai h3{font-size:18px;font-family:'Golos Text',system-ui,sans-serif;font-weight:600;margin-bottom:6px}
+.ai{margin-top:14px;border-top:1px solid var(--line)}
+.ai summary{cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:52px;padding:6px 0;font:600 17px/1.35 'Golos Text',system-ui,sans-serif;list-style:none}
+.ai summary::-webkit-details-marker{display:none}
+.ai summary::after{content:'+';font-size:26px;line-height:1;color:var(--accent);flex:none;width:24px;text-align:center}
+.ai[open] summary::after{content:'\2212'}
 .ai p{font-size:16px;color:var(--soft);margin-bottom:10px}
 /* steps */
-.steps{list-style:none;margin:22px 0 0;padding:0;display:grid;gap:28px}
+.steps{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:22px}
 .step{display:flex;flex-direction:column;gap:10px}
 .step .num{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:var(--ink);color:var(--paper);font:600 17px 'Golos Text',sans-serif}
 .step h3{margin-top:2px}
 .step p{color:var(--soft);font-size:17px}
 .step .frame{align-self:flex-start}
-.step .frame{width:100%;max-width:310px}
+.step .frame{width:100%;max-width:290px}
 .step .frame img{width:100%}
 /* facts */
 .facts{display:grid;gap:0;margin:24px 0 0;padding:0}
-.facts div{padding:10px 0;border-top:1px solid var(--line)}
+.facts div{padding:8px 0;border-top:1px solid var(--line)}
 .facts dt{font-weight:600}
 .facts dd{margin:2px 0 0;color:var(--soft)}
 /* compare */
 .cmp{width:100%;border-collapse:collapse;margin-top:22px}
 .cmp thead{display:none}
-.cmp tr{display:block;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+.cmp tr{display:block;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin-bottom:10px}
 .cmp th[scope=row]{display:block;text-align:left;font:600 18px 'Literata',Georgia,serif;margin-bottom:6px}
-.cmp td{display:block;padding:4px 0;color:var(--soft)}
+.cmp td{display:block;padding:2px 0;color:var(--soft)}
 .cmp td::before{content:attr(data-label) ': ';font-weight:600;color:var(--ink)}
 .cmp td:first-of-type{color:var(--ink)}
 .foot-note{font-size:16px;color:var(--soft);margin-top:14px}
@@ -144,7 +147,7 @@ footer .wrap{display:flex;flex-direction:column;gap:6px}
 footer a{display:inline-flex;align-items:center;min-height:44px;padding:0 6px 0 0;margin-right:8px}
 footer nav{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}
 .fline{display:flex;flex-wrap:wrap;align-items:center;gap:0 4px}
-@media (max-width:359px){.cta{grid-template-columns:1fr}.tabs{grid-template-columns:1fr}}
+@media (max-width:359px){.tabs{grid-template-columns:1fr}}
 @media (min-width:760px){
  body{font-size:19px}
  h1{font-size:56px}
@@ -158,7 +161,7 @@ footer nav{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}
  .ghlink{display:inline-flex}
  .tabs{grid-template-columns:repeat(4,auto);justify-content:start}
  .tabs button{padding:0 22px}
- .cta{grid-template-columns:auto auto;max-width:none;justify-content:start}
+ .cta{grid-template-columns:auto auto;max-width:none;justify-content:start;margin-top:22px}
  .btn{padding:6px 28px;font-size:18px;min-width:210px;white-space:nowrap}
  html[lang=ru] h1{font-size:50px}
  .well{flex-direction:row;align-items:center;justify-content:space-between;padding:16px 18px}
@@ -185,7 +188,7 @@ footer nav{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}
 }
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 </style>
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "SoftwareApplication", "@id": "https://folkbranch.com/#software", "name": "Folkbranch", "url": "https://folkbranch.com/", "applicationCategory": "LifestyleApplication", "applicationSubCategory": "Genealogy software", "operatingSystem": "macOS, Linux, Windows", "softwareRequirements": "Docker on Windows and on a server; nothing extra on macOS and Linux", "description": "Free, open-source family tree software you run yourself. Keep the tree, old photos and relatives’ voice stories on your own server.", "inLanguage": ["en", "ru", "es", "ca", "pt", "fr", "de", "it", "uk", "pl"], "license": "https://www.gnu.org/licenses/agpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "image": "https://folkbranch.com/assets/social-preview.png", "installUrl": "https://github.com/danarkhipov/folkbranch#install", "downloadUrl": "https://github.com/danarkhipov/folkbranch/releases/latest", "releaseNotes": "https://github.com/danarkhipov/Folkbranch/releases/tag/v1.8.0", "codeRepository": "https://github.com/danarkhipov/folkbranch", "sameAs": ["https://github.com/danarkhipov/folkbranch"], "softwareVersion": "1.8.0", "dateModified": "2026-11-23", "author": {"@id": "https://folkbranch.com/#org"}, "publisher": {"@id": "https://folkbranch.com/#org"}, "screenshot": "https://folkbranch.com/assets/social-preview.png", "featureList": ["Family tree with relation labels", "GEDCOM 5.5.1 and 7.0 import and export", "Voice stories by link, no account needed", "Face suggestions computed in the browser", "Self-hosted: one SQLite file and a photos folder", "AI assistant and MCP access with review of every edit"]}, {"@type": "Organization", "@id": "https://folkbranch.com/#org", "name": "Folkbranch", "url": "https://folkbranch.com/", "logo": "https://folkbranch.com/assets/logo-512.png", "description": "The open-source project behind Folkbranch, free self-hosted family tree software.", "sameAs": ["https://github.com/danarkhipov/folkbranch"]}, {"@type": "WebSite", "@id": "https://folkbranch.com/#website", "name": "Folkbranch", "url": "https://folkbranch.com/", "publisher": {"@id": "https://folkbranch.com/#org"}}, {"@type": "WebPage", "@id": "https://folkbranch.com/#webpage", "url": "https://folkbranch.com/", "name": "Folkbranch — family tree and voice stories you host yourself", "description": "Free, open-source family tree with photos and voice stories. Relatives record from a link, no account. Runs on your own computer or server, AGPL-3.0.", "inLanguage": "en", "isPartOf": {"@id": "https://folkbranch.com/#website"}, "about": {"@id": "https://folkbranch.com/#software"}, "datePublished": "2026-11-16", "dateModified": "2026-11-23"}, {"@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is it really free?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Folkbranch is open source under the AGPL-3.0 licence, with no paid plan. You pay only for your own server, if you use one. The optional assistant and cloud speech use your own keys with their providers, which you pay directly."}}, {"@type": "Question", "name": "Do I need a server?", "acceptedAnswer": {"@type": "Answer", "text": "No. On your own computer it runs with one command and you open it in the browser. A server is needed only if relatives should reach the archive from anywhere. On a computer at home, a relative’s link opens only at home unless you run ./folkbranch share, which gives a temporary address."}}, {"@type": "Question", "name": "What does a relative see?", "acceptedAnswer": {"@type": "Answer", "text": "A link, a question and one big Start recording button. They need no account and no app, and the recording waits for your review before it joins the archive."}}, {"@type": "Question", "name": "Does anything leave my server?", "acceptedAnswer": {"@type": "Answer", "text": "Not by itself. The one call the server makes on its own asks GitHub whether a newer release exists, with nothing about your archive, and you can switch it off. If you connect an AI provider or a cloud speech service, what the assistant reads and each recording go to that service, and the app says so first."}}, {"@type": "Question", "name": "Can I bring my tree from Ancestry, MyHeritage or Gramps?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, if the service exports GEDCOM. Folkbranch shows what the file holds before anything changes. GEDCOM carries people, links, events and sources but not the photos themselves: drop the pictures together with the file and they attach to the right people."}}, {"@type": "Question", "name": "How do backups and updates work?", "acceptedAnswer": {"@type": "Answer", "text": "The server copies the database every day and keeps the last seven, and again before an update. Those copies sit on the same disk, so also download a full copy under Settings and keep it elsewhere. To update, run the install command again; your data stays."}}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "SoftwareApplication", "@id": "https://folkbranch.com/#software", "name": "Folkbranch", "url": "https://folkbranch.com/", "applicationCategory": "LifestyleApplication", "applicationSubCategory": "Genealogy software", "operatingSystem": "macOS, Linux, Windows", "softwareRequirements": "Docker on Windows and on a server; nothing extra on macOS and Linux", "description": "Free, open-source family tree software you run yourself. Keep the tree, old photos and relatives’ voice stories on your own server.", "inLanguage": ["en", "ru", "es", "ca", "pt", "fr", "de", "it", "uk", "pl"], "license": "https://www.gnu.org/licenses/agpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "image": "https://folkbranch.com/assets/social-preview.png", "installUrl": "https://github.com/danarkhipov/folkbranch#install", "downloadUrl": "https://github.com/danarkhipov/folkbranch/releases/latest", "releaseNotes": "https://github.com/danarkhipov/Folkbranch/releases/tag/v1.8.0", "codeRepository": "https://github.com/danarkhipov/folkbranch", "sameAs": ["https://github.com/danarkhipov/folkbranch"], "softwareVersion": "1.8.0", "dateModified": "2026-11-23", "author": {"@id": "https://folkbranch.com/#org"}, "publisher": {"@id": "https://folkbranch.com/#org"}, "screenshot": "https://folkbranch.com/assets/social-preview.png", "featureList": ["Family tree with relation labels", "GEDCOM 5.5.1 and 7.0 import and export", "Voice stories by link, no account needed", "Face suggestions computed in the browser", "Self-hosted: one SQLite file and a photos folder", "AI assistant and MCP access with review of every edit"]}, {"@type": "Organization", "@id": "https://folkbranch.com/#org", "name": "Folkbranch", "url": "https://folkbranch.com/", "logo": "https://folkbranch.com/assets/logo-512.png", "description": "The open-source project behind Folkbranch, free self-hosted family tree software.", "sameAs": ["https://github.com/danarkhipov/folkbranch"]}, {"@type": "WebSite", "@id": "https://folkbranch.com/#website", "name": "Folkbranch", "url": "https://folkbranch.com/", "publisher": {"@id": "https://folkbranch.com/#org"}}, {"@type": "WebPage", "@id": "https://folkbranch.com/#webpage", "url": "https://folkbranch.com/", "name": "Folkbranch — family tree and voice stories you host yourself", "description": "Free, open-source family tree with photos and voice stories. Relatives record from a link, no account. Runs on your own computer or server, AGPL-3.0.", "inLanguage": "en", "isPartOf": {"@id": "https://folkbranch.com/#website"}, "about": {"@id": "https://folkbranch.com/#software"}, "datePublished": "2026-11-16", "dateModified": "2026-11-23"}, {"@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is it really free?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. It is open source under the AGPL-3.0 licence, with no paid plan. You pay only for your own server, if you use one. The optional assistant and cloud speech use your own keys, paid to their providers."}}, {"@type": "Question", "name": "Do I need a server?", "acceptedAnswer": {"@type": "Answer", "text": "No. On your own computer it runs with one command and you open it in the browser. A server is needed only if relatives should reach it from anywhere; at home, a link opens only at home unless you run ./folkbranch share for a temporary address."}}, {"@type": "Question", "name": "What does a relative see?", "acceptedAnswer": {"@type": "Answer", "text": "A link, a question and one big Start recording button. They need no account and no app, and the recording waits for your review before it joins the archive."}}, {"@type": "Question", "name": "Does anything leave my server?", "acceptedAnswer": {"@type": "Answer", "text": "Not by itself. The one call the server makes on its own asks GitHub whether a newer release exists, with nothing about your archive, and you can switch it off. If you connect an AI provider or cloud speech, what the assistant reads and each recording go to that service, and the app says so first."}}, {"@type": "Question", "name": "Can I bring my tree from Ancestry, MyHeritage or Gramps?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, if the service exports GEDCOM. Folkbranch shows what the file holds before anything changes. GEDCOM has no photos themselves: drop the pictures together with the file and they attach to the right people."}}, {"@type": "Question", "name": "How do backups and updates work?", "acceptedAnswer": {"@type": "Answer", "text": "The server copies the database every day, keeps the last seven, and copies it again before an update. They sit on the same disk, so also download a full copy under Settings and keep it elsewhere. To update, run the install command again."}}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -202,41 +205,39 @@ footer nav{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}
 <div class="cta"><a class="btn primary" href="https://demo.folkbranch.com/">Try the live demo</a><a class="btn" href="#install">Install</a></div>
 <p class="note">Free and open source (AGPL-3.0). Runs on your computer or server.</p>
 </div>
-<figure class="shot"><div class="frame"><picture><source media="(min-width: 980px)" srcset="/assets/hero-desktop-en.webp" width="1400" height="1036"><img src="/assets/hero-phone-en.webp" alt="Folkbranch on a phone: a person’s page with a biography and an old photo" width="780" height="1120" fetchpriority="high" decoding="async"></picture></div><figcaption>Real screens; the family in them is invented.</figcaption></figure>
+<figure class="shot"><div class="frame"><picture><source media="(min-width: 980px)" srcset="/assets/hero-desktop-en.webp" width="1400" height="1036"><img src="/assets/hero-phone-en.webp" alt="Folkbranch on a phone: a person’s page with a biography and an old photo" width="780" height="1118" fetchpriority="high" decoding="async"></picture></div><figcaption>Real screens; the family in them is invented.</figcaption></figure>
 </div></section>
 
 <section id="install" aria-labelledby="install-h"><div class="wrap">
 <h2 id="install-h">Install it with one command</h2>
-<p class="kicker">One person in the family installs it and keeps the archive. Relatives only open a link in a browser.</p>
+<p class="kicker">One person in the family installs it. Relatives only open a link in a browser.</p>
 <div class="card" style="margin-top:22px">
 <div class="tabs" role="tablist" aria-label="Ways to install"><button type="button" role="tab" id="tab-mac" aria-controls="p-mac" aria-selected="true">macOS / Linux</button><button type="button" role="tab" id="tab-win" aria-controls="p-win" aria-selected="false">Windows</button><button type="button" role="tab" id="tab-srv" aria-controls="p-srv" aria-selected="false">Server</button><button type="button" role="tab" id="tab-npx" aria-controls="p-npx" aria-selected="false">npx</button></div>
 
-<div class="panel" id="p-mac" role="tabpanel" aria-labelledby="tab-mac"><p>Paste this in a terminal. It needs no Docker and no Node: it brings its own. On a Mac or Linux computer it takes under a minute.</p><div class="well"><code id="c-mac">curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh</code><button type="button" class="copy" data-copy="c-mac" data-done="Copied">Copy</button></div></div>
+<div class="panel" id="p-mac" role="tabpanel" aria-labelledby="tab-mac"><p>Paste this in a terminal. No Docker and no Node needed. On a Mac or Linux computer it takes under a minute.</p><div class="well"><code id="c-mac">curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh</code><button type="button" class="copy" data-copy="c-mac" data-done="Copied">Copy</button></div></div>
 <div class="panel" id="p-win" role="tabpanel" aria-labelledby="tab-win" hidden><p>Docker Desktop is the way that has been tried on Windows. Copy docker-compose.yml and .env.example from the repository, copy .env.example to .env, set BETTER_AUTH_URL and BETTER_AUTH_SECRET in it, then run this in that folder:</p><div class="well"><code id="c-win">docker compose up -d</code><button type="button" class="copy" data-copy="c-win" data-done="Copied">Copy</button></div><p class="small">There is also a PowerShell installer, install.ps1. It is built and started on a Windows build server with every release, but nobody has tried it on a real Windows computer yet.</p></div>
 <div class="panel" id="p-srv" role="tabpanel" aria-labelledby="tab-srv" hidden><p>On a Linux server with systemd and 512 MB of memory. It starts with the server and sets up HTTPS by itself, with no Docker and no domain needed:</p><div class="well"><code id="c-srv">curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sudo sh -s -- --server</code><button type="button" class="copy" data-copy="c-srv" data-done="Copied">Copy</button></div><p>With your own domain: point its DNS at the server and add --domain.</p><div class="well"><code id="c-dom">curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sudo sh -s -- --server --domain family.example.com</code><button type="button" class="copy" data-copy="c-dom" data-done="Copied">Copy</button></div></div>
 <div class="panel" id="p-npx" role="tabpanel" aria-labelledby="tab-npx" hidden><p>If you already have Node. It runs the same installer; run it again to open the app.</p><div class="well"><code id="c-npx">npx folkbranch</code><button type="button" class="copy" data-copy="c-npx" data-done="Copied">Copy</button></div></div>
 <h3 style="font-size:18px;margin-top:20px;font-family:'Golos Text',system-ui,sans-serif">After the command</h3>
-<ul class="after"><li>It prints a link. Open it, name your family, and load the invented demo family if you want to look around first.</li><li>On your own computer the app listens on this computer only. For relatives to open links, use a server, or run ./folkbranch share for a temporary address.</li><li>To update, run the same command again. Your settings and data stay, and the database is copied first.</li></ul>
+<ul class="after"><li>It prints a link. Open it, name your family, and load the invented demo family to look around.</li><li>At home the app listens on this computer only. For relatives to open links, use a server, or run ./folkbranch share for a temporary address.</li><li>To update, run the same command again. Settings and data stay.</li></ul>
 <div class="links"><a href="/install/">Full install guide</a><a href="https://github.com/danarkhipov/folkbranch/blob/main/install.sh">Read install.sh first</a></div>
-<div class="ai"><h3>Or paste this into your AI coding assistant</h3><p>Claude Code, Codex or Cursor follow the open install guide, ask whether to install here or on a server, and stop before anything that needs your password or money.</p><div class="well"><code id="c-ai">Install Folkbranch for me by following https://github.com/danarkhipov/folkbranch/blob/main/skills/folkbranch/SKILL.md</code><button type="button" class="copy" data-copy="c-ai" data-done="Copied">Copy</button></div></div>
+<details class="ai"><summary>Or paste this into your AI coding assistant</summary><p>Claude Code, Codex or Cursor follow the open install guide, ask whether to install here or on a server, and stop before anything that needs your password or money.</p><div class="well"><code id="c-ai">Install Folkbranch for me by following https://github.com/danarkhipov/folkbranch/blob/main/skills/folkbranch/SKILL.md</code><button type="button" class="copy" data-copy="c-ai" data-done="Copied">Copy</button></div></details>
 </div>
 </div></section>
 
 <section id="how" aria-labelledby="how-h"><div class="wrap">
 <h2 id="how-h">How it works</h2>
-<p class="kicker">Four steps, from a question to a story on the person’s page.</p>
 <ol class="steps">
-<li class="step"><span class="num" aria-hidden="true">1</span><h3>Send a question by link</h3><p>Open a person, pick up to five questions or write your own, and copy the link. Send it in any messenger.</p><div class="frame"><img src="/assets/step-ask-en.webp" alt="The dialog that makes the link, with a copy button" width="768" height="852" decoding="async"></div></li>
-<li class="step"><span class="num" aria-hidden="true">2</span><h3>The relative records on their phone</h3><p>They tap the link, pick a question and press one big button. No app and no account.</p><div class="frame"><img src="/assets/step-voice-en.webp" alt="A relative’s phone: a question and a Start recording button" width="780" height="880" decoding="async"></div></li>
-<li class="step"><span class="num" aria-hidden="true">3</span><h3>You check it</h3><p>The recording waits in Review. Listen to it, then accept or reject it.</p><div class="frame"><img src="/assets/step-review-en.webp" alt="The Review panel with a recording to accept or reject" width="780" height="660" decoding="async"></div></li>
-<li class="step"><span class="num" aria-hidden="true">4</span><h3>It lands on the person’s page</h3><p>An accepted story sits on that person’s Stories tab, with their biography and photos and their place in the tree.</p><div class="frame"><img src="/assets/step-page-en.webp" alt="A person’s Stories tab with an accepted recording" width="780" height="910" decoding="async"></div></li>
+<li class="step"><span class="num" aria-hidden="true">1</span><h3>Send a question by link</h3><p>Open a person, pick up to five questions or write your own, and copy the link. Send it in any messenger.</p><div class="frame"><img src="/assets/step-ask-en.webp" alt="The dialog that makes the link, with a copy button" width="768" height="680" decoding="async"></div></li>
+<li class="step"><span class="num" aria-hidden="true">2</span><h3>The relative records on their phone</h3><p>They tap the link, pick a question and press one big button. No app and no account.</p><div class="frame"><img src="/assets/step-voice-en.webp" alt="A relative’s phone: a question and a Start recording button" width="780" height="760" decoding="async"></div></li>
+<li class="step"><span class="num" aria-hidden="true">3</span><h3>You check it</h3><p>The recording waits in Review. Listen to it, then accept or reject it.</p><div class="frame"><img src="/assets/step-review-en.webp" alt="The Review panel with a recording to accept or reject" width="780" height="700" decoding="async"></div></li>
+<li class="step"><span class="num" aria-hidden="true">4</span><h3>It lands on the person’s page</h3><p>An accepted story sits on that person’s Stories tab, with their biography and photos.</p><div class="frame"><img src="/assets/step-page-en.webp" alt="A person’s Stories tab with an accepted recording" width="672" height="656" decoding="async"></div></li>
 </ol>
 </div></section>
 
 <section id="selfhost" aria-labelledby="host-h"><div class="wrap">
 <h2 id="host-h">For people who run it themselves</h2>
-<p class="kicker">What is true of the app, from the README and the self-hosting guide.</p>
-<dl class="facts"><div><dt>Small</dt><dd>About 70 MB of memory in our own test, and about 130 MB with a family of a thousand people looking. A server with 512 MB is enough.</dd></div><div><dt>One database file</dt><dd>SQLite and a folder of photos. No other database to run.</dd></div><div><dt>Builds</dt><dd>Ready builds for macOS and Linux on arm64 and x64. The Docker image is for amd64 and arm64.</dd></div><div><dt>Automatic HTTPS</dt><dd>On a server, Caddy gets and renews a Let’s Encrypt certificate by itself.</dd></div><div><dt>Updates and backups</dt><dd>The same install command updates it, with a database copy first. The server also copies the database every day, and you can download a full copy any time.</dd></div><div><dt>GEDCOM</dt><dd>Import and export GEDCOM 5.5.1 and 7.0. Gramps files, Excel and CSV come in too.</dd></div><div><dt>MCP for AI agents</dt><dd>Connect Claude Code or Codex with a key. An agent’s edits wait for your approval.</dd></div><div><dt>Optional AI assistant</dt><dd>Off until you add your own key. What it reads goes to the provider you pick, or stays home with a local model.</dd></div><div><dt>AGPL-3.0, no telemetry</dt><dd>The source is public, so if the project stops your copy keeps working. The only call the server makes by itself asks GitHub whether a newer release exists, and you can switch it off.</dd></div></dl>
+<dl class="facts"><div><dt>Small, one database file</dt><dd>SQLite and a folder of photos. About 70 MB of memory in our own test, about 130 MB with a family of a thousand people looking; a 512 MB server is enough.</dd></div><div><dt>Builds, automatic HTTPS</dt><dd>Ready builds for macOS and Linux on arm64 and x64; the Docker image is for amd64 and arm64. On a server, Caddy gets and renews a Let’s Encrypt certificate by itself.</dd></div><div><dt>Updates and backups</dt><dd>The same command updates it, with a database copy first. The server also copies the database daily; you can download a full copy any time.</dd></div><div><dt>GEDCOM</dt><dd>Import and export GEDCOM 5.5.1 and 7.0. Gramps files, Excel and CSV come in too.</dd></div><div><dt>MCP for AI agents</dt><dd>Connect Claude Code or Codex with a key. An agent’s edits wait for your approval.</dd></div><div><dt>Optional AI assistant</dt><dd>Off until you add your own key. What it reads goes to the provider you pick, or stays home with a local model.</dd></div><div><dt>AGPL-3.0, no telemetry</dt><dd>If the project stops, your copy keeps working. The only call the server makes by itself asks GitHub for a newer release; you can switch it off.</dd></div></dl>
 <p class="links"><a href="https://github.com/danarkhipov/folkbranch">Source, releases and issues on GitHub</a><span style="display:inline-flex;align-items:center;min-height:44px;color:var(--soft)">current release: <a href="https://github.com/danarkhipov/folkbranch/releases/latest" style="margin-left:6px">v1.8.0</a></span></p>
 </div></section>
 
@@ -247,32 +248,30 @@ footer nav{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}
 <tr><th scope="row">Running it</th><td data-label="Folkbranch">One command on Mac or Linux, no Docker. One process with SQLite.</td><td data-label="Gramps Web">Docker Compose: the app, Celery and Valkey.</td><td data-label="webtrees">PHP and a web server, with SQLite or another database.</td></tr>
 <tr><th scope="row">Relatives join</th><td data-label="Folkbranch">With a link, no password or email.</td><td data-label="Gramps Web">A password, or a sign-in service you set up.</td><td data-label="webtrees">A user name and password.</td></tr>
 <tr><th scope="row">A relative tells a story</th><td data-label="Folkbranch">A link with your questions and one button to talk, no account. You review it first.</td><td data-label="Gramps Web">Upload a recording made elsewhere.</td><td data-label="webtrees">Upload a recording made elsewhere.</td></tr>
-<tr><th scope="row">Reports and books</th><td data-label="Folkbranch">The chart and a person’s page in PDF.</td><td data-label="Gramps Web">Many reports.</td><td data-label="webtrees">Many reports.</td></tr>
 <tr><th scope="row">DNA</th><td data-label="Folkbranch">No.</td><td data-label="Gramps Web">Matches, chromosome browser, Y-DNA.</td><td data-label="webtrees">Stores DNA notes only.</td></tr>
 </tbody></table>
-<p class="foot-note">Checked on 8 November 2026 against the code and official documentation: Gramps Web 26.11.1 and webtrees 2.2.6. Ancestry, MyHeritage and FamilySearch hold billions of records and DNA tests, which Folkbranch does not: research there, export GEDCOM, and keep the family’s archive here.</p>
+<p class="foot-note">Checked on 8 November 2026 against the code and documentation: Gramps Web 26.11.1, webtrees 2.2.6. Ancestry, MyHeritage and FamilySearch hold billions of records and DNA tests; Folkbranch has neither. Research there, export GEDCOM, keep the archive here.</p>
 <p class="links"><a href="/alternatives/">Full comparison and the big services</a></p>
 </div></section>
 
 <section id="limits" aria-labelledby="lim-h"><div class="wrap">
 <h2 id="lim-h">Honest limits</h2>
-<ul class="limits"><li>One author, and a young project. Expect rough edges.</li><li>Windows goes through Docker. The PowerShell installer has not been tried on a real Windows computer.</li><li>The app is in 10 languages. English, Russian, Spanish and Catalan are finished; Portuguese, French, German, Italian, Ukrainian and Polish are machine translations marked beta.</li><li>There is no hosted version: you run it yourself.</li><li>No record collections, no DNA, and one family tree per install.</li></ul>
+<ul class="limits"><li>One author, and a young project. Expect rough edges.</li><li>Windows goes through Docker. The PowerShell installer has not been tried on a real Windows computer.</li><li>Of 10 app languages, 6 (Portuguese, French, German, Italian, Ukrainian, Polish) are machine translations marked beta.</li><li>There is no hosted version: you run it yourself.</li><li>No record collections, no DNA, and one family tree per install.</li></ul>
 </div></section>
 
 <section id="faq" aria-labelledby="faq-h"><div class="wrap">
 <h2 id="faq-h">Questions</h2>
 <div class="faq">
-<details open><summary>Is it really free?</summary><p>Yes. Folkbranch is open source under the AGPL-3.0 licence, with no paid plan. You pay only for your own server, if you use one. The optional assistant and cloud speech use your own keys with their providers, which you pay directly.</p></details>
-<details open><summary>Do I need a server?</summary><p>No. On your own computer it runs with one command and you open it in the browser. A server is needed only if relatives should reach the archive from anywhere. On a computer at home, a relative’s link opens only at home unless you run ./folkbranch share, which gives a temporary address.</p></details>
+<details open><summary>Is it really free?</summary><p>Yes. It is open source under the AGPL-3.0 licence, with no paid plan. You pay only for your own server, if you use one. The optional assistant and cloud speech use your own keys, paid to their providers.</p></details>
+<details open><summary>Do I need a server?</summary><p>No. On your own computer it runs with one command and you open it in the browser. A server is needed only if relatives should reach it from anywhere; at home, a link opens only at home unless you run ./folkbranch share for a temporary address.</p></details>
 <details open><summary>What does a relative see?</summary><p>A link, a question and one big Start recording button. They need no account and no app, and the recording waits for your review before it joins the archive.</p></details>
-<details><summary>Does anything leave my server?</summary><p>Not by itself. The one call the server makes on its own asks GitHub whether a newer release exists, with nothing about your archive, and you can switch it off. If you connect an AI provider or a cloud speech service, what the assistant reads and each recording go to that service, and the app says so first.</p></details>
-<details><summary>Can I bring my tree from Ancestry, MyHeritage or Gramps?</summary><p>Yes, if the service exports GEDCOM. Folkbranch shows what the file holds before anything changes. GEDCOM carries people, links, events and sources but not the photos themselves: drop the pictures together with the file and they attach to the right people.</p></details>
-<details><summary>How do backups and updates work?</summary><p>The server copies the database every day and keeps the last seven, and again before an update. Those copies sit on the same disk, so also download a full copy under Settings and keep it elsewhere. To update, run the install command again; your data stays.</p></details>
+<details><summary>Does anything leave my server?</summary><p>Not by itself. The one call the server makes on its own asks GitHub whether a newer release exists, with nothing about your archive, and you can switch it off. If you connect an AI provider or cloud speech, what the assistant reads and each recording go to that service, and the app says so first.</p></details>
+<details><summary>Can I bring my tree from Ancestry, MyHeritage or Gramps?</summary><p>Yes, if the service exports GEDCOM. Folkbranch shows what the file holds before anything changes. GEDCOM has no photos themselves: drop the pictures together with the file and they attach to the right people.</p></details>
+<details><summary>How do backups and updates work?</summary><p>The server copies the database every day, keeps the last seven, and copies it again before an update. They sit on the same disk, so also download a full copy under Settings and keep it elsewhere. To update, run the install command again.</p></details>
 </div>
 </div></section>
 
-<section class="closing" aria-labelledby="end-h"><div class="wrap">
-<h2 id="end-h">Look around first, or install it now</h2>
+<section class="closing" aria-label="Look around first, or install it now"><div class="wrap">
 <div class="cta"><a class="btn primary" href="https://demo.folkbranch.com/">Try the live demo</a><a class="btn" href="#install">Install</a></div>
 </div></section>
 </main>

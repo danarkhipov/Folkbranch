@@ -5,7 +5,8 @@
 // With --landing <dir> it writes only the website's how-it-works shots instead (see below).
 // Writes chart-<lang>.png, card-<lang>.png, map-<lang>.png, story-phone-<lang>.png and social-preview.png (1280x640).
 import { chromium } from 'playwright-core'
-import { mkdirSync, readFileSync, statSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { startApp, cookiesFor } from '../tests/ui/serve.mjs'
@@ -32,16 +33,22 @@ if (process.argv.includes('--landing')) {
   for (const [i, lang] of ['en', 'ru'].entries()) {
     const words = lang === 'ru' ? JSON.parse(readFileSync(path.join(root, 'locales/ru.json'), 'utf8')) : {}
     const tr = (k) => words[k] ?? k
-    const app = await startApp({ port: 3950 + i, language: lang })
+    // Links read https://demo.folkbranch.com/tell/..., not a localhost address: the app takes its link address from this file.
+    const data = mkdtempSync(path.join(tmpdir(), 'folkbranch-landing-'))
+    writeFileSync(path.join(data, 'public-address'), 'https://demo.folkbranch.com\n')
+    const app = await startApp({ port: 3950 + i, language: lang, env: { DATA_DIR: data } })
     try {
       const H = { cookie: app.cookie, origin: app.B, 'content-type': 'application/json' }
       const graph = await (await fetch(app.B + '/api/v1/graph', { headers: H })).json()
       const links = new Map()
       for (const l of graph.parentChild) for (const id of [l.parentId, l.childId]) links.set(id, (links.get(id) ?? 0) + 1)
       const hub = [...links].sort((a, b) => b[1] - a[1])[0][0]
-      const question = tr('How did you meet Grandpa?')
+      const question = lang === 'ru' ? 'Каким Серёжа был в детстве?' : 'What was Stephen like as a boy?'
+      const transcript = lang === 'ru'
+        ? 'Серёжа родился в Ярославле зимой сорок шестого. Каждое лето мы уезжали на Волгу. Этот текст, как и вся демо-семья, выдуман.'
+        : 'Stephen was born in Portland in the winter of 1946. Every summer we went to the coast. This text, like everyone in the demo family, is invented.'
       // Phone-sized screens, so the pictures stay readable on a phone page. The owner's side is shown on a phone too.
-      const { ctx, page } = await session(app, { width: 390, height: 844 }, { phone: true, lang })
+      const { ctx, page } = await session(app, { width: 390, height: 1040 }, { phone: true, lang })
       const tab = (name) => page.getByRole('tab', { name: tr(name), exact: true }).click()
       await page.goto(`${app.B}/?p=${hub}`)
       await page.locator('img').first().waitFor({ timeout: 60000 })
@@ -50,11 +57,13 @@ if (process.argv.includes('--landing')) {
       await tab('Stories')
       await page.getByRole('button', { name: tr('Ask to tell by a link') }).click()
       await page.getByPlaceholder(tr('For example, Grandma Nina')).fill(lang === 'ru' ? 'Бабушка Нина' : 'Grandma Nina')
-      await page.getByRole('button', { name: question, exact: true }).click().catch(() => {})
+      await page.getByLabel(tr('Questions'), { exact: true }).fill(question)
       await page.getByRole('button', { name: tr('Create a story link') }).click()
       await page.getByRole('button', { name: tr('Done') }).waitFor()
       await sleep(500)
-      const token = (await page.locator('[role=dialog]').innerText()).match(/\/tell\/(\S+)/)[1].replace(/\s/g, '')
+      const found = (await page.locator('[role=dialog]').innerText()).match(/https:\/\/demo\.folkbranch\.com\/tell\/(\S+)/)
+      if (!found) throw new Error('the link does not read demo.folkbranch.com')
+      const token = found[1]
       await page.locator('[role=dialog]').screenshot({ path: path.join(dir, `step-ask-${lang}.png`) })
       await page.getByRole('button', { name: tr('Done') }).click()
       // 2. The relative's page, and the recording that arrives from it.
@@ -77,7 +86,11 @@ if (process.argv.includes('--landing')) {
       await page.screenshot({ path: path.join(dir, `step-review-full-${lang}.png`) })
       await page.getByRole('button', { name: tr('Accept') }).first().click()
       await sleep(1500)
-      // 4. Accepted: it sits on the person's page.
+      // 4. Accepted: it sits on the person's page, with what was said written down (here typed in, as no speech service is connected).
+      const mine = await (await fetch(app.B + `/api/v1/persons/${hub}/stories`, { headers: H })).json()
+      const story = mine[0]
+      const put = await fetch(app.B + `/api/v1/stories/${story.id}`, { method: 'PATCH', headers: H, body: JSON.stringify({ baseUpdatedAt: story.updatedAt, about: [hub], body: transcript }) })
+      if (!put.ok) throw new Error('story update answered ' + put.status + ' ' + (await put.text()))
       await page.goto(`${app.B}/?p=${hub}`)
       await sleep(2500)
       await page.getByRole('tab', { name: tr('Stories'), exact: true }).click({ force: true })
@@ -86,18 +99,22 @@ if (process.argv.includes('--landing')) {
       await page.getByRole('button', { name: tr('Close'), exact: true }).last().click()
       await sleep(1500)
       await page.screenshot({ path: path.join(dir, `step-page-full-${lang}.png`) })
+      // The story's own card: title, who told it, the voice and what was said.
+      await page.getByText(transcript.slice(0, 24)).locator('xpath=ancestor::*[contains(@class, "rounded")][1]').screenshot({ path: path.join(dir, `step-page-${lang}.png`) })
       await ctx.close()
       // The first screen on a wide window: the chart with a person's biography open beside it.
       const wide = await session(app, { width: 1000, height: 740 }, { lang })
       await wide.page.goto(`${app.B}/?p=${hub}`)
       await wide.page.locator('img').first().waitFor({ timeout: 60000 })
       await sleep(3000)
+      await wide.page.getByRole('tab', { name: tr('Stories'), exact: true }).click()
+      await sleep(1200)
       // Slide the chart right so nobody at the left edge is cut off.
       await wide.page.mouse.move(250, 560); await wide.page.mouse.down(); await wide.page.mouse.move(400, 560, { steps: 8 }); await wide.page.mouse.up()
       await sleep(600)
       await wide.page.screenshot({ path: path.join(dir, `hero-wide-${lang}.png`) })
       await wide.ctx.close()
-    } finally { app.stop() }
+    } finally { app.stop(); rmSync(data, { recursive: true, force: true }) }
   }
   await br.close()
   process.exit(0)

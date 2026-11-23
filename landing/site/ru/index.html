@@ -52,7 +52,7 @@ a{color:var(--accent-d);text-underline-offset:3px}a:hover{color:var(--ink)}
 :focus-visible{outline:3px solid var(--accent);outline-offset:3px;border-radius:4px}
 code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 h1,h2,h3{font-family:'Literata',Georgia,serif;font-weight:600;color:var(--ink);margin:0;overflow-wrap:break-word;hyphens:manual}
-h1{font-size:34px;line-height:1.14;letter-spacing:-.01em}
+h1{font-size:32px;line-height:1.14;letter-spacing:-.01em}
 h2{font-size:32px;line-height:1.15}
 h3{font-size:20px;line-height:1.3}
 p{margin:0}
@@ -67,11 +67,11 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:12p
 .nav a:hover,.langlink:hover,.ghlink:hover{background:#ece4d3;color:var(--ink)}
 .topright{display:flex;align-items:center;gap:2px}
 .ghlink{display:none}
-section{padding:36px 0}
-.hero{padding:20px 0 40px}
+section{padding:28px 0}
+.hero{padding:16px 0 28px}
 .hero .sub{font-size:18px;color:var(--soft);margin-top:14px;max-width:34em}
-.cta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:22px;max-width:520px}
-.btn{display:inline-flex;align-items:center;justify-content:center;text-align:center;min-height:52px;padding:6px 14px;border-radius:10px;font:600 17px/1.2 'Golos Text',system-ui,sans-serif;text-decoration:none;border:2px solid var(--ink);color:var(--ink);background:transparent;cursor:pointer}
+.cta{display:grid;grid-template-columns:1fr;gap:10px;margin-top:20px;max-width:420px}
+.btn{display:inline-flex;align-items:center;justify-content:center;text-align:center;min-height:52px;padding:6px 14px;border-radius:10px;font:600 17px/1.2 'Golos Text',system-ui,sans-serif;text-decoration:none;border:2px solid var(--ink);color:var(--ink);background:transparent;cursor:pointer;white-space:nowrap}
 .btn:hover{background:#ece4d3;color:var(--ink)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#fffdf8}
 .btn.primary:hover{background:var(--accent-d);border-color:var(--accent-d);color:#fffdf8}
@@ -83,7 +83,7 @@ figcaption{font-size:14.5px;color:var(--soft);margin-top:8px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px}
 .kicker{color:var(--soft);margin-top:10px;max-width:40em}
 /* install */
-.tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:22px 0 16px}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:18px 0 12px}
 .tabs button{min-height:48px;border-radius:10px;border:2px solid var(--line);background:transparent;color:var(--ink);font:600 16px 'Golos Text',system-ui,sans-serif;cursor:pointer;padding:0 10px}
 .tabs button[aria-selected=true]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
 .panel>p{margin:0 0 12px}
@@ -101,29 +101,32 @@ html:not(.js) .tabs{display:none}
 .after li::before{content:'';position:absolute;left:4px;top:.7em;width:10px;height:10px;border-radius:50%;background:var(--accent)}
 .links{display:flex;flex-wrap:wrap;gap:4px 18px;margin-top:14px}
 .links a{display:inline-flex;align-items:center;min-height:44px}
-.ai{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}
-.ai h3{font-size:18px;font-family:'Golos Text',system-ui,sans-serif;font-weight:600;margin-bottom:6px}
+.ai{margin-top:14px;border-top:1px solid var(--line)}
+.ai summary{cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:52px;padding:6px 0;font:600 17px/1.35 'Golos Text',system-ui,sans-serif;list-style:none}
+.ai summary::-webkit-details-marker{display:none}
+.ai summary::after{content:'+';font-size:26px;line-height:1;color:var(--accent);flex:none;width:24px;text-align:center}
+.ai[open] summary::after{content:'\2212'}
 .ai p{font-size:16px;color:var(--soft);margin-bottom:10px}
 /* steps */
-.steps{list-style:none;margin:22px 0 0;padding:0;display:grid;gap:28px}
+.steps{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:22px}
 .step{display:flex;flex-direction:column;gap:10px}
 .step .num{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:var(--ink);color:var(--paper);font:600 17px 'Golos Text',sans-serif}
 .step h3{margin-top:2px}
 .step p{color:var(--soft);font-size:17px}
 .step .frame{align-self:flex-start}
-.step .frame{width:100%;max-width:310px}
+.step .frame{width:100%;max-width:290px}
 .step .frame img{width:100%}
 /* facts */
 .facts{display:grid;gap:0;margin:24px 0 0;padding:0}
-.facts div{padding:10px 0;border-top:1px solid var(--line)}
+.facts div{padding:8px 0;border-top:1px solid var(--line)}
 .facts dt{font-weight:600}
 .facts dd{margin:2px 0 0;color:var(--soft)}
 /* compare */
 .cmp{width:100%;border-collapse:collapse;margin-top:22px}
 .cmp thead{display:none}
-.cmp tr{display:block;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+.cmp tr{display:block;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin-bottom:10px}
 .cmp th[scope=row]{display:block;text-align:left;font:600 18px 'Literata',Georgia,serif;margin-bottom:6px}
-.cmp td{display:block;padding:4px 0;color:var(--soft)}
+.cmp td{display:block;padding:2px 0;color:var(--soft)}
 .cmp td::before{content:attr(data-label) ': ';font-weight:600;color:var(--ink)}
 .cmp td:first-of-type{color:var(--ink)}
 .foot-note{font-size:16px;color:var(--soft);margin-top:14px}
@@ -144,7 +147,7 @@ footer .wrap{display:flex;flex-direction:column;gap:6px}
 footer a{display:inline-flex;align-items:center;min-height:44px;padding:0 6px 0 0;margin-right:8px}
 footer nav{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}
 .fline{display:flex;flex-wrap:wrap;align-items:center;gap:0 4px}
-@media (max-width:359px){.cta{grid-template-columns:1fr}.tabs{grid-template-columns:1fr}}
+@media (max-width:359px){.tabs{grid-template-columns:1fr}}
 @media (min-width:760px){
  body{font-size:19px}
  h1{font-size:56px}
@@ -158,7 +161,7 @@ footer nav{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}
  .ghlink{display:inline-flex}
  .tabs{grid-template-columns:repeat(4,auto);justify-content:start}
  .tabs button{padding:0 22px}
- .cta{grid-template-columns:auto auto;max-width:none;justify-content:start}
+ .cta{grid-template-columns:auto auto;max-width:none;justify-content:start;margin-top:22px}
  .btn{padding:6px 28px;font-size:18px;min-width:210px;white-space:nowrap}
  html[lang=ru] h1{font-size:50px}
  .well{flex-direction:row;align-items:center;justify-content:space-between;padding:16px 18px}
@@ -185,7 +188,7 @@ footer nav{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}
 }
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 </style>
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "SoftwareApplication", "@id": "https://folkbranch.com/#software", "name": "Folkbranch", "url": "https://folkbranch.com/", "applicationCategory": "LifestyleApplication", "applicationSubCategory": "Genealogy software", "operatingSystem": "macOS, Linux, Windows", "softwareRequirements": "Docker on Windows and on a server; nothing extra on macOS and Linux", "description": "Бесплатная программа с открытым кодом для семейного древа на вашем компьютере или сервере. Древо, старые фото и голосовые рассказы родных хранятся у вас.", "inLanguage": ["en", "ru", "es", "ca", "pt", "fr", "de", "it", "uk", "pl"], "license": "https://www.gnu.org/licenses/agpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "image": "https://folkbranch.com/assets/social-preview.png", "installUrl": "https://github.com/danarkhipov/folkbranch#install", "downloadUrl": "https://github.com/danarkhipov/folkbranch/releases/latest", "releaseNotes": "https://github.com/danarkhipov/Folkbranch/releases/tag/v1.8.0", "codeRepository": "https://github.com/danarkhipov/folkbranch", "sameAs": ["https://github.com/danarkhipov/folkbranch"], "softwareVersion": "1.8.0", "dateModified": "2026-11-23", "author": {"@id": "https://folkbranch.com/#org"}, "publisher": {"@id": "https://folkbranch.com/#org"}, "screenshot": "https://folkbranch.com/assets/social-preview.png", "featureList": ["Семейное древо с подписью родства", "Импорт и экспорт GEDCOM 5.5.1 и 7.0", "Голосовые рассказы по ссылке, без аккаунта", "Подсказки по лицам считаются в браузере", "На своём сервере: один файл SQLite и папка с фотографиями", "ИИ-ассистент и доступ по MCP с проверкой каждой правки"]}, {"@type": "Organization", "@id": "https://folkbranch.com/#org", "name": "Folkbranch", "url": "https://folkbranch.com/", "logo": "https://folkbranch.com/assets/logo-512.png", "description": "Открытый проект Folkbranch: бесплатная программа для семейного древа на своём сервере.", "sameAs": ["https://github.com/danarkhipov/folkbranch"]}, {"@type": "WebSite", "@id": "https://folkbranch.com/#website", "name": "Folkbranch", "url": "https://folkbranch.com/", "publisher": {"@id": "https://folkbranch.com/#org"}}, {"@type": "WebPage", "@id": "https://folkbranch.com/ru/#webpage", "url": "https://folkbranch.com/ru/", "name": "Folkbranch — семейное древо и голосовые рассказы на своём сервере", "description": "Бесплатное семейное древо с открытым кодом: фото и голосовые рассказы родных по ссылке, без регистрации. Работает на вашем компьютере или сервере, AGPL-3.0.", "inLanguage": "ru", "isPartOf": {"@id": "https://folkbranch.com/#website"}, "about": {"@id": "https://folkbranch.com/#software"}, "datePublished": "2026-11-16", "dateModified": "2026-11-23"}, {"@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Правда бесплатно?", "acceptedAnswer": {"@type": "Answer", "text": "Да. Folkbranch — открытая программа под лицензией AGPL-3.0, платных тарифов нет. Вы платите только за свой сервер, если он у вас есть. Необязательный ассистент и облачное распознавание речи работают по вашим ключам у их провайдеров, и платите вы им сами."}}, {"@type": "Question", "name": "Нужен ли сервер?", "acceptedAnswer": {"@type": "Answer", "text": "Нет. На вашем компьютере программа запускается одной командой, и вы открываете её в браузере. Сервер нужен, только если родные должны заходить в архив откуда угодно. Ссылка с домашнего компьютера открывается только дома, пока вы не выполните ./folkbranch share: он даёт временный адрес."}}, {"@type": "Question", "name": "Что видит родственник?", "acceptedAnswer": {"@type": "Answer", "text": "Ссылку, вопрос и одну большую кнопку «Начать запись». Ни аккаунт, ни приложение не нужны, а запись ждёт вашей проверки, прежде чем попасть в архив."}}, {"@type": "Question", "name": "Что-нибудь уходит с моего сервера?", "acceptedAnswer": {"@type": "Answer", "text": "Само по себе нет. Единственный запрос, который сервер делает сам, спрашивает у GitHub, вышла ли новая версия, и ничего об архиве не сообщает; его можно отключить. Если вы подключите ИИ-провайдера или облачное распознавание речи, то, что читает ассистент, и каждая запись уходят этому сервису, и приложение предупредит об этом заранее."}}, {"@type": "Question", "name": "Можно перенести дерево из Ancestry, MyHeritage или Gramps?", "acceptedAnswer": {"@type": "Answer", "text": "Да, если сервис выгружает GEDCOM. Folkbranch покажет, что в файле, прежде чем что-то изменится. В GEDCOM есть люди, связи, события и источники, но самих фотографий нет: загрузите картинки вместе с файлом, и они прикрепятся к нужным людям."}}, {"@type": "Question", "name": "Как делаются копии и обновления?", "acceptedAnswer": {"@type": "Answer", "text": "Сервер каждый день копирует базу и хранит последние семь копий, а ещё перед обновлением. Эти копии лежат на том же диске, поэтому скачайте и полную копию в настройках и храните её отдельно. Чтобы обновить, выполните команду установки ещё раз; данные останутся."}}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "SoftwareApplication", "@id": "https://folkbranch.com/#software", "name": "Folkbranch", "url": "https://folkbranch.com/", "applicationCategory": "LifestyleApplication", "applicationSubCategory": "Genealogy software", "operatingSystem": "macOS, Linux, Windows", "softwareRequirements": "Docker on Windows and on a server; nothing extra on macOS and Linux", "description": "Бесплатная программа с открытым кодом для семейного древа на вашем компьютере или сервере. Древо, старые фото и голосовые рассказы родных хранятся у вас.", "inLanguage": ["en", "ru", "es", "ca", "pt", "fr", "de", "it", "uk", "pl"], "license": "https://www.gnu.org/licenses/agpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "image": "https://folkbranch.com/assets/social-preview.png", "installUrl": "https://github.com/danarkhipov/folkbranch#install", "downloadUrl": "https://github.com/danarkhipov/folkbranch/releases/latest", "releaseNotes": "https://github.com/danarkhipov/Folkbranch/releases/tag/v1.8.0", "codeRepository": "https://github.com/danarkhipov/folkbranch", "sameAs": ["https://github.com/danarkhipov/folkbranch"], "softwareVersion": "1.8.0", "dateModified": "2026-11-23", "author": {"@id": "https://folkbranch.com/#org"}, "publisher": {"@id": "https://folkbranch.com/#org"}, "screenshot": "https://folkbranch.com/assets/social-preview.png", "featureList": ["Семейное древо с подписью родства", "Импорт и экспорт GEDCOM 5.5.1 и 7.0", "Голосовые рассказы по ссылке, без аккаунта", "Подсказки по лицам считаются в браузере", "На своём сервере: один файл SQLite и папка с фотографиями", "ИИ-ассистент и доступ по MCP с проверкой каждой правки"]}, {"@type": "Organization", "@id": "https://folkbranch.com/#org", "name": "Folkbranch", "url": "https://folkbranch.com/", "logo": "https://folkbranch.com/assets/logo-512.png", "description": "Открытый проект Folkbranch: бесплатная программа для семейного древа на своём сервере.", "sameAs": ["https://github.com/danarkhipov/folkbranch"]}, {"@type": "WebSite", "@id": "https://folkbranch.com/#website", "name": "Folkbranch", "url": "https://folkbranch.com/", "publisher": {"@id": "https://folkbranch.com/#org"}}, {"@type": "WebPage", "@id": "https://folkbranch.com/ru/#webpage", "url": "https://folkbranch.com/ru/", "name": "Folkbranch — семейное древо и голосовые рассказы на своём сервере", "description": "Бесплатное семейное древо с открытым кодом: фото и голосовые рассказы родных по ссылке, без регистрации. Работает на вашем компьютере или сервере, AGPL-3.0.", "inLanguage": "ru", "isPartOf": {"@id": "https://folkbranch.com/#website"}, "about": {"@id": "https://folkbranch.com/#software"}, "datePublished": "2026-11-16", "dateModified": "2026-11-23"}, {"@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Правда бесплатно?", "acceptedAnswer": {"@type": "Answer", "text": "Да. Это открытая программа под лицензией AGPL-3.0, платных тарифов нет. Платите только за свой сервер, если он есть. Ассистент и облачная речь работают по вашим ключам, их оплата идёт провайдерам."}}, {"@type": "Question", "name": "Нужен ли сервер?", "acceptedAnswer": {"@type": "Answer", "text": "Нет. На вашем компьютере программа запускается одной командой. Сервер нужен, только если родные должны заходить откуда угодно; дома ссылка открывается только дома, пока вы не выполните ./folkbranch share (временный адрес)."}}, {"@type": "Question", "name": "Что видит родственник?", "acceptedAnswer": {"@type": "Answer", "text": "Ссылку, вопрос и одну большую кнопку «Начать запись». Ни аккаунт, ни приложение не нужны, а запись ждёт вашей проверки."}}, {"@type": "Question", "name": "Что-нибудь уходит с моего сервера?", "acceptedAnswer": {"@type": "Answer", "text": "Само по себе нет. Единственный запрос, который сервер делает сам, спрашивает у GitHub, вышла ли новая версия, и ничего об архиве не сообщает; его можно отключить. Если вы подключите ИИ-провайдера или облачную речь, то, что читает ассистент, и каждая запись уходят этому сервису, и приложение предупредит заранее."}}, {"@type": "Question", "name": "Можно перенести дерево из Ancestry, MyHeritage или Gramps?", "acceptedAnswer": {"@type": "Answer", "text": "Да, если сервис выгружает GEDCOM. Folkbranch покажет, что в файле, прежде чем что-то изменится. Самих фотографий в GEDCOM нет: загрузите картинки вместе с файлом, и они прикрепятся к нужным людям."}}, {"@type": "Question", "name": "Как делаются копии и обновления?", "acceptedAnswer": {"@type": "Answer", "text": "Сервер каждый день копирует базу, хранит последние семь копий и копирует ещё раз перед обновлением. Они лежат на том же диске, поэтому скачайте и полную копию в настройках и храните её отдельно. Чтобы обновить, выполните команду установки ещё раз."}}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main">К содержанию</a>
@@ -202,41 +205,39 @@ footer nav{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}
 <div class="cta"><a class="btn primary" href="https://demo.folkbranch.com/">Попробовать демо</a><a class="btn" href="#install">Установить</a></div>
 <p class="note">Бесплатно, открытый код (AGPL-3.0). Работает на вашем компьютере или сервере.</p>
 </div>
-<figure class="shot"><div class="frame"><picture><source media="(min-width: 980px)" srcset="/assets/hero-desktop-ru.webp" width="1400" height="1036"><img src="/assets/hero-phone-ru.webp" alt="Folkbranch на телефоне: страница человека с биографией и старой фотографией" width="780" height="1120" fetchpriority="high" decoding="async"></picture></div><figcaption>Настоящие экраны; семья на них выдуманная.</figcaption></figure>
+<figure class="shot"><div class="frame"><picture><source media="(min-width: 980px)" srcset="/assets/hero-desktop-ru.webp" width="1400" height="1036"><img src="/assets/hero-phone-ru.webp" alt="Folkbranch на телефоне: страница человека с биографией и старой фотографией" width="780" height="1118" fetchpriority="high" decoding="async"></picture></div><figcaption>Настоящие экраны; семья на них выдуманная.</figcaption></figure>
 </div></section>
 
 <section id="install" aria-labelledby="install-h"><div class="wrap">
 <h2 id="install-h">Установка одной командой</h2>
-<p class="kicker">Программу ставит один человек в семье, он и ведёт архив. Остальным родным хватит ссылки в браузере.</p>
+<p class="kicker">Программу ставит один человек в семье. Остальным родным хватит ссылки в браузере.</p>
 <div class="card" style="margin-top:22px">
 <div class="tabs" role="tablist" aria-label="Способы установки"><button type="button" role="tab" id="tab-mac" aria-controls="p-mac" aria-selected="true">macOS / Linux</button><button type="button" role="tab" id="tab-win" aria-controls="p-win" aria-selected="false">Windows</button><button type="button" role="tab" id="tab-srv" aria-controls="p-srv" aria-selected="false">Сервер</button><button type="button" role="tab" id="tab-npx" aria-controls="p-npx" aria-selected="false">npx</button></div>
 
-<div class="panel" id="p-mac" role="tabpanel" aria-labelledby="tab-mac"><p>Вставьте в терминал. Docker и Node не нужны: установщик приносит свои. На Mac или Linux это занимает меньше минуты.</p><div class="well"><code id="c-mac">curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh</code><button type="button" class="copy" data-copy="c-mac" data-done="Скопировано">Копировать</button></div></div>
+<div class="panel" id="p-mac" role="tabpanel" aria-labelledby="tab-mac"><p>Вставьте в терминал. Docker и Node не нужны. На Mac или Linux это занимает меньше минуты.</p><div class="well"><code id="c-mac">curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sh</code><button type="button" class="copy" data-copy="c-mac" data-done="Скопировано">Копировать</button></div></div>
 <div class="panel" id="p-win" role="tabpanel" aria-labelledby="tab-win" hidden><p>На Windows проверен Docker Desktop. Скопируйте из репозитория docker-compose.yml и .env.example, сделайте из .env.example файл .env, впишите в него BETTER_AUTH_URL и BETTER_AUTH_SECRET и выполните в этой папке:</p><div class="well"><code id="c-win">docker compose up -d</code><button type="button" class="copy" data-copy="c-win" data-done="Скопировано">Копировать</button></div><p class="small">Есть ещё установщик для PowerShell, install.ps1. Его собирают и запускают на Windows-сервере при каждом выпуске, но на настоящем компьютере с Windows пока никто не пробовал.</p></div>
 <div class="panel" id="p-srv" role="tabpanel" aria-labelledby="tab-srv" hidden><p>Для Linux-сервера с systemd и 512 МБ памяти. Запускается вместе с сервером и сам настраивает HTTPS, Docker и домен не нужны:</p><div class="well"><code id="c-srv">curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sudo sh -s -- --server</code><button type="button" class="copy" data-copy="c-srv" data-done="Скопировано">Копировать</button></div><p>Со своим доменом: направьте его DNS на сервер и добавьте --domain.</p><div class="well"><code id="c-dom">curl -fsSL https://raw.githubusercontent.com/danarkhipov/folkbranch/main/install.sh | sudo sh -s -- --server --domain family.example.com</code><button type="button" class="copy" data-copy="c-dom" data-done="Скопировано">Копировать</button></div></div>
 <div class="panel" id="p-npx" role="tabpanel" aria-labelledby="tab-npx" hidden><p>Если у вас уже есть Node. Запускает тот же установщик; чтобы открыть приложение, выполните ещё раз.</p><div class="well"><code id="c-npx">npx folkbranch</code><button type="button" class="copy" data-copy="c-npx" data-done="Скопировано">Копировать</button></div></div>
 <h3 style="font-size:18px;margin-top:20px;font-family:'Golos Text',system-ui,sans-serif">Что будет после команды</h3>
-<ul class="after"><li>Она напечатает ссылку. Откройте её, назовите семью и при желании загрузите выдуманную демо-семью, чтобы осмотреться.</li><li>На вашем компьютере приложение слушает только этот компьютер. Чтобы родные открывали ссылки, поставьте его на сервер или выполните ./folkbranch share: это временный адрес.</li><li>Чтобы обновить, выполните ту же команду ещё раз. Настройки и данные остаются, базу сначала копируют.</li></ul>
+<ul class="after"><li>Она напечатает ссылку. Откройте её, назовите семью и загрузите выдуманную демо-семью, чтобы осмотреться.</li><li>Дома приложение слушает только этот компьютер. Чтобы родные открывали ссылки, поставьте его на сервер или выполните ./folkbranch share: это временный адрес.</li><li>Чтобы обновить, выполните ту же команду ещё раз. Настройки и данные остаются.</li></ul>
 <div class="links"><a href="/ru/install/">Подробная инструкция</a><a href="https://github.com/danarkhipov/folkbranch/blob/main/install.sh">Сначала прочитать install.sh</a></div>
-<div class="ai"><h3>Или вставьте это в своего ИИ-помощника для кода</h3><p>Claude Code, Codex или Cursor пройдут по открытой инструкции, спросят, ставить на этот компьютер или на сервер, и остановятся перед всем, что требует пароля или денег.</p><div class="well"><code id="c-ai">Install Folkbranch for me by following https://github.com/danarkhipov/folkbranch/blob/main/skills/folkbranch/SKILL.md</code><button type="button" class="copy" data-copy="c-ai" data-done="Скопировано">Копировать</button></div></div>
+<details class="ai"><summary>Или вставьте это в своего ИИ-помощника для кода</summary><p>Claude Code, Codex или Cursor пройдут по открытой инструкции, спросят, ставить на этот компьютер или на сервер, и остановятся перед всем, что требует пароля или денег.</p><div class="well"><code id="c-ai">Install Folkbranch for me by following https://github.com/danarkhipov/folkbranch/blob/main/skills/folkbranch/SKILL.md</code><button type="button" class="copy" data-copy="c-ai" data-done="Скопировано">Копировать</button></div></details>
 </div>
 </div></section>
 
 <section id="how" aria-labelledby="how-h"><div class="wrap">
 <h2 id="how-h">Как это работает</h2>
-<p class="kicker">Четыре шага: от вопроса до рассказа на странице человека.</p>
 <ol class="steps">
-<li class="step"><span class="num" aria-hidden="true">1</span><h3>Отправляете вопрос по ссылке</h3><p>Откройте человека, выберите до пяти вопросов или напишите свои и скопируйте ссылку. Отправьте её в любом мессенджере.</p><div class="frame"><img src="/assets/step-ask-ru.webp" alt="Окно, в котором создаётся ссылка, с кнопкой копирования" width="768" height="888" decoding="async"></div></li>
-<li class="step"><span class="num" aria-hidden="true">2</span><h3>Родственник записывает рассказ на телефоне</h3><p>Он открывает ссылку, выбирает вопрос и нажимает одну большую кнопку. Ни приложения, ни аккаунта.</p><div class="frame"><img src="/assets/step-voice-ru.webp" alt="Телефон родственника: вопрос и кнопка «Начать запись»" width="780" height="880" decoding="async"></div></li>
-<li class="step"><span class="num" aria-hidden="true">3</span><h3>Вы проверяете запись</h3><p>Запись ждёт в разделе «Проверка». Послушайте и примите её или отклоните.</p><div class="frame"><img src="/assets/step-review-ru.webp" alt="Панель проверки с записью, которую можно принять или отклонить" width="780" height="660" decoding="async"></div></li>
-<li class="step"><span class="num" aria-hidden="true">4</span><h3>Рассказ попадает на страницу человека</h3><p>Принятый рассказ лежит на вкладке «Рассказы» этого человека, рядом с биографией, фотографиями и местом в древе.</p><div class="frame"><img src="/assets/step-page-ru.webp" alt="Вкладка «Рассказы» человека с принятой записью" width="780" height="910" decoding="async"></div></li>
+<li class="step"><span class="num" aria-hidden="true">1</span><h3>Отправляете вопрос по ссылке</h3><p>Откройте человека, задайте до пяти вопросов и скопируйте ссылку. Отправьте её в любом мессенджере.</p><div class="frame"><img src="/assets/step-ask-ru.webp" alt="Окно, в котором создаётся ссылка, с кнопкой копирования" width="768" height="720" decoding="async"></div></li>
+<li class="step"><span class="num" aria-hidden="true">2</span><h3>Родственник записывает рассказ на телефоне</h3><p>Он открывает ссылку, выбирает вопрос и нажимает одну большую кнопку. Ни приложения, ни аккаунта.</p><div class="frame"><img src="/assets/step-voice-ru.webp" alt="Телефон родственника: вопрос и кнопка «Начать запись»" width="780" height="760" decoding="async"></div></li>
+<li class="step"><span class="num" aria-hidden="true">3</span><h3>Вы проверяете запись</h3><p>Запись ждёт в разделе «Проверка». Послушайте и примите её или отклоните.</p><div class="frame"><img src="/assets/step-review-ru.webp" alt="Панель проверки с записью, которую можно принять или отклонить" width="780" height="700" decoding="async"></div></li>
+<li class="step"><span class="num" aria-hidden="true">4</span><h3>Рассказ попадает на страницу человека</h3><p>Принятый рассказ лежит на вкладке «Рассказы» этого человека, рядом с биографией и фотографиями.</p><div class="frame"><img src="/assets/step-page-ru.webp" alt="Вкладка «Рассказы» человека с принятой записью" width="672" height="656" decoding="async"></div></li>
 </ol>
 </div></section>
 
 <section id="selfhost" aria-labelledby="host-h"><div class="wrap">
 <h2 id="host-h">Для тех, кто ставит сам</h2>
-<p class="kicker">Только то, что верно для программы по README и руководству по установке.</p>
-<dl class="facts"><div><dt>Лёгкая</dt><dd>В нашем замере около 70 МБ памяти, а с семьёй в тысячу человек, которые смотрят древо, около 130 МБ. Хватит сервера на 512 МБ.</dd></div><div><dt>Один файл базы</dt><dd>SQLite и папка с фотографиями. Другую базу запускать не нужно.</dd></div><div><dt>Сборки</dt><dd>Готовые сборки для macOS и Linux, arm64 и x64. Образ Docker есть для amd64 и arm64.</dd></div><div><dt>HTTPS сам</dt><dd>На сервере Caddy сам получает и продлевает сертификат Let’s Encrypt.</dd></div><div><dt>Обновления и копии</dt><dd>Обновляет та же команда установки, сначала копируется база. Сервер ещё и каждый день копирует базу, а полную копию можно скачать в любой момент.</dd></div><div><dt>GEDCOM</dt><dd>Импорт и экспорт GEDCOM 5.5.1 и 7.0. Файлы Gramps, Excel и CSV тоже принимает.</dd></div><div><dt>MCP для ИИ-агентов</dt><dd>Подключите Claude Code или Codex по ключу. Правки агента ждут вашего подтверждения.</dd></div><div><dt>ИИ-ассистент по желанию</dt><dd>Выключен, пока вы не добавите свой ключ. То, что он читает, уходит выбранному вами сервису или остаётся дома с локальной моделью.</dd></div><div><dt>AGPL-3.0, без телеметрии</dt><dd>Код открыт, поэтому если проект остановится, ваша копия продолжит работать. Единственный запрос, который сервер делает сам, спрашивает у GitHub, вышла ли новая версия; его можно отключить.</dd></div></dl>
+<dl class="facts"><div><dt>Лёгкая, один файл базы</dt><dd>SQLite и папка с фотографиями. В нашем замере около 70 МБ памяти, с семьёй в тысячу человек около 130 МБ; хватит сервера на 512 МБ.</dd></div><div><dt>Сборки, HTTPS сам</dt><dd>Готовые сборки для macOS и Linux, arm64 и x64; образ Docker есть для amd64 и arm64. На сервере Caddy сам получает и продлевает сертификат Let’s Encrypt.</dd></div><div><dt>Обновления и копии</dt><dd>Обновляет та же команда, сначала копируется база. Сервер копирует базу каждый день; полную копию можно скачать в любой момент.</dd></div><div><dt>GEDCOM</dt><dd>Импорт и экспорт GEDCOM 5.5.1 и 7.0. Файлы Gramps, Excel и CSV тоже принимает.</dd></div><div><dt>MCP для ИИ-агентов</dt><dd>Подключите Claude Code или Codex по ключу. Правки агента ждут вашего подтверждения.</dd></div><div><dt>ИИ-ассистент по желанию</dt><dd>Выключен, пока вы не добавите свой ключ. То, что он читает, уходит выбранному вами сервису или остаётся дома с локальной моделью.</dd></div><div><dt>AGPL-3.0, без телеметрии</dt><dd>Если проект остановится, ваша копия продолжит работать. Единственный запрос сервера к GitHub спрашивает, вышла ли новая версия; его можно отключить.</dd></div></dl>
 <p class="links"><a href="https://github.com/danarkhipov/folkbranch">Код, выпуски и обсуждения на GitHub</a><span style="display:inline-flex;align-items:center;min-height:44px;color:var(--soft)">текущая версия: <a href="https://github.com/danarkhipov/folkbranch/releases/latest" style="margin-left:6px">v1.8.0</a></span></p>
 </div></section>
 
@@ -246,33 +247,31 @@ footer nav{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}
 <table class="cmp"><thead><tr><td></td><th scope="col">Folkbranch</th><th scope="col">Gramps Web</th><th scope="col">webtrees</th></tr></thead><tbody>
 <tr><th scope="row">Как запустить</th><td data-label="Folkbranch">Одна команда на Mac или Linux, без Docker. Один процесс с SQLite.</td><td data-label="Gramps Web">Docker Compose: приложение, Celery и Valkey.</td><td data-label="webtrees">PHP и веб-сервер, база SQLite или другая.</td></tr>
 <tr><th scope="row">Как входят родные</th><td data-label="Folkbranch">По ссылке, без пароля и почты.</td><td data-label="Gramps Web">Пароль или сервис входа, который вы настраиваете.</td><td data-label="webtrees">Имя пользователя и пароль.</td></tr>
-<tr><th scope="row">Родственник рассказывает историю</th><td data-label="Folkbranch">Ссылка с вашими вопросами и одна кнопка, чтобы говорить, без аккаунта. Вы проверяете запись первым.</td><td data-label="Gramps Web">Загрузить запись, сделанную в другом месте.</td><td data-label="webtrees">Загрузить запись, сделанную в другом месте.</td></tr>
-<tr><th scope="row">Отчёты и книги</th><td data-label="Folkbranch">Схема и страница человека в PDF.</td><td data-label="Gramps Web">Много отчётов.</td><td data-label="webtrees">Много отчётов.</td></tr>
+<tr><th scope="row">Родственник рассказывает историю</th><td data-label="Folkbranch">Ссылка с вашими вопросами и одна кнопка, без аккаунта. Запись сначала проверяете вы.</td><td data-label="Gramps Web">Загрузить запись, сделанную в другом месте.</td><td data-label="webtrees">Загрузить запись, сделанную в другом месте.</td></tr>
 <tr><th scope="row">ДНК</th><td data-label="Folkbranch">Нет.</td><td data-label="Gramps Web">Совпадения, браузер хромосом, Y-ДНК.</td><td data-label="webtrees">Только хранит заметки о ДНК.</td></tr>
 </tbody></table>
-<p class="foot-note">Сверено 8 ноября 2026 с кодом и официальной документацией: Gramps Web 26.11.1 и webtrees 2.2.6. У Ancestry, MyHeritage и FamilySearch миллиарды записей и ДНК-тесты, а у Folkbranch их нет: ищите там, выгрузите GEDCOM и держите семейный архив здесь.</p>
+<p class="foot-note">Сверено 8 ноября 2026 с кодом и документацией: Gramps Web 26.11.1, webtrees 2.2.6. У Ancestry, MyHeritage и FamilySearch миллиарды записей и ДНК-тесты, у Folkbranch их нет. Ищите там, выгрузите GEDCOM, держите архив здесь.</p>
 <p class="links"><a href="/ru/alternatives/">Полное сравнение и большие сервисы</a></p>
 </div></section>
 
 <section id="limits" aria-labelledby="lim-h"><div class="wrap">
 <h2 id="lim-h">Честные ограничения</h2>
-<ul class="limits"><li>Один автор, и проект молодой. Шероховатости будут.</li><li>На Windows работает через Docker. Установщик для PowerShell на настоящем компьютере с Windows не пробовали.</li><li>У приложения 10 языков. Английский, русский, испанский и каталанский готовы; португальский, французский, немецкий, итальянский, украинский и польский — машинный перевод с пометкой «бета».</li><li>Размещённой версии нет: вы запускаете программу сами.</li><li>Нет баз записей и ДНК, а на одну установку приходится одно дерево.</li></ul>
+<ul class="limits"><li>Один автор, и проект молодой. Шероховатости будут.</li><li>На Windows работает через Docker. Установщик для PowerShell на настоящем компьютере с Windows не пробовали.</li><li>Из 10 языков приложения 6 (португальский, французский, немецкий, итальянский, украинский, польский) — машинный перевод с пометкой «бета».</li><li>Размещённой версии нет: вы запускаете программу сами.</li><li>Нет баз записей и ДНК, а на одну установку приходится одно дерево.</li></ul>
 </div></section>
 
 <section id="faq" aria-labelledby="faq-h"><div class="wrap">
 <h2 id="faq-h">Вопросы</h2>
 <div class="faq">
-<details open><summary>Правда бесплатно?</summary><p>Да. Folkbranch — открытая программа под лицензией AGPL-3.0, платных тарифов нет. Вы платите только за свой сервер, если он у вас есть. Необязательный ассистент и облачное распознавание речи работают по вашим ключам у их провайдеров, и платите вы им сами.</p></details>
-<details open><summary>Нужен ли сервер?</summary><p>Нет. На вашем компьютере программа запускается одной командой, и вы открываете её в браузере. Сервер нужен, только если родные должны заходить в архив откуда угодно. Ссылка с домашнего компьютера открывается только дома, пока вы не выполните ./folkbranch share: он даёт временный адрес.</p></details>
-<details open><summary>Что видит родственник?</summary><p>Ссылку, вопрос и одну большую кнопку «Начать запись». Ни аккаунт, ни приложение не нужны, а запись ждёт вашей проверки, прежде чем попасть в архив.</p></details>
-<details><summary>Что-нибудь уходит с моего сервера?</summary><p>Само по себе нет. Единственный запрос, который сервер делает сам, спрашивает у GitHub, вышла ли новая версия, и ничего об архиве не сообщает; его можно отключить. Если вы подключите ИИ-провайдера или облачное распознавание речи, то, что читает ассистент, и каждая запись уходят этому сервису, и приложение предупредит об этом заранее.</p></details>
-<details><summary>Можно перенести дерево из Ancestry, MyHeritage или Gramps?</summary><p>Да, если сервис выгружает GEDCOM. Folkbranch покажет, что в файле, прежде чем что-то изменится. В GEDCOM есть люди, связи, события и источники, но самих фотографий нет: загрузите картинки вместе с файлом, и они прикрепятся к нужным людям.</p></details>
-<details><summary>Как делаются копии и обновления?</summary><p>Сервер каждый день копирует базу и хранит последние семь копий, а ещё перед обновлением. Эти копии лежат на том же диске, поэтому скачайте и полную копию в настройках и храните её отдельно. Чтобы обновить, выполните команду установки ещё раз; данные останутся.</p></details>
+<details open><summary>Правда бесплатно?</summary><p>Да. Это открытая программа под лицензией AGPL-3.0, платных тарифов нет. Платите только за свой сервер, если он есть. Ассистент и облачная речь работают по вашим ключам, их оплата идёт провайдерам.</p></details>
+<details open><summary>Нужен ли сервер?</summary><p>Нет. На вашем компьютере программа запускается одной командой. Сервер нужен, только если родные должны заходить откуда угодно; дома ссылка открывается только дома, пока вы не выполните ./folkbranch share (временный адрес).</p></details>
+<details open><summary>Что видит родственник?</summary><p>Ссылку, вопрос и одну большую кнопку «Начать запись». Ни аккаунт, ни приложение не нужны, а запись ждёт вашей проверки.</p></details>
+<details><summary>Что-нибудь уходит с моего сервера?</summary><p>Само по себе нет. Единственный запрос, который сервер делает сам, спрашивает у GitHub, вышла ли новая версия, и ничего об архиве не сообщает; его можно отключить. Если вы подключите ИИ-провайдера или облачную речь, то, что читает ассистент, и каждая запись уходят этому сервису, и приложение предупредит заранее.</p></details>
+<details><summary>Можно перенести дерево из Ancestry, MyHeritage или Gramps?</summary><p>Да, если сервис выгружает GEDCOM. Folkbranch покажет, что в файле, прежде чем что-то изменится. Самих фотографий в GEDCOM нет: загрузите картинки вместе с файлом, и они прикрепятся к нужным людям.</p></details>
+<details><summary>Как делаются копии и обновления?</summary><p>Сервер каждый день копирует базу, хранит последние семь копий и копирует ещё раз перед обновлением. Они лежат на том же диске, поэтому скачайте и полную копию в настройках и храните её отдельно. Чтобы обновить, выполните команду установки ещё раз.</p></details>
 </div>
 </div></section>
 
-<section class="closing" aria-labelledby="end-h"><div class="wrap">
-<h2 id="end-h">Сначала осмотреться или сразу установить</h2>
+<section class="closing" aria-label="Сначала осмотреться или сразу установить"><div class="wrap">
 <div class="cta"><a class="btn primary" href="https://demo.folkbranch.com/">Попробовать демо</a><a class="btn" href="#install">Установить</a></div>
 </div></section>
 </main>
