@@ -70,3 +70,35 @@ describe('disk and totals', () => {
     expect(assistantRefusal(owner)).not.toContain('used up its share')
   })
 })
+
+describe('a full database', () => {
+  it('still switches the assistant off for the day (a file, not a row), and says in plain words that the copy is full', async () => {
+    // Fill the database to its limit, until a row of any size is refused.
+    const { getDb } = await import('../lib/db')
+    const put = getDb().$client.prepare('insert into settings (key, value) values (?, ?)')
+    let n = 0
+    for (const size of [20_000, 2_000, 100]) { for (;;) { try { put.run(`fill${n++}`, 'x'.repeat(size)) } catch { break } } }
+    const usage = await import('../app/api/demo/usage/route')
+    const day = new Date().toISOString().slice(0, 10)
+    const set = await usage.POST(new Request(`http://${HOST}/api/demo/usage`, { method: 'POST', headers: { 'x-demo-secret': SECRET }, body: JSON.stringify({ aiOffDay: day }) }))
+    expect(set.status).toBe(200)
+    const { assistantRefusal } = await import('../lib/agent/agent')
+    expect(assistantRefusal(owner)).toContain('used up its share')
+    await usage.POST(new Request(`http://${HOST}/api/demo/usage`, { method: 'POST', headers: { 'x-demo-secret': SECRET }, body: JSON.stringify({ aiOffDay: '2020-01-01' }) }))
+    // A write that does not fit answers with a sentence, not a server error.
+    hdrs = new Headers({ host: HOST, origin: `http://${HOST}`, cookie, 'content-type': 'application/json' })
+    const { POST } = await import('../app/api/v1/[...path]/route')
+    // Small writes still fit in the pages that are there; keep writing until one needs a page the copy may not have.
+    const { schema } = await import('../lib/db')
+    process.env.DEMO_PEOPLE = '100000'
+    let res: Response | undefined
+    for (let i = 0; i < 3000; i++) {
+      res = await POST(new Request(`http://${HOST}/api/v1/persons`, { method: 'POST', headers: hdrs, body: JSON.stringify({ person: { givenName: `Over${i}`, surname: 'Flow', otherNames: 'x'.repeat(100) } }) }), { params: Promise.resolve({ path: ['persons'] }) })
+      if (res.status !== 200) break
+    }
+    expect(getDb().select().from(schema.persons).all().length).toBeGreaterThan(27)
+    res = res!
+    expect(res.status).toBe(507)
+    expect((await res.json()).error).toBe('The demo copy is full: install your own copy to keep going.')
+  })
+})

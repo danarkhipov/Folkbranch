@@ -2153,5 +2153,6 @@
   "Counting across the archive": "Liczy w całym archiwum",
   "Looking for who lived together": "Szuka, kto mieszkał razem",
   "Demo with an invented family. Everything is deleted after an hour, so do not upload real family data.": "Demo z wymyśloną rodziną. Po godzinie wszystko jest usuwane, więc nie wgrywaj prawdziwych danych rodzinnych.",
-  "Install your own": "Zainstaluj własną"
+  "Install your own": "Zainstaluj własną",
+  "Assistant messages left in this demo: {count}": "Pozostałe wiadomości do asystenta w tym demo: {count}"
 }

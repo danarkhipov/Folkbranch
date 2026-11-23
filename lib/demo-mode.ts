@@ -1,12 +1,17 @@
 // The public demo: every copy is a throwaway archive of an invented family. Nothing here changes anything unless
 // FOLKBRANCH_DEMO=1 is set, so a normal install behaves exactly as before. docs/DEMO.md lists what is refused and why.
 import { createHash, timingSafeEqual } from 'node:crypto'
+import fs from 'node:fs'
+import path from 'node:path'
 import { count, sum } from 'drizzle-orm'
-import { getDb, schema } from './db'
+import { DATA_DIR, getDb, schema } from './db'
 import { getSetting, setSetting } from './ops/app-config'
 import { OpError } from './op-error'
 
 export const demoOn = () => process.env.FOLKBRANCH_DEMO === '1'
+
+/** What a person is told when the copy's database or disk has no room left, in place of a bare server error. */
+export const DEMO_FULL = 'The demo copy is full: install your own copy to keep going.'
 
 /** The one sentence every refusal says. */
 export const DEMO_REFUSAL = 'Not available in the demo: install your own copy to use this.'
@@ -78,15 +83,53 @@ export function demoAssistantOff() {
   if (!demoOn()) return null
   if (process.env.DEMO_AI === 'off') return 'The assistant is switched off in this demo: install your own copy to use it.'
   // The router switches every copy off for the rest of a UTC day when all copies together have spent the day's budget.
-  if (getSetting(BUDGET_KEY) === new Date().toISOString().slice(0, 10)) return 'The demo\'s assistant has used up its share for today and works again tomorrow: install your own copy to use it now.'
+  if (offDay() === new Date().toISOString().slice(0, 10)) return 'The demo\'s assistant has used up its share for today and works again tomorrow: install your own copy to use it now.'
   return null
 }
 
-const BUDGET_KEY = 'demoAiOffDay'
+// A file, not a row: it must work when the copy's database is full, which is just when someone is trying to get past a limit.
+const offFile = () => path.join(/*turbopackIgnore: true*/ DATA_DIR, 'demo-ai-off')
+const offDay = () => { try { return fs.readFileSync(offFile(), 'utf8').trim() } catch { return '' } }
 /** Called by the router, with its secret: the UTC day for which the assistant is off. */
-export const switchAssistantOffFor = (day: string) => setSetting(BUDGET_KEY, day)
+export const switchAssistantOffFor = (day: string) => { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(offFile(), day) }
 
 const COUNT_KEY = 'demoAiMessages'
+
+/** Messages to the assistant this copy may still send. */
+export const demoAiLeft = () => Math.max(0, demoAiMessages() - Number(getSetting(COUNT_KEY) ?? 0))
+
+/** The approvals this copy has itself asked a person for, each good once: the ids are the server's, not the visitor's. */
+const issued = new Set<string>()
+const MAX_ISSUED = 500
+
+/** Passes the answer through and remembers the id of every approval it asks for. */
+export function rememberApprovals() {
+  let tail = ''
+  const text = new TextDecoder()
+  return new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, controller) {
+      const seen = tail + text.decode(chunk, { stream: true })
+      for (const m of seen.matchAll(/"approvalId":"([^"]+)"/g)) {
+        issued.add(m[1])
+        if (issued.size > MAX_ISSUED) issued.delete(issued.values().next().value as string)
+      }
+      tail = seen.slice(-200)
+      controller.enqueue(chunk)
+    },
+  })
+}
+
+/**
+ * True when the last message only answers approvals this copy issued (and so uses them up); false for anything
+ * else, which counts. The ids of earlier turns are not looked at: they were used when they were answered.
+ */
+export function spendApprovals(last: { role: string; parts: object[] } | undefined) {
+  if (!last || last.role !== 'assistant') return false
+  const ids = (last.parts as { state?: unknown; approval?: { id?: unknown } }[]).filter((p) => p.state === 'approval-responded').map((p) => p.approval?.id)
+  if (!ids.length || !ids.every((id): id is string => typeof id === 'string' && issued.has(id))) return false
+  for (const id of ids as string[]) issued.delete(id)
+  return true
+}
 
 /** Counts one message to the assistant; returns the plain refusal when this copy has had all it gets. */
 export function takeDemoAiMessage() {

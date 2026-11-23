@@ -55,6 +55,11 @@ export default function AssistantPanel({ open, width, onWidth, onClose, onPath, 
   const [chatId, setChatId] = useState(() => last?.id ?? crypto.randomUUID())
   const { messages, sendMessage, status, stop, error, regenerate, addToolApprovalResponse, setMessages, clearError } = useChat({ transport, messages: last?.messages ?? [], sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses })
   const busy = status === 'submitted' || status === 'streaming'
+  // In the public demo the copy has a few messages to spend: say how many are left. The banner is how a screen knows it is the demo.
+  const [demo, setDemo] = useState(false)
+  useEffect(() => { setDemo(!!document.querySelector('[data-demo-banner]')) }, [])
+  const { data: left, refetch: recount } = useQuery({ queryKey: ['demo-ai'], queryFn: () => api<{ left: number }>('demo/ai'), enabled: demo, retry: false })
+  useEffect(() => { if (demo && status === 'ready') recount() }, [demo, status, recount])
   const pending = messages.at(-1)?.parts.filter((p): p is ToolUIPart => isToolUIPart(p) && p.state === 'approval-requested') ?? []
 
   // What a finished tool means for the screen behind the chat. What a reopened conversation did to the screen
@@ -197,6 +202,7 @@ export default function AssistantPanel({ open, width, onWidth, onClose, onPath, 
           <button className="underline" onClick={forgetEdits}>{t('Ask again')}</button>
         </p>
       )}
+      {demo && left && <p className="px-3 pt-1 text-xs text-ink-soft" data-demo-left>{t('Assistant messages left in this demo: {count}').replace('{count}', () => String(left.left))}</p>}
       <PromptInput className="composer px-2 pb-2 pt-1" multiple maxFileSize={40 * 1024 * 1024} onError={(e) => notify(e.message)} onSubmit={submit}>
         <AttachedFiles />
         <PromptInputBody>

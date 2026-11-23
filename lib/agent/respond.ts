@@ -7,7 +7,7 @@ import { OpError } from '../ops/core'
 import { tell } from '../ops/settings'
 import { stampMaker } from './stamp'
 import { attachmentBytes, attachmentIdFromUrl, attachmentView, getAttachment, readAttachmentText } from './attachments'
-import { demoOn, takeDemoAiMessage } from '../demo-mode'
+import { demoOn, rememberApprovals, spendApprovals, takeDemoAiMessage } from '../demo-mode'
 
 export const chatInput = z.object({
   messages: z.array(z.record(z.string(), z.unknown())).min(1).max(400),
@@ -57,24 +57,29 @@ export async function assistantResponse(person: Actor, body: unknown, opts: { mo
   const input = chatInput.parse(body)
   if (demoOn() && input.messages.length > 40) throw new OpError(413, 'The demo keeps conversations short: start a new one.')
   const messages = await validateUIMessages<UIMessage>({ messages: input.messages, tools: assistantTools(assistantActor(person)) as never })
-  // Every request that will call the model counts against the demo copy's share, whatever its last message says:
-  // the history is the visitor's own, so a trailing message of any role could be made up.
-  const over = takeDemoAiMessage()
-  if (over) throw new OpError(429, over)
   // Only the owner sends the archive to another of their services: a key added for speech is not a consent for chat.
   if (input.choice && person.role !== 'owner') throw new OpError(403, tell('Only the owner picks another model for an answer'))
   const picked = input.choice && !opts.model ? providerFor(input.choice.provider, input.choice.model) : null
   if (input.choice && !opts.model && !picked) throw new OpError(400, tell('This model is no longer available. Choose another under “Who answers”'))
   if (!opts.model && !picked) await replaceMissingModel()
   const sees = opts.model ? null : await modelSees(picked ?? undefined)
-  return createAgentUIStreamResponse({
+  const uiMessages = await withAttachments(person, messages.filter((m) => m.role !== 'system'), sees)
+  // Every request that is about to call the model counts against the demo copy's share, whatever its last message says:
+  // the history is the visitor's own, so a trailing message of any role could be made up. Only an answer to an approval
+  // this copy itself asked for (a single-use id it remembers) is free, and a request refused above counted nothing.
+  if (demoOn() && !spendApprovals(messages.at(-1))) {
+    const over = takeDemoAiMessage()
+    if (over) throw new OpError(429, over)
+  }
+  const res = await createAgentUIStreamResponse({
     agent: buildAgent(person, { sees, model: opts.model, provider: picked, trustWrites: input.trustWrites, focusId: input.focusId, since: lastAnswerAt(messages), hasFiles: messages.some((m) => m.parts.some((p) => p.type === 'file')) }),
     // Instructions come from the server alone.
-    uiMessages: await withAttachments(person, messages.filter((m) => m.role !== 'system'), sees),
+    uiMessages,
     abortSignal: opts.abortSignal,
     onError: (e) => (e instanceof ToolRefusal ? e.message : (e as { cause?: unknown })?.cause instanceof ToolRefusal ? ((e as { cause: Error }).cause.message) : providerFailure(e) ?? 'The assistant could not answer. Try again.'),
     // What the answer cost, for the check script and anyone who wants to watch it.
     // When it began, and at the end how long it took, in how many steps and tokens (see stamp.ts).
     messageMetadata: ((stamp) => ({ part }: { part: Parameters<typeof stamp>[0] }) => stamp(part))(stampMaker()),
   })
+  return demoOn() && res.body ? new Response(res.body.pipeThrough(rememberApprovals()), res) : res
 }

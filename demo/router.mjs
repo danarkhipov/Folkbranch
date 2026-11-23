@@ -110,7 +110,7 @@ const router = createRouter({
   defaultLang: env.DEMO_LANG === 'ru' ? 'ru' : 'en',
   turnstile,
   totalTokensDay: num('DEMO_TOTAL_TOKENS_DAY', 5_000_000),
-  budgetFile: path.join(root, 'budget.json'),
+  budgetFile: path.join(path.resolve(env.DEMO_STATE_DIR || root), 'budget.json'),
   cfSecret: env.DEMO_CF_SECRET || '',
 })
 

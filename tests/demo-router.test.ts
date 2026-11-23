@@ -18,12 +18,12 @@ type Slot = { id: number; port: number; ready: boolean; visitor: string | null; 
 /** Stands in for the app copies: answers who it is, signs a visitor in with a cookie, streams, and echoes a body. */
 function fakeDriver() {
   const servers = new Map<number, http.Server>()
-  const opts = { gate: null as Promise<void> | null, failKeep: false, spent: new Map<number, number>() }
+  const opts = { gate: null as Promise<void> | null, offGate: null as Promise<void> | null, usageDelay: 0, failKeep: false, spent: new Map<number, number>() }
   const log = { off: [] as { slot: number; day: string }[], starts: [] as { slot: number; lang: string; keep: boolean }[], stops: [] as number[], seen: [] as { slot: number; headers: http.IncomingHttpHeaders }[] }
   return {
     log, opts,
-    async usage(slot: Slot) { return opts.spent.get(slot.id) ?? 0 },
-    async setAiOff(slot: Slot, day: string) { log.off.push({ slot: slot.id, day }) },
+    async usage(slot: Slot) { const t = opts.spent.get(slot.id) ?? 0; if (opts.usageDelay) await new Promise((r) => setTimeout(r, opts.usageDelay)); return t },
+    async setAiOff(slot: Slot, day: string) { log.off.push({ slot: slot.id, day }); if (opts.offGate) await opts.offGate },
     async stop(slot: Slot) {
       const s = servers.get(slot.id)
       if (!s) return
@@ -463,5 +463,78 @@ describe('the total across copies', () => {
     // The next UTC day starts from nothing.
     clock += 24 * 3_600_000
     expect(await statsOf()).toMatchObject({ tokensToday: 0, assistantOff: false })
+  })
+})
+
+describe('requests sent together', () => {
+  const slowCheck = async (_url: string, init: { body: URLSearchParams }) => {
+    await new Promise((r) => setTimeout(r, 120))
+    return { json: async () => ({ success: init.body.get('response') === 'good' }) }
+  }
+
+  it('give one address one copy and one start, however many arrive before the check answers', async () => {
+    await boot({ size: 4, turnstile: { secret: 's', siteKey: 'k' }, fetchImpl: slowCheck })
+    const all = await Promise.all(Array.from({ length: 4 }, () => startAs('198.51.100.1', 'lang=en&cf-turnstile-response=good')))
+    expect(all.map((r) => r.status).sort()).toEqual([303, 429, 429, 429])
+    expect(router.pool.stats().inUse).toBe(1)
+  })
+
+  it('count only the starts that came to something: failed checks give the address its start back', async () => {
+    await boot({ size: 4, startsPerHour: 2, turnstile: { secret: 's', siteKey: 'k' }, fetchImpl: slowCheck })
+    for (let i = 0; i < 4; i++) expect((await startAs('198.51.100.1', 'lang=en&cf-turnstile-response=bad')).status).toBe(403)
+    expect((await startAs('198.51.100.1', 'lang=en&cf-turnstile-response=good')).status).toBe(303)
+  })
+})
+
+describe('the total, read with care', () => {
+  const file = path.join(os.tmpdir(), `demo-budget2-${process.pid}.json`)
+  beforeEach(() => { fs.rmSync(file, { force: true }); return boot({ size: 1, totalTokensDay: 1000, budgetFile: file }) })
+  afterEach(() => fs.rmSync(file, { force: true }))
+  const total = () => JSON.parse(fs.readFileSync(file, 'utf8')).tokens
+
+  it('adds the same tokens once when two readings of one copy overlap', async () => {
+    await startAs('198.51.100.1')
+    driver.opts.spent.set(0, 500)
+    driver.opts.usageDelay = 40
+    await Promise.all([router.pollUsage(), router.pollUsage()])
+    clock += 21 * 60_000
+    const sweeping = router.sweep()
+    await Promise.all([router.pollUsage(), router.idle()])
+    expect(sweeping).toHaveLength(1)
+    expect(total()).toBe(500)
+  })
+
+  it('does not hand a slot to the next visitor unwiped when the visitor\'s time ran out while the copy was being switched off', async () => {
+    await startAs('198.51.100.1')
+    driver.opts.spent.set(0, 2000)
+    await router.pollUsage()
+    const slot = router.pool.slots[0]
+    let release = () => {}
+    driver.opts.offGate = new Promise<void>((r) => { release = r })
+    await driver.stop(slot)
+    router.crashed(slot)
+    await new Promise((r) => setTimeout(r, 30))
+    clock += 21 * 60_000
+    router.sweep()
+    driver.opts.offGate = null
+    release()
+    await router.idle()
+    expect(driver.log.starts.slice(-2).map((x: { keep: boolean }) => x.keep)).toEqual([true, false])
+    expect(slot.wipePending).toBe(false)
+  })
+})
+
+describe('a Cloudflare secret without the header', () => {
+  it('warns once that every visitor now shares one address', async () => {
+    await boot({ size: 2, cfSecret: 'cf-shared-secret', warnAfter: 3 })
+    for (let i = 0; i < 4; i++) await startAs(`9.9.9.${i}`)
+    expect(logged.filter((l) => l.event === 'warning')).toHaveLength(1)
+    expect(String(logged.find((l) => l.event === 'warning')!.message)).toContain('x-demo-cf')
+  })
+
+  it('stays quiet when the header comes with the requests', async () => {
+    await boot({ size: 4, cfSecret: 'cf-shared-secret', warnAfter: 3 })
+    for (let i = 0; i < 4; i++) await startAs(`9.9.9.${i}`, 'lang=en', { 'x-demo-cf': 'cf-shared-secret' })
+    expect(logged.filter((l) => l.event === 'warning')).toHaveLength(0)
   })
 })

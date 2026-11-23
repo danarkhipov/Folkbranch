@@ -2,7 +2,8 @@ import { LANG_ENUM } from '@/lib/languages'
 import { exportAiSettings, importAiSettings } from '@/lib/ops/ai-config'
 import { z } from 'zod'
 import { chooseModel, connectProvider, modelChoices, currentProvider, disconnectProvider, keyBalance, providerStatus, answerChoices } from '@/lib/agent/provider-key'
-import { requireRole } from '@/lib/ops/core'
+import { OpError, requireRole } from '@/lib/ops/core'
+import { demoAiLeft, demoAiMessages, demoOn } from '@/lib/demo-mode'
 import { acceptProposal, listProposals, myProposals, rejectProposal, removeProposalOp } from '@/lib/ops/proposals'
 import * as settings from '@/lib/ops/settings'
 import { createShare, listShares, revokeShare } from '@/lib/ops/share'
@@ -65,6 +66,7 @@ export const accessRoutes: Route[] = [
   human('PUT', 'ai-settings', 'Apply such a file: what can be applied is, and the rest is named', async ({ actor, body }) => importAiSettings(actor, await body())),
   human('GET', 'assistant/provider', 'Which AI provider is connected', ({ actor }) => providerStatus(actor)),
   human('GET', 'assistant/choices', 'Services and models the owner added, to pick one for an answer', ({ actor }) => (actor.role === 'owner' ? answerChoices() : [])),
+  human('GET', 'demo/ai', 'How many messages to the assistant this demo copy has left', () => { if (!demoOn()) throw new OpError(404, 'not found'); return { left: demoAiLeft(), limit: demoAiMessages() } }),
   human('GET', 'ai/usage', 'Who used which AI function this month, from real figures only', ({ actor }) => usageReport(actor)),
   human('GET', 'ai/keys', 'Keys to AI services, and which functions use each', ({ actor }) => listServices(actor)),
   human('PUT', 'ai/keys', 'Add a key to an AI service, checked with it first', async ({ actor, body }) => addKey(actor, await body())),

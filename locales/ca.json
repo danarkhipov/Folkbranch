@@ -2148,5 +2148,6 @@
   "Counting across the archive": "Comptant a tot l'arxiu",
   "Looking for who lived together": "Cercant qui va viure junt",
   "Demo with an invented family. Everything is deleted after an hour, so do not upload real family data.": "Demostració amb una família inventada. Tot s'esborra passada una hora, així que no pugis dades reals de la teva família.",
-  "Install your own": "Instal·la la teva"
+  "Install your own": "Instal·la la teva",
+  "Assistant messages left in this demo: {count}": "Missatges a l'assistent que queden en aquesta demostració: {count}"
 }

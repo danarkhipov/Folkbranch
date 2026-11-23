@@ -2153,5 +2153,6 @@
   "Counting across the archive": "Рахує по всьому архіву",
   "Looking for who lived together": "Шукає, хто жив поруч",
   "Demo with an invented family. Everything is deleted after an hour, so do not upload real family data.": "Демо з вигаданою родиною. Через годину все видаляється, тому не завантажуйте справжні родинні дані.",
-  "Install your own": "Встановити свою"
+  "Install your own": "Встановити свою",
+  "Assistant messages left in this demo: {count}": "Повідомлень асистенту залишилось у цьому демо: {count}"
 }

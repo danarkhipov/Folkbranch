@@ -92,6 +92,8 @@ export function createLimiter({ max, windowMs, now = Date.now }) {
     peek(key) { return kept(key).length < max },
     /** Counts one start. */
     hit(key) { seen.set(key, [...kept(key), now()]) },
+    /** Takes back the latest count of a start that came to nothing. */
+    undo(key) { seen.set(key, kept(key).slice(0, -1)) },
     allow(key) {
       const t = now()
       const kept = (seen.get(key) ?? []).filter((x) => t - x < windowMs)
@@ -187,7 +189,7 @@ export function createRouter({
   /** Tokens all copies together may spend in a UTC day; then every copy's assistant is switched off until the next day. 0 means no total. */
   totalTokensDay = 0, budgetFile = null,
   /** A header Cloudflare is made to add: only with it is CF-Connecting-IP believed. Without the option the header is trusted as it comes. */
-  cfSecret = '', bodyTimeoutMs = 10_000, retryMs = 3000, keepFailures = 3,
+  cfSecret = '', warnAfter = 20, bodyTimeoutMs = 10_000, retryMs = 3000, keepFailures = 3,
 }) {
   const pool = createPool({ size, ttlMs, idleMs, now })
   const limiter = createLimiter({ max: startsPerHour, windowMs: 3_600_000, now })
@@ -195,6 +197,8 @@ export function createRouter({
   const secure = publicUrl.startsWith('https:')
   const hashIp = (ip) => createHash('sha256').update(`${secret}:${ip}`).digest('hex').slice(0, 10)
   const resetting = new Map()
+  /** Addresses with a start in progress, between the check and the copy being given. */
+  const starting = new Set()
   let everReady = false
   let stopped = false
 
@@ -211,13 +215,17 @@ export function createRouter({
   }
   const switchOff = (slot) => driver.setAiOff?.(slot, today()).catch((e) => log('ai-off-failed', { slot: slot.id, error: String(e?.message ?? e) }))
   /** What a copy has spent since it was last asked, added to the total; the assistant goes off everywhere when the total is used up. */
-  async function collect(slot, force = false) {
-    if (!(slot.ready || force) || !driver.usage) return
-    let t
-    try { t = await driver.usage(slot) } catch { return }
-    addTokens(t >= slot.reported ? t - slot.reported : t)
-    slot.reported = t
-    if (budgetOut()) await Promise.all(pool.slots.filter((s) => s.ready).map(switchOff))
+  function collect(slot, force = false) {
+    if (!(slot.ready || force) || !driver.usage) return Promise.resolve()
+    // One reading at a time per copy, against the last figure seen: two at once would add the same tokens twice.
+    slot.collecting = (slot.collecting ?? Promise.resolve()).then(async () => {
+      let t
+      try { t = await driver.usage(slot) } catch { return }
+      addTokens(t >= slot.reported ? t - slot.reported : t)
+      slot.reported = t
+      if (budgetOut()) await Promise.all(pool.slots.filter((s) => s.ready).map(switchOff))
+    })
+    return slot.collecting
   }
   const pollUsage = () => Promise.all(pool.slots.filter((s) => s.ready && s.visitor).map(collect))
 
@@ -246,8 +254,9 @@ export function createRouter({
           await driver.start(slot, wanted, { keep: keepData && !slot.wipePending && failures < keepFailures })
           slot.lang = wanted
           slot.reported = 0
-          if (slot.wipePending) { slot.wipePending = false; keepData = false; lang = wanted; continue }
+          // Before the wipe check: the wait can be long enough for the visitor's time to run out.
           if (budgetOut()) await switchOff(slot)
+          if (slot.wipePending) { slot.wipePending = false; keepData = false; lang = wanted; continue }
           slot.ready = true
           everReady = true
           return
@@ -299,11 +308,15 @@ export function createRouter({
 
   const html = (res, status, body, extra = {}) => { res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', ...extra }); res.end(body) }
   /** The visitor's address: Cloudflare's header when it can be believed, else the connection's own. */
+  let viaCf = 0
+  let direct = 0
   const ipOf = (req) => {
-    const direct = String(req.socket.remoteAddress ?? '')
+    const peer = String(req.socket.remoteAddress ?? '')
     const cf = req.headers['cf-connecting-ip']
-    if (cf && (!cfSecret || sameSecret(req.headers['x-demo-cf'], cfSecret))) return String(cf)
-    return cfSecret ? `direct:${direct}` : direct
+    if (cf && (!cfSecret || sameSecret(req.headers['x-demo-cf'], cfSecret))) { viaCf++; return String(cf) }
+    // With the secret set, a request without the header makes everyone share one address: say so, once, before it bites.
+    if (cfSecret && ++direct === warnAfter && !viaCf) log('warning', { message: `DEMO_CF_SECRET is set but ${warnAfter} requests carried no valid x-demo-cf header: every visitor shares one address. Check the Cloudflare Transform Rule that adds it.` })
+    return cfSecret ? `direct:${peer}` : peer
   }
   // Kept a day past the copy's life, so a visitor who comes back is told that their demo ended, not shown a stranger's start page.
   const routerCookie = (value) => `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.ceil(ttlMs / 1000) + 86_400}${secure ? '; Secure' : ''}`
@@ -319,12 +332,25 @@ export function createRouter({
     }
     const lang = form.get('lang') === 'ru' ? 'ru' : form.get('lang') === 'en' ? 'en' : langOfHeader(req.headers['accept-language'])
     if (!limiter.peek(ip)) { log('start-limited', { ip: owner }); return html(res, 429, noticePage(lang, 'limit')) }
-    if (pool.liveFor(owner)) { log('start-already', { ip: owner }); return html(res, 429, noticePage(lang, 'already')) }
-    if (!(await verifyTurnstile(form.get('cf-turnstile-response'), ip))) { log('start-check-failed', { ip: owner }); return html(res, 403, noticePage(lang, 'check')) }
-    const got = pool.assign(lang, owner)
-    if (!got) { log('start-busy', { ip: owner }); return html(res, 503, busyPage(lang, pool.minutesToFree()), { 'retry-after': '60' }) }
-    // Only a start that got a copy counts against the address.
+    if (starting.has(owner) || pool.liveFor(owner)) { log('start-already', { ip: owner }); return html(res, 429, noticePage(lang, 'already')) }
+    // The address is taken, and the start counted, before anything is waited for: requests sent together meet the reservation.
+    starting.add(owner)
     limiter.hit(ip)
+    let kept = false
+    try {
+      if (!(await verifyTurnstile(form.get('cf-turnstile-response'), ip))) { log('start-check-failed', { ip: owner }); return html(res, 403, noticePage(lang, 'check')) }
+      const got = pool.assign(lang, owner)
+      if (!got) { log('start-busy', { ip: owner }); return html(res, 503, busyPage(lang, pool.minutesToFree()), { 'retry-after': '60' }) }
+      kept = true
+      return await give(req, res, got, lang, owner)
+    } finally {
+      starting.delete(owner)
+      // Only a start that got a copy counts against the address.
+      if (!kept) limiter.undo(ip)
+    }
+  }
+
+  async function give(req, res, got, lang, owner) {
     const { slot, token, needsReset } = got
     try {
       // A copy in the other language is made fresh in this one; the visitor's time starts when it is ready.

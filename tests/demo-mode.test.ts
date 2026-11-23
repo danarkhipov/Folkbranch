@@ -358,3 +358,72 @@ describe('the banner', () => {
     expect(renderToStaticMarkup(DemoShell({ lang: 'ru', children: null }))).toContain('Демо с выдуманной семьёй')
   })
 })
+
+describe('approvals and the count', () => {
+  const owner = { userId: 'u', name: 'O', role: 'owner' as const, personId: null }
+  const editor = { userId: 'e', name: 'E', role: 'editor' as const, personId: null }
+  const usage2 = { inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 1, text: 1, reasoning: 0 } }
+  const chunks = (parts: object[]) => ({ stream: simulateReadableStream({ chunks: [{ type: 'stream-start', warnings: [] }, ...parts, { type: 'finish', finishReason: { unified: parts.some((p) => (p as { type: string }).type === 'tool-call') ? 'tool-calls' : 'stop', raw: 'x' }, usage: usage2 }] as never[] }) })
+  const text = (t: string) => chunks([{ type: 'text-start', id: 't' }, { type: 'text-delta', id: 't', delta: t }, { type: 'text-end', id: 't' }])
+  const call = (name: string, input: unknown) => chunks([{ type: 'tool-call', toolCallId: `c${Math.random()}`, toolName: name, input: JSON.stringify(input) }])
+  const plain = () => new MockLanguageModelV4({ doStream: async () => text('ok') as never })
+  const count = async () => Number((await import('../lib/ops/app-config')).getSetting('demoAiMessages') ?? 0)
+
+  /** A request that makes the assistant ask to confirm an edit with an outside link: returns the message holding the card. */
+  async function askForApproval() {
+    const { assistantResponse } = await import('../lib/agent/respond')
+    const { readUIMessageStream } = await import('ai')
+    const { getDb, schema } = await import('../lib/db')
+    const person = getDb().select().from(schema.persons).get()!
+    const model = new MockLanguageModelV4({ doStream: [call('use_tools', { groups: ['pages'] }), call('create_page', { personId: person.id, title: 'x', markdown: '![x](https://evil.test/a.png)' })] as never })
+    const res = await assistantResponse(owner, { messages: [{ id: 'u1', role: 'user', parts: [{ type: 'text', text: 'add a page' }] }] }, { model })
+    const lines = (await res.text()).split('\n').filter((l) => l.startsWith('data: ') && !l.includes('[DONE]')).map((l) => JSON.parse(l.slice(6)))
+    let message: { parts: { type: string; state?: string; approval?: { id: string } }[] } | undefined
+    for await (const x of readUIMessageStream({ stream: new ReadableStream({ start(c) { lines.forEach((y) => c.enqueue(y)); c.close() } }) })) message = x as never
+    const part = message!.parts.find((p) => p.state === 'approval-requested')!
+    return { message: message as { id: string; role: string; parts: object[] }, part }
+  }
+  const answered = (m: { parts: object[] }, part: { approval?: { id: string } }, id = part.approval!.id) => ({
+    ...m, role: 'assistant', parts: m.parts.map((p) => (p === part ? { ...p, state: 'approval-responded', approval: { id, approved: false } } : p)),
+  })
+  const send = async (messages: object[], who: typeof owner | typeof editor = owner, extra = {}) => {
+    const { assistantResponse } = await import('../lib/agent/respond')
+    return (await assistantResponse(who, { messages, ...extra }, { model: plain() })).text()
+  }
+  const first = { id: 'u1', role: 'user', parts: [{ type: 'text', text: 'add a page' }] }
+
+  it('lets an answer to an approval this copy asked for go free, once, and counts a made-up one', async () => {
+    const { setSetting } = await import('../lib/ops/app-config')
+    setSetting('demoAiMessages', '0')
+    process.env.DEMO_AI_MESSAGES = '50'
+    const { message, part } = await askForApproval()
+    expect(part.approval?.id).toBeTruthy()
+    expect(await count()).toBe(1)
+    // The real answer to the card the server issued costs nothing.
+    await send([first, answered(message, part)])
+    expect(await count()).toBe(1)
+    // The same id again is used up: it counts.
+    await send([first, answered(message, part)])
+    expect(await count()).toBe(2)
+    // An id the server never issued counts.
+    await send([first, answered(message, part, 'made-up-id')])
+    expect(await count()).toBe(3)
+  })
+
+  it('does not count a request that is refused before the model is called', async () => {
+    const { setSetting } = await import('../lib/ops/app-config')
+    setSetting('demoAiMessages', '0')
+    process.env.DEMO_AI_MESSAGES = '50'
+    await expect(send([first], editor, { choice: { provider: 'openai', model: 'x' } })).rejects.toMatchObject({ status: 403 })
+    expect(await count()).toBe(0)
+  })
+
+  it('says how many messages are left, for the panel', async () => {
+    const { setSetting } = await import('../lib/ops/app-config')
+    setSetting('demoAiMessages', '3')
+    process.env.DEMO_AI_MESSAGES = '20'
+    expect((await rest('GET', 'demo/ai')).body).toEqual({ left: 17, limit: 20 })
+    demo(false)
+    expect((await rest('GET', 'demo/ai')).status).toBe(404)
+  })
+})
