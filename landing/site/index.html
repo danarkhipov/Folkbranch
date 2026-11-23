@@ -111,7 +111,7 @@ html:not(.js) .tabs{display:none}
 .step h3{margin-top:2px}
 .step p{color:var(--soft);font-size:17px}
 .step .frame{align-self:flex-start}
-.step .frame{width:100%;max-width:343px}
+.step .frame{width:100%;max-width:310px}
 .step .frame img{width:100%}
 /* facts */
 .facts{display:grid;gap:0;margin:24px 0 0;padding:0}
@@ -159,7 +159,8 @@ footer nav{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}
  .tabs{grid-template-columns:repeat(4,auto);justify-content:start}
  .tabs button{padding:0 22px}
  .cta{grid-template-columns:auto auto;max-width:none;justify-content:start}
- .btn{padding:6px 28px;font-size:18px;min-width:210px}
+ .btn{padding:6px 28px;font-size:18px;min-width:210px;white-space:nowrap}
+ html[lang=ru] h1{font-size:50px}
  .well{flex-direction:row;align-items:center;justify-content:space-between;padding:16px 18px}
  .well code{font-size:16px}
  .copy{flex:none}
@@ -175,6 +176,7 @@ footer nav{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}
  .cmp thead th:nth-child(2){padding-left:14px;background:rgba(154,71,39,.07)}
  .facts{grid-template-columns:1fr 1fr;gap:0 48px}
  .steps{grid-template-columns:1fr 1fr;gap:44px 48px}
+ .step .frame{max-width:343px}
 }
 @media (min-width:980px){
  .hero .wrap{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,6fr);gap:48px;align-items:center}
@@ -224,10 +226,10 @@ footer nav{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}
 <h2 id="how-h">How it works</h2>
 <p class="kicker">Four steps, from a question to a story on the person’s page.</p>
 <ol class="steps">
-<li class="step"><span class="num" aria-hidden="true">1</span><h3>Send a question by link</h3><p>Open a person, pick up to five questions or write your own, and copy the link. Send it in any messenger.</p><div class="frame"><img src="/assets/step-ask-en.webp" alt="The dialog that makes the link, with a copy button" width="770" height="834" loading="lazy" decoding="async"></div></li>
-<li class="step"><span class="num" aria-hidden="true">2</span><h3>The relative records on their phone</h3><p>They tap the link, pick a question and press one big button. No app and no account.</p><div class="frame"><img src="/assets/step-voice-en.webp" alt="A relative’s phone: a question and a Start recording button" width="780" height="880" loading="lazy" decoding="async"></div></li>
-<li class="step"><span class="num" aria-hidden="true">3</span><h3>You check it</h3><p>The recording waits in Review. Listen to it, then accept or reject it.</p><div class="frame"><img src="/assets/step-review-en.webp" alt="The Review panel with a recording to accept or reject" width="780" height="660" loading="lazy" decoding="async"></div></li>
-<li class="step"><span class="num" aria-hidden="true">4</span><h3>It lands on the person’s page</h3><p>An accepted story sits on that person’s Stories tab, with their biography and photos and their place in the tree.</p><div class="frame"><img src="/assets/step-page-en.webp" alt="A person’s Stories tab with an accepted recording" width="780" height="910" loading="lazy" decoding="async"></div></li>
+<li class="step"><span class="num" aria-hidden="true">1</span><h3>Send a question by link</h3><p>Open a person, pick up to five questions or write your own, and copy the link. Send it in any messenger.</p><div class="frame"><img src="/assets/step-ask-en.webp" alt="The dialog that makes the link, with a copy button" width="768" height="852" decoding="async"></div></li>
+<li class="step"><span class="num" aria-hidden="true">2</span><h3>The relative records on their phone</h3><p>They tap the link, pick a question and press one big button. No app and no account.</p><div class="frame"><img src="/assets/step-voice-en.webp" alt="A relative’s phone: a question and a Start recording button" width="780" height="880" decoding="async"></div></li>
+<li class="step"><span class="num" aria-hidden="true">3</span><h3>You check it</h3><p>The recording waits in Review. Listen to it, then accept or reject it.</p><div class="frame"><img src="/assets/step-review-en.webp" alt="The Review panel with a recording to accept or reject" width="780" height="660" decoding="async"></div></li>
+<li class="step"><span class="num" aria-hidden="true">4</span><h3>It lands on the person’s page</h3><p>An accepted story sits on that person’s Stories tab, with their biography and photos and their place in the tree.</p><div class="frame"><img src="/assets/step-page-en.webp" alt="A person’s Stories tab with an accepted recording" width="780" height="910" decoding="async"></div></li>
 </ol>
 </div></section>
 

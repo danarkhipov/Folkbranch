@@ -111,7 +111,7 @@ html:not(.js) .tabs{display:none}
 .step h3{margin-top:2px}
 .step p{color:var(--soft);font-size:17px}
 .step .frame{align-self:flex-start}
-.step .frame{width:100%;max-width:343px}
+.step .frame{width:100%;max-width:310px}
 .step .frame img{width:100%}
 /* facts */
 .facts{display:grid;gap:0;margin:24px 0 0;padding:0}
@@ -159,7 +159,8 @@ footer nav{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}
  .tabs{grid-template-columns:repeat(4,auto);justify-content:start}
  .tabs button{padding:0 22px}
  .cta{grid-template-columns:auto auto;max-width:none;justify-content:start}
- .btn{padding:6px 28px;font-size:18px;min-width:210px}
+ .btn{padding:6px 28px;font-size:18px;min-width:210px;white-space:nowrap}
+ html[lang=ru] h1{font-size:50px}
  .well{flex-direction:row;align-items:center;justify-content:space-between;padding:16px 18px}
  .well code{font-size:16px}
  .copy{flex:none}
@@ -175,6 +176,7 @@ footer nav{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}
  .cmp thead th:nth-child(2){padding-left:14px;background:rgba(154,71,39,.07)}
  .facts{grid-template-columns:1fr 1fr;gap:0 48px}
  .steps{grid-template-columns:1fr 1fr;gap:44px 48px}
+ .step .frame{max-width:343px}
 }
 @media (min-width:980px){
  .hero .wrap{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,6fr);gap:48px;align-items:center}
@@ -195,7 +197,7 @@ footer nav{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}
 <main id="main">
 <section class="hero"><div class="wrap">
 <div>
-<h1>Семейное древо, фото и голосовые рассказы родных на вашем сервере</h1>
+<h1>Семейное древо, фото и голосовые рассказы на вашем сервере</h1>
 <p class="sub">Отправьте родственнику ссылку. Он запишет рассказ с телефона, без регистрации. Вы проверите запись, и она появится на странице этого человека.</p>
 <div class="cta"><a class="btn primary" href="https://demo.folkbranch.com/">Попробовать демо</a><a class="btn" href="#install">Установить</a></div>
 <p class="note">Бесплатно, открытый код (AGPL-3.0). Работает на вашем компьютере или сервере.</p>
@@ -224,10 +226,10 @@ footer nav{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}
 <h2 id="how-h">Как это работает</h2>
 <p class="kicker">Четыре шага: от вопроса до рассказа на странице человека.</p>
 <ol class="steps">
-<li class="step"><span class="num" aria-hidden="true">1</span><h3>Отправляете вопрос по ссылке</h3><p>Откройте человека, выберите до пяти вопросов или напишите свои и скопируйте ссылку. Отправьте её в любом мессенджере.</p><div class="frame"><img src="/assets/step-ask-ru.webp" alt="Окно, в котором создаётся ссылка, с кнопкой копирования" width="770" height="834" loading="lazy" decoding="async"></div></li>
-<li class="step"><span class="num" aria-hidden="true">2</span><h3>Родственник записывает рассказ на телефоне</h3><p>Он открывает ссылку, выбирает вопрос и нажимает одну большую кнопку. Ни приложения, ни аккаунта.</p><div class="frame"><img src="/assets/step-voice-ru.webp" alt="Телефон родственника: вопрос и кнопка «Начать запись»" width="780" height="880" loading="lazy" decoding="async"></div></li>
-<li class="step"><span class="num" aria-hidden="true">3</span><h3>Вы проверяете запись</h3><p>Запись ждёт в разделе «Проверка». Послушайте и примите её или отклоните.</p><div class="frame"><img src="/assets/step-review-ru.webp" alt="Панель проверки с записью, которую можно принять или отклонить" width="780" height="660" loading="lazy" decoding="async"></div></li>
-<li class="step"><span class="num" aria-hidden="true">4</span><h3>Рассказ попадает на страницу человека</h3><p>Принятый рассказ лежит на вкладке «Рассказы» этого человека, рядом с биографией, фотографиями и местом в древе.</p><div class="frame"><img src="/assets/step-page-ru.webp" alt="Вкладка «Рассказы» человека с принятой записью" width="780" height="910" loading="lazy" decoding="async"></div></li>
+<li class="step"><span class="num" aria-hidden="true">1</span><h3>Отправляете вопрос по ссылке</h3><p>Откройте человека, выберите до пяти вопросов или напишите свои и скопируйте ссылку. Отправьте её в любом мессенджере.</p><div class="frame"><img src="/assets/step-ask-ru.webp" alt="Окно, в котором создаётся ссылка, с кнопкой копирования" width="768" height="888" decoding="async"></div></li>
+<li class="step"><span class="num" aria-hidden="true">2</span><h3>Родственник записывает рассказ на телефоне</h3><p>Он открывает ссылку, выбирает вопрос и нажимает одну большую кнопку. Ни приложения, ни аккаунта.</p><div class="frame"><img src="/assets/step-voice-ru.webp" alt="Телефон родственника: вопрос и кнопка «Начать запись»" width="780" height="880" decoding="async"></div></li>
+<li class="step"><span class="num" aria-hidden="true">3</span><h3>Вы проверяете запись</h3><p>Запись ждёт в разделе «Проверка». Послушайте и примите её или отклоните.</p><div class="frame"><img src="/assets/step-review-ru.webp" alt="Панель проверки с записью, которую можно принять или отклонить" width="780" height="660" decoding="async"></div></li>
+<li class="step"><span class="num" aria-hidden="true">4</span><h3>Рассказ попадает на страницу человека</h3><p>Принятый рассказ лежит на вкладке «Рассказы» этого человека, рядом с биографией, фотографиями и местом в древе.</p><div class="frame"><img src="/assets/step-page-ru.webp" alt="Вкладка «Рассказы» человека с принятой записью" width="780" height="910" decoding="async"></div></li>
 </ol>
 </div></section>
 
