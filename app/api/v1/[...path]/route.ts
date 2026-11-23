@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 import { z } from 'zod'
 import { fromOurPages } from '@/lib/same-origin'
+import { DEMO_REFUSAL, demoRefusesRoute } from '@/lib/demo-mode'
 import { getActor, guestActor, hasBearer } from '@/lib/api-auth'
 import { match, openApi } from '@/lib/api/router'
 import { accessRoutes } from '@/lib/api/routes/access'
@@ -25,6 +26,7 @@ const isDiskFull = (e: unknown) => ['ENOSPC', 'SQLITE_FULL'].includes((e as { co
 async function handle(req: Request, ctx: { params: Promise<{ path: string[] }> }) {
   const path = (await ctx.params).path
   if (req.method === 'GET' && path.join('/') === 'openapi.json') return Response.json(openApi(routes))
+  if (demoRefusesRoute(req.method, path.join('/'))) return Response.json({ error: DEMO_REFUSAL }, { status: 403 })
   const found = match(routes, req.method, path)
   if (!found) return Response.json({ error: 'not found' }, { status: 404 })
   // Before the body is read into memory.

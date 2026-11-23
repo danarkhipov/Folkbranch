@@ -9,7 +9,7 @@ import sharp from 'sharp'
 import { sheetCell } from '../import-formats'
 import { DATA_DIR } from '../db'
 import { newId, OpError, type Actor } from '../ops/core'
-import { checkDemoUpload, demoOn, demoStorageBytes } from '../demo-mode'
+import { checkDemoUpload, demoOn, demoStorageBytes, fullCopy } from '../demo-mode'
 
 const MAX_SIZE = 40 * 1024 * 1024
 const MAX_AGE = 14 * 24 * 3600 * 1000
@@ -53,7 +53,7 @@ export async function saveAttachment(actor: Actor, buf: Buffer, name: string): P
   if (buf.length > MAX_SIZE) throw new OpError(413, 'file too large')
   if (demoOn() && !(await isPicture(buf))) throw new OpError(403, 'The demo takes pictures and sound recordings only.')
   checkDemoUpload(buf.length, true)
-  if (demoOn() && (await folderBytes(dirOf(actor.userId))) + buf.length > demoStorageBytes()) throw new OpError(413, `The demo copy holds up to ${demoStorageBytes() / 1024 / 1024} MB of files: it is full.`)
+  if (demoOn() && (await folderBytes(dirOf(actor.userId))) + buf.length > demoStorageBytes()) throw fullCopy()
   const id = newId()
   await fs.mkdir(dirOf(actor.userId), { recursive: true })
   const put = (part: string, data: Buffer | string) => fs.writeFile(fileOf(actor.userId, id, part), data)

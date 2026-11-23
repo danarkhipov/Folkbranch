@@ -219,7 +219,7 @@ export function createRouter({ secret, size = 8, ttlMs = 60 * 60_000, idleMs = 2
 
   /** The app's own Set-Cookie lines for the demo owner, from the slot. */
   async function sessionCookies(slot) {
-    const res = await fetchImpl(`http://127.0.0.1:${slot.port}/api/demo/session`, { method: 'POST', headers: { 'x-demo-secret': secret } })
+    const res = await fetch(`http://127.0.0.1:${slot.port}/api/demo/session`, { method: 'POST', headers: { 'x-demo-secret': secret } })
     if (!res.ok) throw new Error(`session answered ${res.status}`)
     return res.headers.getSetCookie()
   }
