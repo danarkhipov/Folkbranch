@@ -58,7 +58,10 @@ export default function AssistantPanel({ open, width, onWidth, onClose, onPath, 
   // In the public demo the copy has a few messages to spend: say how many are left. The banner is how a screen knows it is the demo.
   const [demo] = useState(() => !!document.querySelector('[data-demo-banner]'))
   const { data: left, refetch: recount } = useQuery({ queryKey: ['demo-ai'], queryFn: () => api<{ left: number }>('demo/ai'), enabled: demo, retry: false })
-  useEffect(() => { if (demo && status === 'ready') recount() }, [demo, status, recount])
+  useEffect(() => { if (demo && (status === 'ready' || status === 'error')) recount() }, [demo, status, recount])
+  // The copy has no messages left: the box says so instead of offering a retry that cannot work.
+  const capped = demo && left?.left === 0
+  const capText = error ? plainError(error, t) : t('Assistant messages left in this demo: {count}').replace('{count}', () => '0')
   const pending = messages.at(-1)?.parts.filter((p): p is ToolUIPart => isToolUIPart(p) && p.state === 'approval-requested') ?? []
 
   // What a finished tool means for the screen behind the chat. What a reopened conversation did to the screen
@@ -181,7 +184,7 @@ export default function AssistantPanel({ open, width, onWidth, onClose, onPath, 
           {busy && !visiblyWorking(messages.at(-1), status) && <Thinking />}
           {error && (
             <div role="alert" className="text-xs text-destructive">
-              {plainError(error, t)} <button className="underline" onClick={() => regenerate()}>{t('Try again')}</button>
+              {plainError(error, t)} {!capped && <button className="underline" onClick={() => regenerate()}>{t('Try again')}</button>}
             </div>
           )}
         </ConversationContent>
@@ -205,11 +208,11 @@ export default function AssistantPanel({ open, width, onWidth, onClose, onPath, 
       <PromptInput className="composer px-2 pb-2 pt-1" multiple maxFileSize={40 * 1024 * 1024} onError={(e) => notify(e.message)} onSubmit={submit}>
         <AttachedFiles />
         <PromptInputBody>
-          <PromptInputTextarea aria-label={t('Message to the assistant')} placeholder={t(pending.length ? 'Answer the question above first' : 'Ask, or ask for a change…')} disabled={pending.length > 0} />
+          <PromptInputTextarea aria-label={t('Message to the assistant')} placeholder={capped ? capText : t(pending.length ? 'Answer the question above first' : 'Ask, or ask for a change…')} disabled={pending.length > 0 || capped} />
         </PromptInputBody>
         <PromptInputFooter>
           <PromptInputTools><AttachButton /><DictateButton /><ModelPick userId={me.id} pick={pick} onPick={setPick} /></PromptInputTools>
-          <PromptInputSubmit labels={{ send: t('Send'), stop: t('Stop') }} status={status} onStop={stop} disabled={pending.length > 0} className="size-7 rounded-full">{busy ? undefined : <ArrowUp className="size-4" />}</PromptInputSubmit>
+          <PromptInputSubmit labels={{ send: t('Send'), stop: t('Stop') }} status={status} onStop={stop} disabled={pending.length > 0 || capped} className="size-7 rounded-full">{busy ? undefined : <ArrowUp className="size-4" />}</PromptInputSubmit>
         </PromptInputFooter>
       </PromptInput>
     </aside>

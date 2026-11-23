@@ -97,9 +97,14 @@ try {
 
   // ---- the assistant answers (stub), and the 21st message is refused ----
   await one.page.getByRole('button', { name: /^AI/ }).first().click()
+  const leftText = () => one.page.locator('[data-demo-left]').innerText({ timeout: 5000 }).catch(() => '')
+  await one.page.locator('[data-demo-left]').waitFor({ timeout: 15_000 }).catch(() => {})
+  ok('the panel says 20 messages are left before the first', (await leftText()).endsWith(': 20'), await leftText())
   await ask(one.page, 'Hello')
   await one.page.getByText('Hello.').first().waitFor({ timeout: 30_000 })
   ok('the assistant answers', true)
+  await one.page.getByText(/: 19$/).first().waitFor({ timeout: 10_000 }).catch(() => {})
+  ok('and the count goes down to 19 after the answer', (await leftText()).endsWith(': 19'), await leftText())
   let allowed = 1
   for (let i = 0; i < 19; i++) {
     const r = await inPage(one.page, 'POST', '/api/agent', { messages: [{ id: `m${i}`, role: 'user', parts: [{ type: 'text', text: 'hi' }] }] })
@@ -110,6 +115,9 @@ try {
   const refusal = one.page.getByText(/up to 20 messages/).first()
   await refusal.waitFor({ timeout: 30_000 }).catch(() => {})
   ok('the 21st message is refused, in plain words on the screen', await refusal.isVisible().catch(() => false))
+  await one.page.getByText(/: 0$/).first().waitFor({ timeout: 10_000 }).catch(() => {})
+  ok('at the cap the counter reads 0', (await leftText()).endsWith(': 0'), await leftText())
+  ok('the cap offers no Try again, and the box is disabled', (await one.page.getByRole('button', { name: 'Try again' }).count()) === 0 && await one.page.getByRole('textbox').last().isDisabled())
   await one.page.screenshot({ path: path.join(data, 'cap.png') })
   const twentyOne = await inPage(one.page, 'POST', '/api/agent', { messages: [{ id: 'z', role: 'user', parts: [{ type: 'text', text: 'hi' }] }] })
   ok('and the server says 429', twentyOne.status === 429, String(twentyOne.status))
