@@ -18,11 +18,11 @@ type Slot = { id: number; port: number; ready: boolean; visitor: string | null; 
 /** Stands in for the app copies: answers who it is, signs a visitor in with a cookie, streams, and echoes a body. */
 function fakeDriver() {
   const servers = new Map<number, http.Server>()
-  const opts = { gate: null as Promise<void> | null, offGate: null as Promise<void> | null, usageDelay: 0, failKeep: false, spent: new Map<number, number>() }
+  const opts = { gate: null as Promise<void> | null, offGate: null as Promise<void> | null, usageDelay: 0, seq: [] as { value: number; delay: number }[], failKeep: false, spent: new Map<number, number>() }
   const log = { off: [] as { slot: number; day: string }[], starts: [] as { slot: number; lang: string; keep: boolean }[], stops: [] as number[], seen: [] as { slot: number; headers: http.IncomingHttpHeaders }[] }
   return {
     log, opts,
-    async usage(slot: Slot) { const t = opts.spent.get(slot.id) ?? 0; if (opts.usageDelay) await new Promise((r) => setTimeout(r, opts.usageDelay)); return t },
+    async usage(slot: Slot) { const next = opts.seq.shift(); if (next) { await new Promise((r) => setTimeout(r, next.delay)); return next.value } const t = opts.spent.get(slot.id) ?? 0; if (opts.usageDelay) await new Promise((r) => setTimeout(r, opts.usageDelay)); return t },
     async setAiOff(slot: Slot, day: string) { log.off.push({ slot: slot.id, day }); if (opts.offGate) await opts.offGate },
     async stop(slot: Slot) {
       const s = servers.get(slot.id)
@@ -492,16 +492,12 @@ describe('the total, read with care', () => {
   afterEach(() => fs.rmSync(file, { force: true }))
   const total = () => JSON.parse(fs.readFileSync(file, 'utf8')).tokens
 
-  it('adds the same tokens once when two readings of one copy overlap', async () => {
+  it('adds tokens once when readings of one copy overlap and the older answer arrives last', async () => {
     await startAs('198.51.100.1')
-    driver.opts.spent.set(0, 500)
-    driver.opts.usageDelay = 40
+    // The first reading is slow and sees 500; the second is quick and sees 700. Taken as they come, the late 500 would look like a new day and be added again.
+    driver.opts.seq = [{ value: 500, delay: 80 }, { value: 700, delay: 5 }]
     await Promise.all([router.pollUsage(), router.pollUsage()])
-    clock += 21 * 60_000
-    const sweeping = router.sweep()
-    await Promise.all([router.pollUsage(), router.idle()])
-    expect(sweeping).toHaveLength(1)
-    expect(total()).toBe(500)
+    expect(total()).toBe(700)
   })
 
   it('does not hand a slot to the next visitor unwiped when the visitor\'s time ran out while the copy was being switched off', async () => {

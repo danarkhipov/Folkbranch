@@ -40,7 +40,8 @@ Router (`demo/router.mjs`):
 | `DEMO_SWEEP_MS` | `5000` | How often expired copies are collected |
 | `TURNSTILE_SECRET`, `TURNSTILE_SITE_KEY` | unset | Cloudflare Turnstile on the start button. Unset: no check, which is allowed only on an `http` address (local and tests). With an `https` `DEMO_PUBLIC_URL` the router refuses to start without it, unless `DEMO_ALLOW_NO_TURNSTILE=1` |
 | `DEMO_CF_SECRET` | unset | A secret that a Cloudflare Transform Rule adds to every request as the header `x-demo-cf`. When set, `CF-Connecting-IP` is believed only with that header; a request without it is counted as one "direct" address, so reaching the router around Cloudflare (for example by the `*.up.railway.app` domain) cannot forge addresses. Unset: the header is believed as it comes, so **disable the Railway-generated domain** and let only Cloudflare reach the router |
-| `DEMO_TOTAL_TOKENS_DAY` | `5000000` | Tokens all copies together may spend in a UTC day. About 25 copies at the per-copy `AGENT_DAILY_TOKENS` of 200000; set it to what the day's spend on your key should be, with a cheap model. `0` means no total. Kept in `DEMO_ROOT/budget.json`, so a restart does not forget it |
+| `DEMO_TOTAL_TOKENS_DAY` | `5000000` | Tokens all copies together may spend in a UTC day. About 25 copies at the per-copy `AGENT_DAILY_TOKENS` of 200000; set it to what the day's spend on your key should be, with a cheap model. `0` means no total. Kept in `budget.json` in `DEMO_STATE_DIR`, so a restart of the process does not forget it; a redeploy does, unless that folder is on a volume (see below) |
+| `DEMO_STATE_DIR` | `DEMO_ROOT` | Where `budget.json` lives. `DEMO_ROOT` is ordinary container disk and is empty after every deploy, so **put `DEMO_STATE_DIR` on a small Railway volume** (a few MB, for example mounted at `/state`), or each redeploy starts a new full daily total. The copies' own data stays in `DEMO_ROOT`, with no volume |
 | `DEMO_USAGE_POLL_MS` | `30000` | How often the router asks each busy copy what it has spent (it also asks before wiping a copy) |
 | `DEMO_REQUEST_TIMEOUT_MIN` | `5` | The longest a request may take to arrive (an upload gets minutes). A page's live line is not limited by it. `/start` has its own 10 second, 2 KB limit |
 
@@ -51,7 +52,7 @@ App copy (`lib/demo-mode.ts`), all read from the environment of the copy:
 | Variable | Default | Meaning |
 |---|---|---|
 | `FOLKBRANCH_DEMO` | unset | `1` turns demo mode on. Without it nothing below does anything |
-| `DEMO_AI_MESSAGES` | `20` | Requests to the assistant per copy, every request that calls the model (an answer to a confirmation card too: the history is the visitor's, so a trailing message could be made up); then a plain message |
+| `DEMO_AI_MESSAGES` | `20` | Requests to the assistant per copy, every request that calls the model; then a plain message. Free: only an answer to a confirmation card this copy itself asked for (the server remembers the id it issued, single use). Anything else, a made-up one included, counts. A request refused before the model is called counts nothing. The assistant panel shows how many are left |
 | `AGENT_DAILY_TOKENS` | `200000` in the router, `5000000` otherwise | Tokens per day per copy, the existing limit |
 | `DEMO_AI` | unset | `off` switches the assistant off in the demo, with a plain message |
 | `DEMO_UPLOAD_MB` | `5` | Largest file. Pictures and sound recordings only |
@@ -85,6 +86,7 @@ The refusals are in English only: the sentences are server answers, not interfac
 - Per address: one live copy at a time (a second start gets a plain refusal), `DEMO_STARTS_PER_HOUR` counted only for starts that got a copy, and Turnstile on the start button (required on an `https` address). The address is `CF-Connecting-IP`, which anyone can write if they reach the router directly: keep the router behind Cloudflare only, as the public demo address, so the header is Cloudflare's.
 - Per copy: assistant requests (at most 40 messages of history, a 256 KB body, 8 steps for one message), tokens per day (the tool loop also stops the moment the day's tokens are used up), database size, upload size and room, number of people, one hour of life.
 - Across the demo: `DEMO_SLOTS` limits visitors at once, and so total memory and disk. Each copy is one Node process (the image caps its heap at 256 MB): plan roughly 300 MB per slot.
+- A copy's switch-off for the day is a file in its data folder, not a database row, so it works when the database is full. A write that does not fit answers "The demo copy is full: install your own copy to keep going."
 - Across all copies: `DEMO_TOTAL_TOKENS_DAY`. The router adds up what every copy has spent (read through the secret-protected `/api/demo/usage`, also before a copy is wiped). When the total is reached it switches the assistant off in every copy, with a plain message, until the next UTC day.
 - **A spending limit on the model provider's key is yours to set, in the provider's console.** The demo caps messages and tokens per copy, but only the provider can cap the total. Use a key made for the demo, with a low monthly limit, and a cheap model.
 - The assistant is told not to follow instructions found in archive text. That is a prompt, not a guarantee: the copy holds invented data only, and has no key or token to leak.
@@ -97,7 +99,7 @@ Kill switch: set `DEMO_AI=off` and redeploy to keep the demo but stop the spend;
 
 ## Running it
 
-On Railway: a service from the same image as the app, start command `node demo/router.mjs` (the image contains `demo/`), no volume, with the variables above and a domain. Redeploy it with every release (see [RELEASING.md](RELEASING.md)): it runs the code of the image it was built from, and the demo must show the current version.
+On Railway: a service from the same image as the app, start command `node demo/router.mjs` (the image contains `demo/`), one small volume for `DEMO_STATE_DIR` (the copies themselves need none), with the variables above and a domain. Redeploy it with every release (see [RELEASING.md](RELEASING.md)): it runs the code of the image it was built from, and the demo must show the current version.
 
 Locally, with the model stub (no paid model), after `pnpm build`:
 
@@ -110,3 +112,13 @@ node demo/router.mjs
 ```
 
 Open http://127.0.0.1:3700. The tests: `npx vitest run tests/demo-mode.test.ts tests/demo-router.test.ts` for the app side and the router with fake slots, and `node tests/e2e/demo.mjs` for the whole thing in a browser (about three minutes; it needs `pnpm build` first).
+
+## Shared addresses, and the Cloudflare header
+
+The one-copy-per-address rule and the start limit use the visitor's address. People behind one carrier NAT or an office network share an address: they share one copy at a time (a second visitor is told a copy from their connection is already running), and someone who loses their cookie waits for their copy to end, at most `DEMO_TTL_MIN`.
+
+If `DEMO_CF_SECRET` is set but the Cloudflare Transform Rule that adds `x-demo-cf` is missing or wrong, every real visitor falls into one "direct" address: one copy and a few starts an hour for everyone. The router logs a `warning` event once, after 20 requests without a valid header and none with one. Check the rule if you see it.
+
+## What a crash costs
+
+When a copy's process dies, the router reads its usage before wiping it, and cannot (the process is gone): the tokens since the last poll (`DEMO_USAGE_POLL_MS`, 30 s) are lost to the total. A copy restarted with its data kept is read again afterwards, from the counter in its own database, so only a wiped crash loses them. The error is small and in the cheap direction; the provider-side limit is still the real bound.

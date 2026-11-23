@@ -82,6 +82,8 @@ describe('a full database', () => {
     const day = new Date().toISOString().slice(0, 10)
     const set = await usage.POST(new Request(`http://${HOST}/api/demo/usage`, { method: 'POST', headers: { 'x-demo-secret': SECRET }, body: JSON.stringify({ aiOffDay: day }) }))
     expect(set.status).toBe(200)
+    // Written outside the database, so it cannot have been refused for want of room.
+    expect((await import('../lib/ops/app-config')).getSetting('demoAiOffDay')).toBeNull()
     const { assistantRefusal } = await import('../lib/agent/agent')
     expect(assistantRefusal(owner)).toContain('used up its share')
     await usage.POST(new Request(`http://${HOST}/api/demo/usage`, { method: 'POST', headers: { 'x-demo-secret': SECRET }, body: JSON.stringify({ aiOffDay: '2020-01-01' }) }))
