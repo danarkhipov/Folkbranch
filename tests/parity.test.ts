@@ -202,6 +202,7 @@ const UI_ONLY: [RegExp, string][] = [
   [/^(proposals\/:id|proposals\/suggest)/, 'accepting or rejecting a draft is a person’s decision; an agent’s own drafts are my_proposals'],
   [/^(persons\/:id\/contacts)/, 'how to reach a living relative: private, for editors’ eyes only'],
   [/^(presence|link-address|views|me$)/, 'what is on a person’s own screen'],
+  [/^demo\/ai$/, 'the public demo’s message counter, shown in the assistant panel'],
   [/^(stories|proposals\/:id\/ops)/, 'a story is a recording: it goes through a link or the app and waits for review (see create_story)'],
   [/^(merge$|duplicates\/dismiss)/, 'merging two cards is a person’s own act (mergePeople refuses a token and the assistant); the tools only compare'],
   [/^(places\/:id$|repositories)/, 'deleting a place or an archive, and the list of archives: left to the screen, not asked for yet'],
