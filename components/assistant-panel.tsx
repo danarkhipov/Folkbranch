@@ -56,8 +56,7 @@ export default function AssistantPanel({ open, width, onWidth, onClose, onPath, 
   const { messages, sendMessage, status, stop, error, regenerate, addToolApprovalResponse, setMessages, clearError } = useChat({ transport, messages: last?.messages ?? [], sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses })
   const busy = status === 'submitted' || status === 'streaming'
   // In the public demo the copy has a few messages to spend: say how many are left. The banner is how a screen knows it is the demo.
-  const [demo, setDemo] = useState(false)
-  useEffect(() => { setDemo(!!document.querySelector('[data-demo-banner]')) }, [])
+  const [demo] = useState(() => !!document.querySelector('[data-demo-banner]'))
   const { data: left, refetch: recount } = useQuery({ queryKey: ['demo-ai'], queryFn: () => api<{ left: number }>('demo/ai'), enabled: demo, retry: false })
   useEffect(() => { if (demo && status === 'ready') recount() }, [demo, status, recount])
   const pending = messages.at(-1)?.parts.filter((p): p is ToolUIPart => isToolUIPart(p) && p.state === 'approval-requested') ?? []
