@@ -5,13 +5,17 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
-import { createRouter } from './router-lib.mjs'
+import { createRouter, startupProblem } from './router-lib.mjs'
 
 const env = process.env
 const num = (name, fallback) => { const n = Number(env[name]); return env[name] !== undefined && env[name] !== '' && Number.isFinite(n) && n > 0 ? n : fallback }
 
 const secret = env.DEMO_ROUTER_SECRET
 if (!secret || secret.length < 16) { console.error('DEMO_ROUTER_SECRET is required: at least 16 characters, a long random string.'); process.exit(1) }
+
+const turnstile = env.TURNSTILE_SECRET ? { secret: env.TURNSTILE_SECRET, siteKey: env.TURNSTILE_SITE_KEY ?? '' } : null
+const problem = startupProblem({ publicUrl: (env.DEMO_PUBLIC_URL || env.BETTER_AUTH_URL || '').replace(/\/+$/, ''), turnstile, allowNoTurnstile: env.DEMO_ALLOW_NO_TURNSTILE === '1' })
+if (problem) { console.error(problem); process.exit(1) }
 
 const size = num('DEMO_SLOTS', 8)
 const root = path.resolve(env.DEMO_ROOT || '/tmp/folkbranch-demo')
@@ -43,7 +47,13 @@ async function healthy(slot, ms = 120_000) {
   throw new Error('the app did not come up')
 }
 
+const call = (slot, init = {}) => fetch(`http://127.0.0.1:${slot.port}/api/demo/usage`, { ...init, headers: { 'x-demo-secret': secret, 'content-type': 'application/json' }, signal: AbortSignal.timeout(5000) })
+
 const driver = {
+  /** Tokens the copy's assistant has spent today. */
+  async usage(slot) { const r = await call(slot); if (!r.ok) throw new Error(`usage answered ${r.status}`); return (await r.json()).tokens },
+  /** Switches the copy's assistant off for the UTC day named. */
+  async setAiOff(slot, day) { const r = await call(slot, { method: 'POST', body: JSON.stringify({ aiOffDay: day }) }); if (!r.ok) throw new Error(`switch answered ${r.status}`) },
   async stop(slot) {
     const child = children.get(slot.id)
     if (!child) return
@@ -57,6 +67,7 @@ const driver = {
     })
   },
   async start(slot, lang, { keep }) {
+    if (stopping) throw new Error('the router is stopping')
     const dir = path.join(root, `slot-${slot.id}`)
     if (!keep) fs.rmSync(dir, { recursive: true, force: true })
     fs.mkdirSync(dir, { recursive: true })
@@ -97,21 +108,26 @@ const router = createRouter({
   idleMs: num('DEMO_IDLE_MIN', 20) * 60_000,
   startsPerHour: num('DEMO_STARTS_PER_HOUR', 3),
   defaultLang: env.DEMO_LANG === 'ru' ? 'ru' : 'en',
-  turnstile: env.TURNSTILE_SECRET ? { secret: env.TURNSTILE_SECRET, siteKey: env.TURNSTILE_SITE_KEY ?? '' } : null,
+  turnstile,
+  totalTokensDay: num('DEMO_TOTAL_TOKENS_DAY', 5_000_000),
+  budgetFile: path.join(root, 'budget.json'),
+  cfSecret: env.DEMO_CF_SECRET || '',
 })
 
 const server = http.createServer(router.handle)
-// A page that holds its live line open for hours must not be cut off by a timeout.
-server.requestTimeout = 0
+// Receiving a request is limited (an upload gets minutes); a live line the router streams back is not a request in this sense, so it may last.
+server.requestTimeout = num('DEMO_REQUEST_TIMEOUT_MIN', 5) * 60_000
 server.headersTimeout = 30_000
 server.keepAliveTimeout = 65_000
 server.listen(listen, () => log('listening', { port: listen, slots: size, publicUrl }))
 
 router.init().then(() => log('slots-ready', router.pool.stats()))
 setInterval(router.sweep, num('DEMO_SWEEP_MS', 5000)).unref()
+setInterval(() => router.pollUsage().catch(() => {}), num('DEMO_USAGE_POLL_MS', 30_000)).unref()
 
 async function shutdown() {
   stopping = true
+  router.stop()
   server.close()
   await Promise.all([...children.keys()].map((id) => driver.stop({ id })))
   process.exit(0)

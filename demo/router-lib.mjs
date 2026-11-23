@@ -1,7 +1,9 @@
 // The demo router's logic, with the processes left out so tests can drive it with fake slots. docs/DEMO.md explains the whole.
 // A slot is one app process with its own data folder and port. A visitor holds one slot until it expires, and what
 // ties them together is a cookie the router signs: a slot number and a token the slot remembers.
+import fs from 'node:fs'
 import http from 'node:http'
+import path from 'node:path'
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 
 export const COOKIE = 'fb_demo'
@@ -35,17 +37,18 @@ export function sameSecret(given, expected) {
 // ---- the slots ------------------------------------------------------------------------------------------------
 
 export function createPool({ size, ttlMs, idleMs, now = Date.now }) {
-  const slots = Array.from({ length: size }, (_, id) => ({ id, ready: false, visitor: null, lang: 'en', startedAt: 0, lastSeen: 0 }))
+  const slots = Array.from({ length: size }, (_, id) => ({ id, ready: false, visitor: null, owner: null, lang: 'en', startedAt: 0, lastSeen: 0, reported: 0, wipePending: false }))
   const starts = []
   const endsAt = (s) => Math.min(s.startedAt + ttlMs, s.lastSeen + idleMs)
   return {
     slots,
     /** A free, ready slot for this language (one already in it, or else any), taken for a new visitor; null when none. */
-    assign(lang) {
+    assign(lang, owner = null) {
       const free = slots.filter((s) => s.ready && !s.visitor)
       const slot = free.find((s) => s.lang === lang) ?? free[0]
       if (!slot) return null
       slot.visitor = randomBytes(12).toString('hex')
+      slot.owner = owner
       slot.startedAt = slot.lastSeen = now()
       starts.push(now())
       return { slot, token: slot.visitor, needsReset: slot.lang !== lang }
@@ -56,6 +59,8 @@ export function createPool({ size, ttlMs, idleMs, now = Date.now }) {
       if (!s || !s.visitor || s.visitor !== token) return 'ended'
       return now() >= endsAt(s) ? 'ended' : 'ok'
     },
+    /** Whether this address already holds a copy that has not ended. */
+    liveFor(owner) { return !!owner && slots.some((s) => s.owner === owner && s.visitor && now() < endsAt(s)) },
     touch(id) { if (slots[id]) slots[id].lastSeen = now() },
     /** Slots whose visitor has used up the time or been idle too long. */
     expired() { return slots.filter((s) => s.visitor && now() >= endsAt(s)) },
@@ -81,7 +86,12 @@ export function createPool({ size, ttlMs, idleMs, now = Date.now }) {
 /** At most `max` starts per key in `windowMs`. */
 export function createLimiter({ max, windowMs, now = Date.now }) {
   const seen = new Map()
+  const kept = (key) => (seen.get(key) ?? []).filter((x) => now() - x < windowMs)
   return {
+    /** Whether a start would be let through, counting nothing. */
+    peek(key) { return kept(key).length < max },
+    /** Counts one start. */
+    hit(key) { seen.set(key, [...kept(key), now()]) },
     allow(key) {
       const t = now()
       const kept = (seen.get(key) ?? []).filter((x) => t - x < windowMs)
@@ -101,7 +111,7 @@ const WORDS = {
     start: 'Start the demo', note: 'Your copy is deleted after an hour, or after 20 minutes of silence. Do not upload real family data.',
     busyTitle: 'All demo copies are in use.', busy: (n) => `All demo copies are in use. Try again in about ${n} ${n === 1 ? 'minute' : 'minutes'}.`,
     endedTitle: 'Your demo has ended', ended: 'Your demo has ended. Start again for a fresh copy.', again: 'Start again',
-    limit: 'Too many demos from your connection. Try again later.', check: 'The check did not pass. Go back and try again.',
+    limit: 'Too many demos from your connection. Try again later.', already: 'A demo copy from your connection is already running. Use it, or wait until it ends.', slow: 'The request took too long. Go back and try again.', big: 'The request was too large.', check: 'The check did not pass. Go back and try again.',
     starting: 'The demo copy is starting. This page reloads by itself.', broken: 'The demo is not answering. Try again in a moment.', other: 'Русский',
   },
   ru: {
@@ -109,7 +119,7 @@ const WORDS = {
     start: 'Начать демо', note: 'Копия удаляется через час или через 20 минут без действий. Не загружайте настоящие семейные данные.',
     busyTitle: 'Все копии демо заняты.', busy: (n) => `Все копии демо заняты. Попробуйте снова примерно через ${n} мин.`,
     endedTitle: 'Ваше демо закончилось', ended: 'Ваше демо закончилось. Начните заново, чтобы получить новую копию.', again: 'Начать заново',
-    limit: 'С вашего подключения слишком много запусков демо. Попробуйте позже.', check: 'Проверка не пройдена. Вернитесь назад и попробуйте ещё раз.',
+    limit: 'С вашего подключения слишком много запусков демо. Попробуйте позже.', already: 'С вашего подключения уже запущена копия демо. Пользуйтесь ей или дождитесь её конца.', slow: 'Запрос шёл слишком долго. Вернитесь назад и попробуйте ещё раз.', big: 'Запрос слишком большой.', check: 'Проверка не пройдена. Вернитесь назад и попробуйте ещё раз.',
     starting: 'Копия демо запускается. Страница обновится сама.', broken: 'Демо не отвечает. Попробуйте ещё раз через минуту.', other: 'English',
   },
 }
@@ -140,10 +150,21 @@ export const noticePage = (lang, key, refresh) => shell(lang, WORDS[lang].title,
 /** Requests that say nothing about someone being there: an open page's live line and its presence beat. */
 const PASSIVE = [/^\/api\/events(\/|$)/, /^\/api\/v1\/presence$/, /^\/api\/health$/]
 
-const readBody = (req, max = 8192) => new Promise((resolve, reject) => {
+/** What must be put right before the router may start, or null. */
+export function startupProblem({ publicUrl, turnstile, allowNoTurnstile }) {
+  if (publicUrl.startsWith('https:') && !turnstile && !allowNoTurnstile) return 'The public demo needs Cloudflare Turnstile: set TURNSTILE_SECRET and TURNSTILE_SITE_KEY (or DEMO_ALLOW_NO_TURNSTILE=1 to run without, and accept that bots can take every copy).'
+  return null
+}
+
+/** The body of a small form, read within a time and a size: a connection that trickles is cut off. */
+const readBody = (req, max = 2048, timeoutMs = 10_000) => new Promise((resolve, reject) => {
   let size = 0
   const parts = []
-  req.on('data', (c) => { size += c.length; if (size > max) { reject(new Error('too large')); req.destroy() } else parts.push(c) })
+  const timer = setTimeout(() => reject(Object.assign(new Error('too slow'), { code: 408 })), timeoutMs)
+  const done = (fn) => (v) => { clearTimeout(timer); fn(v) }
+  resolve = done(resolve)
+  reject = done(reject)
+  req.on('data', (c) => { size += c.length; if (size > max) reject(Object.assign(new Error('too large'), { code: 413 })); else parts.push(c) })
   req.on('end', () => resolve(Buffer.concat(parts).toString()))
   req.on('error', reject)
 })
@@ -160,29 +181,80 @@ function pipeTo(slotPort, req, res, headers, onError) {
   req.pipe(up)
 }
 
-export function createRouter({ secret, size = 8, ttlMs = 60 * 60_000, idleMs = 20 * 60_000, startsPerHour = 3, driver, publicUrl = '', defaultLang = 'en', turnstile = null, now = Date.now, log = () => {}, fetchImpl = fetch, port = (id) => 4100 + id }) {
+export function createRouter({
+  secret, size = 8, ttlMs = 60 * 60_000, idleMs = 20 * 60_000, startsPerHour = 3, driver, publicUrl = '', defaultLang = 'en', turnstile = null,
+  now = Date.now, log = () => {}, fetchImpl = fetch, port = (id) => 4100 + id,
+  /** Tokens all copies together may spend in a UTC day; then every copy's assistant is switched off until the next day. 0 means no total. */
+  totalTokensDay = 0, budgetFile = null,
+  /** A header Cloudflare is made to add: only with it is CF-Connecting-IP believed. Without the option the header is trusted as it comes. */
+  cfSecret = '', bodyTimeoutMs = 10_000, retryMs = 3000, keepFailures = 3,
+}) {
   const pool = createPool({ size, ttlMs, idleMs, now })
   const limiter = createLimiter({ max: startsPerHour, windowMs: 3_600_000, now })
   for (const s of pool.slots) { s.port = port(s.id); s.lang = defaultLang }
   const secure = publicUrl.startsWith('https:')
   const hashIp = (ip) => createHash('sha256').update(`${secret}:${ip}`).digest('hex').slice(0, 10)
   const resetting = new Map()
+  let everReady = false
+  let stopped = false
 
-  /** Wipes the slot and starts it fresh in a language. Never throws: a failed start is tried again. */
+  // ---- the total budget ----
+  const today = () => new Date(now()).toISOString().slice(0, 10)
+  let budget = { day: today(), tokens: 0 }
+  try { const b = JSON.parse(fs.readFileSync(budgetFile, 'utf8')); if (b.day === today() && Number.isFinite(b.tokens)) budget = b } catch { /* none yet */ }
+  const spentToday = () => (budget.day === today() ? budget.tokens : 0)
+  const budgetOut = () => totalTokensDay > 0 && spentToday() >= totalTokensDay
+  function addTokens(n) {
+    if (budget.day !== today()) budget = { day: today(), tokens: 0 }
+    budget.tokens += n
+    if (budgetFile) { try { fs.mkdirSync(path.dirname(budgetFile), { recursive: true }); fs.writeFileSync(budgetFile, JSON.stringify(budget)) } catch (e) { log('budget-save-failed', { error: String(e?.message ?? e) }) } }
+  }
+  const switchOff = (slot) => driver.setAiOff?.(slot, today()).catch((e) => log('ai-off-failed', { slot: slot.id, error: String(e?.message ?? e) }))
+  /** What a copy has spent since it was last asked, added to the total; the assistant goes off everywhere when the total is used up. */
+  async function collect(slot, force = false) {
+    if (!(slot.ready || force) || !driver.usage) return
+    let t
+    try { t = await driver.usage(slot) } catch { return }
+    addTokens(t >= slot.reported ? t - slot.reported : t)
+    slot.reported = t
+    if (budgetOut()) await Promise.all(pool.slots.filter((s) => s.ready).map(switchOff))
+  }
+  const pollUsage = () => Promise.all(pool.slots.filter((s) => s.ready && s.visitor).map(collect))
+
+  /**
+   * Wipes the slot and starts it fresh in a language. Never throws: a failed start is tried again. A wipe asked for while
+   * a reset that keeps the data is running is done again after it, and a copy that will not start with its data is wiped.
+   */
   function reset(slot, lang, { keep = false } = {}) {
-    if (resetting.has(slot.id)) return resetting.get(slot.id)
+    if (resetting.has(slot.id)) {
+      if (!keep) { slot.wipePending = true; slot.pendingLang = lang }
+      return resetting.get(slot.id)
+    }
+    const wasReady = slot.ready
     slot.ready = false
     const run = (async () => {
+      let failures = 0
+      // What the copy spent counts toward the total before it is wiped.
+      if (wasReady) await collect(slot, true).catch(() => {})
+      let keepData = keep
       for (;;) {
+        if (stopped) return
         try {
           await driver.stop(slot)
-          await driver.start(slot, lang, { keep })
-          slot.lang = lang
+          if (stopped) return
+          const wanted = slot.wipePending ? slot.pendingLang ?? lang : lang
+          await driver.start(slot, wanted, { keep: keepData && !slot.wipePending && failures < keepFailures })
+          slot.lang = wanted
+          slot.reported = 0
+          if (slot.wipePending) { slot.wipePending = false; keepData = false; lang = wanted; continue }
+          if (budgetOut()) await switchOff(slot)
           slot.ready = true
+          everReady = true
           return
         } catch (e) {
+          failures++
           log('slot-start-failed', { slot: slot.id, error: String(e?.message ?? e) })
-          await new Promise((r) => setTimeout(r, 3000))
+          await new Promise((r) => setTimeout(r, retryMs))
         }
       }
     })().finally(() => resetting.delete(slot.id))
@@ -196,6 +268,7 @@ export function createRouter({ secret, size = 8, ttlMs = 60 * 60_000, idleMs = 2
     for (const s of out) {
       log('slot-expired', { slot: s.id })
       s.visitor = null
+      s.owner = null
       reset(s, s.lang)
     }
     return out.map((s) => s.id)
@@ -203,7 +276,7 @@ export function createRouter({ secret, size = 8, ttlMs = 60 * 60_000, idleMs = 2
 
   /** A slot's process died by itself: start it again, keeping what the visitor made. */
   function crashed(slot) {
-    if (resetting.has(slot.id)) return
+    if (resetting.has(slot.id) || stopped) return
     log('slot-crashed', { slot: slot.id })
     reset(slot, slot.lang, { keep: !!slot.visitor })
   }
@@ -225,31 +298,46 @@ export function createRouter({ secret, size = 8, ttlMs = 60 * 60_000, idleMs = 2
   }
 
   const html = (res, status, body, extra = {}) => { res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', ...extra }); res.end(body) }
-  const ipOf = (req) => String(req.headers['cf-connecting-ip'] ?? req.socket.remoteAddress ?? '')
+  /** The visitor's address: Cloudflare's header when it can be believed, else the connection's own. */
+  const ipOf = (req) => {
+    const direct = String(req.socket.remoteAddress ?? '')
+    const cf = req.headers['cf-connecting-ip']
+    if (cf && (!cfSecret || sameSecret(req.headers['x-demo-cf'], cfSecret))) return String(cf)
+    return cfSecret ? `direct:${direct}` : direct
+  }
   // Kept a day past the copy's life, so a visitor who comes back is told that their demo ended, not shown a stranger's start page.
   const routerCookie = (value) => `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.ceil(ttlMs / 1000) + 86_400}${secure ? '; Secure' : ''}`
 
   async function start(req, res) {
     const ip = ipOf(req)
+    const owner = hashIp(ip)
     let form
-    try { form = new URLSearchParams(await readBody(req)) } catch { form = new URLSearchParams() }
+    try { form = new URLSearchParams(await readBody(req, 2048, bodyTimeoutMs)) } catch (e) {
+      const lang = langOfHeader(req.headers['accept-language'])
+      res.on('finish', () => req.destroy())
+      return html(res, e.code === 413 ? 413 : 408, noticePage(lang, e.code === 413 ? 'big' : 'slow'), { connection: 'close' })
+    }
     const lang = form.get('lang') === 'ru' ? 'ru' : form.get('lang') === 'en' ? 'en' : langOfHeader(req.headers['accept-language'])
-    if (!limiter.allow(ip)) { log('start-limited', { ip: hashIp(ip) }); return html(res, 429, noticePage(lang, 'limit')) }
-    if (!(await verifyTurnstile(form.get('cf-turnstile-response'), ip))) { log('start-check-failed', { ip: hashIp(ip) }); return html(res, 403, noticePage(lang, 'check')) }
-    const got = pool.assign(lang)
-    if (!got) { log('start-busy', { ip: hashIp(ip) }); return html(res, 503, busyPage(lang, pool.minutesToFree()), { 'retry-after': '60' }) }
+    if (!limiter.peek(ip)) { log('start-limited', { ip: owner }); return html(res, 429, noticePage(lang, 'limit')) }
+    if (pool.liveFor(owner)) { log('start-already', { ip: owner }); return html(res, 429, noticePage(lang, 'already')) }
+    if (!(await verifyTurnstile(form.get('cf-turnstile-response'), ip))) { log('start-check-failed', { ip: owner }); return html(res, 403, noticePage(lang, 'check')) }
+    const got = pool.assign(lang, owner)
+    if (!got) { log('start-busy', { ip: owner }); return html(res, 503, busyPage(lang, pool.minutesToFree()), { 'retry-after': '60' }) }
+    // Only a start that got a copy counts against the address.
+    limiter.hit(ip)
     const { slot, token, needsReset } = got
     try {
       // A copy in the other language is made fresh in this one; the visitor's time starts when it is ready.
       if (needsReset) await reset(slot, lang)
       slot.startedAt = slot.lastSeen = now()
       const cookies = await sessionCookies(slot)
-      log('start', { slot: slot.id, ip: hashIp(ip), lang })
+      log('start', { slot: slot.id, ip: owner, lang })
       res.writeHead(303, { location: '/', 'cache-control': 'no-store', 'set-cookie': [...cookies, routerCookie(sign(`${slot.id}:${token}`, secret))] })
       res.end()
     } catch (e) {
       log('start-failed', { slot: slot.id, error: String(e?.message ?? e) })
       slot.visitor = null
+      slot.owner = null
       reset(slot, slot.lang)
       html(res, 503, noticePage(lang, 'broken', 5))
     }
@@ -261,6 +349,7 @@ export function createRouter({ secret, size = 8, ttlMs = 60 * 60_000, idleMs = 2
     if (!PASSIVE.some((p) => p.test(path))) pool.touch(slot.id)
     const headers = { ...req.headers }
     delete headers['x-demo-secret']
+    delete headers['x-demo-cf']
     // The visitor's own cookies reach the app; the router's cookie does not.
     const rest = String(headers.cookie ?? '').split(/;\s*/).filter((c) => c && !c.startsWith(`${COOKIE}=`)).join('; ')
     if (rest) headers.cookie = rest
@@ -275,11 +364,12 @@ export function createRouter({ secret, size = 8, ttlMs = 60 * 60_000, idleMs = 2
     try {
       const url = new URL(req.url, 'http://x')
       const lang = url.searchParams.get('lang') === 'ru' ? 'ru' : url.searchParams.get('lang') === 'en' ? 'en' : langOfHeader(req.headers['accept-language'])
-      if (url.pathname === '/health') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end('{"ok":true}') }
+      // Up only once a copy has been ready: a release that cannot start is seen as broken, and a busy demo is not.
+      if (url.pathname === '/health') { res.writeHead(everReady ? 200 : 503, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ ok: everReady })) }
       if (url.pathname === '/stats') {
         if (!sameSecret(req.headers['x-demo-secret'], secret)) { res.writeHead(404); return res.end() }
         res.writeHead(200, { 'content-type': 'application/json' })
-        return res.end(JSON.stringify(pool.stats()))
+        return res.end(JSON.stringify({ ...pool.stats(), tokensToday: spentToday(), assistantOff: budgetOut() }))
       }
       const payload = verify(cookieOf(req.headers.cookie, COOKIE), secret)
       const [slotId, token] = payload ? payload.split(':') : []
@@ -304,7 +394,11 @@ export function createRouter({ secret, size = 8, ttlMs = 60 * 60_000, idleMs = 2
   }
 
   return {
-    pool, handle, sweep, crashed, reset, hashIp,
+    pool, handle, sweep, crashed, reset, hashIp, pollUsage, collect,
+    /** After this no copy is started again: a reset in progress ends, and the caller stops the rest. */
+    stop() { stopped = true },
+    /** Resolves when no reset is running. */
+    idle: () => Promise.all([...resetting.values()]),
     /** Starts every slot at once; resolves when all are ready. */
     init: () => Promise.all(pool.slots.map((s) => reset(s, defaultLang))),
   }

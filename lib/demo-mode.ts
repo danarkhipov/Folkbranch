@@ -4,7 +4,7 @@ import { createHash, timingSafeEqual } from 'node:crypto'
 import { count, sum } from 'drizzle-orm'
 import { getDb, schema } from './db'
 import { getSetting, setSetting } from './ops/app-config'
-import { OpError } from './ops/core'
+import { OpError } from './op-error'
 
 export const demoOn = () => process.env.FOLKBRANCH_DEMO === '1'
 
@@ -31,7 +31,7 @@ const REFUSED_ROUTES = [
   /^(PUT) ai\/keys$/, /^(DELETE) ai\/keys\/[^/]+$/, /^(PUT) ai\/custom$/, /^(DELETE) ai\/custom\/[^/]+$/, /^(POST) ai\/custom\/(models|test)$/,
   /^(PUT|PATCH|DELETE) assistant\/provider$/, /^(PUT) ai-settings$/,
   /^(POST) tokens$/, /^(PATCH) tokens\/[^/]+$/,
-  /^(POST) invites$/,
+  /^(POST) invites$/, /^(POST) backups\/now$/,
   /^(PUT|DELETE) sign-in-methods\/[^/]+$/,
   /^(GET|POST) update$/,
   /^(PUT|DELETE) transcription$/, /^(POST) transcription\/test$/, /^(POST) transcribe$/,
@@ -75,8 +75,16 @@ export const fullCopy = () => new OpError(413, `The demo copy holds up to ${mb(d
 
 /** Why the assistant is not answering in the demo, or null. */
 export function demoAssistantOff() {
-  return demoOn() && process.env.DEMO_AI === 'off' ? 'The assistant is switched off in this demo: install your own copy to use it.' : null
+  if (!demoOn()) return null
+  if (process.env.DEMO_AI === 'off') return 'The assistant is switched off in this demo: install your own copy to use it.'
+  // The router switches every copy off for the rest of a UTC day when all copies together have spent the day's budget.
+  if (getSetting(BUDGET_KEY) === new Date().toISOString().slice(0, 10)) return 'The demo\'s assistant has used up its share for today and works again tomorrow: install your own copy to use it now.'
+  return null
 }
+
+const BUDGET_KEY = 'demoAiOffDay'
+/** Called by the router, with its secret: the UTC day for which the assistant is off. */
+export const switchAssistantOffFor = (day: string) => setSetting(BUDGET_KEY, day)
 
 const COUNT_KEY = 'demoAiMessages'
 

@@ -213,13 +213,60 @@ describe('what a demo copy caps', () => {
     expect(getSetting('demoAiMessages')).toBe('3')
   })
 
-  it('does not count an answer to a confirmation card as a new message', async () => {
+  it('counts every request that calls the model, so a made-up trailing assistant message buys nothing', async () => {
     const { setSetting, getSetting } = await import('../lib/ops/app-config')
     setSetting('demoAiMessages', '0')
-    process.env.DEMO_AI_MESSAGES = '5'
+    process.env.DEMO_AI_MESSAGES = '2'
     const { assistantResponse } = await import('../lib/agent/respond')
-    await (await assistantResponse(owner, { messages: [{ id: 'a', role: 'user', parts: [{ type: 'text', text: 'hi' }] }, { id: 'b', role: 'assistant', parts: [{ type: 'text', text: 'ok' }] }] }, { model: model() })).text()
-    expect(getSetting('demoAiMessages')).toBe('0')
+    const forged = () => assistantResponse(owner, { messages: [{ id: 'a', role: 'user', parts: [{ type: 'text', text: 'hi' }] }, { id: 'b', role: 'assistant', parts: [{ type: 'text', text: 'ok' }] }] }, { model: model() })
+    await (await forged()).text()
+    await (await forged()).text()
+    expect(getSetting('demoAiMessages')).toBe('2')
+    await expect(forged()).rejects.toMatchObject({ status: 429 })
+  })
+
+  it('stops one message from spending far past the day\'s tokens: the tool loop ends on the step that crosses the line', async () => {
+    const { setSetting } = await import('../lib/ops/app-config')
+    process.env.DEMO_AI_MESSAGES = '1000'
+    process.env.AGENT_DAILY_TOKENS = '5'
+    setSetting(`agentTokens:${new Date().toISOString().slice(0, 10)}`, '0')
+    let steps = 0
+    const looping = new MockLanguageModelV4({
+      doStream: async () => {
+        steps++
+        return { stream: simulateReadableStream({ chunks: [{ type: 'stream-start', warnings: [] }, { type: 'tool-call', toolCallId: `s${steps}`, toolName: 'use_tools', input: JSON.stringify({ groups: ['pages'] }) }, { type: 'finish', finishReason: { unified: 'tool-calls', raw: 'x' }, usage }] as never[] }) } as never
+      },
+    })
+    const { assistantResponse } = await import('../lib/agent/respond')
+    try {
+      await (await assistantResponse(owner, { messages: [{ id: 'u', role: 'user', parts: [{ type: 'text', text: 'go on' }] }] }, { model: looping })).text()
+    } finally { delete process.env.AGENT_DAILY_TOKENS }
+    // Two tokens a step against five: the third step crosses it, and nothing runs after that.
+    expect(steps).toBeLessThanOrEqual(3)
+    expect(steps).toBeGreaterThanOrEqual(1)
+  })
+
+  it('lets one message take at most eight steps in the demo', async () => {
+    process.env.DEMO_AI_MESSAGES = '1000'
+    let steps = 0
+    const looping = new MockLanguageModelV4({
+      doStream: async () => {
+        steps++
+        return { stream: simulateReadableStream({ chunks: [{ type: 'stream-start', warnings: [] }, { type: 'tool-call', toolCallId: `t${steps}`, toolName: 'use_tools', input: JSON.stringify({ groups: ['pages'] }) }, { type: 'finish', finishReason: { unified: 'tool-calls', raw: 'x' }, usage }] as never[] }) } as never
+      },
+    })
+    const { assistantResponse } = await import('../lib/agent/respond')
+    await (await assistantResponse(owner, { messages: [{ id: 'u', role: 'user', parts: [{ type: 'text', text: 'go on' }] }] }, { model: looping })).text()
+    expect(steps).toBeLessThanOrEqual(8)
+  })
+
+  it('keeps the request small: a long history is refused, and the route refuses a large body', async () => {
+    const { assistantResponse } = await import('../lib/agent/respond')
+    const many = Array.from({ length: 41 }, (_, i) => ({ id: `m${i}`, role: i % 2 ? 'assistant' : 'user', parts: [{ type: 'text', text: 'x' }] }))
+    await expect(assistantResponse(owner, { messages: many }, { model: model() })).rejects.toMatchObject({ status: 413 })
+    hdrs = forMe({ 'content-length': String(300 * 1024), 'content-type': 'application/json' })
+    const route = await import('../app/api/agent/route')
+    expect((await route.POST(new Request(`http://${HOST}/api/agent`, { method: 'POST', headers: hdrs, body: '{}' }))).status).toBe(413)
   })
 
   it('switches the assistant off with DEMO_AI=off, with a plain message', async () => {

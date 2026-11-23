@@ -1,10 +1,14 @@
 // The demo router with fake slots: tiny servers on real ports that stand in for app copies, so assignment, the
 // per-visitor binding, expiry, the limits and the proxying are all checked as the browser meets them.
+import fs from 'node:fs'
 import http from 'node:http'
+import net from 'node:net'
+import os from 'node:os'
+import path from 'node:path'
 import type { AddressInfo } from 'node:net'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 // @ts-expect-error plain JavaScript, run by Node as it is
-import { COOKIE, createRouter, sign, verify } from '../demo/router-lib.mjs'
+import { COOKIE, createRouter, sign, startupProblem, verify } from '../demo/router-lib.mjs'
 
 const SECRET = 'a-long-router-secret-for-tests'
 const SLOT_SECRET_HEADER = 'x-demo-secret'
@@ -14,9 +18,12 @@ type Slot = { id: number; port: number; ready: boolean; visitor: string | null; 
 /** Stands in for the app copies: answers who it is, signs a visitor in with a cookie, streams, and echoes a body. */
 function fakeDriver() {
   const servers = new Map<number, http.Server>()
-  const log = { starts: [] as { slot: number; lang: string; keep: boolean }[], stops: [] as number[], seen: [] as { slot: number; headers: http.IncomingHttpHeaders }[] }
+  const opts = { gate: null as Promise<void> | null, failKeep: false, spent: new Map<number, number>() }
+  const log = { off: [] as { slot: number; day: string }[], starts: [] as { slot: number; lang: string; keep: boolean }[], stops: [] as number[], seen: [] as { slot: number; headers: http.IncomingHttpHeaders }[] }
   return {
-    log,
+    log, opts,
+    async usage(slot: Slot) { return opts.spent.get(slot.id) ?? 0 },
+    async setAiOff(slot: Slot, day: string) { log.off.push({ slot: slot.id, day }) },
     async stop(slot: Slot) {
       const s = servers.get(slot.id)
       if (!s) return
@@ -27,6 +34,8 @@ function fakeDriver() {
     },
     async start(slot: Slot, lang: string, { keep }: { keep: boolean }) {
       log.starts.push({ slot: slot.id, lang, keep })
+      if (opts.gate) await opts.gate
+      if (opts.failKeep && keep) throw new Error('will not start with its data')
       const s = http.createServer((req, res) => {
         log.seen.push({ slot: slot.id, headers: req.headers })
         if (req.url === '/api/health') return void res.end('{"ok":true}')
@@ -59,11 +68,11 @@ let front: http.Server
 let B = ''
 let logged: { event: string; [k: string]: unknown }[] = []
 
-async function boot(opts: Record<string, unknown> = {}) {
+async function boot({ noInit = false, ...opts }: Record<string, unknown> = {}) {
   driver = fakeDriver()
   logged = []
-  router = createRouter({ secret: SECRET, size: 2, driver, now: () => clock, port: (id: number) => base + id, log: (event: string, f: object) => logged.push({ event, ...f }), ...opts })
-  await router.init()
+  router = createRouter({ secret: SECRET, size: 2, driver, retryMs: 5, now: () => clock, port: (id: number) => base + id, log: (event: string, f: object) => logged.push({ event, ...f }), ...opts })
+  if (!noInit) await router.init()
   front = http.createServer(router.handle)
   await new Promise<void>((r) => front.listen(0, '127.0.0.1', r))
   B = `http://127.0.0.1:${(front.address() as AddressInfo).port}`
@@ -75,7 +84,7 @@ const startAs = (ip: string, body = 'lang=en', extra: Record<string, string> = {
 const jar = (res: Response) => res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ')
 
 beforeEach(() => { clock = 1_000_000 })
-afterEach(async () => { front.closeAllConnections(); await new Promise((r) => front.close(r)); await driver.stopAll() })
+afterEach(async () => { router.stop(); driver.opts.gate = null; await router.idle(); front.closeAllConnections(); await new Promise((r) => front.close(r)); await driver.stopAll() })
 
 describe('the start page', () => {
   beforeEach(() => boot())
@@ -99,7 +108,7 @@ describe('the start page', () => {
     expect((await fetch(`${B}/stats`, { headers: { [SLOT_SECRET_HEADER]: 'wrong' } })).status).toBe(404)
     await startAs('203.0.113.5')
     const stats = await (await fetch(`${B}/stats`, { headers: { [SLOT_SECRET_HEADER]: SECRET } })).json()
-    expect(stats).toEqual({ slots: 2, inUse: 1, free: 1, starting: 0, startsLastHour: 1 })
+    expect(stats).toMatchObject({ slots: 2, inUse: 1, free: 1, starting: 0, startsLastHour: 1, tokensToday: 0, assistantOff: false })
     expect(JSON.stringify(stats)).not.toContain('203.0.113.5')
   })
 })
@@ -158,7 +167,12 @@ describe('giving a visitor a copy', () => {
   })
 
   it('stops a connection after its starts per hour, counted by the address Cloudflare names', async () => {
-    for (let i = 0; i < 3; i++) expect((await startAs('192.0.2.9')).status).toBe(303)
+    // Each copy ends before the address starts the next, since an address holds one live copy at a time.
+    for (let i = 0; i < 3; i++) {
+      expect((await startAs('192.0.2.9')).status).toBe(303)
+      // The visitor leaves, so the address holds no copy.
+      for (const sl of router.pool.slots) { sl.visitor = null; sl.owner = null }
+    }
     const fourth = await startAs('192.0.2.9')
     expect(fourth.status).toBe(429)
     expect(await fourth.text()).toContain('Too many demos')
@@ -166,7 +180,7 @@ describe('giving a visitor a copy', () => {
     expect(logged.some((l) => l.event === 'start-limited')).toBe(true)
     expect(JSON.stringify(logged)).not.toContain('192.0.2.9')
     clock += 3_600_001
-    expect((await startAs('192.0.2.9')).status).toBe(503)
+    expect((await startAs('192.0.2.9')).status).toBe(303)
   })
 
   it('says when all copies are in use, and when the soonest one frees', async () => {
@@ -253,7 +267,7 @@ describe('what a copy may not be used for', () => {
     const slot = router.pool.slots.find((s: Slot) => s.visitor)!
     await driver.stop(slot)
     router.crashed(slot)
-    await router.reset(slot, 'en')
+    await router.reset(slot, 'en', { keep: true })
     expect(driver.log.starts.at(-1)).toMatchObject({ slot: slot.id, keep: true })
     expect((await fetch(`${B}/api/v1/graph`, { headers: { cookie } })).status).toBe(200)
   })
@@ -284,5 +298,170 @@ describe('the check against bots', () => {
     const good = await startAs('198.51.100.1', 'lang=en&cf-turnstile-response=good')
     expect(good.status).toBe(303)
     expect(asked.at(-1)).toMatchObject({ secret: 'ts-secret', response: 'good', remoteip: '198.51.100.1' })
+  })
+})
+
+describe('a crashed copy, and wiping', () => {
+  beforeEach(() => boot({ size: 1 }))
+
+  it('wipes again after a restart that kept the data, when the visitor had run out of time meanwhile', async () => {
+    await startAs('198.51.100.1')
+    const slot = router.pool.slots[0]
+    let release = () => {}
+    driver.opts.gate = new Promise<void>((r) => { release = r })
+    await driver.stop(slot)
+    router.crashed(slot)
+    await new Promise((r) => setTimeout(r, 20))
+    clock += 21 * 60_000
+    router.sweep()
+    driver.opts.gate = null
+    release()
+    await router.reset(slot, 'en', { keep: true })
+    const after = driver.log.starts.slice(1)
+    expect(after.map((x: { keep: boolean }) => x.keep)).toEqual([true, false])
+    expect(slot.ready).toBe(true)
+    expect(slot.visitor).toBeNull()
+  })
+
+  it('wipes a copy that will not start with its data, after a few tries', async () => {
+    await startAs('198.51.100.1')
+    const slot = router.pool.slots[0]
+    driver.opts.failKeep = true
+    await driver.stop(slot)
+    router.crashed(slot)
+    await router.reset(slot, 'en', { keep: true })
+    expect(driver.log.starts.at(-1)).toMatchObject({ keep: false })
+    expect(logged.filter((l) => l.event === 'slot-start-failed').length).toBe(3)
+    expect(slot.ready).toBe(true)
+  })
+
+  it('starts nothing once the router is stopping', async () => {
+    await startAs('198.51.100.1')
+    const before = driver.log.starts.length
+    router.stop()
+    clock += 21 * 60_000
+    router.sweep()
+    await new Promise((r) => setTimeout(r, 30))
+    expect(driver.log.starts.length).toBe(before)
+  })
+})
+
+describe('slow and large requests to /start', () => {
+  beforeEach(() => boot({ bodyTimeoutMs: 150 }))
+  const raw = (head: string, body = '', hold = 600) => new Promise<string>((resolve) => {
+    const sock = net.connect((front.address() as AddressInfo).port, '127.0.0.1', () => { sock.write(head + body) })
+    let got = ''
+    sock.on('data', (d) => { got += d })
+    sock.on('close', () => resolve(got))
+    setTimeout(() => sock.destroy(), hold)
+  })
+
+  it('cuts off a body that does not arrive, and gives no copy for it', async () => {
+    const t0 = Date.now()
+    const got = await raw('POST /start HTTP/1.1\r\nHost: x\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 100\r\n\r\nlang=')
+    expect(got).toContain('HTTP/1.1 408')
+    expect(Date.now() - t0).toBeLessThan(550)
+    expect(router.pool.stats().inUse).toBe(0)
+  })
+
+  it('refuses a body larger than a form needs', async () => {
+    const got = await raw('POST /start HTTP/1.1\r\nHost: x\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 5000\r\n\r\n', 'a'.repeat(5000))
+    expect(got).toContain('HTTP/1.1 413')
+    expect(router.pool.stats().inUse).toBe(0)
+  })
+})
+
+describe('who may take a copy', () => {
+  it('gives one live copy to an address, and a plain refusal for a second', async () => {
+    await boot({ size: 2 })
+    expect((await startAs('198.51.100.1')).status).toBe(303)
+    const again = await startAs('198.51.100.1')
+    expect(again.status).toBe(429)
+    expect(await again.text()).toContain('already running')
+    expect((await startAs('198.51.100.2')).status).toBe(303)
+    expect(router.pool.stats().inUse).toBe(2)
+  })
+
+  it('believes CF-Connecting-IP only with the header Cloudflare is made to add, when a secret is set', async () => {
+    await boot({ size: 3, cfSecret: 'cf-shared-secret' })
+    // Without the header every claimed address is the connection's own, so a second start is refused however the header reads.
+    expect((await startAs('1.1.1.1')).status).toBe(303)
+    expect((await startAs('2.2.2.2')).status).toBe(429)
+    // Through Cloudflare, addresses differ.
+    expect((await startAs('3.3.3.3', 'lang=en', { 'x-demo-cf': 'cf-shared-secret' })).status).toBe(303)
+    expect((await startAs('4.4.4.4', 'lang=en', { 'x-demo-cf': 'cf-shared-secret' })).status).toBe(303)
+    expect((await startAs('4.4.4.4', 'lang=en', { 'x-demo-cf': 'wrong' })).status).toBe(429)
+  })
+
+  it('will not start on an https address without Turnstile, unless told to', () => {
+    expect(startupProblem({ publicUrl: 'https://demo.example', turnstile: null, allowNoTurnstile: false })).toMatch(/Turnstile/)
+    expect(startupProblem({ publicUrl: 'https://demo.example', turnstile: { secret: 's', siteKey: 'k' }, allowNoTurnstile: false })).toBeNull()
+    expect(startupProblem({ publicUrl: 'https://demo.example', turnstile: null, allowNoTurnstile: true })).toBeNull()
+    expect(startupProblem({ publicUrl: 'http://127.0.0.1:3700', turnstile: null, allowNoTurnstile: false })).toBeNull()
+  })
+
+  it('counts a start against the address only once it got a copy', async () => {
+    await boot({ size: 1, startsPerHour: 3 })
+    expect((await startAs('198.51.100.1')).status).toBe(303)
+    for (let i = 0; i < 4; i++) expect((await startAs('198.51.100.2')).status).toBe(503)
+    router.pool.slots[0].visitor = null
+    router.pool.slots[0].owner = null
+    expect((await startAs('198.51.100.2')).status).toBe(303)
+  })
+})
+
+describe('/health', () => {
+  it('answers 503 until a copy has been ready once, then stays 200 even when every copy is busy being wiped', async () => {
+    await boot({ size: 1, noInit: true })
+    expect((await fetch(`${B}/health`)).status).toBe(503)
+    await router.init()
+    expect((await fetch(`${B}/health`)).status).toBe(200)
+    await startAs('198.51.100.1')
+    clock += 21 * 60_000
+    let release = () => {}
+    driver.opts.gate = new Promise<void>((r) => { release = r })
+    router.sweep()
+    expect(router.pool.stats().starting).toBe(1)
+    expect((await fetch(`${B}/health`)).status).toBe(200)
+    release()
+  })
+})
+
+describe('the total across copies', () => {
+  const file = path.join(os.tmpdir(), `demo-budget-${process.pid}.json`)
+  beforeEach(() => { fs.rmSync(file, { force: true }); return boot({ size: 2, totalTokensDay: 1000, budgetFile: file }) })
+  afterEach(() => fs.rmSync(file, { force: true }))
+  const statsOf = async (url = B) => (await fetch(`${url}/stats`, { headers: { [SLOT_SECRET_HEADER]: SECRET } })).json()
+
+  it('adds what copies spend, switches the assistant off in every copy when the total is used up, and keeps the total across a restart', async () => {
+    await startAs('198.51.100.1')
+    await startAs('198.51.100.2')
+    driver.opts.spent.set(0, 600)
+    await router.pollUsage()
+    expect(driver.log.off).toEqual([])
+    expect((await statsOf()).tokensToday).toBe(600)
+    driver.opts.spent.set(1, 500)
+    await router.pollUsage()
+    expect(await statsOf()).toMatchObject({ tokensToday: 1100, assistantOff: true })
+    expect(new Set(driver.log.off.map((o: { slot: number }) => o.slot))).toEqual(new Set([0, 1]))
+    expect(driver.log.off[0].day).toBe('1970-01-01')
+    // What a copy spent counts before it is wiped, and a copy started afterwards is switched off at once.
+    driver.opts.spent.set(0, 700)
+    clock += 21 * 60_000
+    router.sweep()
+    await router.reset(router.pool.slots[0], 'en')
+    expect((await statsOf()).tokensToday).toBe(1200)
+    expect(driver.log.off.filter((o: { slot: number }) => o.slot === 0).length).toBeGreaterThan(1)
+    expect(JSON.parse(fs.readFileSync(file, 'utf8')).tokens).toBeGreaterThanOrEqual(1200)
+    // Another router on the same file starts with the same total.
+    const again = createRouter({ secret: SECRET, size: 1, driver: { start: async () => {}, stop: async () => {} }, now: () => clock, totalTokensDay: 1000, budgetFile: file })
+    await again.init()
+    const probe = http.createServer(again.handle)
+    await new Promise<void>((r) => probe.listen(0, '127.0.0.1', r))
+    expect(await statsOf(`http://127.0.0.1:${(probe.address() as AddressInfo).port}`)).toMatchObject({ assistantOff: true })
+    probe.close()
+    // The next UTC day starts from nothing.
+    clock += 24 * 3_600_000
+    expect(await statsOf()).toMatchObject({ tokensToday: 0, assistantOff: false })
   })
 })
