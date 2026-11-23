@@ -5,7 +5,7 @@
 // answers, and the 21st message is refused; a refused screen says so; a second visitor gets another copy and does not
 // see the first one's edit; after its time a visitor sees that the demo ended.
 import { spawn } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -35,7 +35,12 @@ const router = spawn('node', ['demo/router.mjs'], {
 })
 let tail = ''
 for (const s of [router.stdout, router.stderr]) s.on('data', (d) => { tail = (tail + d).slice(-4000) })
-const cleanup = () => { router.kill('SIGTERM'); stub.stop(); setTimeout(() => rmSync(data, { recursive: true, force: true }), 1500) }
+const SHOTS = path.resolve(process.env.UI_SHOTS ?? 'ui-shots')
+const cleanup = () => {
+  mkdirSync(SHOTS, { recursive: true })
+  for (const f of readdirSync(data).filter((n) => n.endsWith('.png'))) cpSync(path.join(data, f), path.join(SHOTS, `demo-${f}`))
+  router.kill('SIGTERM'); stub.stop(); setTimeout(() => rmSync(data, { recursive: true, force: true }), 1500)
+}
 process.on('exit', () => router.kill('SIGTERM'))
 
 const stats = () => fetch(`${R}/stats`, { headers: { 'x-demo-secret': SECRET } }).then((r) => r.json()).catch(() => null)
@@ -119,11 +124,17 @@ try {
   ok('restoring a backup is refused', restore.status === 403, restore.text)
   const door = await inPage(one.page, 'POST', '/api/auth/family/setup', { name: 'x', familyName: 'x', language: 'en' })
   ok('making a second account is refused', door.status === 403, door.text)
-  // On screen: the settings, where the owner would invite someone.
-  await one.page.getByRole('button', { name: /settings/i }).first().click().catch(() => {})
-  const body = await one.page.locator('body').innerText()
-  ok('the settings screen opens with no script error', one.errors.length === 0, one.errors.join(' | '))
-  void body
+  // On screen: Settings > Users and access, where the owner would invite someone. The screen says it is refused.
+  await one.page.locator('button[title^="Account, people"]').first().click()
+  await one.page.getByRole('button', { name: /Users and access/ }).first().click()
+  await one.page.getByPlaceholder('For example, Aunt Helen').fill('Aunt')
+  await one.page.getByRole('button', { name: 'Create link' }).click()
+  const notice = one.page.locator('[data-demo-notice]')
+  await notice.waitFor({ timeout: 10_000 }).catch(() => {})
+  ok('on the Users and access screen, inviting someone says it is not available in the demo', (await notice.innerText().catch(() => '')) === 'Not available in the demo: install your own copy to use this.')
+  await one.page.screenshot({ path: path.join(data, 'refused.png') })
+  ok('and no script error came of it', one.errors.length === 0, one.errors.join(' | '))
+  await one.page.keyboard.press('Escape')
 
   // ---- an edit of visitor one ----
   const made = await inPage(one.page, 'POST', '/api/v1/persons', { person: { givenName: 'Zedekiah', surname: 'Onlyhere' } })
@@ -137,6 +148,12 @@ try {
   const graphTwo = await inPage(two.page, 'GET', '/api/v1/graph')
   ok('a second visitor gets another copy of the family', graphTwo.status === 200 && graphTwo.text.includes('Whitlock'))
   ok('and does not see the first visitor\'s edit', !graphTwo.text.includes('Onlyhere'))
+  // The banner at a phone's width: it wraps, and nothing is wider than the screen.
+  await two.page.setViewportSize({ width: 375, height: 812 })
+  await two.page.waitForTimeout(500)
+  const phone = await two.page.evaluate(() => ({ wide: document.documentElement.scrollWidth > innerWidth, banner: document.querySelector('[data-demo-banner]')?.getBoundingClientRect().width ?? 0 }))
+  ok('at a phone width the banner fits and nothing is wider than the screen', !phone.wide && phone.banner <= 375, JSON.stringify(phone))
+  await two.page.screenshot({ path: path.join(data, 'phone.png') })
   const s = await stats()
   ok('/stats counts two copies in use and gives no personal data', s.inUse === 2 && s.startsLastHour === 2 && !JSON.stringify(s).includes('10.0.0'), JSON.stringify(s))
   const third = await visitor('10.0.0.3')
@@ -150,9 +167,11 @@ try {
   console.log(`waiting ${Math.max(0, Math.round(left / 1000))} s for the first copy to expire`)
   await sleep(Math.max(0, left) + 3000)
   await one.page.reload()
-  ok('after its time the visitor sees that the demo has ended', await one.page.getByText('Your demo has ended').first().isVisible({ timeout: 15_000 }).catch(() => false))
+  ok('after its time the visitor sees that the demo has ended', await one.page.getByText('Your demo has ended').first().waitFor({ timeout: 15_000 }).then(() => true, () => false))
   await one.page.screenshot({ path: path.join(data, 'ended.png') })
   // Starting again gives a fresh copy, without the old edit.
+  // The expired copies are being wiped and started again: pressing the button before one is ready would only meet the busy page.
+  for (let i = 0; i < 120 && !((await stats())?.free > 0); i++) await sleep(500)
   await one.page.getByRole('button', { name: 'Start again' }).click()
   await one.page.locator('.pcard').first().waitFor({ timeout: 90_000 })
   const fresh = await inPage(one.page, 'GET', '/api/v1/graph')

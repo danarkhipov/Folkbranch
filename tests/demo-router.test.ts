@@ -125,6 +125,12 @@ describe('giving a visitor a copy', () => {
     expect(seen['x-demo-secret']).toBeUndefined()
   })
 
+  it('keeps the router cookie past the life of the copy, so a late visitor is told it ended', async () => {
+    const res = await startAs('198.51.100.1')
+    const maxAge = Number(res.headers.getSetCookie().find((c) => c.startsWith(`${COOKIE}=`))!.match(/Max-Age=(\d+)/)![1])
+    expect(maxAge).toBeGreaterThan(3600 + 3600)
+  })
+
   it('does not let a visitor pass the router secret on to their slot', async () => {
     const cookie = jar(await startAs('198.51.100.1'))
     await fetch(`${B}/api/demo/session`, { method: 'POST', headers: { cookie, [SLOT_SECRET_HEADER]: SECRET } })

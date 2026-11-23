@@ -1,5 +1,6 @@
 import { translate } from '@/lib/i18n'
 import type { Lang } from '@/lib/types'
+import { DemoNotice } from './demo-notice'
 
 /**
  * A thin line above every screen of the public demo. The app sits below it in a box of its own, so what the app
@@ -13,6 +14,7 @@ export function DemoShell({ lang, children }: { lang: Lang; children: React.Reac
         <a href="https://folkbranch.com/#install" target="_blank" rel="noopener noreferrer" className="font-medium underline underline-offset-2">{translate(lang, 'Install your own')}</a>
       </div>
       <div className="relative min-h-0 flex-1 overflow-auto" style={{ transform: 'translateZ(0)' }}>{children}</div>
+      <DemoNotice />
     </div>
   )
 }

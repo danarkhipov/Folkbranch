@@ -72,11 +72,11 @@ Each answers HTTP 403 with one sentence: *Not available in the demo: install you
 | The assistant's and API's "photo from a link" (`fetchRemote`) | The server would fetch addresses a visitor names |
 | Uploads that are not pictures or sound, too large, or past the room; people past `DEMO_PEOPLE`; assistant messages past `DEMO_AI_MESSAGES` | The caps above (403, 413, 403, 429) |
 
-The refusals are in English only: the sentences are server answers, not interface phrases. The banner is translated.
+The refusals are in English only: the sentences are server answers, not interface phrases. The banner is translated. A refusal that a screen does not catch itself is shown in a notice at the bottom of the screen (`components/demo-notice.tsx`).
 
 ## Abuse protection, and what is yours to do
 
-- Per address: `DEMO_STARTS_PER_HOUR`, and Turnstile on the start button.
+- Per address: `DEMO_STARTS_PER_HOUR`, and Turnstile on the start button. The address is `CF-Connecting-IP`, which anyone can write if they reach the router directly: keep the router behind Cloudflare only, as the public demo address, so the header is Cloudflare's.
 - Per copy: assistant messages, tokens per day, upload size and room, number of people, one hour of life.
 - Across the demo: `DEMO_SLOTS` limits visitors at once, and so total memory and disk. Each copy is one Node process (the image caps its heap at 256 MB): plan roughly 300 MB per slot.
 - **A spending limit on the model provider's key is yours to set, in the provider's console.** The demo caps messages and tokens per copy, but only the provider can cap the total. Use a key made for the demo, with a low monthly limit, and a cheap model.

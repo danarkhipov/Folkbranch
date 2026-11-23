@@ -226,7 +226,8 @@ export function createRouter({ secret, size = 8, ttlMs = 60 * 60_000, idleMs = 2
 
   const html = (res, status, body, extra = {}) => { res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', ...extra }); res.end(body) }
   const ipOf = (req) => String(req.headers['cf-connecting-ip'] ?? req.socket.remoteAddress ?? '')
-  const routerCookie = (value) => `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.ceil(ttlMs / 1000)}${secure ? '; Secure' : ''}`
+  // Kept a day past the copy's life, so a visitor who comes back is told that their demo ended, not shown a stranger's start page.
+  const routerCookie = (value) => `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.ceil(ttlMs / 1000) + 86_400}${secure ? '; Secure' : ''}`
 
   async function start(req, res) {
     const ip = ipOf(req)
