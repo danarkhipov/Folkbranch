@@ -27,6 +27,8 @@ function open() {
   sqlite.pragma('journal_size_limit = 4194304')
   const db = drizzle(sqlite, { schema })
   migrateWithCopy(sqlite, db, DATA_DIR, path.resolve(/*turbopackIgnore: true*/ 'drizzle'))
+  // A demo copy's database cannot grow past a size: text has no other limit, and the disk is shared by every copy.
+  if (process.env.FOLKBRANCH_DEMO === '1') sqlite.pragma(`max_page_count = ${Math.max(1, Math.floor(((Number(process.env.DEMO_DB_MB) > 0 ? Number(process.env.DEMO_DB_MB) : 100) * 1024 * 1024) / (sqlite.pragma('page_size', { simple: true }) as number)))}`)
   return db
 }
 

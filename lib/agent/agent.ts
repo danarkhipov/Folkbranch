@@ -8,10 +8,13 @@ import { CORE_TOOLS, TOOL_GROUPS, toolsFor, type ToolDef } from '../ops/tools'
 import type { AssistantState, Lang } from '../types'
 import { currentProvider } from './provider-key'
 import type { ActiveProvider } from './provider'
-import { countTokens } from './limits'
+import { countTokens, dailyLimit, tokensToday } from './limits'
 import { recordUse } from '../ai/usage'
+import { DEMO_PROMPT, demoAssistantOff, demoOn } from '../demo-mode'
 
 const MAX_STEPS = 25
+/** A demo copy lets one message take few steps, so a message cannot spend far past the day's tokens. */
+const maxSteps = () => (demoOn() ? 8 : MAX_STEPS)
 /** A model that keeps failing stops and explains, instead of paying for the same refusal again. */
 const MAX_FAILED_STEPS = 3
 /** Beyond this, an edit in one answer asks again even if the person allowed edits for the conversation. */
@@ -61,7 +64,8 @@ export const changesWhoIsLiving = (input: unknown) => /"(living|deathDate)"\s*:/
 
 /** What the assistant's button leads this person to: the chat, or why there is none and what to do. */
 export function assistantState(actor: Actor): AssistantState {
-  const canFix = actor.role === 'owner'
+  const canFix = actor.role === 'owner' && !demoOn()
+  if (demoAssistantOff()) return { ready: false, reason: 'off', canFix }
   if (!currentProvider()) return { ready: false, reason: 'no-key', canFix }
   if (getSetting('assistantEnabled') !== '1') return { ready: false, reason: 'off', canFix }
   if (actor.role === 'reader' && getSetting('assistantForReaders') !== '1') return { ready: false, reason: 'readers', canFix: false }
@@ -70,6 +74,8 @@ export function assistantState(actor: Actor): AssistantState {
 
 /** Why this person cannot use the assistant, or null when they can. */
 export function assistantRefusal(actor: Actor) {
+  const demoOff = demoAssistantOff()
+  if (demoOff) return demoOff
   if (getSetting('assistantEnabled') !== '1') return tell('The assistant is turned off by the archive owner.')
   if (!currentProvider()) return tell('The assistant is not set up: the server has no API key or model.')
   if (actor.role === 'reader' && getSetting('assistantForReaders') !== '1') return tell('The assistant is not available to readers.')
@@ -135,7 +141,7 @@ export function activeToolNames(available: Set<string>, messages: readonly Model
 
 /** The last step, or after repeated failures: the model must say where things stand. */
 export function mustFinish(steps: readonly { content: readonly { type: string }[] }[], stepNumber: number) {
-  if (stepNumber >= MAX_STEPS - 1) return true
+  if (stepNumber >= maxSteps() - 1) return true
   const recent = steps.slice(-MAX_FAILED_STEPS)
   return recent.length === MAX_FAILED_STEPS && recent.every((s) => s.content.some((p) => p.type === 'tool-error') && !s.content.some((p) => p.type === 'tool-result'))
 }
@@ -201,6 +207,7 @@ export function buildAgent(person: Actor, opts: { model?: LanguageModel; provide
     language ? `The archive is kept in ${language}: write what you add to it in that language, and reply in it unless the person writes in another.` : '',
     actor.role === 'reader' ? 'As a reader they do not see living relatives, and neither do you.' : '',
     opts.hasFiles ? FILES : '',
+    demoOn() ? DEMO_PROMPT : '',
     opts.sees === false ? 'The model answering cannot see pictures. Say so when asked to read a scan or photo, and suggest the owner choose a model that can under Settings.' : '',
     opts.focusId ? `They have this person open on the chart: id ${opts.focusId}.` : '',
   ].filter(Boolean).join(' ')
@@ -222,7 +229,8 @@ export function buildAgent(person: Actor, opts: { model?: LanguageModel; provide
       // The reason reaches the person's confirmation card, not the model.
       return status === 'user-approval' ? { type: status, reason: def?.describe?.(actor, toolCall.input) ?? '' } : status
     },
-    stopWhen: stepCountIs(MAX_STEPS),
+    // In the demo the loop also stops the moment the day's tokens are used up, whatever step it is on.
+    stopWhen: demoOn() ? [stepCountIs(maxSteps()), () => tokensToday() >= dailyLimit()] : stepCountIs(MAX_STEPS),
     prepareStep: ({ messages, steps, stepNumber }) => ({ messages: trimHistory(messages, !!provider?.keepReasoning), ...(process.env.AGENT_ALL_TOOLS === '1' ? {} : { activeTools: activeToolNames(new Set(defs.keys()), messages, !!opts.hasFiles) as never }), ...(mustFinish(steps, stepNumber) ? { toolChoice: 'none' as const } : {}) }),
     maxOutputTokens: 16_000,
     // Counted per call, so an answer stopped halfway still shows what it cost.

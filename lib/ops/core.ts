@@ -3,6 +3,8 @@ import { and, desc, eq, gte, sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { getDb, schema } from '../db'
 import { announceChange } from '../live'
+import { checkDemoPeople } from '../demo-mode'
+import { OpError } from '../op-error'
 import type { Role } from '../types'
 
 export interface Actor {
@@ -26,11 +28,7 @@ export interface Actor {
 /** Sees only people who have died: a reader, or a model the data would be sent to. */
 export const seesOnlyPublic = (a: Actor) => a.role === 'reader'
 
-export class OpError extends Error {
-  constructor(public status: number, message: string) {
-    super(message)
-  }
-}
+export { OpError }
 
 const RANK: Record<Role, number> = { reader: 0, editor: 1, owner: 2 }
 export const can = (a: Actor, role: Role) => RANK[a.role] >= RANK[role]
@@ -81,6 +79,8 @@ export class Changes {
   private db = getDb()
 
   insert(table: Tracked, row: Row) {
+    // Every way a person appears passes here: adding, importing, and undoing a delete.
+    if (table === 'persons') checkDemoPeople()
     this.db.insert(TRACKED[table]).values(row as never).run()
     const after = this.get(table, row.id)
     this.list.push({ table, id: row.id, before: null, after })

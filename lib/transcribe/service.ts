@@ -9,6 +9,7 @@ import { getSetting, tell, setSetting } from '../ops/settings'
 import { seal, unseal } from '../sealed'
 import { newestOfLine, type Line } from '../agent/lines'
 import { STT_PRESETS, sttPreset, type SttId } from './presets'
+import { refuseInDemo } from '../demo-mode'
 
 /** The speech models we tested, by service: the newest of the line the service lists is used from then on, never an older one. */
 const STT_LINES: Partial<Record<SttId, Line>> = {
@@ -125,6 +126,7 @@ export async function checkKey(style: 'openai' | 'openrouter', base: string, key
 }
 
 export async function saveTranscription(actor: Actor, raw: unknown) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   if (fromEnv()) throw new OpError(409, tell('Transcription is set in the server\'s settings'))
   const b = input.parse(raw)
@@ -150,6 +152,7 @@ export async function saveTranscription(actor: Actor, raw: unknown) {
 }
 
 export function removeTranscription(actor: Actor) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   if (fromEnv()) throw new OpError(409, tell('Transcription is set in the server\'s settings'))
   setSetting('sttConfig', '')
@@ -213,6 +216,7 @@ function slowDown(userId: string) {
 }
 
 export async function transcribe(actor: Actor, audio: { bytes: Buffer; name: string; mime: string }, opts: { language?: string | null; seconds: number }) {
+  refuseInDemo()
   requireRole(actor, 'editor')
   const c = config()
   if (!c) throw new OpError(409, tell('Cloud transcription is not set up'))
@@ -234,6 +238,7 @@ export async function transcribe(actor: Actor, audio: { bytes: Buffer; name: str
 
 /** Two seconds of silence: enough to see that the key, the model and the address work together, for a fraction of a cent. */
 export async function testTranscription(actor: Actor) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   const c = config()
   if (!c) throw new OpError(409, tell('Connect a service first'))

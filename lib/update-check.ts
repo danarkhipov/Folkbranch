@@ -1,5 +1,6 @@
 import pkg from '../package.json'
 import { requireRole, type Actor } from './ops/core'
+import { refuseInDemo } from './demo-mode'
 
 // FOLKBRANCH_RELEASES_API points the check at another source, for a mirror or a test.
 const URL = () => process.env.FOLKBRANCH_RELEASES_API ?? 'https://api.github.com/repos/danarkhipov/folkbranch/releases/latest'
@@ -34,6 +35,7 @@ function isNewer(latest: string, current: string) {
 
 /** Whether a newer release exists. Owner only; FOLKBRANCH_UPDATE_CHECK=off stops the call to GitHub altogether. */
 export async function updateStatus(actor: Actor) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   const current = pkg.version
   const r = process.env.FOLKBRANCH_UPDATE_CHECK === 'off' ? null : await latestRelease()

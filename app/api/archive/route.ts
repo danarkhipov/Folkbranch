@@ -13,6 +13,7 @@ import { OpError } from '@/lib/ops/core'
 import { hasUsers } from '@/lib/ops/settings'
 import { fromOurPages } from '@/lib/same-origin'
 import { setupCodeMatches } from '@/lib/setup-code'
+import { DEMO_REFUSAL, demoOn } from '@/lib/demo-mode'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,6 +46,8 @@ export async function GET() {
 /** Replaces the archive with a saved copy. The owner may; on an empty install, whoever has the setup code. */
 export async function POST(req: Request) {
   const h = await headers()
+  // Before anything is written: a restore replaces the whole copy, and the copy is the demo.
+  if (demoOn()) return Response.json({ error: DEMO_REFUSAL }, { status: 403 })
   if (hasBearer(h)) return Response.json({ error: 'not available to tokens' }, { status: 403 })
   if (!fromOurPages(h)) return Response.json({ error: 'bad origin' }, { status: 403 })
   if (hasUsers()) {

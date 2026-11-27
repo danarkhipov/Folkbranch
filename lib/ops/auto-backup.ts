@@ -6,6 +6,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { DATA_DIR, getDb } from '../db'
 import { Actor, requireRole } from './core'
+import { refuseInDemo } from '../demo-mode'
 
 const DAY = 24 * 3600 * 1000
 export const KEEP = 7
@@ -58,6 +59,7 @@ export async function backupStatus(actor: Actor): Promise<BackupStatus> {
 }
 
 export async function backupNow(actor: Actor) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   await runAutoBackup({ force: true })
   return backupStatus(actor)

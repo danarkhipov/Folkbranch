@@ -14,6 +14,7 @@ import { localLoginAllowed } from './local-login'
 import { tell } from './ops/app-config'
 import { findInvite, findOwnerId, hasUsers, isRecoveryToken, setSetting } from './ops/settings'
 import { loadDemo } from './demo'
+import { demoOn, demoSecretMatches } from './demo-mode'
 import { applyOwnerEmail } from './owner-email'
 import { publicOrigins, publicUrl } from './public-url'
 import { serverSecret } from './server-secret'
@@ -98,6 +99,15 @@ const familyAccess = () =>
         const found = await ctx.context.internalAdapter.findAccountOwnerByKey({ providerId: 'telegram', accountId })
         if (found?.kind === 'owned' && found.user.id !== userId) throw new APIError('CONFLICT', { message: 'linked to someone else' })
         if (!found) await ctx.context.internalAdapter.linkAccount({ userId, providerId: 'telegram', accountId })
+        return ctx.json({ ok: true })
+      }),
+      // The demo router's door: a signed-in session for the demo owner, for whoever holds the router's secret. Shut at /api/auth.
+      demoSession: createAuthEndpoint('/family/demo-session', { method: 'POST' }, async (ctx) => {
+        if (!demoOn() || !demoSecretMatches(ctx.headers?.get('x-demo-secret'))) throw new APIError('NOT_FOUND', { message: 'not found' })
+        const owner = await ctx.context.internalAdapter.findUserById(findOwnerId() ?? '')
+        if (!owner) throw new APIError('SERVICE_UNAVAILABLE', { message: 'not ready' })
+        const session = await ctx.context.internalAdapter.createSession(owner.id)
+        await setSessionCookie(ctx, { session, user: owner })
         return ctx.json({ ok: true })
       }),
       local: createAuthEndpoint('/family/local', { method: 'GET' }, async (ctx) => {

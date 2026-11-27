@@ -9,6 +9,7 @@ import { assistantResponse } from '@/lib/agent/respond'
 import { getActor, hasBearer } from '@/lib/api-auth'
 import { langOfRequest, withViewerLang } from '@/lib/ops/app-config'
 import { tell } from '@/lib/ops/settings'
+import { DEMO_FULL, demoOn } from '@/lib/demo-mode'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +26,7 @@ async function answer(req: Request, h: Headers) {
   if (hasBearer(h)) return Response.json({ error: 'not available to tokens' }, { status: 403 })
   if (!fromOurPages(h)) return Response.json({ error: 'bad origin' }, { status: 403 })
   if (h.get('transfer-encoding')?.includes('chunked')) return Response.json({ error: 'length required' }, { status: 411 })
-  if (Number(h.get('content-length') ?? 0) > MAX_BODY) return Response.json({ error: 'conversation too long' }, { status: 413 })
+  if (Number(h.get('content-length') ?? 0) > (demoOn() ? 256 * 1024 : MAX_BODY)) return Response.json({ error: 'conversation too long' }, { status: 413 })
   const actor = await getActor(h)
   if (!actor) return Response.json({ error: 'unauthorized' }, { status: 401 })
   const refusal = assistantRefusal(actor)
@@ -43,6 +44,7 @@ async function answer(req: Request, h: Headers) {
     release()
     if (e instanceof z.ZodError || e instanceof SyntaxError) return Response.json({ error: 'bad request' }, { status: 400 })
     if (e instanceof OpError) return Response.json({ error: errorFor(e.message, langOfRequest(h)), plain: true }, { status: e.status })
+    if (['ENOSPC', 'SQLITE_FULL'].includes((e as { code?: string })?.code ?? '') && demoOn()) return Response.json({ error: DEMO_FULL, plain: true }, { status: 507 })
     console.error(e)
     return Response.json({ error: 'server error' }, { status: 500 })
   }

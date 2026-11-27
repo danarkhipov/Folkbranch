@@ -8,6 +8,7 @@ import { type Actor, OpError, requireRole } from '../ops/core'
 import { getSetting, tell, setSetting } from '../ops/settings'
 import { seal, unseal } from '../sealed'
 import { FACE_PRESETS, faceChoices, facePreset, type FaceBox, type FaceId, type FaceMatch, type FaceSize } from './presets'
+import { refuseInDemo } from '../demo-mode'
 
 const purpose = 'face-key'
 const MAX_BYTES = 10 * 1024 * 1024
@@ -269,6 +270,7 @@ async function checkKey(c: NonNullable<ReturnType<typeof config>>) {
 }
 
 export async function saveFaces(actor: Actor, raw: unknown) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   if (fromEnv()) throw new OpError(409, tell('Cloud faces are set in the server settings'))
   const b = input.parse(raw)
@@ -293,6 +295,7 @@ export async function saveFaces(actor: Actor, raw: unknown) {
 }
 
 export function removeFaces(actor: Actor) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   if (fromEnv()) throw new OpError(409, tell('Cloud faces are set in the server settings'))
   setSetting('faceConfig', '')
@@ -333,6 +336,7 @@ function checkLimit(c: NonNullable<ReturnType<typeof config>>, calls: number) {
 
 /** One photo and a few already-tagged faces: the service finds every face, and says which known person each may be. */
 export async function scanFaces(actor: Actor, raw: unknown) {
+  refuseInDemo()
   requireRole(actor, 'editor')
   const c = config()
   if (!c) throw new OpError(409, tell('Cloud face recognition is not set up'))
@@ -360,6 +364,7 @@ export async function scanFaces(actor: Actor, raw: unknown) {
 
 /** A blank picture is enough to see that the key, the address and the service work together. */
 export async function testFaces(actor: Actor) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   const c = config()
   if (!c) throw new OpError(409, tell('Connect a service first'))

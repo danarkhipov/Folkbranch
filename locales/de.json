@@ -2141,5 +2141,8 @@
   "Bulk edits apply at once": "Massenänderungen werden sofort angewendet",
   "Changes to many people at once, and deleting several, skip review. Imports still wait for you.": "Änderungen an vielen Personen auf einmal und das Löschen mehrerer werden ohne Prüfung übernommen. Importe warten weiterhin auf Sie.",
   "Counting across the archive": "Rechnet über das ganze Archiv",
-  "Looking for who lived together": "Sucht, wer zusammen lebte"
+  "Looking for who lived together": "Sucht, wer zusammen lebte",
+  "Demo with an invented family. Everything is deleted after an hour, so do not upload real family data.": "Demo mit einer erfundenen Familie. Nach einer Stunde wird alles gelöscht, lade also keine echten Familiendaten hoch.",
+  "Install your own": "Eigene Installation",
+  "Assistant messages left in this demo: {count}": "Verbleibende Nachrichten an den Assistenten in dieser Demo: {count}"
 }

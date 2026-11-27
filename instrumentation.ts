@@ -21,6 +21,9 @@ export async function register() {
   // An open page keeps a live line, and the server would wait for it before stopping: an update or a restart would hang.
   const { closeAll } = await import('./lib/live')
   for (const signal of ['SIGTERM', 'SIGINT'] as const) process.on(signal, closeAll)
+  // A demo copy makes its own owner and family, so nobody meets the setup screen.
+  const { demoOn } = await import('./lib/demo-mode')
+  if (demoOn() && !hasUsers()) await (await import('./lib/demo-seed')).seedDemo()
   if (hasUsers()) return
   const code = setupCode()
   const { publicOrigins, publicUrl } = await import('./lib/public-url')

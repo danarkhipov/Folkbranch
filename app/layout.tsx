@@ -4,6 +4,8 @@ import './globals.css'
 import { Providers } from '@/components/providers'
 import { viewerLang, langDef } from '@/lib/languages'
 import { archiveLang } from '@/lib/ops/settings'
+import { demoOn } from '@/lib/demo-mode'
+import { DemoShell } from '@/components/demo-banner'
 
 export const metadata: Metadata = { title: 'Folkbranch', applicationName: 'Folkbranch', robots: { index: false, follow: false } }
 export const viewport: Viewport = { themeColor: '#f7f3ea' }
@@ -15,7 +17,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // The archive keeps its own language for its data, whatever the viewer reads the interface in.
   return (
     <html lang={lang} dir={langDef(lang).dir} data-archive-lang={archive}>
-      <body><Providers>{children}</Providers></body>
+      <body><Providers>{demoOn() ? <DemoShell lang={lang}>{children}</DemoShell> : children}</Providers></body>
     </html>
   )
 }

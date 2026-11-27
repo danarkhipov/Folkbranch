@@ -10,6 +10,7 @@ import { faceSetup, saveFaces } from '../faces/service'
 import { FACE_PRESETS } from '../faces/presets'
 import { type Actor, OpError, requireRole } from './core'
 import { getSetting, tell, setSetting } from './settings'
+import { refuseInDemo } from '../demo-mode'
 
 const FILE = 'ai-settings'
 
@@ -56,6 +57,7 @@ export function exportAiSettings(actor: Actor): AiSettingsFile {
 
 /** Applies what it can and says what it could not, and why: a half-applied file is told, not hidden. */
 export async function importAiSettings(actor: Actor, raw: unknown) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   const parsed = schema.safeParse(raw)
   if (!parsed.success) throw new OpError(400, tell('This is not an AI settings file of the app'))

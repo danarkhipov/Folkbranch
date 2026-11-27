@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 import { z } from 'zod'
 import { fromOurPages } from '@/lib/same-origin'
+import { DEMO_FULL, DEMO_REFUSAL, demoOn, demoRefusesRoute } from '@/lib/demo-mode'
 import { getActor, guestActor, hasBearer } from '@/lib/api-auth'
 import { match, openApi } from '@/lib/api/router'
 import { accessRoutes } from '@/lib/api/routes/access'
@@ -25,6 +26,7 @@ const isDiskFull = (e: unknown) => ['ENOSPC', 'SQLITE_FULL'].includes((e as { co
 async function handle(req: Request, ctx: { params: Promise<{ path: string[] }> }) {
   const path = (await ctx.params).path
   if (req.method === 'GET' && path.join('/') === 'openapi.json') return Response.json(openApi(routes))
+  if (demoRefusesRoute(req.method, path.join('/'))) return Response.json({ error: DEMO_REFUSAL }, { status: 403 })
   const found = match(routes, req.method, path)
   if (!found) return Response.json({ error: 'not found' }, { status: 404 })
   // Before the body is read into memory.
@@ -53,7 +55,7 @@ async function handle(req: Request, ctx: { params: Promise<{ path: string[] }> }
     // Words for the person, the details for programs; an array in `error` showed up as "[object Object]".
     if (e instanceof z.ZodError) return Response.json({ error: e.issues.map((i) => (i.path.length ? `${i.path.join('.')}: ${i.message}` : i.message)).join('; '), issues: e.issues.map((i) => ({ path: i.path, code: i.code, message: i.message })) }, { status: 400 })
     if (e instanceof SyntaxError) return Response.json({ error: 'invalid JSON' }, { status: 400 })
-    if (isDiskFull(e)) return Response.json({ error: 'the server disk is full' }, { status: 507 })
+    if (isDiskFull(e)) return Response.json({ error: demoOn() ? DEMO_FULL : 'the server disk is full' }, { status: 507 })
     console.error(e)
     return Response.json({ error: 'server error' }, { status: 500 })
   }

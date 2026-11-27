@@ -12,6 +12,7 @@ import type { Box, Media } from '../types'
 import { Actor, Changes, mutate, newId, OpError, requireRole, seesOnlyPublic } from './core'
 import { hiddenPeople, getPersonRow } from './people'
 import { say, tell } from './settings'
+import { checkDemoUpload, refuseInDemo } from '../demo-mode'
 
 const MAX_SIZE = 40 * 1024 * 1024
 /** About three hours of speech as a browser records it. */
@@ -101,6 +102,7 @@ export async function storeUpload(buf: Buffer, originalName: string, uploadedBy:
   const meta = await sharp(buf, { failOn: 'none' }).metadata().catch(() => null)
   // Only raster photos become images. SVG is served as a download, since it can carry scripts.
   const raster = !!meta?.format && ['jpeg', 'png', 'webp', 'gif', 'heif', 'tiff', 'avif'].includes(meta.format)
+  checkDemoUpload(buf.length, raster)
   const copies = raster ? await inTurn(() => makeCopies(id, buf)) : null
   const ext = path.extname(originalName).toLowerCase().replace(/[^.a-z0-9]/g, '').slice(0, 8)
   const filename = copies ? `${id}.orig${ext || '.' + meta!.format}` : `${id}.file${ext}`
@@ -138,6 +140,7 @@ export async function storeAudio(buf: Buffer, originalName: string, uploadedBy: 
   if (buf.length > MAX_AUDIO) throw new OpError(413, tell('The recording is too large: up to 50 MB'))
   const type = soundType(buf)
   if (!type) throw new OpError(400, tell('This file does not look like a sound recording'))
+  checkDemoUpload(buf.length, true)
   if (audioUsed() + buf.length > audioLimit()) throw new OpError(507, tell('The room for voice recordings has run out'))
   const id = newId()
   const filename = `${id}.voice${type.ext}`
@@ -201,6 +204,7 @@ export function listAllMedia(actor: Actor, limit = 200): Media[] {
 
 /** Fetches a photo for an upload-by-link, refusing addresses inside our own network. */
 export async function fetchRemote(url: string): Promise<{ buf: Buffer; name: string }> {
+  refuseInDemo()
   const u = new URL(url)
   if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new OpError(400, 'only http and https links')
   const literal = u.hostname.replace(/^\[|\]$/g, '')

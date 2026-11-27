@@ -14,6 +14,7 @@ import { activeProvider, keyEnvOf } from './provider'
 import { dropOldCopy, vaultKey, writeKey } from '../ai/keys'
 import { customActive } from './provider'
 import { customById, customKey, customUsable, isCustomId, readCustom } from '../ai/custom-providers'
+import { refuseInDemo } from '../demo-mode'
 
 
 /** The service the assistant uses, with its key from the owner's list of keys. */
@@ -213,6 +214,7 @@ export async function modelSees(provider?: { id: string; key: string; folder: st
 
 /** Another model for the key already saved. */
 export async function chooseModel(actor: Actor, raw: unknown) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   const { model, auto, provider } = z.object({ model: z.string().trim().min(1).max(200).optional(), auto: z.boolean().optional(), provider: z.union([z.enum(PRESETS.map((p) => p.id) as [PresetId, ...PresetId[]]), z.string().regex(/^custom-[a-z0-9]{10}$/)]).optional() }).parse(raw)
   if (activeProvider(process.env)) throw new OpError(409, tell('The model is set on the server'))
@@ -273,6 +275,7 @@ export const connectInput = z.object({
 
 /** Nothing is stored until the provider has accepted the key. */
 export async function connectProvider(actor: Actor, raw: unknown) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   const input = connectInput.parse(raw)
   const model = input.model || PRESETS.find((p) => p.id === input.provider)!.models[0].id
@@ -290,6 +293,7 @@ export async function connectProvider(actor: Actor, raw: unknown) {
 }
 
 export function disconnectProvider(actor: Actor) {
+  refuseInDemo()
   requireRole(actor, 'owner')
   // The key stays in the list for the other functions; it is removed there, under Providers.
   for (const key of ['agentProvider', 'agentKey', 'agentModel', 'agentFolder', 'agentAuto']) getDb().delete(schema.settings).where(eq(schema.settings.key, key)).run()
