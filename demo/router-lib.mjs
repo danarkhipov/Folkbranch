@@ -211,7 +211,7 @@ export function createRouter({
   function addTokens(n) {
     if (budget.day !== today()) budget = { day: today(), tokens: 0 }
     budget.tokens += n
-    if (budgetFile) { try { fs.mkdirSync(path.dirname(budgetFile), { recursive: true }); fs.writeFileSync(budgetFile, JSON.stringify(budget)) } catch (e) { log('budget-save-failed', { error: String(e?.message ?? e) }) } }
+    if (budgetFile) { try { fs.mkdirSync(path.dirname(budgetFile), { recursive: true, mode: 0o700 }); const part = `${budgetFile}.${process.pid}.part`; fs.writeFileSync(part, JSON.stringify(budget), { mode: 0o600, flag: 'w' }); fs.renameSync(part, budgetFile) } catch (e) { log('budget-save-failed', { error: String(e?.message ?? e) }) } }
   }
   const switchOff = (slot) => driver.setAiOff?.(slot, today()).catch((e) => log('ai-off-failed', { slot: slot.id, error: String(e?.message ?? e) }))
   /** What a copy has spent since it was last asked, added to the total; the assistant goes off everywhere when the total is used up. */
